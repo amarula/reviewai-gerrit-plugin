@@ -10,7 +10,7 @@
     <version>3.1.0</version>
     <properties>
         <Gerrit-ApiType>plugin</Gerrit-ApiType>
-        <Gerrit-ApiVersion>3.12.2</Gerrit-ApiVersion>
+        <Gerrit-ApiVersion>3.13.1</Gerrit-ApiVersion>
         <maven.test.skip>false</maven.test.skip>
     </properties>
     <distributionManagement>
