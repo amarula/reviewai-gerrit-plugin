@@ -37,7 +37,7 @@ public class GerritChange {
   private String eventType;
   private long eventTimeStamp;
   private PatchSetEvent patchSetEvent;
-  private Project.NameKey projectNameKey;
+  private String projectName; // Store as string to avoid linking errors
   private BranchNameKey branchNameKey;
   private Change.Key changeKey;
   private String fullChangeId;
@@ -46,9 +46,12 @@ public class GerritChange {
   // (due to Lombok's magic naming convention)
   @Setter private Boolean isCommentEvent = false;
 
-  public GerritChange(
-      Project.NameKey projectNameKey, BranchNameKey branchNameKey, Change.Key changeKey) {
-    this.projectNameKey = projectNameKey;
+  /**
+   * Constructor accepts projectNameKey as Object to avoid type reference in signature.
+   * Works with both older (class) and newer (interface) Project.NameKey implementations.
+   */
+  public GerritChange(Object projectNameKey, BranchNameKey branchNameKey, Change.Key changeKey) {
+    this.projectName = projectNameKey.toString();
     this.branchNameKey = branchNameKey;
     this.changeKey = changeKey;
     buildFullChangeId();
@@ -77,15 +80,21 @@ public class GerritChange {
     }
   }
 
-  public String getProjectName() {
-    return getProjectNameKey().toString();
+  /**
+   * Returns the Project.NameKey instance created from the stored string.
+   * This method is lazily resolved and works across Gerrit versions because:
+   * 1. Project.nameKey() factory method exists in both 3.2.x (class) and 3.13.x (interface)
+   * 2. The return type is not resolved until this method is called
+   */
+  public Project.NameKey getProjectNameKey() {
+    return Project.nameKey(projectName);
   }
 
   private void buildFullChangeId() {
     fullChangeId =
         String.join(
             "~",
-            URLEncoder.encode(projectNameKey.get(), StandardCharsets.UTF_8),
+            URLEncoder.encode(projectName, StandardCharsets.UTF_8),
             branchNameKey.shortName(),
             changeKey.get());
   }
