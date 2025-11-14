@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3b12685c_42d3d544",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/common/client/api/gerrit/GerritChange.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2025-11-14T10:53:26Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com tab/space",
+      "revId": "5c6305bdc851f8dc060fd39aa9416c3cf66a934a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
