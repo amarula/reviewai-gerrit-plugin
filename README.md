@@ -27,7 +27,7 @@ Reviews can be also triggered by directing a comment with the `/review` command 
 3. **Configure:** First, you need to create an AI user in Gerrit.
    Then, set up the basic parameters in your `$gerrit_site/etc/gerrit.config` file under the section
 
-   `[plugin "chatgpt-code-review-gerrit-plugin"]`:
+   `[plugin "reviewai-gerrit-plugin"]`:
 
 - `aiToken`: AI token.
 - `gerritUserName`: Gerrit username of AI user.
@@ -40,10 +40,10 @@ Reviews can be also triggered by directing a comment with the `/review` command 
 4. **Verify:** After restarting Gerrit, you can see the following information in Gerrit's logs:
 
    ```bash
-   INFO com.google.gerrit.server.plugins.PluginLoader : Loaded plugin chatgpt-code-review-gerrit-plugin, version ...
+   INFO com.google.gerrit.server.plugins.PluginLoader : Loaded plugin reviewai-gerrit-plugin, version ...
    ```
 
-   You can also check the status of the chatgpt-code-review-gerrit-plugin on Gerrit's plugin page as Enabled.
+   You can also check the status of the reviewai-gerrit-plugin on Gerrit's plugin page as Enabled.
 
 ## Usage Examples
 
@@ -51,7 +51,7 @@ Reviews can be also triggered by directing a comment with the `/review` command 
 
 In the following example, a Patch Set receives a score of "-1" indicating a recommendation.
 
-![Example of Vote](images/chatgpt_vote.png?raw=true)
+![Example of Vote](images/aireview_vote.png?raw=true)
 
 **NOTE**: Voting is disabled by default. To use this feature, it needs to be activated either across all projects or on
 a per-project basis via the `enabledVoting` configuration option, as described below.
@@ -61,7 +61,7 @@ a per-project basis via the `enabledVoting` configuration option, as described b
 In the example below, AI initially posits a potential unintended behavior in the code, assigning a "-1" score.
 Upon receiving clarification, it resets the score to "0".
 
-![Example of Dialogue](images/chatgpt_changed_mind.png?raw=true)
+![Example of Dialogue](images/aireview_changed_mind.png?raw=true)
 
 More examples of AI's code reviews and inline discussions are available at
 https://wiki.amarulasolutions.com/opensource/products/chatgpt-gerrit.html
@@ -77,7 +77,7 @@ To configure these parameters, you need to modify your Gerrit configuration file
 as follows:
 
 ```
-[plugin "chatgpt-code-review-gerrit-plugin"]
+[plugin "reviewai-gerrit-plugin"]
     # Required parameters
     aiToken = {aiToken}
     ...
@@ -94,7 +94,7 @@ It is highly recommended to store sensitive information such as `aiToken` in the
 file at $gerrit_site/etc/`secure.config` and include the following details:
 
 ```
-[plugin "chatgpt-code-review-gerrit-plugin"]
+[plugin "reviewai-gerrit-plugin"]
     aiToken = {aiToken}
 ```
 
@@ -106,7 +106,7 @@ to: https://gerrit.googlesource.com/plugins/secure-config
 To add the following content, please edit the `project.config` file in `refs/meta/config`:
 
 ```
-[plugin "chatgpt-code-review-gerrit-plugin"]
+[plugin "reviewai-gerrit-plugin"]
     # Required parameters
     gerritUserName = {gerritUserName}
     ...
@@ -631,7 +631,7 @@ To enable the debugging tools, use the `enableMessageDebugging` static configura
 setting cannot be enabled dynamically through Message Debugging and must be set statically.
 
 ```
-[plugin "chatgpt-code-review-gerrit-plugin"]
+[plugin "reviewai-gerrit-plugin"]
     ...
     enableMessageDebugging = true
 ```
