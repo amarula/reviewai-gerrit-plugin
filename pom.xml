@@ -101,25 +101,24 @@
                             </relocations>
                             <filters>
                                 <filter>
-                                    <!-- Do not include files that should not be shaded -->
                                     <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
                                         <exclude>META-INF/*.MF</exclude>
-                                        <exclude>META-INF/license/*</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/*/module-info.class</exclude>
                                         <exclude>META-INF/okio.kotlin_module</exclude>
-                                        <exclude>META-INF/versions/9/module-info.class</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
                             <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Gerrit-PluginName>reviewai-gerrit-plugin</Gerrit-PluginName>
                                         <Gerrit-Module>com.googlesource.gerrit.plugins.reviewai.Module</Gerrit-Module>
+                                        <Gerrit-HttpModule>com.googlesource.gerrit.plugins.reviewai.HttpModule</Gerrit-HttpModule>
                                         <Implementation-Vendor>Amarula</Implementation-Vendor>
                                         <Implementation-URL>
                                             https://github.com/amarula/reviewai-gerrit-plugin
@@ -130,12 +129,16 @@
                                         <Gerrit-ApiVersion>${Gerrit-ApiVersion}</Gerrit-ApiVersion>
                                     </manifestEntries>
                                 </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <addHeader>false</addHeader>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-
         </plugins>
     </build>
 
