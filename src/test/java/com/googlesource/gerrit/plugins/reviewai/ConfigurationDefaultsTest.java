@@ -30,7 +30,7 @@ import org.junit.Test;
 
 public class ConfigurationDefaultsTest {
 
-  private static final String PLUGIN_NAME = "chatgpt-code-review-gerrit-plugin";
+  private static final String PLUGIN_NAME = "reviewai-gerrit-plugin";
 
   @Test
   public void shouldDefaultToLangChainGeminiModelWhenUnset() {

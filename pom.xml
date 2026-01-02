@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.googlesource.gerrit.plugins</groupId>
-    <artifactId>chatgpt-code-review-gerrit-plugin</artifactId>
+    <artifactId>reviewai-gerrit-plugin</artifactId>
     <packaging>jar</packaging>
     <version>3.1.0</version>
     <properties>
@@ -29,12 +29,12 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <Gerrit-PluginName>chatgpt-code-review-gerrit-plugin</Gerrit-PluginName>
+                            <Gerrit-PluginName>reviewai-gerrit-plugin</Gerrit-PluginName>
                             <Gerrit-Module>com.googlesource.gerrit.plugins.reviewai.Module</Gerrit-Module>
 
                             <Implementation-Vendor>Amarula</Implementation-Vendor>
                             <Implementation-URL>
-                                https://github.com/amarula/chatgpt-code-review-gerrit-plugin
+                                https://github.com/amarula/reviewai-gerrit-plugin
                             </Implementation-URL>
 
                             <Implementation-Title>ChatGPT Code Review Gerrit Plugin</Implementation-Title>
@@ -96,7 +96,7 @@
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml.jackson</pattern>
-                                    <shadedPattern>com.googlesource.gerrit.plugins.chatgpt.jackson</shadedPattern>
+                                    <shadedPattern>com.googlesource.gerrit.plugins.aireview.jackson</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
@@ -118,11 +118,11 @@
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Gerrit-PluginName>chatgpt-code-review-gerrit-plugin</Gerrit-PluginName>
+                                        <Gerrit-PluginName>reviewai-gerrit-plugin</Gerrit-PluginName>
                                         <Gerrit-Module>com.googlesource.gerrit.plugins.reviewai.Module</Gerrit-Module>
                                         <Implementation-Vendor>Amarula</Implementation-Vendor>
                                         <Implementation-URL>
-                                            https://github.com/amarula/chatgpt-code-review-gerrit-plugin
+                                            https://github.com/amarula/reviewai-gerrit-plugin
                                         </Implementation-URL>
                                         <Implementation-Title>ChatGPT Code Review Gerrit Plugin</Implementation-Title>
                                         <Implementation-Version>${project.version}</Implementation-Version>
