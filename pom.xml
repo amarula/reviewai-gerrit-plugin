@@ -7,7 +7,7 @@
     <groupId>com.googlesource.gerrit.plugins</groupId>
     <artifactId>reviewai-gerrit-plugin</artifactId>
     <packaging>jar</packaging>
-    <version>3.1.0</version>
+    <version>3.1.1</version>
     <properties>
         <Gerrit-ApiType>plugin</Gerrit-ApiType>
         <Gerrit-ApiVersion>3.13.1</Gerrit-ApiVersion>
