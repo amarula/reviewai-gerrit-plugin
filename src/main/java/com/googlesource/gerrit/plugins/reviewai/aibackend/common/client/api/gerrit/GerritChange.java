@@ -51,7 +51,7 @@ public class GerritChange {
    * Works with both older (class) and newer (interface) Project.NameKey implementations.
    */
   public GerritChange(Object projectNameKey, BranchNameKey branchNameKey, Change.Key changeKey) {
-    this.projectName = projectNameKey.toString();
+    this.projectName = extractProjectName(projectNameKey);
     this.branchNameKey = branchNameKey;
     this.changeKey = changeKey;
     buildFullChangeId();
@@ -87,6 +87,9 @@ public class GerritChange {
    * 2. The return type is not resolved until this method is called
    */
   public Project.NameKey getProjectNameKey() {
+    if (projectName == null && patchSetEvent != null) {
+      projectName = extractProjectName(patchSetEvent.getProjectNameKey());
+    }
     return Project.nameKey(projectName);
   }
 
@@ -97,5 +100,20 @@ public class GerritChange {
             URLEncoder.encode(projectName, StandardCharsets.UTF_8),
             branchNameKey.shortName(),
             changeKey.get());
+  }
+
+  private static String extractProjectName(Object projectNameKey) {
+    if (projectNameKey == null) {
+      return null;
+    }
+    try {
+      Object name = projectNameKey.getClass().getMethod("get").invoke(projectNameKey);
+      if (name != null) {
+        return name.toString();
+      }
+    } catch (ReflectiveOperationException e) {
+      log.debug("Falling back to project name key toString.", e);
+    }
+    return projectNameKey.toString();
   }
 }
