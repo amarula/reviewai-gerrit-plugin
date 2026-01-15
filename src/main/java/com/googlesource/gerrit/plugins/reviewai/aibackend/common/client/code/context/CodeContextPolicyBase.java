@@ -55,9 +55,8 @@ public abstract class CodeContextPolicyBase extends ClientBase implements ICodeC
     return null;
   }
 
-  public void removeVectorStore() throws OperationNotSupportedException {
+  public void removeVectorStore() {
     log.debug("Vector Store removal skipped with the current code context policy");
-    throw new OperationNotSupportedException();
   }
 
   public void updateAssistantTools(
