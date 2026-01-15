@@ -132,7 +132,8 @@ public class GitRepoFiles {
   }
 
   private Repository openRepository(GerritChange change) throws IOException {
-    String repoPath = String.format(REPO_PATTERN, change.getProjectNameKey().toString());
+    log.debug("Opening repository for change: {}", change.getFullChangeId());
+    String repoPath = String.format(REPO_PATTERN, change.getProjectName());
     log.debug("Opening repository at path: {}", repoPath);
     FileRepositoryBuilder builder = new FileRepositoryBuilder();
     return builder
