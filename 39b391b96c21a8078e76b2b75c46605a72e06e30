@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d53f63e9_11ec211b",
+        "filename": "pom.xml",
+        "patchSetId": 4
+      },
+      "lineNbr": 121,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-01-15T11:54:45Z",
+      "side": 1,
+      "message": "This entry causes `Unable to load plugin Guice Modules` at plugin loading time. Please remove it.",
+      "range": {
+        "startLine": 121,
+        "startChar": 40,
+        "endLine": 121,
+        "endChar": 130
+      },
+      "revId": "39b391b96c21a8078e76b2b75c46605a72e06e30",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
