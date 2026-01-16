@@ -74,7 +74,7 @@ public class GitRepoFiles {
     }
   }
 
-  public String getFileContent(GerritChange change, String path) throws IOException {
+  public String getFileContent(GerritChange change, String path) throws FileNotFoundException {
     try (Repository repository = openRepository(change);
         ObjectReader reader = repository.newObjectReader()) {
       RevTree tree = getMasterRevTree(repository);
