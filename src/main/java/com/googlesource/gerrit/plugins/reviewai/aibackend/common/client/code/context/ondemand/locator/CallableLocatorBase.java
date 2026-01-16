@@ -26,7 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.set.ListOrderedSet;
 
-import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -126,7 +126,7 @@ public abstract class CallableLocatorBase extends ClientBase implements IEntityL
     String content;
     try {
       content = codeFileFetcher.getFileContent(filename);
-    } catch (IOException e) {
+    } catch (FileNotFoundException e) {
       log.debug("File `{}` not found in the git repository", filename);
       return null;
     }
