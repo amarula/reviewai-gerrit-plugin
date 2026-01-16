@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructions;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
@@ -44,6 +45,7 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   protected final GerritChange change;
 
   private final ICodeContextPolicy codeContextPolicy;
+  private final ProjectInstructions projectInstructions;
 
   public AiPromptBase(
       Configuration config,
@@ -55,6 +57,7 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
     this.isCommentEvent = change.getIsCommentEvent();
+    this.projectInstructions = new ProjectInstructions(change);
     loadDefaultPrompts("promptsOpenAi");
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
   }
@@ -76,6 +79,7 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
                 config.getAiSystemPromptInstructions(DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS)
                     + DOT));
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
+    this.projectInstructions.addProjectInstructions(instructions);
     addAiAssistantInstructions(instructions);
     String compiledInstructions = joinWithSpace(instructions);
     log.debug("Compiled AI Assistant Instructions: {}", compiledInstructions);
