@@ -23,7 +23,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git.FileEntry;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -46,7 +46,7 @@ public class CodeFileFetcher extends ClientBase {
     }
   }
 
-  public String getFileContent(String filename) throws IOException {
+  public String getFileContent(String filename) throws FileNotFoundException {
     if (preloadedFiles.containsKey(filename)) {
       return preloadedFiles.get(filename);
     }
