@@ -71,7 +71,7 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws AiConnectionFailException {
     isCommentEvent = change.getIsCommentEvent();
-    log.info(
+    log.debug(
         "Processing OPENAI OpenAI Request with changeId: {}, Patch Set: {}",
         change.getFullChangeId(),
         patchSet);
