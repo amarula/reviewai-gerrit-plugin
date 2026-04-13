@@ -44,7 +44,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwra
 
 @Slf4j
 @Singleton
-public class OpenAiClient extends OpenAiClientBase implements IAiClient {
+public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiClient {
   public enum ReviewAssistantStages {
     REVIEW_CODE,
     REVIEW_COMMIT_MESSAGE,
@@ -62,14 +62,14 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
 
   @VisibleForTesting
   @Inject
-  public OpenAiClient(
+  public OpenAiReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
     super(config);
     this.codeContextPolicy = codeContextPolicy;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
-    log.debug("Initialized OpenAiClient.");
+    log.debug("Initialized OpenAiReviewClient.");
   }
 
   public AiResponseContent ask(

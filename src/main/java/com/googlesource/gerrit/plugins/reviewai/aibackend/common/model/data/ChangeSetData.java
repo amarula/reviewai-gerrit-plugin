@@ -16,7 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;

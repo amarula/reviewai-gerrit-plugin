@@ -19,7 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClientTaskSpecific;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -33,7 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import lombok.extern.slf4j.Slf4j;
@@ -79,8 +79,8 @@ public class GerritEventContextModule extends FactoryModule {
     return switch (config.getAiBackend()) {
       case OPENAI ->
           config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-              ? OpenAiClientTaskSpecific.class
-              : OpenAiClient.class;
+              ? OpenAiTaskSpecificReviewClient.class
+              : OpenAiReviewClient.class;
       case LANGCHAIN -> LangChainClient.class;
     };
   }

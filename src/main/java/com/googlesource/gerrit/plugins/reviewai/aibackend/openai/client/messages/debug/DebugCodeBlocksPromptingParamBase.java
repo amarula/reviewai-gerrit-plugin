@@ -24,7 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 
 import java.util.LinkedHashMap;
 import java.util.List;

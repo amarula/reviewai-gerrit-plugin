@@ -26,13 +26,13 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 
 @Slf4j
-public abstract class OpenAiClientBase extends AiClientBase {
+public abstract class OpenAiReviewClientBase extends AiClientBase {
   protected boolean isCommentEvent = false;
   @Getter protected String requestBody;
 
-  public OpenAiClientBase(Configuration config) {
+  public OpenAiReviewClientBase(Configuration config) {
     super(config);
-    log.debug("OpenAiClientBase initialized with configuration.");
+    log.debug("OpenAiReviewClientBase initialized with configuration.");
   }
 
   protected AiResponseContent getResponseContent(List<AiToolCall> toolCalls) {

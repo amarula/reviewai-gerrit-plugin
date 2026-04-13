@@ -35,18 +35,18 @@ import java.util.List;
 
 @Slf4j
 @Singleton
-public class OpenAiClientTaskSpecific extends OpenAiClient implements IAiClient {
+public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implements IAiClient {
   private static final List<ReviewAssistantStages> TASK_SPECIFIC_ASSISTANT_STAGES =
       List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
 
   @VisibleForTesting
   @Inject
-  public OpenAiClientTaskSpecific(
+  public OpenAiTaskSpecificReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
     super(config, codeContextPolicy, pluginDataHandlerProvider);
-    log.debug("Initialized OpenAiClientTaskSpecific.");
+    log.debug("Initialized OpenAiTaskSpecificReviewClient.");
   }
 
   public AiResponseContent ask(

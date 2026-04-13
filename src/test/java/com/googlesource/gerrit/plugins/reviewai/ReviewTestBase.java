@@ -42,8 +42,8 @@ import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClientTaskSpecific;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
@@ -430,9 +430,9 @@ public class ReviewTestBase extends TestBase {
     return switch (config.getAiBackend()) {
       case OPENAI ->
           config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-              ? new OpenAiClientTaskSpecific(
+              ? new OpenAiTaskSpecificReviewClient(
                   config, getCodeContextPolicy(), pluginDataHandlerProvider)
-              : new OpenAiClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
+              : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
       case LANGCHAIN ->
           new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
     };

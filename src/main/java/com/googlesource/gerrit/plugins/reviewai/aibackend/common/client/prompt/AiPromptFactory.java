@@ -25,7 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.open
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.*;
 import lombok.extern.slf4j.Slf4j;
 
