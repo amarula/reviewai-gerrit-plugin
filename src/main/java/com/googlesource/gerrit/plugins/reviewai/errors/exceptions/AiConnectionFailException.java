@@ -25,6 +25,10 @@ public class AiConnectionFailException extends Exception {
     super(message);
   }
 
+  public AiConnectionFailException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
   public AiConnectionFailException(Throwable cause) {
     super(cause);
   }

@@ -77,7 +77,12 @@ public class OpenAiConversation {
         return conversationId;
       }
     } catch (Exception e) {
-      throw new AiConnectionFailException(e);
+      throw new AiConnectionFailException(
+          String.format(
+              "OpenAI conversation creation failed against `%s`: %s",
+              OpenAiSdkClientFactory.getResolvedBaseUrl(config),
+              OpenAiSdkClientFactory.describeException(e)),
+          e);
     } finally {
       client.close();
     }

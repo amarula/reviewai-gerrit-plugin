@@ -120,7 +120,13 @@ public class OpenAiResponses {
         return openAiPoller.runPoll(client, openAiResponse, OpenAiResponsesResponse.class);
       }
     } catch (Exception e) {
-      throw new AiConnectionFailException(e);
+      throw new AiConnectionFailException(
+          String.format(
+              "OpenAI response creation failed against `%s` with model `%s`: %s",
+              OpenAiSdkClientFactory.getResolvedBaseUrl(config),
+              model,
+              OpenAiSdkClientFactory.describeException(e)),
+          e);
     } finally {
       client.close();
     }

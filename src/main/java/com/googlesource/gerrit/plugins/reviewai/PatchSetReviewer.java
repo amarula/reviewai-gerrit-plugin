@@ -92,6 +92,14 @@ public class PatchSetReviewer {
         reviewReply = getReviewReply(change, patchSet);
         log.debug("OpenAI response: {}", reviewReply);
       } catch (AiConnectionFailException e) {
+        log.error(
+            "OpenAI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
+            change.getFullChangeId(),
+            config.getAiDomain(),
+            config.getAiModel(),
+            openAiClient.getRequestBody() == null ? "<unavailable>" : openAiClient.getRequestBody(),
+            e.getMessage(),
+            e);
         changeSetData.setReviewSystemMessage(localizer.getText("message.openai.connection.error"));
       }
       if (reviewReply != null) {

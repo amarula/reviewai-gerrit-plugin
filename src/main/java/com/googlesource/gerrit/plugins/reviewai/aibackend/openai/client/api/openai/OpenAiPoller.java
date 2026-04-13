@@ -45,11 +45,13 @@ public class OpenAiPoller {
 
   private final int pollingTimeout;
   private final int pollingInterval;
+  private final Configuration config;
 
   @Getter private int pollingCount;
   @Getter private double elapsedTime;
 
   public OpenAiPoller(Configuration config) {
+    this.config = config;
     pollingTimeout = config.getAiPollingTimeout();
     pollingInterval = config.getAiPollingInterval();
     elapsedTime = 0.0;
@@ -71,12 +73,21 @@ public class OpenAiPoller {
         log.debug("OpenAI Poll response: {}", responseBody);
         pollResponse = jsonToClass(responseBody, clazz);
       } catch (Exception e) {
-        throw new AiConnectionFailException(e);
+        throw new AiConnectionFailException(
+            String.format(
+                "OpenAI response polling failed for response `%s` against `%s`: %s",
+                pollResponse.getId(),
+                OpenAiSdkClientFactory.getResolvedBaseUrl(config),
+                OpenAiSdkClientFactory.describeException(e)),
+            e);
       }
       elapsedTime = (double) (TimeUtils.getCurrentMillis() - startTime) / 1000;
       if (elapsedTime >= pollingTimeout) {
         log.error("Polling timed out after {} seconds.", elapsedTime);
-        throw new AiConnectionFailException();
+        throw new AiConnectionFailException(
+            String.format(
+                "OpenAI response polling timed out after %.3f seconds for response `%s` against `%s`",
+                elapsedTime, pollResponse.getId(), OpenAiSdkClientFactory.getResolvedBaseUrl(config)));
       }
     }
     return pollResponse;
