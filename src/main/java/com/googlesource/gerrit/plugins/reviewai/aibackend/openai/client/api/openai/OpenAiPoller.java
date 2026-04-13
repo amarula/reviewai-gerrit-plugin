@@ -16,22 +16,25 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai;
 
+import com.openai.client.OpenAIClient;
+import com.openai.core.http.HttpResponseFor;
+import com.openai.models.responses.Response;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponse;
 import com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Request;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
 import static com.googlesource.gerrit.plugins.reviewai.utils.ThreadUtils.threadSleep;
 
 @Slf4j
-public class OpenAiPoller extends OpenAiApiBase {
+public class OpenAiPoller {
   public static final String COMPLETED_STATUS = "completed";
   public static final String CANCELLED_STATUS = "cancelled";
   public static final String FAILED_STATUS = "failed";
@@ -47,14 +50,14 @@ public class OpenAiPoller extends OpenAiApiBase {
   @Getter private double elapsedTime;
 
   public OpenAiPoller(Configuration config) {
-    super(config);
     pollingTimeout = config.getAiPollingTimeout();
     pollingInterval = config.getAiPollingInterval();
     elapsedTime = 0.0;
     pollingCount = 0;
   }
 
-  public <T extends OpenAiResponse> T runPoll(String uri, T pollResponse, Class<T> clazz)
+  public <T extends OpenAiResponse> T runPoll(
+      OpenAIClient client, T pollResponse, Class<T> clazz)
       throws AiConnectionFailException {
     long startTime = TimeUtils.getCurrentMillis();
 
@@ -62,10 +65,14 @@ public class OpenAiPoller extends OpenAiApiBase {
       pollingCount++;
       log.debug("Polling request #{}", pollingCount);
       threadSleep(pollingInterval);
-      Request pollRequest = httpClient.createRequestFromJson(uri, null);
-      log.debug("OpenAI Poll request: {}", pollRequest);
-      pollResponse = getOpenAiResponse(pollRequest, clazz);
-      log.debug("OpenAI Poll response: {}", pollResponse);
+      try (HttpResponseFor<Response> response =
+          client.responses().withRawResponse().retrieve(pollResponse.getId())) {
+        String responseBody = OpenAiSdkClientFactory.readBody(response);
+        log.debug("OpenAI Poll response: {}", responseBody);
+        pollResponse = jsonToClass(responseBody, clazz);
+      } catch (Exception e) {
+        throw new AiConnectionFailException(e);
+      }
       elapsedTime = (double) (TimeUtils.getCurrentMillis() - startTime) / 1000;
       if (elapsedTime >= pollingTimeout) {
         log.error("Polling timed out after {} seconds.", elapsedTime);

@@ -16,20 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai;
 
+import com.openai.client.OpenAIClient;
+import com.openai.core.http.HttpResponseFor;
+import com.openai.models.conversations.Conversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponse;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Request;
+
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
 
 @Slf4j
-public class OpenAiConversation extends OpenAiApiBase {
+public class OpenAiConversation {
   public static final String KEY_CONVERSATION_ID = "conversationId";
 
+  private final Configuration config;
   private final ChangeSetData changeSetData;
   private final PluginDataHandler changeDataHandler;
 
@@ -37,7 +41,7 @@ public class OpenAiConversation extends OpenAiApiBase {
       Configuration config,
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
-    super(config);
+    this.config = config;
     this.changeSetData = changeSetData;
     changeDataHandler = pluginDataHandlerProvider.getChangeScope();
   }
@@ -55,19 +59,28 @@ public class OpenAiConversation extends OpenAiApiBase {
   }
 
   private String createConversation() throws AiConnectionFailException {
-    Request request =
-        httpClient.createRequestFromJson(OpenAiUriResourceLocator.conversationsUri(), new Object());
-    log.debug("OpenAI Create Conversation request: {}", request);
+    log.debug("OpenAI Create Conversation request: {}", "{}");
 
-    OpenAiResponse conversationResponse = getOpenAiResponse(request, OpenAiResponse.class);
-    String conversationId = conversationResponse.getId();
-    if (conversationId != null) {
-      changeDataHandler.setValue(KEY_CONVERSATION_ID, conversationId);
-      log.info("Conversation created: {}", conversationResponse);
-    } else {
-      log.error("Failed to create conversation. Response: {}", conversationResponse);
+    OpenAIClient client = OpenAiSdkClientFactory.create(config);
+    try {
+      try (HttpResponseFor<Conversation> response =
+          client.conversations().withRawResponse().create()) {
+        String responseBody = OpenAiSdkClientFactory.readBody(response);
+        OpenAiResponse conversationResponse = jsonToClass(responseBody, OpenAiResponse.class);
+        String conversationId = conversationResponse.getId();
+        if (conversationId != null) {
+          changeDataHandler.setValue(KEY_CONVERSATION_ID, conversationId);
+          log.info("Conversation created: {}", conversationResponse);
+        } else {
+          log.error("Failed to create conversation. Response: {}", conversationResponse);
+        }
+        return conversationId;
+      }
+    } catch (Exception e) {
+      throw new AiConnectionFailException(e);
+    } finally {
+      client.close();
     }
-    return conversationId;
   }
 
   public void clear() {

@@ -106,10 +106,13 @@
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <artifactSet>
                                 <includes>
+                                    <include>com.openai*</include>
                                     <include>com.squareup.*</include>
+                                    <include>io.swagger.core*</include>
                                     <include>org.apache.commons*</include>
                                     <include>org.jetbrains*</include>
                                     <include>com.knuddels*</include>
+                                    <include>com.github.victools*</include>
                                     <include>dev.langchain4j*</include>
                                     <include>com.fasterxml.jackson*</include>
                                 </includes>
@@ -191,6 +194,11 @@
             <version>1.4.0</version>
         </dependency>
         <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java-client-okhttp</artifactId>
+            <version>4.31.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
             <version>4.5.0</version>
@@ -236,11 +244,6 @@
             <artifactId>wiremock-standalone</artifactId>
             <version>3.13.1</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
         </dependency>
     </dependencies>
 
