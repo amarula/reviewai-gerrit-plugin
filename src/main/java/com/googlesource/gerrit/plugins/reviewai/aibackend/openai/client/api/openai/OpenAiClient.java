@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.ope
 
 import com.google.common.annotations.VisibleForTesting;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiToolCall;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.google.gson.JsonSyntaxException;
 import com.google.inject.Inject;
@@ -54,6 +55,7 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
   private static final String TYPE_FUNCTION_CALL = "function_call";
   private static final String TYPE_MESSAGE = "message";
   private static final String FUNCTION_FORMAT_REPLIES = "format_replies";
+  private static final String MISSING_TOOL_OUTPUT_ERROR = "No tool output found for function call";
 
   private final ICodeContextPolicy codeContextPolicy;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
@@ -107,9 +109,11 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
         new OpenAiResponses(config, changeSetData, change, codeContextPolicy);
     String conversationId = openAiConversation.resolveConversationId();
     OpenAiResponsesResponse response =
-        openAiResponses.createPromptResponse(
-            getPrompt(changeSetData, change, patchSet), conversationId);
-    requestBody = openAiResponses.getRequestBody();
+        createPromptResponseWithRecovery(
+            openAiConversation,
+            openAiResponses,
+            getPrompt(changeSetData, change, patchSet),
+            conversationId);
     response = continueResponseLoop(openAiResponses, response, conversationId);
     AiResponseContent aiResponseContent = getResponseContentOpenAI(response);
     if (!isCommentEvent && aiResponseContent.getReplies() == null) {
@@ -123,10 +127,14 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
       throws AiConnectionFailException {
     while (hasToolCallsRequiringOutput(response)) {
       List<OpenAiResponsesResponse.OutputItem> functionCalls = getFunctionCalls(response);
-      response =
-          openAiResponses.createToolResponse(
-              codeContextPolicy.buildToolResponseItems(toAiToolCalls(functionCalls)),
-              conversationId);
+      try {
+        response =
+            openAiResponses.createToolResponse(
+                codeContextPolicy.buildToolResponseItems(toAiToolCalls(functionCalls)),
+                response.getId());
+      } finally {
+        requestBody = openAiResponses.getRequestBody();
+      }
     }
     return response;
   }
@@ -144,6 +152,11 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
       return getResponseContent(toAiToolCalls(functionCalls));
     }
 
+    AiResponseContent structuredResponseContent = extractStructuredResponseContent(response);
+    if (structuredResponseContent != null) {
+      return structuredResponseContent;
+    }
+
     String responseText = extractResponseText(response);
     if (responseText == null) {
       throw new RuntimeException("OpenAI response content is null");
@@ -158,25 +171,27 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
     return new AiResponseContent(responseText);
   }
 
-  private String extractResponseText(OpenAiResponsesResponse response) {
-    if (response.getOutputText() != null && !response.getOutputText().isEmpty()) {
-      return response.getOutputText();
-    }
-
-    if (response.getOutput() == null) {
-      return null;
-    }
-    for (OpenAiResponsesResponse.OutputItem outputItem : response.getOutput()) {
-      if (!TYPE_MESSAGE.equals(outputItem.getType()) || outputItem.getContent() == null) {
+  private AiResponseContent extractStructuredResponseContent(OpenAiResponsesResponse response) {
+    List<AiResponseContent> structuredResponses = new ArrayList<>();
+    for (String responseText : extractResponseTexts(response)) {
+      if (!isJsonObjectAsString(responseText)) {
         continue;
       }
-      for (OpenAiResponsesResponse.OutputItem.Content content : outputItem.getContent()) {
-        if (content.getText() != null) {
-          return content.getText();
-        }
-      }
+      structuredResponses.add(extractResponseContent(responseText));
     }
-    return null;
+
+    if (structuredResponses.isEmpty()) {
+      return null;
+    }
+    if (structuredResponses.size() == 1) {
+      return structuredResponses.get(0);
+    }
+    return mergeStructuredResponses(structuredResponses);
+  }
+
+  private String extractResponseText(OpenAiResponsesResponse response) {
+    List<String> responseTexts = extractResponseTexts(response);
+    return responseTexts.isEmpty() ? null : responseTexts.get(0);
   }
 
   private boolean hasToolCallsRequiringOutput(OpenAiResponsesResponse response) {
@@ -235,5 +250,75 @@ public class OpenAiClient extends OpenAiClientBase implements IAiClient {
   private AiResponseContent extractResponseContent(String responseText) {
     log.debug("Extracting response content from JSON.");
     return convertResponseContentFromJson(unwrapJsonCode(responseText));
+  }
+
+  private OpenAiResponsesResponse createPromptResponseWithRecovery(
+      OpenAiConversation openAiConversation,
+      OpenAiResponses openAiResponses,
+      String prompt,
+      String conversationId)
+      throws AiConnectionFailException {
+    try {
+      return openAiResponses.createPromptResponse(prompt, conversationId);
+    } catch (AiConnectionFailException e) {
+      if (!isMissingToolOutputError(e)) {
+        throw e;
+      }
+      log.warn(
+          "OpenAI conversation {} has unresolved tool calls. Resetting it and retrying once.",
+          conversationId);
+      openAiConversation.clear();
+      return openAiResponses.createPromptResponse(prompt, openAiConversation.resolveConversationId());
+    } finally {
+      requestBody = openAiResponses.getRequestBody();
+    }
+  }
+
+  private List<String> extractResponseTexts(OpenAiResponsesResponse response) {
+    List<String> responseTexts = new ArrayList<>();
+    if (response.getOutputText() != null && !response.getOutputText().isEmpty()) {
+      responseTexts.add(response.getOutputText());
+      return responseTexts;
+    }
+
+    if (response.getOutput() == null) {
+      return responseTexts;
+    }
+    for (OpenAiResponsesResponse.OutputItem outputItem : response.getOutput()) {
+      if (!TYPE_MESSAGE.equals(outputItem.getType()) || outputItem.getContent() == null) {
+        continue;
+      }
+      for (OpenAiResponsesResponse.OutputItem.Content content : outputItem.getContent()) {
+        if (content.getText() != null) {
+          responseTexts.add(content.getText());
+        }
+      }
+    }
+    return responseTexts;
+  }
+
+  private AiResponseContent mergeStructuredResponses(List<AiResponseContent> structuredResponses) {
+    List<AiReplyItem> replies = new ArrayList<>();
+    String changeId = null;
+    for (AiResponseContent structuredResponse : structuredResponses) {
+      if (structuredResponse.getReplies() != null) {
+        replies.addAll(structuredResponse.getReplies());
+      }
+      if (changeId == null && structuredResponse.getChangeId() != null) {
+        changeId = structuredResponse.getChangeId();
+      }
+    }
+
+    AiResponseContent mergedResponse = new AiResponseContent("");
+    mergedResponse.setReplies(replies.isEmpty() ? null : replies);
+    mergedResponse.setChangeId(changeId);
+    return mergedResponse;
+  }
+
+  private boolean isMissingToolOutputError(AiConnectionFailException exception) {
+    if (exception == null || exception.getMessage() == null) {
+      return false;
+    }
+    return exception.getMessage().contains(MISSING_TOOL_OUTPUT_ERROR);
   }
 }

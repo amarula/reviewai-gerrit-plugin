@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.langchain4j.model.chat.request.ResponseFormat;
@@ -50,33 +49,19 @@ class LangChainStructuredResponseFactory {
       JsonObject root =
           JsonParser.parseReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))
               .getAsJsonObject();
-      JsonObject function = LangChainToolSchemaUtils.getFunctionDefinition(root);
-      if (function == null) {
+      JsonObject schemaDefinition = LangChainToolSchemaUtils.getStructuredOutputDefinition(root);
+      String schemaName = LangChainToolSchemaUtils.getStructuredOutputName(root);
+      if (schemaDefinition == null || schemaName == null) {
         log.warn(
-            "Structured output schema resource {} missing function definition; ignoring",
-            schemaResourcePath);
-        return null;
-      }
-
-      JsonElement nameElement = function.get("name");
-      JsonElement parametersElement = function.get("parameters");
-      if (nameElement == null || !nameElement.isJsonPrimitive()) {
-        log.warn(
-            "Structured output schema resource {} missing function name; ignoring",
-            schemaResourcePath);
-        return null;
-      }
-      if (parametersElement == null || parametersElement.isJsonNull()) {
-        log.warn(
-            "Structured output schema resource {} missing function parameters; ignoring",
+            "Structured output schema resource {} missing schema definition; ignoring",
             schemaResourcePath);
         return null;
       }
 
       JsonSchemaElement rootElement = null;
-      if (parametersElement.isJsonObject()) {
+      if (schemaDefinition.isJsonObject()) {
         try {
-          rootElement = LangChainJsonSchemaParser.parse(parametersElement.getAsJsonObject());
+          rootElement = LangChainJsonSchemaParser.parse(schemaDefinition.getAsJsonObject());
         } catch (Exception e) {
           log.warn(
               "Failed to convert structured output schema {} into LangChain schema classes",
@@ -92,7 +77,6 @@ class LangChainStructuredResponseFactory {
         return null;
       }
 
-      String schemaName = nameElement.getAsString();
       JsonSchema jsonSchema =
           JsonSchema.builder().name(schemaName).rootElement(rootElement).build();
 

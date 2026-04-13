@@ -24,26 +24,32 @@ import com.openai.core.http.HttpResponseFor;
 import com.openai.models.responses.FunctionTool;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
+import com.openai.models.responses.ResponseFormatTextJsonSchemaConfig;
 import com.openai.models.responses.ResponseInputItem;
+import com.openai.models.responses.ResponseTextConfig;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiParameters;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiPoller;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiSdkClientFactory;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTools;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiAssistantTools;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiCreateResponseRequest;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseFormatSchema;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseInputItem;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseText;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiTool;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,12 +60,16 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 
 @Slf4j
 public class OpenAiResponses {
+  private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
+  private static final String RESPONSE_FORMAT_JSON_SCHEMA = "json_schema";
+
   private final Configuration config;
   @Getter private final String instructions;
   @Getter private final String model;
   @Getter private final Double temperature;
   private final ICodeContextPolicy codeContextPolicy;
   private final OpenAiPoller openAiPoller;
+  private final OpenAiResponseFormatSchema structuredOutputSchema;
 
   private OpenAiCreateResponseRequest requestBody;
 
@@ -77,36 +87,45 @@ public class OpenAiResponses {
     model = config.getAiModel();
     temperature = openAiParameters.getAiTemperature();
     openAiPoller = new OpenAiPoller(config);
+    structuredOutputSchema = loadStructuredOutputSchema();
   }
 
   public OpenAiResponsesResponse createPromptResponse(String input, String conversationId)
       throws AiConnectionFailException {
-    return createResponse(input, conversationId);
+    return createResponse(input, conversationId, null);
   }
 
   public OpenAiResponsesResponse createToolResponse(
-      List<OpenAiResponseInputItem> input, String conversationId)
+      List<OpenAiResponseInputItem> input, String previousResponseId)
       throws AiConnectionFailException {
-    return createResponse(input, conversationId);
+    return createResponse(input, null, previousResponseId);
   }
 
   public String getRequestBody() {
     return getGson().toJson(requestBody);
   }
 
-  private OpenAiResponsesResponse createResponse(Object input, String conversationId)
+  private OpenAiResponsesResponse createResponse(
+      Object input, String conversationId, String previousResponseId)
       throws AiConnectionFailException {
     OpenAiAssistantTools openAiAssistantTools = buildTools();
-    requestBody =
+    OpenAiCreateResponseRequest.OpenAiCreateResponseRequestBuilder requestBuilder =
         OpenAiCreateResponseRequest.builder()
             .model(model)
             .instructions(instructions)
             .input(input)
             .temperature(temperature)
-            .tools(openAiAssistantTools.getTools())
-            .conversation(conversationId)
-            .build();
-    ResponseCreateParams sdkRequest = createSdkRequest(input, conversationId, openAiAssistantTools);
+            .text(buildResponseText())
+            .tools(openAiAssistantTools.getTools().isEmpty() ? null : openAiAssistantTools.getTools());
+    if (conversationId != null) {
+      requestBuilder.conversation(conversationId);
+    }
+    if (previousResponseId != null) {
+      requestBuilder.previousResponseId(previousResponseId);
+    }
+    requestBody = requestBuilder.build();
+    ResponseCreateParams sdkRequest =
+        createSdkRequest(input, conversationId, previousResponseId, openAiAssistantTools);
     log.debug("OpenAI Create Response request: {}", requestBody);
 
     OpenAIClient client = OpenAiSdkClientFactory.create(config);
@@ -133,23 +152,29 @@ public class OpenAiResponses {
   }
 
   private OpenAiAssistantTools buildTools() {
-    OpenAiTools openAiFormatRepliesTools = new OpenAiTools(OpenAiTools.Functions.formatReplies);
     OpenAiAssistantTools openAiAssistantTools =
-        OpenAiAssistantTools.builder()
-            .tools(new ArrayList<>(List.of(openAiFormatRepliesTools.retrieveFunctionTool())))
-            .build();
+        OpenAiAssistantTools.builder().tools(new ArrayList<>()).build();
     codeContextPolicy.updateOpenAiTools(openAiAssistantTools);
     return openAiAssistantTools;
   }
 
   private ResponseCreateParams createSdkRequest(
-      Object input, String conversationId, OpenAiAssistantTools openAiAssistantTools) {
+      Object input,
+      String conversationId,
+      String previousResponseId,
+      OpenAiAssistantTools openAiAssistantTools) {
     ResponseCreateParams.Builder builder =
         ResponseCreateParams.builder()
             .model(model)
             .instructions(instructions)
             .temperature(temperature)
-            .conversation(conversationId);
+            .text(toSdkTextConfig(buildResponseText()));
+
+    if (previousResponseId != null) {
+      builder.previousResponseId(previousResponseId);
+    } else if (conversationId != null) {
+      builder.conversation(conversationId);
+    }
 
     if (input instanceof String) {
       builder.input((String) input);
@@ -163,6 +188,19 @@ public class OpenAiResponses {
       builder.addTool(toSdkTool(tool));
     }
     return builder.build();
+  }
+
+  private OpenAiResponseText buildResponseText() {
+    return OpenAiResponseText.builder()
+        .format(
+            OpenAiResponseText.Format.builder()
+                .type(RESPONSE_FORMAT_JSON_SCHEMA)
+                .name(structuredOutputSchema.getName())
+                .schema(structuredOutputSchema.getSchema())
+                .description(structuredOutputSchema.getDescription())
+                .strict(structuredOutputSchema.getStrict())
+                .build())
+        .build();
   }
 
   @SuppressWarnings("unchecked")
@@ -183,6 +221,21 @@ public class OpenAiResponses {
     return items;
   }
 
+  private ResponseTextConfig toSdkTextConfig(OpenAiResponseText responseText) {
+    OpenAiResponseText.Format format = responseText.getFormat();
+    ResponseFormatTextJsonSchemaConfig.Builder builder =
+        ResponseFormatTextJsonSchemaConfig.builder()
+            .name(format.getName())
+            .schema(toSdkSchema(format.getSchema()));
+    if (format.getDescription() != null) {
+      builder.description(format.getDescription());
+    }
+    if (format.getStrict() != null) {
+      builder.strict(format.getStrict());
+    }
+    return ResponseTextConfig.builder().format(builder.build()).build();
+  }
+
   private FunctionTool toSdkTool(OpenAiTool tool) {
     FunctionTool.Builder builder =
         FunctionTool.builder()
@@ -195,6 +248,15 @@ public class OpenAiResponses {
     }
     if (tool.getParameters() != null) {
       builder.parameters(toSdkParameters(tool.getParameters()));
+    }
+    return builder.build();
+  }
+
+  private ResponseFormatTextJsonSchemaConfig.Schema toSdkSchema(Object schema) {
+    ResponseFormatTextJsonSchemaConfig.Schema.Builder builder =
+        ResponseFormatTextJsonSchemaConfig.Schema.builder();
+    for (Map.Entry<String, JsonValue> entry : toJsonValueMap(schema).entrySet()) {
+      builder.putAdditionalProperty(entry.getKey(), entry.getValue());
     }
     return builder.build();
   }
@@ -221,5 +283,17 @@ public class OpenAiResponses {
       values.put(entry.getKey(), JsonValue.from(entry.getValue()));
     }
     return values;
+  }
+
+  private OpenAiResponseFormatSchema loadStructuredOutputSchema() {
+    try (InputStreamReader reader =
+        FileUtils.getInputStreamReader(FORMAT_REPLIES_SCHEMA_RESOURCE)) {
+      return jsonToClass(reader, OpenAiResponseFormatSchema.class);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to load OpenAI structured response schema from "
+              + FORMAT_REPLIES_SCHEMA_RESOURCE,
+          e);
+    }
   }
 }

@@ -4,11 +4,15 @@
   "status": "completed",
   "output": [
     {
-      "id": "fc_TEST_COMMENT",
-      "type": "function_call",
-      "call_id": "call_LYyZRTLRqSx2Bwn0QNWq1yYU",
-      "name": "format_replies",
-      "arguments": "{\n  \"replies\": [\n    {\n      \"id\": 0,\n      \"reply\": \"The commit message 'Corrected Indentation in Module-Class Retrieval Line' accurately represents the change made in the code.\"\n    }\n  ]\n  }"
+      "id": "msg_TEST_COMMENT",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\n  \"replies\": [\n    {\n      \"id\": 0,\n      \"reply\": \"The commit message 'Corrected Indentation in Module-Class Retrieval Line' accurately represents the change made in the code.\"\n    }\n  ]\n}"
+        }
+      ]
     }
   ]
 }

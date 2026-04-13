@@ -40,9 +40,11 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwrapJsonCode;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -130,8 +132,38 @@ public class OpenAiReviewTestBase extends ReviewTestBase {
   protected String getReviewMessage(String responseFile, int toolCallId) {
     OpenAiResponsesResponse responseContent =
         jsonToClass(readTestFile(responseFile), OpenAiResponsesResponse.class);
-    String reviewJsonResponse = responseContent.getOutput().get(toolCallId).getArguments();
-    return jsonToClass(reviewJsonResponse, AiResponseContent.class).getReplies().get(0).getReply();
+    List<String> responseTexts = new ArrayList<>();
+    if (responseContent.getOutputText() != null && !responseContent.getOutputText().isEmpty()) {
+      responseTexts.add(responseContent.getOutputText());
+    } else if (responseContent.getOutput() != null) {
+      for (OpenAiResponsesResponse.OutputItem outputItem : responseContent.getOutput()) {
+        if (outputItem.getArguments() != null) {
+          responseTexts.add(outputItem.getArguments());
+          continue;
+        }
+        if (outputItem.getContent() == null) {
+          continue;
+        }
+        for (OpenAiResponsesResponse.OutputItem.Content content : outputItem.getContent()) {
+          if (content.getText() != null) {
+            responseTexts.add(content.getText());
+          }
+        }
+      }
+    }
+
+    AiResponseContent mergedResponse = new AiResponseContent("");
+    List<com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem>
+        replies = new ArrayList<>();
+    for (String responseText : responseTexts) {
+      AiResponseContent parsedResponse =
+          jsonToClass(unwrapJsonCode(responseText), AiResponseContent.class);
+      if (parsedResponse.getReplies() != null) {
+        replies.addAll(parsedResponse.getReplies());
+      }
+    }
+    mergedResponse.setReplies(replies);
+    return mergedResponse.getReplies().get(toolCallId).getReply();
   }
 
   protected List<ReviewInput.CommentInput> getCapturedComments(

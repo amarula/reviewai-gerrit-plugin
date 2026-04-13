@@ -1,9 +1,8 @@
 {
-  "type": "function",
   "name": "format_replies",
   "description": "Provide the PatchSet review replies.",
   "strict": false,
-  "parameters": {
+  "schema": {
     "type": "object",
     "properties": {
       "replies": {

@@ -16,15 +16,21 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
-public class OpenAiToolChoice {
-  private String type;
-  private Function function;
+@Builder
+public class OpenAiResponseText {
+  private Format format;
 
   @Data
-  public static class Function {
+  @Builder
+  public static class Format {
+    private String type;
     private String name;
+    private Object schema;
+    private String description;
+    private Boolean strict;
   }
 }

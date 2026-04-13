@@ -250,4 +250,18 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
   }
+
+  @Test
+  public void responseCreateRequestUsesJsonSchemaStructuredOutput() throws Exception {
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+    testRequestSent();
+
+    Assert.assertEquals(
+        "json_schema",
+        aiRequestBody.getAsJsonObject("text").getAsJsonObject("format").get("type").getAsString());
+    Assert.assertEquals(
+        "format_replies",
+        aiRequestBody.getAsJsonObject("text").getAsJsonObject("format").get("name").getAsString());
+    Assert.assertFalse(aiRequestBody.has("tools"));
+  }
 }

@@ -54,7 +54,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwra
 @Singleton
 public class LangChainClient extends AiClientBase implements IAiClient {
 
-  private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesTool.json";
+  private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
   private static final String GET_CONTEXT_TOOL_RESOURCE = "config/getContextTool.json";
 
   private final ICodeContextPolicy codeContextPolicy;

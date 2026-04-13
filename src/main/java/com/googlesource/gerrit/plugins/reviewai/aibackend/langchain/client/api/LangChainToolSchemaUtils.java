@@ -35,4 +35,34 @@ final class LangChainToolSchemaUtils {
     }
     return null;
   }
+
+  static JsonObject getStructuredOutputDefinition(JsonObject root) {
+    JsonObject directSchema = root.getAsJsonObject("schema");
+    if (directSchema != null) {
+      return directSchema;
+    }
+
+    JsonObject functionDefinition = getFunctionDefinition(root);
+    if (functionDefinition != null) {
+      return functionDefinition.getAsJsonObject("parameters");
+    }
+    return null;
+  }
+
+  static String getStructuredOutputName(JsonObject root) {
+    JsonElement directName = root.get("name");
+    if (directName != null && directName.isJsonPrimitive()) {
+      return directName.getAsString();
+    }
+
+    JsonObject functionDefinition = getFunctionDefinition(root);
+    if (functionDefinition == null) {
+      return null;
+    }
+    JsonElement functionName = functionDefinition.get("name");
+    if (functionName != null && functionName.isJsonPrimitive()) {
+      return functionName.getAsString();
+    }
+    return null;
+  }
 }

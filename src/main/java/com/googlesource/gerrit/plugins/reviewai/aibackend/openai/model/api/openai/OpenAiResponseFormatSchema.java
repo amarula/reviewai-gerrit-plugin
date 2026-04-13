@@ -16,23 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai;
 
-import com.google.gson.annotations.SerializedName;
-import lombok.Builder;
 import lombok.Data;
 
-import java.util.List;
-
 @Data
-@Builder
-public class OpenAiCreateResponseRequest {
-  private String model;
-  private String instructions;
-  private Object input;
-  private Double temperature;
-  private OpenAiResponseText text;
-  private List<OpenAiTool> tools;
-  private String conversation;
-
-  @SerializedName("previous_response_id")
-  private String previousResponseId;
+public class OpenAiResponseFormatSchema {
+  private String name;
+  private String description;
+  private Boolean strict;
+  private Object schema;
 }

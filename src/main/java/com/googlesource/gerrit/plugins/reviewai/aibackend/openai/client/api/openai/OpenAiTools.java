@@ -17,7 +17,6 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiTool;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiToolChoice;
 import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,12 +28,10 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 @Slf4j
 public class OpenAiTools {
   public enum Functions {
-    formatReplies,
     getContext
   }
 
   private static final String FILENAME_TOOL_FORMAT = "config/%sTool.json";
-  private static final String FILENAME_TOOL_CHOICE_FORMAT = "config/%sToolChoice.json";
 
   private final String functionName;
 
@@ -50,23 +47,10 @@ public class OpenAiTools {
       if (tools.getStrict() == null) {
         tools.setStrict(false);
       }
-      log.debug("Successfully loaded format replies tool from JSON.");
+      log.debug("Successfully loaded OpenAI tool {} from JSON.", functionName);
     } catch (IOException e) {
       throw new RuntimeException("Failed to load data for OpenAI `" + functionName + "` tool", e);
     }
     return tools;
-  }
-
-  public OpenAiToolChoice retrieveFunctionToolChoice() {
-    OpenAiToolChoice toolChoice;
-    try (InputStreamReader reader =
-        FileUtils.getInputStreamReader(String.format(FILENAME_TOOL_CHOICE_FORMAT, functionName))) {
-      toolChoice = jsonToClass(reader, OpenAiToolChoice.class);
-      log.debug("Successfully loaded format replies tool choice from JSON.");
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to load data for OpenAI `" + functionName + "` tool choice", e);
-    }
-    return toolChoice;
   }
 }

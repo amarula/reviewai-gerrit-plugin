@@ -4,11 +4,15 @@
   "status": "completed",
   "output": [
     {
-      "id": "fc_TEST_MALFORMED",
-      "type": "function_call",
-      "call_id": "call_TEST_MALFORMED",
-      "name": "format_replies",
-      "arguments": "{\n        \"replies\": [\n          {\n            \"reply\": \"Malformed JSON response\"\n            \"score\": -1\n          }\n        ],\n        \"changeId\": \"myProject~myBranchName~myChangeId\"\n      }"
+      "id": "msg_TEST_MALFORMED",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\n  \"replies\": [\n    {\n      \"reply\": \"Malformed JSON response\"\n      \"score\": -1\n    }\n  ],\n  \"changeId\": \"myProject~myBranchName~myChangeId\"\n}"
+        }
+      ]
     }
   ]
 }
