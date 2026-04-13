@@ -12,7 +12,7 @@
     },
 
     createHistoryItem(entry) {
-      const role = entry.role === 'assistant' ? 'assistant' : 'user';
+      const role = entry.systemMessage ? 'system' : entry.role === 'assistant' ? 'assistant' : 'user';
       const pendingClass = entry.pending ? ' reviewai-history__item--pending' : '';
       const item = reviewAiDom.createElement('section', {
         className: `reviewai-history__item reviewai-history__item--${role}${pendingClass}`,

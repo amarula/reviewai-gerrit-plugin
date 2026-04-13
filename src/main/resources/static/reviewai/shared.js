@@ -36,6 +36,11 @@
       .reviewai-history__item--assistant {
         justify-self: start;
       }
+      .reviewai-history__item--system {
+        justify-self: start;
+        background: var(--table-subheader-background-color, #f6f7f9);
+        border-style: dashed;
+      }
       .reviewai-history__item--pending {
         opacity: 0.75;
       }
@@ -195,7 +200,9 @@
         return false;
       }
 
-      return entries.slice(promptIndex + 1).some(entry => entry.role === 'assistant');
+      return entries
+        .slice(promptIndex + 1)
+        .some(entry => entry.role === 'assistant' || entry.systemMessage);
     },
   };
 })(window);

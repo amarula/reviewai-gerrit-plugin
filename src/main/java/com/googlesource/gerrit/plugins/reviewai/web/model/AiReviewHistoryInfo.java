@@ -31,6 +31,7 @@ public class AiReviewHistoryInfo {
   public static class Entry {
     private final String id;
     private final String role;
+    private final boolean systemMessage;
     private final String author;
     private final String updated;
     private final Integer patchSet;

@@ -33,9 +33,20 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
+
 @Singleton
 @Slf4j
 public class GerritAiReviewHistoryCollector {
+  private static final Pattern PATCH_SET_PREFIX_PATTERN =
+      Pattern.compile(
+          "^"
+              + Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET
+              + " \\d+:[^\\n]*(?:\\s+\\(\\d+ "
+              + Settings.GERRIT_DEFAULT_MESSAGE_COMMENTS
+              + "?\\)\\s*)?\\n*",
+          Pattern.DOTALL);
+
   public AiReviewHistoryInfo collect(
       Configuration config,
       Localizer localizer,
@@ -82,15 +93,24 @@ public class GerritAiReviewHistoryCollector {
       int aiAccountId,
       GerritComment comment) {
     boolean fromAi = isFromAi(comment, aiAccountId);
+    boolean systemMessage = fromAi && isPreservedAssistantMessage(comment, localizer);
 
     ClientMessageCleaner cleaner =
         new ClientMessageCleaner(config, Optional.ofNullable(comment.getMessage()).orElse(""), localizer);
-    if (fromAi) {
+    if (fromAi && !systemMessage) {
       cleaner.removeDebugCodeBlocks();
     } else {
-      cleaner.removeMentions();
+      if (!fromAi) {
+        cleaner.removeMentions();
+      }
     }
-    String cleanedMessage = cleaner.removeHeadings().getMessage().trim();
+    String cleanedMessage = cleaner.getMessage();
+    if (systemMessage) {
+      cleanedMessage = cleanPreservedAssistantMessage(cleanedMessage, localizer);
+    } else {
+      cleaner.removeHeadings();
+      cleanedMessage = cleaner.getMessage().trim();
+    }
     if (cleanedMessage.isEmpty()) {
       return;
     }
@@ -99,6 +119,7 @@ public class GerritAiReviewHistoryCollector {
         new AiReviewHistoryInfo.Entry(
             comment.getId(),
             fromAi ? Settings.OPENAI_ROLE_ASSISTANT : Settings.OPENAI_ROLE_USER,
+            systemMessage,
             getAuthorName(comment),
             getUpdated(comment),
             comment.getPatchSet(),
@@ -131,6 +152,38 @@ public class GerritAiReviewHistoryCollector {
 
   private boolean isFromAi(GerritComment comment, int aiAccountId) {
     return comment.getAuthor() != null && comment.getAuthor().getAccountId() == aiAccountId;
+  }
+
+  private boolean isPreservedAssistantMessage(GerritComment comment, Localizer localizer) {
+    return isSystemMessage(comment, localizer) || isDynamicConfigurationMessage(comment, localizer);
+  }
+
+  private boolean isSystemMessage(GerritComment comment, Localizer localizer) {
+    String message =
+        stripPatchSetHeading(Optional.ofNullable(comment.getMessage()).orElse("")).stripLeading();
+    String prefix = Optional.ofNullable(localizer.getText("system.message.prefix")).orElse("").trim();
+    return !prefix.isEmpty() && message.startsWith(prefix);
+  }
+
+  private boolean isDynamicConfigurationMessage(GerritComment comment, Localizer localizer) {
+    String message =
+        stripPatchSetHeading(Optional.ofNullable(comment.getMessage()).orElse("")).stripLeading();
+    String title =
+        Optional.ofNullable(localizer.getText("message.dump.dynamic.configuration.title"))
+            .orElse("")
+            .trim();
+    if (title.isEmpty()) {
+      return false;
+    }
+    return message.startsWith(title) || message.startsWith(CODE_DELIMITER + "\n" + title);
+  }
+
+  private String stripPatchSetHeading(String message) {
+    return PATCH_SET_PREFIX_PATTERN.matcher(message).replaceFirst("");
+  }
+
+  private String cleanPreservedAssistantMessage(String message, Localizer localizer) {
+    return stripPatchSetHeading(message).trim();
   }
 
   private Pattern getBotMentionPattern(Configuration config) {

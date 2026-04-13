@@ -39,7 +39,9 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("System");
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("message.dump.dynamic.configuration.title"))
+        .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
     GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
 
@@ -116,6 +118,16 @@ public class GerritAiReviewHistoryCollectorTest {
             5,
             null,
             null);
+    GerritComment systemReply =
+        newComment(
+            "msg-4",
+            7,
+            "ReviewAI",
+            "SYSTEM MESSAGE: No update to show for this Change Set",
+            "2026-04-09 10:05:00.000000",
+            5,
+            null,
+            null);
 
     AiReviewHistoryInfo info =
         collector.collect(
@@ -123,11 +135,11 @@ public class GerritAiReviewHistoryCollectorTest {
             localizer,
             7,
             Map.of(
-                "/PATCHSET_LEVEL", List.of(patchSetPrompt, botReply, commandOnly),
+                "/PATCHSET_LEVEL", List.of(patchSetPrompt, botReply, commandOnly, systemReply),
                 "src/main/java/Foo.java",
                 List.of(inlinePrompt, inlineAiReply, nonAddressedInline, nonAddressedReplyToAi)));
 
-    assertEquals(5, info.getEntries().size());
+    assertEquals(6, info.getEntries().size());
 
     AiReviewHistoryInfo.Entry patchSetPromptEntry =
         findEntry(info, "please verify the null handling.");
@@ -156,12 +168,89 @@ public class GerritAiReviewHistoryCollectorTest {
     assertNotNull(inlineReplyEntry);
     assertEquals("ReviewAI", inlineReplyEntry.getAuthor());
     assertEquals("assistant", inlineReplyEntry.getRole());
+    assertEquals(false, inlineReplyEntry.isSystemMessage());
+
+    AiReviewHistoryInfo.Entry systemReplyEntry =
+        findEntry(info, "SYSTEM MESSAGE: No update to show for this Change Set");
+    assertNotNull(systemReplyEntry);
+    assertEquals("ReviewAI", systemReplyEntry.getAuthor());
+    assertEquals("assistant", systemReplyEntry.getRole());
+    assertEquals(true, systemReplyEntry.isSystemMessage());
 
     AiReviewHistoryInfo.Entry commandEntry = findEntry(info, "/review --debug");
     assertNotNull(commandEntry);
     assertEquals("Dave", commandEntry.getAuthor());
     assertEquals("user", commandEntry.getRole());
     assertNull(commandEntry.getFilename());
+  }
+
+  @Test
+  public void collectsSystemMessagesEvenWhenPrefixedByPatchSetHeader() {
+    Configuration config = mock(Configuration.class);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("message.dump.dynamic.configuration.title"))
+        .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
+
+    GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
+
+    GerritComment systemReply =
+        newComment(
+            "msg-system",
+            7,
+            "ReviewAI",
+            "Patch Set 5:\n\nSYSTEM MESSAGE: No update to show for this Change Set",
+            "2026-04-09 10:05:00.000000",
+            5,
+            null,
+            null);
+
+    AiReviewHistoryInfo info =
+        collector.collect(config, localizer, 7, Map.of("/PATCHSET_LEVEL", List.of(systemReply)));
+
+    assertEquals(1, info.getEntries().size());
+    AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
+    assertEquals("assistant", entry.getRole());
+    assertEquals(true, entry.isSystemMessage());
+    assertEquals("SYSTEM MESSAGE: No update to show for this Change Set", entry.getMessage());
+  }
+
+  @Test
+  public void collectsDynamicConfigurationMessages() {
+    Configuration config = mock(Configuration.class);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("message.dump.dynamic.configuration.title"))
+        .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
+
+    GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
+
+    GerritComment dynamicConfigReply =
+        newComment(
+            "msg-dynamic",
+            7,
+            "ReviewAI",
+            "Patch Set 5:\n\n```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```",
+            "2026-04-09 10:05:00.000000",
+            5,
+            null,
+            null);
+
+    AiReviewHistoryInfo info =
+        collector.collect(
+            config, localizer, 7, Map.of("/PATCHSET_LEVEL", List.of(dynamicConfigReply)));
+
+    assertEquals(1, info.getEntries().size());
+    AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
+    assertEquals("assistant", entry.getRole());
+    assertEquals(true, entry.isSystemMessage());
+    assertEquals("```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```", entry.getMessage());
   }
 
   private static AiReviewHistoryInfo.Entry findEntry(AiReviewHistoryInfo info, String message) {
