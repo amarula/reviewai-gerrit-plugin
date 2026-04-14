@@ -1,4 +1,13 @@
 dependency-reduced-pom.xml
+CLAUDE.local.md
+.claude/
+.codeiumignore
+.codex
+.codex/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
 .idea/
 .vscode/
 /target
