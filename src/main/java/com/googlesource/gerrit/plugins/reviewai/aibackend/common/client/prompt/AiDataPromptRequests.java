@@ -56,13 +56,20 @@ public class AiDataPromptRequests extends AiDataPromptBase {
   protected AiMessageItem getMessageItem(int i) {
     messageItem = super.getMessageItem(i);
     log.debug("Retrieving extended message item for index: {}", i);
-    messageHistory = aiMessageHistory.retrieveHistory(commentProperties.get(i));
-    AiRequestMessage request = extractLastUserMessageFromHistory();
-    if (request != null) {
-      messageItem.setRequest(request.getContent());
-    } else {
+    GerritComment commentProperty = commentProperties.get(i);
+    messageHistory = aiMessageHistory.retrieveHistory(commentProperty);
+    if (commentProperty.isPatchSetComment()) {
       setRequestFromCommentProperty(messageItem, i);
+      removeLastMatchingUserMessage(messageItem.getRequest());
+    } else {
+      AiRequestMessage request = extractLastUserMessageFromHistory();
+      if (request != null) {
+        messageItem.setRequest(request.getContent());
+      } else {
+        setRequestFromCommentProperty(messageItem, i);
+      }
     }
+    setHistory(messageItem, messageHistory);
     log.debug("Message item after setting request content: {}", messageItem);
     return messageItem;
   }
@@ -87,5 +94,16 @@ public class AiDataPromptRequests extends AiDataPromptBase {
         "Error extracting request from message history: no user message found in {}",
         messageHistory);
     return null;
+  }
+
+  private void removeLastMatchingUserMessage(String content) {
+    log.debug("Removing last matching user message from history: {}", content);
+    for (int i = messageHistory.size() - 1; i >= 0; i--) {
+      AiRequestMessage message = messageHistory.get(i);
+      if (OPENAI_ROLE_USER.equals(message.getRole()) && content.equals(message.getContent())) {
+        messageHistory.remove(i);
+        return;
+      }
+    }
   }
 }

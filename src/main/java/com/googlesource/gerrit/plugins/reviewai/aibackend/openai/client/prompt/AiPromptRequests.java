@@ -62,6 +62,25 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
     return requestDataPrompt;
   }
 
+  @Override
+  public String getDefaultAiThreadReviewMessage(String patchSet) {
+    String requestDataPrompt = getAiRequestDataPrompt();
+    if (requestDataPrompt == null || requestDataPrompt.isEmpty()) {
+      return super.getDefaultAiThreadReviewMessage(patchSet);
+    }
+
+    List<String> promptSections = new ArrayList<>();
+    if (patchSet != null && !patchSet.isEmpty()) {
+      promptSections.add(DEFAULT_AI_REQUEST_PROMPT_DIFF);
+      promptSections.add(String.format("```%s```", patchSet));
+    }
+    promptSections.add(DEFAULT_AI_REQUEST_PROMPT_REQUESTS);
+    promptSections.add(requestDataPrompt);
+    String prompt = joinWithSpace(promptSections);
+    log.debug("AI thread review message for requests: {}", prompt);
+    return prompt;
+  }
+
   private String getCommentRequestPrompt(int commentPropertiesSize) {
     log.debug(
         "Constructing OpenAI comment request prompt for {} comment properties.",

@@ -23,8 +23,9 @@ import com.google.gerrit.extensions.api.changes.FileApi;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
-import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.ReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -244,8 +245,23 @@ public class OpenAiReviewTestBase extends ReviewTestBase {
   }
 
   protected String getUserPrompt() {
-    JsonArray prompts =
-        readContentToType(aiRequestBody.get("input").getAsString(), JsonArray.class);
-    return prompts.get(0).getAsJsonObject().get("request").getAsString();
+    return getUserPromptItems().get(0).getAsJsonObject().get("request").getAsString();
+  }
+
+  protected String getInputContent() {
+    return aiRequestBody.get("input").getAsString();
+  }
+
+  protected JsonArray getUserPromptItems() {
+    String inputContent = getInputContent();
+    int promptItemsStart = inputContent.indexOf("[{\"request\"");
+    if (promptItemsStart < 0) {
+      throw new IllegalStateException("Request JSON array not found in input: " + inputContent);
+    }
+    return readContentToType(inputContent.substring(promptItemsStart), JsonArray.class);
+  }
+
+  protected JsonObject getUserPromptItem(int index) {
+    return getUserPromptItems().get(index).getAsJsonObject();
   }
 }

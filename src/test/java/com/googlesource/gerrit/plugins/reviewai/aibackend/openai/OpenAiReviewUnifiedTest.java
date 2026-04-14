@@ -20,6 +20,8 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.common.net.HttpHeaders;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.restapi.RestApiException;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewReiterated;
 import com.googlesource.gerrit.plugins.reviewai.utils.ThreadUtils;
@@ -190,7 +192,7 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
-    Assert.assertEquals(promptTagComments, requestContent);
+    assertCommentPromptPreservesHistory();
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
   }
@@ -206,7 +208,7 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
-    Assert.assertEquals(promptTagComments, requestContent);
+    assertCommentPromptPreservesHistory();
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
   }
@@ -246,9 +248,28 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
-    Assert.assertEquals(promptTagComments, requestContent);
+    assertCommentPromptPreservesHistory();
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
+  }
+
+  private void assertCommentPromptPreservesHistory() {
+    String inputContent = getInputContent();
+    Assert.assertTrue(inputContent.contains("I have some requests about the following PatchSet Diff:"));
+    Assert.assertTrue(inputContent.contains(formattedPatchContent));
+
+    JsonArray prompts = getUserPromptItems();
+    Assert.assertEquals(2, prompts.size());
+
+    JsonObject patchSetRequest = getUserPromptItem(0);
+    Assert.assertEquals(
+        "comment 2 (Ref. message \"message from gpt\")",
+        patchSetRequest.get("request").getAsString());
+    Assert.assertTrue(patchSetRequest.has("history"));
+    Assert.assertTrue(patchSetRequest.get("history").getAsJsonArray().size() > 0);
+
+    JsonObject inlineRequest = getUserPromptItem(1);
+    Assert.assertEquals("message", inlineRequest.get("request").getAsString());
   }
 
   @Test

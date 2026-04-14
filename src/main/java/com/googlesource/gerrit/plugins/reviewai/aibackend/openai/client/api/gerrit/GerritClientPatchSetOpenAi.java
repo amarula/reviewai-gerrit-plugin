@@ -41,11 +41,10 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
   }
 
   public String getPatchSet(ChangeSetData changeSetData, GerritChange change) throws Exception {
-    if (change.getIsCommentEvent()) {
-      log.debug("No patch set retrieval because the change is a comment event.");
-      return "";
-    }
     this.change = change;
+    if (change.getIsCommentEvent()) {
+      retrieveRevisionBase(change);
+    }
 
     String formattedPatch = getPatchFromGerrit();
     patchSetFiles = extractFilesFromPatch(formattedPatch);
