@@ -88,7 +88,7 @@ public class ConfigCreator {
             .get(changeKey.toString())
             .getJsonObjectValue(KEY_DYNAMIC_CONFIG, String.class);
     if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
-      log.info("DynamicConfig found for change '{}': {}", changeKey, dynamicConfig);
+      log.debug("DynamicConfig found for change '{}': {}", changeKey, dynamicConfig);
       projectConfig = updateDynamicConfig(projectConfig, pluginName, dynamicConfig);
     }
     Optional<AccountState> aiAccount = getAccount(globalConfig);
