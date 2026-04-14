@@ -31,8 +31,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.open
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 @Slf4j
 public class ClientCommandExecutor extends ClientCommandBase {
@@ -84,6 +88,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.dynamicOptions = dynamicOptions;
     this.nextString = nextString.trim();
     switch (command) {
+      case HELP -> commandHelp();
       case REVIEW, REVIEW_LAST -> commandForceReview(command);
       case FORGET_THREAD -> commandForgetThread();
       case CONFIGURE -> commandDynamicallyConfigure();
@@ -96,6 +101,124 @@ public class ClientCommandExecutor extends ClientCommandBase {
     if (!DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command)) {
       changeSetData.setHideDynamicConfigMessage(true);
     }
+  }
+
+  private void commandHelp() {
+    CommandSet requestedCommand = parseHelpTarget(nextString);
+    if (requestedCommand == null && !nextString.isEmpty()) {
+      changeSetData.setReviewSystemMessage(
+          String.format(localizer.getText("message.command.help.command.unknown"), nextString));
+      return;
+    }
+    if (requestedCommand != null) {
+      changeSetData.setReviewSystemMessage(getSingleCommandHelpMessage(requestedCommand));
+      return;
+    }
+    changeSetData.setReviewSystemMessage(
+        joinWithNewLine(
+            List.of(
+                localizer.getText("message.command.help.title"),
+                "",
+                localizer.getText("message.command.help.notes.detail"),
+                "",
+                localizer.getText("message.command.help.help"),
+                localizer.getText("message.command.help.message"),
+                localizer.getText("message.command.help.review"),
+                localizer.getText("message.command.help.review_last"),
+                localizer.getText("message.command.help.directives"),
+                localizer.getText("message.command.help.forget_thread"),
+                localizer.getText("message.command.help.configure"),
+                localizer.getText("message.command.help.show"),
+                "",
+                localizer.getText("message.command.help.notes.title"),
+                localizer.getText("message.command.help.notes.debug"),
+                localizer.getText("message.command.help.notes.message"))));
+  }
+
+  private CommandSet parseHelpTarget(String input) {
+    if (input == null || input.isBlank()) {
+      return null;
+    }
+    String commandName = input.trim().split("\\s+")[0].replaceFirst("^/+", "");
+    if (commandName.isEmpty()) {
+      return null;
+    }
+    return COMMAND_MAP.get(commandName.toLowerCase(Locale.ROOT));
+  }
+
+  private String getSingleCommandHelpMessage(CommandSet command) {
+    return switch (command) {
+      case HELP ->
+          joinWithNewLine(
+              List.of(
+                  String.format(localizer.getText("message.command.help.command.title"), "/help"),
+                  "",
+                  localizer.getText("message.command.help.command.help.syntax"),
+                  localizer.getText("message.command.help.command.help.description")));
+      case MESSAGE ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/message"),
+                  "",
+                  localizer.getText("message.command.help.command.message.syntax"),
+                  localizer.getText("message.command.help.command.message.description"),
+                  localizer.getText("message.command.help.command.message.note")));
+      case REVIEW ->
+          joinWithNewLine(
+              List.of(
+                  String.format(localizer.getText("message.command.help.command.title"), "/review"),
+                  "",
+                  localizer.getText("message.command.help.command.review.syntax"),
+                  localizer.getText("message.command.help.command.review.description"),
+                  localizer.getText("message.command.help.command.review.options")));
+      case REVIEW_LAST ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/review_last"),
+                  "",
+                  localizer.getText("message.command.help.command.review_last.syntax"),
+                  localizer.getText("message.command.help.command.review_last.description"),
+                  localizer.getText("message.command.help.command.review_last.options")));
+      case DIRECTIVES ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/directives"),
+                  "",
+                  localizer.getText("message.command.help.command.directives.syntax"),
+                  localizer.getText("message.command.help.command.directives.description"),
+                  localizer.getText("message.command.help.command.directives.options"),
+                  localizer.getText("message.command.help.command.directives.note")));
+      case FORGET_THREAD ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/forget_thread"),
+                  "",
+                  localizer.getText("message.command.help.command.forget_thread.syntax"),
+                  localizer.getText("message.command.help.command.forget_thread.description")));
+      case CONFIGURE ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/configure"),
+                  "",
+                  localizer.getText("message.command.help.command.configure.syntax"),
+                  localizer.getText("message.command.help.command.configure.description"),
+                  localizer.getText("message.command.help.command.configure.options"),
+                  localizer.getText("message.command.help.command.configure.note")));
+      case SHOW ->
+          joinWithNewLine(
+              List.of(
+                  String.format(localizer.getText("message.command.help.command.title"), "/show"),
+                  "",
+                  localizer.getText("message.command.help.command.show.syntax"),
+                  localizer.getText("message.command.help.command.show.description"),
+                  localizer.getText("message.command.help.command.show.options"),
+                  localizer.getText("message.command.help.command.show.note")));
+    };
   }
 
   private void commandForceReview(CommandSet command) {

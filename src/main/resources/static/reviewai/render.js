@@ -79,7 +79,7 @@
       const input = reviewAiDom.createElement('textarea', {
         className: 'reviewai-history__composer-input',
         rows: 1,
-        placeholder: 'Ask the AI about this change...',
+        placeholder: 'Ask the AI about this change or enter /help...',
       });
       input.addEventListener('input', event => {
         view._draftMessage = event.target.value;
@@ -96,7 +96,8 @@
       });
       const hint = reviewAiDom.createElement('div', {
         className: 'reviewai-history__composer-hint',
-        textContent: 'Replies may take a few seconds and will also appear in Gerrit comments.',
+        textContent:
+          'Enter /help for command help. Replies may take a few seconds and will also appear in Gerrit comments.',
       });
 
       reviewAiDom.appendChildren(actions, button, hint);

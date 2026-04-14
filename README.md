@@ -7,7 +7,8 @@ review feedback in the form of comments and, optionally, a vote.
 You can continue to ask AI by @{gerritUserName} or @{gerritEmailAddress} (provided that `gerritEmailAddress` is in the
 form "gerritUserName@<any_email_domain>") in the comments to further guide it in generating more targeted review
 comments.
-Reviews can be also triggered by directing a comment with the `/review` command to AI.
+Reviews can be also triggered by directing a comment with the `/review` command to AI, and `/help` or `/help <command>`
+shows command reference directly in Gerrit.
 
 ## Getting Started
 
@@ -273,6 +274,21 @@ These parameters are specific to connecting with the OpenAI server and should on
   chunk files. This setting specifies the maximum size of each chunk file, with a default of 5 MB.
 
 ## Commands
+
+### Help
+
+Use `/help` in a comment directed at the AI user to display a summary of all supported commands and their main
+options directly in Gerrit. Use `/help <command>` or `/help /<command>` to show detailed help for a single command.
+
+Example:
+
+```
+@gpt /help
+```
+
+```
+@gpt /help /review
+```
 
 ### Message
 

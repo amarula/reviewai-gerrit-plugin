@@ -120,6 +120,36 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandHelp() throws Exception {
+    setupCommandComment("/help");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    Assert.assertTrue(systemMessage.contains("AVAILABLE COMMANDS"));
+    Assert.assertTrue(systemMessage.contains("`/help <command>`"));
+    Assert.assertTrue(systemMessage.contains("`/help`"));
+    Assert.assertTrue(systemMessage.contains("`/message <text>`"));
+    Assert.assertTrue(systemMessage.contains("`/review [--filter=true|false] [--debug]`"));
+    Assert.assertTrue(
+        systemMessage.contains(
+            "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
+  }
+
+  @Test
+  public void commandHelpSpecificCommand() throws Exception {
+    setupCommandComment("/help /review");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    Assert.assertEquals(false, changeSetData.getForcedReview());
+    Assert.assertTrue(systemMessage.contains("HELP FOR `/review`"));
+    Assert.assertTrue(systemMessage.contains("`/review [--filter=true|false] [--debug]`"));
+    Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
+  }
+
+  @Test
   public void commandConfigure() throws Exception {
     String dynamicKey = "aiModel";
     String dynamicValue = "DUMMY_MODEL";

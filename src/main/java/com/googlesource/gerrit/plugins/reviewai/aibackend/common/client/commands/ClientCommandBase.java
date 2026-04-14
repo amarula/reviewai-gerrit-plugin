@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public abstract class ClientCommandBase extends ClientBase {
   public enum CommandSet {
+    HELP,
     MESSAGE,
     REVIEW,
     REVIEW_LAST,
@@ -52,6 +53,7 @@ public abstract class ClientCommandBase extends ClientBase {
 
   protected static final ImmutableBiMap<String, CommandSet> COMMAND_MAP =
       ImmutableBiMap.of(
+          "help", CommandSet.HELP,
           "message", CommandSet.MESSAGE,
           "review", CommandSet.REVIEW,
           "review_last", CommandSet.REVIEW_LAST,

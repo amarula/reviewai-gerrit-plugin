@@ -107,10 +107,14 @@ public class ClientCommandParser extends ClientCommandBase {
     Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
     changeSetData.setHideOpenAiReview(true);
     while (commandMatcher.find()) {
+      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
       if (!parseSingleCommand(comment, commandMatcher)) {
         return false;
       }
       commandFound = true;
+      if (command == CommandSet.HELP) {
+        break;
+      }
     }
     if (!changeSetData.getForcedReview()) {
       changeSetData.setHideOpenAiReview(false);
