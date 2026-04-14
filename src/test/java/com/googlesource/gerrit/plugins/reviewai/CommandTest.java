@@ -167,8 +167,9 @@ public class CommandTest extends OpenAiReviewTestBase {
 
     // The dump order may vary, so the contents are compared in sorted form.
     String systemMessage =
-        sortTextLines(readTestFile("__files/commands/dumpStoredDataSystemMessage.txt"));
-    Assert.assertEquals(systemMessage, sortTextLines(changeSetData.getReviewSystemMessage()));
+        sortTextLines(readTestFile("__files/commands/dumpStoredDataSystemMessage.txt").stripTrailing());
+    Assert.assertEquals(
+        systemMessage, sortTextLines(changeSetData.getReviewSystemMessage().stripTrailing()));
   }
 
   @Test
@@ -178,8 +179,25 @@ public class CommandTest extends OpenAiReviewTestBase {
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
-    String systemMessage = readTestFile("__files/commands/dumpConfig.txt");
-    Assert.assertEquals(systemMessage, changeSetData.getReviewSystemMessage());
+    String systemMessage = readTestFile("__files/commands/dumpConfig.txt").stripTrailing();
+    Assert.assertEquals(systemMessage, changeSetData.getReviewSystemMessage().stripTrailing());
+  }
+
+  @Test
+  public void commandShowPromptsUsesSafeMarkdownFence() throws Exception {
+    setupCommandComment("/show --prompts");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    Mockito.verify(revisionApiMock).review(captor.capture());
+
+    String reviewMessage = captor.getValue().message;
+    Assert.assertTrue(reviewMessage.contains("SYSTEM MESSAGE:"));
+    Assert.assertTrue(reviewMessage.contains("PROMPTS CURRENTLY USED"));
+    Assert.assertTrue(reviewMessage.contains("Review the following Patch Set:  ` ` `"));
+    Assert.assertTrue(reviewMessage.contains("\n```\n"));
   }
 
   @Test

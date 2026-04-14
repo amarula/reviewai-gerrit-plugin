@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
@@ -251,6 +252,45 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals("assistant", entry.getRole());
     assertEquals(true, entry.isSystemMessage());
     assertEquals("```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```", entry.getMessage());
+  }
+
+  @Test
+  public void preservesShowCommandSystemMessageBodyInHistory() {
+    Configuration config = mock(Configuration.class);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.filterProperties("message.dump.", ".title"))
+        .thenReturn(List.of("PROMPTS CURRENTLY USED", "INSTRUCTIONS CURRENTLY USED"));
+
+    GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
+
+    GerritComment systemReply =
+        newComment(
+            "msg-show",
+            7,
+            "ReviewAI",
+            "Patch Set 5:\n\nSYSTEM MESSAGE:\n\n```\nPROMPTS CURRENTLY USED\n\n### Review Prompt\n"
+                + "Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ..."
+                + " <PATCH_SET> ` ` `\n```\n",
+            "2026-04-09 10:05:00.000000",
+            5,
+            null,
+            null);
+
+    AiReviewHistoryInfo info =
+        collector.collect(config, localizer, 7, Map.of("/PATCHSET_LEVEL", List.of(systemReply)));
+
+    assertEquals(1, info.getEntries().size());
+    AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
+    assertEquals("assistant", entry.getRole());
+    assertEquals(true, entry.isSystemMessage());
+    assertTrue(entry.getMessage().contains("SYSTEM MESSAGE:"));
+    assertTrue(entry.getMessage().contains("PROMPTS CURRENTLY USED"));
+    assertTrue(entry.getMessage().contains("### Review Prompt"));
+    assertTrue(entry.getMessage().contains("Review the following Patch Set:  ` ` `"));
   }
 
   private static AiReviewHistoryInfo.Entry findEntry(AiReviewHistoryInfo info, String message) {
