@@ -268,7 +268,6 @@ These parameters are specific to connecting with the OpenAI server and should on
 - `aiConnectionTimeout`: Defines the timeout for connections to the OpenAI server, with a default of 30 seconds.
 - `aiPollingTimeout`: Sets the timeout for terminating OpenAI polling on requests, defaulting to 180 seconds.
 - `getPollingInterval`: Sets the interval for OpenAI polling on requests, defaulting to 1 second.
-- `aiConnectionRetryInterval`: Sets the interval between two connection attempts, with a default of 10 seconds.
 - `aiConnectionMaxRetryAttempts`: Determines the maximum number of retry attempts, defaulting to 2.
 - `aiUploadedChunkSizeMb`: When uploading project repositories to OpenAI, the repositories are packaged and split into
   chunk files. This setting specifies the maximum size of each chunk file, with a default of 5 MB.

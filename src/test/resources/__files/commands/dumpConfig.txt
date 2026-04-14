@@ -6,7 +6,6 @@ CONFIGURATION SETTINGS
 aiBackend: OPENAI
 aiCommentTemperature: 1.0
 aiConnectionMaxRetryAttempts: 1
-aiConnectionRetryInterval: 10
 aiConnectionTimeout: 30
 aiDomain: http://localhost:9527
 aiFullFileReview: true

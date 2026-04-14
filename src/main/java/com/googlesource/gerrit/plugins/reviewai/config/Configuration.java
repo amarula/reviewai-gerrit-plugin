@@ -84,7 +84,6 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_IGNORE_RESOLVED_AI_COMMENTS = true;
   private static final boolean DEFAULT_TASK_SPECIFIC_ASSISTANTS = false;
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 30;
-  private static final int DEFAULT_AI_CONNECTION_RETRY_INTERVAL = 10;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
   private static final int DEFAULT_AI_POLLING_TIMEOUT = 180;
   private static final int DEFAULT_AI_POLLING_INTERVAL = 1000;
@@ -142,7 +141,6 @@ public class Configuration extends ConfigCore {
   private static final String KEY_IGNORE_RESOLVED_AI_COMMENTS = "ignoreResolvedAiComments";
   private static final String KEY_TASK_SPECIFIC_ASSISTANTS = "taskSpecificAssistants";
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
-  private static final String KEY_AI_CONNECTION_RETRY_INTERVAL = "aiConnectionRetryInterval";
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
   private static final String KEY_AI_POLLING_TIMEOUT = "aiPollingTimeout";
   private static final String KEY_AI_POLLING_INTERVAL = "aiPollingInterval";
@@ -349,10 +347,6 @@ public class Configuration extends ConfigCore {
 
   public int getLcMaxMemoryTokens() {
     return getInt(KEY_LC_MAX_MEMORY_TOKENS, DEFAULT_LC_MAX_MEMORY_TOKENS);
-  }
-
-  public int getAiConnectionRetryInterval() {
-    return getInt(KEY_AI_CONNECTION_RETRY_INTERVAL, DEFAULT_AI_CONNECTION_RETRY_INTERVAL);
   }
 
   public int getAiConnectionMaxRetryAttempts() {
