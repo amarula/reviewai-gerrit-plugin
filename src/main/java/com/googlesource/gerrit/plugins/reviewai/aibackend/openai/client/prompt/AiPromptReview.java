@@ -34,6 +34,14 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   private static final String RULE_NUMBER_PREFIX = "RULE #";
 
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS;
+  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES;
@@ -72,15 +80,42 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   @Override
   public String getDefaultAiAssistantInstructions() {
-    String reviewPrompt =
-        GerritUiPromptLoader.resolveReviewInstructions(
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS);
-    List<String> instructions = new ArrayList<>();
-    addCommonAiAssistantInstructions(instructions, false);
-    addAiAssistantInstructions(instructions);
-    String remainingInstructions = joinWithSpace(instructions);
-    String compiledInstructions =
-        remainingInstructions.isEmpty() ? reviewPrompt : reviewPrompt + "\n\n" + remainingInstructions;
+    List<String> sections = new ArrayList<>();
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE,
+            GerritUiPromptLoader.resolveReviewInstructions(
+                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS)));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            getScopeAndReviewConstraints()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES, getAiAssistantInstructionsReview()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+            getMandatoryResponseFormat()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS, getPatchSetReviewPrompt()));
+    if (config.getAiReviewCommitMessages()) {
+      sections.add(
+          buildSection(
+              DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
+              getReviewPromptCommitMessages()));
+    }
+
+    String compiledInstructions = joinWithDoubleNewLine(sections);
     log.debug("Compiled AI Assistant Review Instructions: {}", compiledInstructions);
     return compiledInstructions;
   }
@@ -98,6 +133,29 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                         DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES))),
             getPatchSetReviewPrompt()));
     log.debug("Review instructions formed: {}", instructions);
+  }
+
+  private String getScopeAndReviewConstraints() {
+    List<String> constraints = new ArrayList<>(List.of(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT));
+    List<String> commonInstructions = new ArrayList<>();
+    addCommonAiAssistantInstructions(commonInstructions, false);
+    commonInstructions.stream()
+        .filter(instruction -> !constraints.contains(instruction))
+        .forEach(constraints::add);
+    return joinWithDoubleNewLine(constraints);
+  }
+
+  private String getMandatoryResponseFormat() {
+    return joinWithNewLine(
+        splitString(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT.strip(), "\n").stream()
+            .map(String::strip)
+            .filter(line -> !line.isEmpty())
+            .filter(line -> !line.startsWith("//"))
+            .toList());
+  }
+
+  private String buildSection(String title, String body) {
+    return "# " + title + "\n\n" + body.strip();
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {

@@ -23,6 +23,7 @@ import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewReiterated;
 import com.googlesource.gerrit.plugins.reviewai.utils.ThreadUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -57,12 +58,52 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
   public void reviewAssistantInstructionsUseGerritUiDefaultPrompt() {
     String instructions = openAiPrompt.getDefaultAiAssistantInstructions();
 
-    Assert.assertTrue(instructions.startsWith("Remote Gerrit review prompt."));
-    Assert.assertTrue(instructions.contains("Remote Gerrit review prompt.\n\n"));
-    Assert.assertTrue(instructions.contains("While reviewing, you MUST strictly adhere"));
+    Assert.assertTrue(
+        instructions.startsWith(
+            sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE)
+                + "Remote Gerrit review prompt."));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(
+                    AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS)));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES)
+                + "RULE #1:"));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(
+                    AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES)));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(
+                    AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT)));
+    Assert.assertTrue(instructions.contains("- the response will be only valid JSON using double-quotes"));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE)
+                + "User: Review the following Patch Set:"));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS)
+                + "The answer object includes"));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(
+                    AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT)
+                + "You MUST review the commit message"));
     Assert.assertFalse(instructions.contains("Act as a PatchSet Reviewer."));
     Assert.assertFalse(instructions.contains("{{patch}}"));
     Assert.assertFalse(instructions.contains("\nPatch:\n"));
+    Assert.assertFalse(instructions.contains("// MANDATORY Response format"));
+    Assert.assertFalse(instructions.contains("// Example response to user"));
   }
 
   @Test
@@ -74,11 +115,22 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
 
     String instructions = openAiPrompt.getDefaultAiAssistantInstructions();
 
-    Assert.assertTrue(instructions.startsWith("Remote Gerrit review prompt."));
-    Assert.assertTrue(instructions.contains("\n\n"));
+    Assert.assertTrue(
+        instructions.startsWith(
+            sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE)
+                + "Remote Gerrit review prompt."));
+    Assert.assertTrue(
+        instructions.contains(
+            "\n\n"
+                + sectionHeader(
+                    AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS)));
     Assert.assertTrue(
         instructions.contains("Disregard missing implementations of methods or other code entities"));
     Assert.assertFalse(instructions.contains("Act as a PatchSet Reviewer."));
+  }
+
+  private String sectionHeader(String title) {
+    return "# " + title + "\n\n";
   }
 
   @Test
