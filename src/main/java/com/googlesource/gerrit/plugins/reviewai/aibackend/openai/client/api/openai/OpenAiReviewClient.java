@@ -115,6 +115,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
             getPrompt(changeSetData, change, patchSet),
             conversationId);
     response = continueResponseLoop(openAiResponses, response, conversationId);
+    log.debug("OpenAI response: {}", response);
     AiResponseContent aiResponseContent = getResponseContentOpenAI(response);
     if (!isCommentEvent && aiResponseContent.getReplies() == null) {
       throw new ResponseEmptyRepliesException();
