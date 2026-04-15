@@ -459,7 +459,7 @@ public class ReviewTestBase extends TestBase {
       case OPENAI ->
           config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
               ? new OpenAiTaskSpecificReviewClient(
-                  config, getCodeContextPolicy(), pluginDataHandlerProvider)
+                  config, getCodeContextPolicy(), pluginDataHandlerProvider, Runnable::run)
               : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
       case LANGCHAIN ->
           new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);

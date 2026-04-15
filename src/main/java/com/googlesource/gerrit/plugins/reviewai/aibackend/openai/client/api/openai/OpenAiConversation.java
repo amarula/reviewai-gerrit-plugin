@@ -20,12 +20,15 @@ import com.openai.client.OpenAIClient;
 import com.openai.core.http.HttpResponseFor;
 import com.openai.models.conversations.Conversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponse;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.Locale;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
 
@@ -36,18 +39,32 @@ public class OpenAiConversation {
   private final Configuration config;
   private final ChangeSetData changeSetData;
   private final PluginDataHandler changeDataHandler;
+  private final String conversationKey;
 
   public OpenAiConversation(
       Configuration config,
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
+    this(config, changeSetData, pluginDataHandlerProvider, KEY_CONVERSATION_ID);
+  }
+
+  public OpenAiConversation(
+      Configuration config,
+      ChangeSetData changeSetData,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      String conversationKey) {
     this.config = config;
     this.changeSetData = changeSetData;
+    this.conversationKey = conversationKey;
     changeDataHandler = pluginDataHandlerProvider.getChangeScope();
   }
 
+  public static String getTaskSpecificConversationKey(ReviewAssistantStages assistantStage) {
+    return KEY_CONVERSATION_ID + "." + assistantStage.name().toLowerCase(Locale.ROOT);
+  }
+
   public String resolveConversationId() throws AiConnectionFailException {
-    String conversationId = changeDataHandler.getValue(KEY_CONVERSATION_ID);
+    String conversationId = changeDataHandler.getValue(conversationKey);
     if (conversationId == null
         || !changeSetData.getForcedReview() && !changeSetData.getForcedStagedReview()) {
       return createConversation();
@@ -69,7 +86,7 @@ public class OpenAiConversation {
         OpenAiResponse conversationResponse = jsonToClass(responseBody, OpenAiResponse.class);
         String conversationId = conversationResponse.getId();
         if (conversationId != null) {
-          changeDataHandler.setValue(KEY_CONVERSATION_ID, conversationId);
+          changeDataHandler.setValue(conversationKey, conversationId);
           log.info("Conversation created: {}", conversationResponse);
         } else {
           log.error("Failed to create conversation. Response: {}", conversationResponse);
@@ -90,5 +107,8 @@ public class OpenAiConversation {
 
   public void clear() {
     changeDataHandler.removeValue(KEY_CONVERSATION_ID);
+    for (ReviewAssistantStages assistantStage : ReviewAssistantStages.values()) {
+      changeDataHandler.removeValue(getTaskSpecificConversationKey(assistantStage));
+    }
   }
 }

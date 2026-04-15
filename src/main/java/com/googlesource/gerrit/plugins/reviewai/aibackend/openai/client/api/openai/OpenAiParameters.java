@@ -22,11 +22,11 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class OpenAiParameters extends ClientBase {
-  private static boolean isCommentEvent;
+  private final boolean isCommentEvent;
 
   public OpenAiParameters(Configuration config, boolean isCommentEvent) {
     super(config);
-    OpenAiParameters.isCommentEvent = isCommentEvent;
+    this.isCommentEvent = isCommentEvent;
     log.debug("OpenAiParameters initialized with isCommentEvent: {}", isCommentEvent);
   }
 

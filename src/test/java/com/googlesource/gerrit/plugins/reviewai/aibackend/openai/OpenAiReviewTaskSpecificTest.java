@@ -20,6 +20,7 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
@@ -81,6 +82,7 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
     handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
 
+    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
     IAiPrompt openAiPromptOpenAICommitMessage =
         AiPromptFactory.getAiPrompt(
             config, changeSetData, getGerritChange(), getCodeContextPolicy());

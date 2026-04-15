@@ -50,4 +50,20 @@ public class ChangeSetData {
   public Boolean shouldRequestAiReview() {
     return reviewSystemMessage == null && !shouldHideOpenAiReview();
   }
+
+  public ChangeSetData copy() {
+    ChangeSetData copy = new ChangeSetData(aiAccountId, votingMinScore, votingMaxScore);
+    copy.setAiDataPrompt(aiDataPrompt);
+    copy.setCommentPropertiesSize(commentPropertiesSize);
+    copy.setReviewAssistantStage(reviewAssistantStage);
+    copy.setForcedStagedReview(forcedStagedReview);
+    copy.setForcedReview(forcedReview);
+    copy.setForcedReviewLastPatchSet(forcedReviewLastPatchSet);
+    copy.setReplyFilterEnabled(replyFilterEnabled);
+    copy.setDebugReviewMode(debugReviewMode);
+    copy.setHideOpenAiReview(hideOpenAiReview);
+    copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
+    copy.setReviewSystemMessage(reviewSystemMessage);
+    return copy;
+  }
 }

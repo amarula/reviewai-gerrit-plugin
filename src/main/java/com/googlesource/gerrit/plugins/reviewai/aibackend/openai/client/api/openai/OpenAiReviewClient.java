@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -60,6 +61,20 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
   private final ICodeContextPolicy codeContextPolicy;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
 
+  @Getter
+  protected static class ReviewRequestResult {
+    private final AiResponseContent responseContent;
+    private final String requestBody;
+    private final String conversationId;
+
+    ReviewRequestResult(
+        AiResponseContent responseContent, String requestBody, String conversationId) {
+      this.responseContent = responseContent;
+      this.requestBody = requestBody;
+      this.conversationId = conversationId;
+    }
+  }
+
   @VisibleForTesting
   @Inject
   public OpenAiReviewClient(
@@ -75,7 +90,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
   public AiResponseContent ask(
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws AiConnectionFailException {
-    isCommentEvent = change.getIsCommentEvent();
+    boolean isCommentEvent = change.getIsCommentEvent();
     log.debug(
         "Processing OPENAI OpenAI Request with changeId: {}, Patch Set: {}",
         change.getFullChangeId(),
@@ -84,7 +99,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
     AiResponseContent aiResponseContent = null;
     for (int reiterate = 0; reiterate < MAX_REITERATION_REQUESTS; reiterate++) {
       try {
-        aiResponseContent = askSingleRequest(changeSetData, change, patchSet);
+        aiResponseContent = askSingleRequest(changeSetData, change, patchSet, isCommentEvent);
       } catch (ResponseEmptyRepliesException | JsonSyntaxException e) {
         log.debug("Review response in incorrect format; Requesting resend with correct format.");
         changeSetData.setForcedStagedReview(true);
@@ -99,28 +114,84 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
     return aiResponseContent;
   }
 
+  protected ReviewRequestResult askWithConversationKey(
+      ChangeSetData changeSetData, GerritChange change, String patchSet, String conversationKey)
+      throws AiConnectionFailException {
+    boolean isCommentEvent = change.getIsCommentEvent();
+    log.debug(
+        "Processing OPENAI OpenAI Request with changeId: {}, Patch Set: {}",
+        change.getFullChangeId(),
+        patchSet);
+
+    ReviewRequestResult reviewRequestResult = null;
+    for (int reiterate = 0; reiterate < MAX_REITERATION_REQUESTS; reiterate++) {
+      try {
+        reviewRequestResult =
+            askSingleRequest(changeSetData, change, patchSet, isCommentEvent, conversationKey);
+      } catch (ResponseEmptyRepliesException | JsonSyntaxException e) {
+        log.debug("Review response in incorrect format; Requesting resend with correct format.");
+        changeSetData.setForcedStagedReview(true);
+        changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_REITERATED);
+        continue;
+      }
+      if (reviewRequestResult == null) {
+        return null;
+      }
+      break;
+    }
+    return reviewRequestResult;
+  }
+
+  protected PluginDataHandlerProvider getPluginDataHandlerProvider() {
+    return pluginDataHandlerProvider;
+  }
+
   private AiResponseContent askSingleRequest(
-      ChangeSetData changeSetData, GerritChange change, String patchSet)
+      ChangeSetData changeSetData, GerritChange change, String patchSet, boolean isCommentEvent)
+      throws AiConnectionFailException {
+    ReviewRequestResult reviewRequestResult =
+        askSingleRequest(
+            changeSetData,
+            change,
+            patchSet,
+            isCommentEvent,
+            OpenAiConversation.KEY_CONVERSATION_ID);
+    requestBody = reviewRequestResult == null ? null : reviewRequestResult.getRequestBody();
+    return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
+  }
+
+  private ReviewRequestResult askSingleRequest(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      boolean isCommentEvent,
+      String conversationKey)
       throws AiConnectionFailException {
     log.debug("Processing Single OpenAI Request");
     OpenAiConversation openAiConversation =
-        new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider);
+        new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey);
     OpenAiResponses openAiResponses =
         new OpenAiResponses(config, changeSetData, change, codeContextPolicy);
-    String conversationId = openAiConversation.resolveConversationId();
-    OpenAiResponsesResponse response =
-        createPromptResponseWithRecovery(
-            openAiConversation,
-            openAiResponses,
-            getPrompt(changeSetData, change, patchSet),
-            conversationId);
-    response = continueResponseLoop(openAiResponses, response, conversationId);
-    log.debug("OpenAI response: {}", response);
-    AiResponseContent aiResponseContent = getResponseContentOpenAI(response);
-    if (!isCommentEvent && aiResponseContent.getReplies() == null) {
-      throw new ResponseEmptyRepliesException();
+    try {
+      String conversationId = openAiConversation.resolveConversationId();
+      OpenAiResponsesResponse response =
+          createPromptResponseWithRecovery(
+              openAiConversation,
+              openAiResponses,
+              getPrompt(changeSetData, change, patchSet),
+              conversationId);
+      response = continueResponseLoop(openAiResponses, response, conversationId);
+      log.debug("OpenAI response: {}", response);
+      AiResponseContent aiResponseContent = getResponseContentOpenAI(response);
+      if (!isCommentEvent && aiResponseContent.getReplies() == null) {
+        throw new ResponseEmptyRepliesException();
+      }
+      return new ReviewRequestResult(
+          aiResponseContent, openAiResponses.getRequestBody(), conversationId);
+    } catch (AiConnectionFailException e) {
+      requestBody = openAiResponses.getRequestBody();
+      throw e;
     }
-    return aiResponseContent;
   }
 
   private OpenAiResponsesResponse continueResponseLoop(
@@ -270,8 +341,6 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
           conversationId);
       openAiConversation.clear();
       return openAiResponses.createPromptResponse(prompt, openAiConversation.resolveConversationId());
-    } finally {
-      requestBody = openAiResponses.getRequestBody();
     }
   }
 

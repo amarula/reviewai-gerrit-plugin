@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.common.net.HttpHeaders;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.restapi.RestApiException;
@@ -46,6 +47,8 @@ import static org.mockito.Mockito.when;
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
 public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
+  private static final String REITERATE_SECOND_CALL = "reiterate-second-call";
+
   @Rule public TestName testName = new TestName();
 
   @Override
@@ -239,7 +242,10 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
                 config, changeSetData, getGerritChange(), getCodeContextPolicy())
             .getDefaultAiThreadReviewMessage("");
 
-    setupMockRequestCreateResponse("openAiResponseRequestMessage.json");
+    setupReiterateScenarioResponse(
+        "reiterate-textual",
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiResponseRequestMessage.json"),
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json"));
 
     handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
 
@@ -254,7 +260,10 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
                 config, changeSetData, getGerritChange(), getCodeContextPolicy())
             .getDefaultAiThreadReviewMessage("");
 
-    setupMockRequestCreateResponse("openAiRunStepsResponseMalformedJson.json");
+    setupReiterateScenarioResponse(
+        "reiterate-malformed-json",
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponseMalformedJson.json"),
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json"));
 
     handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
 
@@ -384,5 +393,31 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
     Assert.assertEquals(1, captor.getValue().labels.get("Code-Review").intValue());
+  }
+
+  private void setupReiterateScenarioResponse(
+      String scenarioName, String firstResponseBody, String secondResponseBody) {
+    WireMock.stubFor(
+        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .atPriority(1)
+            .inScenario(scenarioName)
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo(REITERATE_SECOND_CALL)
+            .willReturn(
+                WireMock.aResponse()
+                    .withStatus(200)
+                    .withHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.toString())
+                    .withBody(firstResponseBody)));
+
+    WireMock.stubFor(
+        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .atPriority(1)
+            .inScenario(scenarioName)
+            .whenScenarioStateIs(REITERATE_SECOND_CALL)
+            .willReturn(
+                WireMock.aResponse()
+                    .withStatus(200)
+                    .withHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.toString())
+                    .withBody(secondResponseBody)));
   }
 }

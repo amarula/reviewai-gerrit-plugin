@@ -27,8 +27,7 @@ import java.util.List;
 
 @Slf4j
 public abstract class OpenAiReviewClientBase extends AiClientBase {
-  protected boolean isCommentEvent = false;
-  @Getter protected String requestBody;
+  @Getter protected volatile String requestBody;
 
   public OpenAiReviewClientBase(Configuration config) {
     super(config);
