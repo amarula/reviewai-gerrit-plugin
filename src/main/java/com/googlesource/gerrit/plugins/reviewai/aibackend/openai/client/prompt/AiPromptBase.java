@@ -72,14 +72,19 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
 
   public abstract String getAiRequestDataPrompt();
 
-  public String getDefaultAiAssistantInstructions() {
-    List<String> instructions =
-        new ArrayList<>(
-            List.of(
-                config.getAiSystemPromptInstructions(DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS)
-                    + DOT));
+  protected void addCommonAiAssistantInstructions(
+      List<String> instructions, boolean includeSystemPromptInstructions) {
+    if (includeSystemPromptInstructions) {
+      instructions.add(
+          config.getAiSystemPromptInstructions(DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS) + DOT);
+    }
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
     this.projectInstructions.addProjectInstructions(instructions);
+  }
+
+  public String getDefaultAiAssistantInstructions() {
+    List<String> instructions = new ArrayList<>();
+    addCommonAiAssistantInstructions(instructions, true);
     addAiAssistantInstructions(instructions);
     String compiledInstructions = joinWithSpace(instructions);
     log.debug("Compiled AI Assistant Instructions: {}", compiledInstructions);

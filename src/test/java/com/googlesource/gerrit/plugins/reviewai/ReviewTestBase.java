@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai;
 
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
@@ -65,6 +66,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 
 import lombok.NonNull;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.mockito.ArgumentCaptor;
@@ -78,6 +80,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -100,6 +103,8 @@ public class ReviewTestBase extends TestBase {
   protected static final String GERRIT_USER_GROUP = "Test";
   protected static final String AI_TOKEN = "tk-test";
   protected static final String AI_DOMAIN = "http://localhost:9527";
+  protected static final String GERRIT_UI_PROMPTS_PATH = "/gerrit-prompts.ts?format=TEXT";
+  protected static final String GERRIT_UI_PROMPTS_URL_PROPERTY = "reviewai.gerritUiPromptUrl";
   protected static final long TEST_TIMESTAMP = 1699270812;
   protected static final Type COMMENTS_GERRIT_TYPE =
       new TypeLiteral<Map<String, List<CommentInfo>>>() {}.getType();
@@ -137,11 +142,17 @@ public class ReviewTestBase extends TestBase {
 
   @Before
   public void before() throws RestApiException {
+    System.setProperty(GERRIT_UI_PROMPTS_URL_PROPERTY, AI_DOMAIN + GERRIT_UI_PROMPTS_PATH);
     initGlobalAndProjectConfig();
     initConfig();
     setupMockRequests();
     initComparisonContent();
     initTest();
+  }
+
+  @After
+  public void after() {
+    System.clearProperty(GERRIT_UI_PROMPTS_URL_PROPERTY);
   }
 
   protected void initGlobalAndProjectConfig() {
@@ -184,6 +195,8 @@ public class ReviewTestBase extends TestBase {
   }
 
   protected void setupMockRequests() throws RestApiException {
+    mockGerritUiPromptsApiCall();
+
     Accounts accountsMock = mockGerritAccountsRestEndpoint();
     // Mock the behavior of the gerritAccountIdUri request
     mockGerritAccountsQueryApiCall(GERRIT_AI_USERNAME, GERRIT_AI_ACCOUNT_ID);
@@ -210,6 +223,21 @@ public class ReviewTestBase extends TestBase {
 
     // Mock the pluginDataHandlerProvider to return the mocked Change pluginDataHandler
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(pluginDataHandler);
+  }
+
+  protected void mockGerritUiPromptsApiCall() {
+    mockGerritUiPromptsApiCall(readTestFile("__files/gerrit/gerritPrompts.ts"));
+  }
+
+  protected void mockGerritUiPromptsApiCall(String promptsSource) {
+    WireMock.stubFor(
+        WireMock.get(WireMock.urlEqualTo(GERRIT_UI_PROMPTS_PATH))
+            .willReturn(
+                WireMock.aResponse()
+                    .withStatus(200)
+                    .withBody(
+                        Base64.getEncoder()
+                            .encodeToString(promptsSource.getBytes(java.nio.charset.StandardCharsets.UTF_8)))));
   }
 
   private Accounts mockGerritAccountsRestEndpoint() {

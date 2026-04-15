@@ -70,10 +70,24 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     return null;
   }
 
+  @Override
+  public String getDefaultAiAssistantInstructions() {
+    String reviewPrompt =
+        GerritUiPromptLoader.resolveReviewInstructions(
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS);
+    List<String> instructions = new ArrayList<>();
+    addCommonAiAssistantInstructions(instructions, false);
+    addAiAssistantInstructions(instructions);
+    String remainingInstructions = joinWithSpace(instructions);
+    String compiledInstructions =
+        remainingInstructions.isEmpty() ? reviewPrompt : reviewPrompt + "\n\n" + remainingInstructions;
+    log.debug("Compiled AI Assistant Review Instructions: {}", compiledInstructions);
+    return compiledInstructions;
+  }
+
   protected void addReviewInstructions(List<String> instructions) {
     instructions.addAll(
         List.of(
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS,
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(

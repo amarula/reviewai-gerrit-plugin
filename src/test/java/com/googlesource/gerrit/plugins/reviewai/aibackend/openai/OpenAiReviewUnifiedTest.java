@@ -54,6 +54,34 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void reviewAssistantInstructionsUseGerritUiDefaultPrompt() {
+    String instructions = openAiPrompt.getDefaultAiAssistantInstructions();
+
+    Assert.assertTrue(instructions.startsWith("Remote Gerrit review prompt."));
+    Assert.assertTrue(instructions.contains("Remote Gerrit review prompt.\n\n"));
+    Assert.assertTrue(instructions.contains("While reviewing, you MUST strictly adhere"));
+    Assert.assertFalse(instructions.contains("Act as a PatchSet Reviewer."));
+    Assert.assertFalse(instructions.contains("{{patch}}"));
+    Assert.assertFalse(instructions.contains("\nPatch:\n"));
+  }
+
+  @Test
+  public void reviewAssistantInstructionsPutNoFileContextAfterGerritPrompt() {
+    when(globalConfig.getString(Mockito.eq("codeContextPolicy"), Mockito.anyString()))
+        .thenReturn("NONE");
+    initConfig();
+    initTest();
+
+    String instructions = openAiPrompt.getDefaultAiAssistantInstructions();
+
+    Assert.assertTrue(instructions.startsWith("Remote Gerrit review prompt."));
+    Assert.assertTrue(instructions.contains("\n\n"));
+    Assert.assertTrue(
+        instructions.contains("Disregard missing implementations of methods or other code entities"));
+    Assert.assertFalse(instructions.contains("Act as a PatchSet Reviewer."));
+  }
+
+  @Test
   public void patchSetCreatedOrUpdated() throws Exception {
     String reviewMessageCode =
         getReviewMessage(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json", 0);
