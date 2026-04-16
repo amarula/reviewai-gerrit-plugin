@@ -60,6 +60,18 @@
     return entry.message || '';
   }
 
+  function buildClientData(overridesPreviousTurn) {
+    if (!overridesPreviousTurn) {
+      return '{}';
+    }
+    return JSON.stringify({
+      overridesPreviousTurn: true,
+      actionId: 'ask-reviewai',
+      contextItems: [],
+      isBackgroundRequest: false,
+    });
+  }
+
   class ReviewAiCodeReviewProvider {
     constructor(plugin, pluginName) {
       this.plugin = plugin;
@@ -223,18 +235,20 @@
     _entriesToConversationTurns(entries) {
       const turns = [];
       let currentTurn = null;
+      let hasClientDataOverride = false;
 
       entries.forEach(entry => {
         if (entry.role === 'user' && !entry.systemMessage) {
           currentTurn = {
             user_input: {
               user_question: entry.message || '',
-              client_data: '',
+              client_data: buildClientData(!hasClientDataOverride),
             },
             regeneration_index: 0,
             timestamp_millis: parseTimestampMillis(entry.updated),
           };
           turns.push(currentTurn);
+          hasClientDataOverride = true;
           return;
         }
 
@@ -246,12 +260,13 @@
           currentTurn = {
             user_input: {
               user_question: '',
-              client_data: '',
+              client_data: buildClientData(!hasClientDataOverride),
             },
             regeneration_index: 0,
             timestamp_millis: parseTimestampMillis(entry.updated),
           };
           turns.push(currentTurn);
+          hasClientDataOverride = true;
         }
 
         if (!currentTurn.response) {
