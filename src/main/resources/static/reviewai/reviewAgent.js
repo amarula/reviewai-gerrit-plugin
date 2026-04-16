@@ -84,6 +84,26 @@
     return String(left || '').toLowerCase() === String(right || '').toLowerCase();
   }
 
+  function toDisplayName(value) {
+    const knownNames = {
+      openai: 'OpenAI',
+      gemini: 'Gemini',
+      moonshot: 'Moonshot',
+    };
+    const normalized = String(value || '').toLowerCase();
+    if (!normalized) {
+      return 'ReviewAI';
+    }
+    if (knownNames[normalized]) {
+      return knownNames[normalized];
+    }
+    return normalized
+      .split(/[_\s-]+/)
+      .filter(Boolean)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
   class ReviewAiCodeReviewProvider {
     constructor(plugin, pluginName) {
       this.plugin = plugin;
@@ -95,13 +115,20 @@
       this.supports_this_change = true;
     }
 
-    async getModels() {
+    async getModels(change) {
+      const modelInfo = await this._fetchModelInfo(change);
+      const provider = toDisplayName(modelInfo && modelInfo.provider);
+      const model = modelInfo && modelInfo.ai_model;
+      const fullDisplayText = model
+        ? `${provider} (${model})`
+        : provider;
+
       return {
         models: [
           {
             model_id: this.defaultModel,
-            short_text: 'ReviewAI',
-            full_display_text: 'ReviewAI Gerrit assistant',
+            short_text: provider,
+            full_display_text: fullDisplayText,
           },
         ],
         default_model_id: this.defaultModel,
@@ -282,6 +309,15 @@
       return this.plugin
         .restApi()
         .post(`/changes/${change._number}/${this.pluginName}~ai-review-agent-conversations`, input);
+    }
+
+    async _fetchModelInfo(change) {
+      if (!change || !change._number) {
+        return null;
+      }
+      return this.plugin
+        .restApi()
+        .get(`/changes/${change._number}/${this.pluginName}~ai-review-agent-model`);
     }
 
     async _listStoredConversations(change) {

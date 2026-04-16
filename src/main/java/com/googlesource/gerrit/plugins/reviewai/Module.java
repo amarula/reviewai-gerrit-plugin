@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewHistory;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessage;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations;
+import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel;
 
 public class Module extends AbstractModule {
   @Override
@@ -38,6 +39,7 @@ public class Module extends AbstractModule {
           @Override
           protected void configure() {
             get(ChangeResource.CHANGE_KIND, "ai-review-history").to(AiReviewHistory.class);
+            get(ChangeResource.CHANGE_KIND, "ai-review-agent-model").to(ReviewAgentModel.class);
             post(ChangeResource.CHANGE_KIND, "ai-review-message").to(AiReviewMessage.class);
             post(ChangeResource.CHANGE_KIND, "ai-review-agent-conversations")
                 .to(ReviewAgentConversations.class);
