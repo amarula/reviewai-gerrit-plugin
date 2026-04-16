@@ -46,6 +46,11 @@ public class AiPromptReviewCode extends AiPromptReview implements IAiPrompt {
   }
 
   @Override
+  protected boolean includeCommitMessageReviewRequirement() {
+    return false;
+  }
+
+  @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     String filteredPatchSet = filterPatchWithoutCommitMessage(change, patchSet);
     log.debug("Filtered Patch Set for Review Code: {}", filteredPatchSet);

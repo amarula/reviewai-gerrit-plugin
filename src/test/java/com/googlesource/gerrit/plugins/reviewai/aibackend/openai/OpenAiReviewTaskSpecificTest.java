@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.openai;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.restapi.RestApiException;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
@@ -74,6 +75,28 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void reviewCodeInstructionsExcludeCommitMessageReviewPrompts() {
+    IAiPrompt reviewCodePrompt = getAiPrompt(ReviewAssistantStages.REVIEW_CODE);
+
+    String instructions = reviewCodePrompt.getDefaultAiAssistantInstructions();
+
+    Assert.assertFalse(instructions.contains("You MUST review the commit message"));
+    Assert.assertFalse(
+        instructions.contains(AiPrompt.DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES));
+  }
+
+  @Test
+  public void reviewCommitMessageInstructionsIncludeCommitMessageReviewPrompts() {
+    IAiPrompt commitMessagePrompt = getAiPrompt(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+
+    String instructions = commitMessagePrompt.getDefaultAiAssistantInstructions();
+
+    Assert.assertTrue(instructions.contains("You MUST review the commit message"));
+    Assert.assertTrue(
+        instructions.contains(AiPrompt.DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES));
+  }
+
+  @Test
   public void patchSetCreatedOrUpdated() throws Exception {
     String reviewMessageCode =
         getReviewMessage(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json", 0);
@@ -82,10 +105,8 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
     handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
 
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
     IAiPrompt openAiPromptOpenAICommitMessage =
-        AiPromptFactory.getAiPrompt(
-            config, changeSetData, getGerritChange(), getCodeContextPolicy());
+        getAiPrompt(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
     String reviewPrompt =
         openAiPromptOpenAICommitMessage.getDefaultAiThreadReviewMessage(formattedPatchContent);
 
@@ -97,5 +118,11 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
+  }
+
+  private IAiPrompt getAiPrompt(ReviewAssistantStages reviewAssistantStage) {
+    changeSetData.setReviewAssistantStage(reviewAssistantStage);
+    return AiPromptFactory.getAiPrompt(
+        config, changeSetData, getGerritChange(), getCodeContextPolicy());
   }
 }

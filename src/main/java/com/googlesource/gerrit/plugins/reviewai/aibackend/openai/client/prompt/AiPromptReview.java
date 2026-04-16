@@ -66,7 +66,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
     addReviewInstructions(instructions);
-    if (config.getAiReviewCommitMessages()) {
+    if (includeCommitMessageReviewRequirement()) {
       instructions.add(getReviewPromptCommitMessages());
     }
     log.debug("AI Assistant Review Instructions added: {}", instructions);
@@ -108,7 +108,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS, getPatchSetReviewPrompt()));
-    if (config.getAiReviewCommitMessages()) {
+    if (includeCommitMessageReviewRequirement()) {
       sections.add(
           buildSection(
               DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
@@ -118,6 +118,10 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     String compiledInstructions = joinWithDoubleNewLine(sections);
     log.debug("Compiled AI Assistant Review Instructions: {}", compiledInstructions);
     return compiledInstructions;
+  }
+
+  protected boolean includeCommitMessageReviewRequirement() {
+    return config.getAiReviewCommitMessages();
   }
 
   protected void addReviewInstructions(List<String> instructions) {
