@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.filterCommitMessage;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 @Slf4j
 public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPrompt {
@@ -49,6 +49,8 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
   public void addAiAssistantInstructions(List<String> instructions) {
     instructions.addAll(
         List.of(
+            GerritUiPromptLoader.resolveCommitMessageInstructions(
+                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES),
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(
@@ -61,6 +63,52 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT,
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
     log.debug("Commit Message Review specific AI Assistant Instructions added: {}", instructions);
+  }
+
+  @Override
+  public String getDefaultAiAssistantInstructions() {
+    List<String> sections = new ArrayList<>();
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE,
+            GerritUiPromptLoader.resolveCommitMessageInstructions(
+                    DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES)
+                + "\n\nReturn the feedback using this plugin's mandatory JSON response format, "
+                + "not the standalone Gerrit UI Markdown code-block output format."));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            getScopeAndReviewConstraints()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
+            getAiAssistantInstructionsReview(false, true, false)));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
+            getReviewPromptCommitMessages()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            getPatchSetReviewPromptInstructions()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+            getMandatoryResponseFormat()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
+
+    String compiledInstructions = joinWithDoubleNewLine(sections);
+    log.debug(
+        "Compiled Commit Message Review specific AI Assistant Instructions: {}",
+        compiledInstructions);
+    return compiledInstructions;
   }
 
   @Override

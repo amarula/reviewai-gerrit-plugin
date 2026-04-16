@@ -35,26 +35,35 @@ final class GerritUiPromptLoader {
       "https://gerrit.googlesource.com/gerrit/+/HEAD/polygerrit-ui/app/elements/change/"
           + "gr-ai-prompt-dialog/prompts.ts?format=TEXT";
   private static final String HELP_ME_REVIEW_PROMPT = "HELP_ME_REVIEW_PROMPT";
+  private static final String IMPROVE_COMMIT_MESSAGE_PROMPT = "IMPROVE_COMMIT_MESSAGE";
   private static final HttpClient HTTP_CLIENT =
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
   private GerritUiPromptLoader() {}
 
   static String resolveReviewInstructions(String fallbackPrompt) {
+    return resolvePromptInstructions(HELP_ME_REVIEW_PROMPT, fallbackPrompt);
+  }
+
+  static String resolveCommitMessageInstructions(String fallbackPrompt) {
+    return resolvePromptInstructions(IMPROVE_COMMIT_MESSAGE_PROMPT, fallbackPrompt);
+  }
+
+  private static String resolvePromptInstructions(String promptConstant, String fallbackPrompt) {
     try {
       String source = fetchPromptsSource();
-      String prompt = extractTemplateLiteral(source, HELP_ME_REVIEW_PROMPT);
-      String normalizedPrompt = normalizeReviewPrompt(prompt);
+      String prompt = extractTemplateLiteral(source, promptConstant);
+      String normalizedPrompt = normalizePrompt(prompt);
       if (!normalizedPrompt.isBlank()) {
         return normalizedPrompt;
       }
     } catch (IOException e) {
-      log.warn("Unable to fetch Gerrit UI review prompt: {}", e.getMessage());
+      log.warn("Unable to fetch Gerrit UI prompt {}: {}", promptConstant, e.getMessage());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      log.warn("Interrupted while fetching Gerrit UI review prompt");
+      log.warn("Interrupted while fetching Gerrit UI prompt {}", promptConstant);
     } catch (IllegalArgumentException e) {
-      log.warn("Unable to parse Gerrit UI review prompt: {}", e.getMessage());
+      log.warn("Unable to parse Gerrit UI prompt {}: {}", promptConstant, e.getMessage());
     }
     return fallbackPrompt;
   }
@@ -78,7 +87,7 @@ final class GerritUiPromptLoader {
     return System.getProperty(PROMPTS_URL_PROPERTY, DEFAULT_PROMPTS_URL);
   }
 
-  private static String normalizeReviewPrompt(String prompt) {
+  private static String normalizePrompt(String prompt) {
     String normalizedPrompt = prompt.replace("\r\n", "\n").strip();
     int patchSectionStart = normalizedPrompt.indexOf("\nPatch:");
     if (patchSectionStart >= 0) {

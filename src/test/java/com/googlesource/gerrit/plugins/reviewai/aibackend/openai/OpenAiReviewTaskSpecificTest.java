@@ -22,6 +22,7 @@ import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
@@ -91,9 +92,23 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
     String instructions = commitMessagePrompt.getDefaultAiAssistantInstructions();
 
+    Assert.assertTrue(
+        instructions.startsWith(
+            sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE)
+                + "You are a Git commit message expert, tasked with improving the quality and clarity of commit messages."));
+    Assert.assertTrue(instructions.contains("Remote Gerrit improve commit message prompt."));
+    Assert.assertTrue(
+        instructions.contains(
+            "Return the feedback using this plugin's mandatory JSON response format"));
     Assert.assertTrue(instructions.contains("You MUST review the commit message"));
     Assert.assertTrue(
         instructions.contains(AiPrompt.DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES));
+    Assert.assertTrue(
+        instructions.contains(
+            sectionHeader(AiPromptReview.DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT)));
+    Assert.assertFalse(instructions.contains("Remote Gerrit review prompt."));
+    Assert.assertFalse(instructions.contains("{{patch}}"));
+    Assert.assertFalse(instructions.contains("\nPatch:\n"));
   }
 
   @Test
@@ -124,5 +139,9 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     changeSetData.setReviewAssistantStage(reviewAssistantStage);
     return AiPromptFactory.getAiPrompt(
         config, changeSetData, getGerritChange(), getCodeContextPolicy());
+  }
+
+  private String sectionHeader(String title) {
+    return "# " + title + "\n\n";
   }
 }
