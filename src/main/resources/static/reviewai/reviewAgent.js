@@ -72,6 +72,18 @@
     });
   }
 
+  function getConversationTitle(prompt) {
+    const normalized = (prompt || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return 'ReviewAI conversation';
+    }
+    return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+  }
+
+  function isSameConversationId(left, right) {
+    return String(left || '').toLowerCase() === String(right || '').toLowerCase();
+  }
+
   class ReviewAiCodeReviewProvider {
     constructor(plugin, pluginName) {
       this.plugin = plugin;
@@ -109,23 +121,48 @@
     }
 
     async listChatConversations(change) {
-      const entries = await this._fetchEntries(change);
-      if (!entries.length) {
-        return [];
+      const storedConversations = await this._listStoredConversations(change);
+      if (this._hasReviewAiCommentsConversation(change, storedConversations)) {
+        return storedConversations;
       }
-      const lastEntry = entries[entries.length - 1];
-      return [
+
+      const entries = await this._fetchEntries(change);
+      const reviewAiCommentsEntries = this._filterStoredConversationEntries(
+        change,
+        entries,
+        storedConversations
+      );
+      if (!reviewAiCommentsEntries.length) {
+        return storedConversations;
+      }
+      const lastEntry = reviewAiCommentsEntries[reviewAiCommentsEntries.length - 1];
+      return storedConversations.concat([
         {
           id: this._conversationId(change),
           title: 'ReviewAI comments',
           timestamp_millis: parseTimestampMillis(lastEntry.updated),
         },
-      ];
+      ]);
     }
 
-    async getChatConversation(change) {
+    async getChatConversation(change, conversationId) {
+      if (!conversationId) {
+        return [];
+      }
+      const storedConversation = await this._getStoredConversation(change, conversationId);
+      if (storedConversation) {
+        return storedConversation.turns || [];
+      }
+
+      if (!isSameConversationId(conversationId, this._conversationId(change))) {
+        return [];
+      }
+
+      const storedConversations = await this._listStoredConversations(change);
       const entries = await this._fetchEntries(change);
-      return this._entriesToConversationTurns(entries);
+      return this._entriesToConversationTurns(
+        this._filterStoredConversationEntries(change, entries, storedConversations)
+      );
     }
 
     _actions() {
@@ -173,10 +210,12 @@
 
         const baselineEntries = await this._fetchEntries(change);
         const baselineKeys = new Set(baselineEntries.map(entryKey));
+        const conversationId = this._getRequestConversationId(req, change);
 
         await this._sendMessage(change, prompt);
 
         const responseText = await this._waitForAssistantReply(change, baselineKeys);
+        await this._storeConversationTurn(change, req, conversationId, prompt, responseText);
         listener.emitResponse(buildChatResponse(responseText));
         listener.done();
       } catch (error) {
@@ -197,6 +236,13 @@
         return prompt;
       }
       return `/message ${prompt}`;
+    }
+
+    _getRequestConversationId(req, change) {
+      return (
+        (req && (req.conversation_id || req.conversationId)) ||
+        this._conversationId(change)
+      );
     }
 
     async _waitForAssistantReply(change, baselineKeys) {
@@ -230,6 +276,102 @@
 
     _sendMessage(change, message) {
       return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(change, message);
+    }
+
+    _conversationStore(change, input) {
+      return this.plugin
+        .restApi()
+        .post(`/changes/${change._number}/${this.pluginName}~ai-review-agent-conversations`, input);
+    }
+
+    async _listStoredConversations(change) {
+      const output = await this._conversationStore(change, {action: 'list'});
+      return Array.isArray(output && output.conversations) ? output.conversations : [];
+    }
+
+    async _getStoredConversation(change, conversationId) {
+      if (!conversationId) {
+        return null;
+      }
+      const output = await this._conversationStore(change, {
+        action: 'get',
+        conversationId,
+        conversation_id: conversationId,
+      });
+      return output && output.conversation;
+    }
+
+    async _appendStoredConversationTurn(change, input) {
+      return this._conversationStore(change, {
+        action: 'append',
+        ...input,
+      });
+    }
+
+    _hasReviewAiCommentsConversation(change, conversations) {
+      const conversationId = this._conversationId(change);
+      return conversations.some(conversation =>
+        isSameConversationId(conversation && conversation.id, conversationId)
+      );
+    }
+
+    _filterStoredConversationEntries(change, entries, conversations) {
+      const conversationId = this._conversationId(change);
+      const userMessages = new Map();
+      const assistantMessages = new Map();
+
+      conversations.forEach(conversation => {
+        if (!conversation || isSameConversationId(conversation.id, conversationId)) {
+          return;
+        }
+        const turns = Array.isArray(conversation.turns) ? conversation.turns : [];
+        turns.forEach(turn => {
+          this._incrementMessageCount(
+            userMessages,
+            turn && turn.user_input && turn.user_input.user_question
+          );
+          this._incrementMessageCount(assistantMessages, this._turnResponseText(turn));
+        });
+      });
+
+      return entries.filter(entry => {
+        if (entry.role === 'user' && !entry.systemMessage) {
+          return !this._consumeMessageCount(userMessages, entry.message || '');
+        }
+        if (isAssistantEntry(entry)) {
+          return !this._consumeMessageCount(assistantMessages, formatAgentEntry(entry));
+        }
+        return true;
+      });
+    }
+
+    _turnResponseText(turn) {
+      const response = turn && (turn.response || turn.chat_response);
+      const responseParts = response && response.response_parts;
+      if (!Array.isArray(responseParts)) {
+        return '';
+      }
+      return responseParts.map(part => (part && part.text) || '').join('\n\n');
+    }
+
+    _incrementMessageCount(messages, message) {
+      if (!message) {
+        return;
+      }
+      messages.set(message, (messages.get(message) || 0) + 1);
+    }
+
+    _consumeMessageCount(messages, message) {
+      const count = messages.get(message) || 0;
+      if (!count) {
+        return false;
+      }
+      if (count === 1) {
+        messages.delete(message);
+      } else {
+        messages.set(message, count - 1);
+      }
+      return true;
     }
 
     _entriesToConversationTurns(entries) {
@@ -281,6 +423,30 @@
       });
 
       return turns;
+    }
+
+    async _storeConversationTurn(change, req, conversationId, prompt, responseText) {
+      const now = Date.now();
+      const turn = {
+        user_input: {
+          user_question: prompt,
+          client_data:
+            (req && req.client_data) || buildClientData(!req || req.turn_index === 0),
+        },
+        response: buildChatResponse(responseText),
+        regeneration_index: (req && req.regeneration_index) || 0,
+        timestamp_millis: now,
+      };
+      await this._appendStoredConversationTurn(change, {
+        conversationId,
+        conversation_id: conversationId,
+        title: getConversationTitle(prompt),
+        timestampMillis: now,
+        timestamp_millis: now,
+        turnIndex: req && Number.isInteger(req.turn_index) ? req.turn_index : undefined,
+        turn_index: req && Number.isInteger(req.turn_index) ? req.turn_index : undefined,
+        turn,
+      });
     }
 
     _conversationId(change) {
