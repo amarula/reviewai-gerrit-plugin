@@ -41,7 +41,7 @@ const reviewAiLoader = (() => {
   return {
     load(plugin) {
       if (!loadPromise) {
-        const scriptPaths = ['shared.js', 'render.js', 'components.js', 'register.js'];
+        const scriptPaths = ['shared.js', 'reviewAgent.js', 'render.js', 'components.js', 'register.js'];
 
         loadPromise = scriptPaths
           .reduce(
@@ -63,6 +63,17 @@ const reviewAiLoader = (() => {
   };
 })();
 
+function initializeReviewAi(plugin, pluginName) {
+  reviewAiLoader
+    .load(plugin)
+    .then(() => {
+      window.ReviewAi.agent.register(plugin, pluginName);
+    })
+    .catch(error => {
+      console.error('ReviewAI frontend failed to initialize.', error);
+    });
+}
+
 Gerrit.install(plugin => {
   const pluginName = plugin.getPluginName();
 
@@ -83,12 +94,8 @@ Gerrit.install(plugin => {
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
         });
-      reviewAiLoader.load(plugin).catch(error => {
-        console.error('ReviewAI frontend failed to initialize.', error);
-      });
+      initializeReviewAi(plugin, pluginName);
     });
 
-  reviewAiLoader.load(plugin).catch(error => {
-    console.error('ReviewAI frontend failed to initialize.', error);
-  });
+  initializeReviewAi(plugin, pluginName);
 });
