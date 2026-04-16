@@ -30,7 +30,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.di
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritReviewFileDiff;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -81,12 +80,6 @@ public class GerritClientPatchSet extends GerritClientAccount {
     }
   }
 
-  protected int getChangeSetRevisionBase(ChangeSetData changeSetData) {
-    int base = isChangeSetBased(changeSetData) ? 0 : revisionBase;
-    log.debug("Determined ChangeSet revision base as {}", base);
-    return base;
-  }
-
   protected void retrieveFileDiff(GerritChange change, int revisionBase) throws Exception {
     List<String> enabledFileExtensions = config.getEnabledFileExtensions();
     log.debug("Retrieving file diff for change: {}", change.getFullChangeId());
@@ -111,10 +104,6 @@ public class GerritClientPatchSet extends GerritClientAccount {
         log.debug("Processed file diff for file: {}", filename);
       }
     }
-  }
-
-  private boolean isChangeSetBased(ChangeSetData changeSetData) {
-    return !changeSetData.getForcedReviewLastPatchSet();
   }
 
   private void processFileDiff(String filename, DiffInfo diff) {

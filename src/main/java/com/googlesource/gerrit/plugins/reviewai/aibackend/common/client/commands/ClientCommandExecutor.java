@@ -41,7 +41,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithN
 @Slf4j
 public class ClientCommandExecutor extends ClientCommandBase {
   private static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
-      Set.of(CommandSet.REVIEW, CommandSet.REVIEW_LAST, CommandSet.CONFIGURE, CommandSet.SHOW);
+      Set.of(CommandSet.REVIEW, CommandSet.CONFIGURE, CommandSet.SHOW);
 
   private final ChangeSetData changeSetData;
   private final GerritChange change;
@@ -89,7 +89,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.nextString = nextString.trim();
     switch (command) {
       case HELP -> commandHelp();
-      case REVIEW, REVIEW_LAST -> commandForceReview(command);
+      case REVIEW -> commandForceReview();
       case FORGET_THREAD -> commandForgetThread();
       case CONFIGURE -> commandDynamicallyConfigure();
       case DIRECTIVES -> commandDirectives();
@@ -124,7 +124,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
                 localizer.getText("message.command.help.help"),
                 localizer.getText("message.command.help.message"),
                 localizer.getText("message.command.help.review"),
-                localizer.getText("message.command.help.review_last"),
                 localizer.getText("message.command.help.directives"),
                 localizer.getText("message.command.help.forget_thread"),
                 localizer.getText("message.command.help.configure"),
@@ -172,15 +171,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
                   localizer.getText("message.command.help.command.review.syntax"),
                   localizer.getText("message.command.help.command.review.description"),
                   localizer.getText("message.command.help.command.review.options")));
-      case REVIEW_LAST ->
-          joinWithNewLine(
-              List.of(
-                  String.format(
-                      localizer.getText("message.command.help.command.title"), "/review_last"),
-                  "",
-                  localizer.getText("message.command.help.command.review_last.syntax"),
-                  localizer.getText("message.command.help.command.review_last.description"),
-                  localizer.getText("message.command.help.command.review_last.options")));
       case DIRECTIVES ->
           joinWithNewLine(
               List.of(
@@ -221,16 +211,11 @@ public class ClientCommandExecutor extends ClientCommandBase {
     };
   }
 
-  private void commandForceReview(CommandSet command) {
+  private void commandForceReview() {
     changeSetData.setForcedReview(true);
     changeSetData.setHideOpenAiReview(false);
     changeSetData.setReviewSystemMessage(null);
-    if (command == CommandSet.REVIEW_LAST) {
-      log.info("Forced review command applied to the last Patch Set");
-      changeSetData.setForcedReviewLastPatchSet(true);
-    } else {
-      log.info("Forced review command applied to the entire Change Set");
-    }
+    log.info("Forced review command applied to the entire Change Set");
     if (baseOptions.containsKey(BaseOptionSet.FILTER)) {
       boolean value = Boolean.parseBoolean(baseOptions.get(BaseOptionSet.FILTER));
       log.debug("Option 'replyFilterEnabled' set to {}", value);

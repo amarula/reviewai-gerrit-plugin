@@ -42,7 +42,7 @@
   }
 
   function isCommandPrompt(prompt) {
-    return /^\s*\/(?:help|message|review|review_last|directives|forget_thread|configure|show)\b/.test(
+    return /^\s*\/(?:help|message|review|directives|forget_thread|configure|show)\b/.test(
       prompt
     );
   }
@@ -205,13 +205,6 @@
           hover_text: 'Run /review for the full change',
           enable_send_without_input: true,
           initial_user_prompt: '/review',
-        },
-        {
-          id: 'review-last-patch-set',
-          display_text: 'Review last patch set',
-          hover_text: 'Run /review_last for the latest patch set',
-          enable_send_without_input: true,
-          initial_user_prompt: '/review_last',
         },
         {
           id: 'reviewai-help',

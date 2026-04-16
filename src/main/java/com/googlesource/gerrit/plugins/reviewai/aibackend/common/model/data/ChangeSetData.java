@@ -36,7 +36,6 @@ public class ChangeSetData {
 
   // Command variables
   private Boolean forcedReview = false;
-  private Boolean forcedReviewLastPatchSet = false;
   private Boolean replyFilterEnabled = true;
   private Boolean debugReviewMode = false;
   private Boolean hideOpenAiReview = false;
@@ -58,7 +57,6 @@ public class ChangeSetData {
     copy.setReviewAssistantStage(reviewAssistantStage);
     copy.setForcedStagedReview(forcedStagedReview);
     copy.setForcedReview(forcedReview);
-    copy.setForcedReviewLastPatchSet(forcedReviewLastPatchSet);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);
     copy.setHideOpenAiReview(hideOpenAiReview);

@@ -323,22 +323,20 @@ ensures the message is correctly forwarded to AI.
 
 ### Review Commands
 
-Reviewing a Change Set or the last Patch Set can occur automatically upon submission or be manually triggered using the
-commands outlined in this section.
+Reviewing a Change Set can occur automatically upon submission or be manually triggered using the commands outlined in
+this section.
 
 #### Basic Syntax
 
 - `/review`: when used in a comment directed at AI on any Change Set, triggers a review of the full Change Set. A vote
   is cast on the Change Set if the voting feature is enabled and the AI Gerrit user is authorized to vote on it.
-- `/review_last`: when used in a comment directed at AI on any Change Set, triggers a review of the last Patch Set of
-  the Change Set. Unlike `/review`, this command does not result in casting or updating votes.
 
 #### Command Options
 
 - `--filter=[true/false]`: Controls the filtering of duplicate, conflicting and irrelevant comments, defaulting to
   "true" to apply filters.
-- `--debug`: When paired with `/review` or `/review_last` commands, this option displays useful debug information in
-  each AI reply, showing all replies as though the filter setting were disabled.
+- `--debug`: When paired with `/review`, this option displays useful debug information in each AI reply, showing all
+  replies as though the filter setting were disabled.
 
   **NOTE**: The usage of `--debug` option is disabled by default. To enable it, `enableMessageDebugging` setting must be
   set to true.

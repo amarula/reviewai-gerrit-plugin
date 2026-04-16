@@ -47,7 +47,6 @@ public class ClientCommandParser extends ClientCommandBase {
   private static final Map<CommandSet, List<BaseOptionSet>> COMMAND_VALID_OPTIONS_MAP =
       Map.of(
           CommandSet.REVIEW, List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG),
-          CommandSet.REVIEW_LAST, List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG),
           CommandSet.CONFIGURE, List.of(BaseOptionSet.RESET, BaseOptionSet.CONFIGURATION_OPTION),
           CommandSet.DIRECTIVES, List.of(BaseOptionSet.RESET, BaseOptionSet.REMOVE),
           CommandSet.SHOW,
@@ -57,7 +56,7 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.PROMPTS,
                   BaseOptionSet.INSTRUCTIONS));
   private static final List<CommandSet> REVIEW_COMMANDS =
-      new ArrayList<>(List.of(CommandSet.REVIEW, CommandSet.REVIEW_LAST));
+      new ArrayList<>(List.of(CommandSet.REVIEW));
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
       new ArrayList<>(List.of(CommandSet.SHOW));
   private static final List<CommandSet> DEBUG_REQUIRED_COMMANDS =
