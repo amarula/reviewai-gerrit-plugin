@@ -72,6 +72,11 @@ public class GerritClientPatchSetHelper {
       String commitMessage = commitMessageMatcher.group(1).trim();
       log.debug("Commit message extracted: {}", commitMessage);
       return commitMessage;
+    } else if (!formattedPatch.contains("diff --git")
+        && !formattedPatch.contains(COMMIT_MESSAGE_FILTER_OUT_PREFIXES.get("CHANGE_ID"))) {
+      String commitMessage = formattedPatch.trim();
+      log.debug("Patch set already contains only the commit message: {}", commitMessage);
+      return commitMessage;
     } else {
       log.error("Commit message not found in patch set: {}", formattedPatch);
       throw new RuntimeException("Commit message not found in patch set: " + formattedPatch);

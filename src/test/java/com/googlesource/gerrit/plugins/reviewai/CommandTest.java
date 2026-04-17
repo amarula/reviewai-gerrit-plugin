@@ -23,6 +23,7 @@ import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.OpenAiReviewTestBase;
 import org.junit.Assert;
@@ -130,7 +131,9 @@ public class CommandTest extends OpenAiReviewTestBase {
     Assert.assertTrue(systemMessage.contains("`/help <command>`"));
     Assert.assertTrue(systemMessage.contains("`/help`"));
     Assert.assertTrue(systemMessage.contains("`/message <text>`"));
-    Assert.assertTrue(systemMessage.contains("`/review [--filter=true|false] [--debug]`"));
+    Assert.assertTrue(
+        systemMessage.contains(
+            "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(
         systemMessage.contains(
             "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
@@ -145,8 +148,66 @@ public class CommandTest extends OpenAiReviewTestBase {
     String systemMessage = changeSetData.getReviewSystemMessage();
     Assert.assertEquals(false, changeSetData.getForcedReview());
     Assert.assertTrue(systemMessage.contains("HELP FOR `/review`"));
-    Assert.assertTrue(systemMessage.contains("`/review [--filter=true|false] [--debug]`"));
+    Assert.assertTrue(
+        systemMessage.contains(
+            "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
+  }
+
+  @Test
+  public void commandReviewCommitMessageScopeIgnoresCommitMessageReviewConfig() throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("aiReviewCommitMessages"), Mockito.anyBoolean()))
+        .thenReturn(false);
+
+    setupCommandComment(reviewCommandWithScope(ReviewScope.COMMIT_MESSAGE));
+    setupMockRequestCreateResponse("openAiRunStepsResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    Assert.assertTrue(getInputContent().contains("Minor fixes"));
+    Assert.assertFalse(getInputContent().contains("diff --git"));
+    Assert.assertTrue(
+        aiRequestBody
+            .get("instructions")
+            .getAsString()
+            .contains("Git commit message expert"));
+  }
+
+  @Test
+  public void commandReviewPatchsetScopeExcludesCommitMessage() throws Exception {
+    setupCommandComment(reviewCommandWithScope(ReviewScope.PATCHSET));
+    setupMockRequestCreateResponse("openAiRunStepsResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    Assert.assertFalse(getInputContent().contains("Subject: Minor fixes"));
+    Assert.assertTrue(getInputContent().contains("diff --git"));
+    Assert.assertFalse(
+        aiRequestBody
+            .get("instructions")
+            .getAsString()
+            .contains("You MUST review the commit message"));
+  }
+
+  @Test
+  public void commandReviewScopeRejectsUnsupportedValue() throws Exception {
+    setupCommandComment("/review --scope=full");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        String.format(
+            localizer.getText("message.command.option.value.invalid"),
+            "SCOPE",
+            "full",
+            ReviewScope.commandOptionValues()),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  private String reviewCommandWithScope(ReviewScope reviewScope) {
+    return "/review --scope=" + reviewScope.getCommandOptionValue();
   }
 
   @Test

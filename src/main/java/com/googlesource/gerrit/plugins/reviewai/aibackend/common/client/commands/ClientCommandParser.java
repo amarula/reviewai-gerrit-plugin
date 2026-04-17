@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class ClientCommandParser extends ClientCommandBase {
       Map.of(
           "filter", BaseOptionSet.FILTER,
           "debug", BaseOptionSet.DEBUG,
+          "scope", BaseOptionSet.SCOPE,
           "reset", BaseOptionSet.RESET,
           "remove", BaseOptionSet.REMOVE,
           "config", BaseOptionSet.CONFIG,
@@ -46,7 +48,8 @@ public class ClientCommandParser extends ClientCommandBase {
           "instructions", BaseOptionSet.INSTRUCTIONS);
   private static final Map<CommandSet, List<BaseOptionSet>> COMMAND_VALID_OPTIONS_MAP =
       Map.of(
-          CommandSet.REVIEW, List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG),
+          CommandSet.REVIEW,
+              List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG, BaseOptionSet.SCOPE),
           CommandSet.CONFIGURE, List.of(BaseOptionSet.RESET, BaseOptionSet.CONFIGURATION_OPTION),
           CommandSet.DIRECTIVES, List.of(BaseOptionSet.RESET, BaseOptionSet.REMOVE),
           CommandSet.SHOW,
@@ -55,6 +58,8 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.LOCAL_DATA,
                   BaseOptionSet.PROMPTS,
                   BaseOptionSet.INSTRUCTIONS));
+  private static final Map<BaseOptionSet, List<String>> BASE_OPTION_VALID_VALUES_MAP =
+      Map.of(BaseOptionSet.SCOPE, ReviewScope.commandOptionValues());
   private static final List<CommandSet> REVIEW_COMMANDS =
       new ArrayList<>(List.of(CommandSet.REVIEW));
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
@@ -187,6 +192,9 @@ public class ClientCommandParser extends ClientCommandBase {
           String.format(localizer.getText("message.command.option.invalid"), command, baseOptions));
       return true;
     }
+    if (baseOptionValuesMismatch()) {
+      return true;
+    }
     if (!dynamicOptions.isEmpty()) {
       if (commandOptions == null || !commandOptions.contains(BaseOptionSet.CONFIGURATION_OPTION)) {
         log.debug("Unknown option(s) for command `{}`: {}", command, dynamicOptions);
@@ -196,6 +204,27 @@ public class ClientCommandParser extends ClientCommandBase {
         return true;
       }
       return configurationOptionsMismatch();
+    }
+    return false;
+  }
+
+  private boolean baseOptionValuesMismatch() {
+    for (Map.Entry<BaseOptionSet, String> baseOption : baseOptions.entrySet()) {
+      List<String> validValues = BASE_OPTION_VALID_VALUES_MAP.get(baseOption.getKey());
+      if (validValues != null && !validValues.contains(baseOption.getValue())) {
+        changeSetData.setReviewSystemMessage(
+            String.format(
+                localizer.getText("message.command.option.value.invalid"),
+                baseOption.getKey(),
+                baseOption.getValue(),
+                validValues));
+        log.debug(
+            "Invalid value for option `{}`: {}. Valid values are: {}",
+            baseOption.getKey(),
+            baseOption.getValue(),
+            validValues);
+        return true;
+      }
     }
     return false;
   }

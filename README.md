@@ -335,6 +335,8 @@ this section.
 
 - `--filter=[true/false]`: Controls the filtering of duplicate, conflicting and irrelevant comments, defaulting to
   "true" to apply filters.
+- `--scope=[patchset/commit_message]`: Limits the review scope. `patchset` reviews only the PatchSet code changes, and
+  `commit_message` reviews only the commit message. If omitted, both are reviewed.
 - `--debug`: When paired with `/review`, this option displays useful debug information in each AI reply, showing all
   replies as though the filter setting were disabled.
 

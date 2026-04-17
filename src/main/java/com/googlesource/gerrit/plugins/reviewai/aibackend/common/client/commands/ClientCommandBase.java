@@ -38,6 +38,7 @@ public abstract class ClientCommandBase extends ClientBase {
   public enum BaseOptionSet {
     FILTER,
     DEBUG,
+    SCOPE,
     RESET,
     REMOVE,
     // `CONFIGURATION_OPTION` is a placeholder option indicating that the associated options must be

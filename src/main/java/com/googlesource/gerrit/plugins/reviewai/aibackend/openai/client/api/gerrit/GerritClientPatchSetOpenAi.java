@@ -33,6 +33,7 @@ import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.a
 public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
     implements IGerritClientPatchSet {
   private GerritChange change;
+  private ChangeSetData changeSetData;
 
   @VisibleForTesting
   @Inject
@@ -42,6 +43,7 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
 
   public String getPatchSet(ChangeSetData changeSetData, GerritChange change) throws Exception {
     this.change = change;
+    this.changeSetData = changeSetData;
     if (change.getIsCommentEvent()) {
       retrieveRevisionBase(change);
     }
@@ -74,6 +76,9 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
   }
 
   private String filterPatch(String formattedPatch) {
+    if (changeSetData.getReviewScope() != null) {
+      return filterPatchByReviewScope(formattedPatch);
+    }
     if (config.getAiReviewCommitMessages()) {
       String patchWithCommitMessage = filterPatchWithCommitMessage(formattedPatch);
       log.debug("Patch filtered to include commit messages: {}", patchWithCommitMessage);
@@ -83,5 +88,25 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
       log.debug("Patch filtered to exclude commit messages: {}", patchWithoutCommitMessage);
       return patchWithoutCommitMessage;
     }
+  }
+
+  private String filterPatchByReviewScope(String formattedPatch) {
+    return switch (changeSetData.getReviewScope()) {
+      case PATCHSET -> {
+        String patchWithoutCommitMessage =
+            filterPatchWithoutCommitMessage(change, formattedPatch);
+        log.debug(
+            "Patch filtered by command scope to exclude commit messages: {}",
+            patchWithoutCommitMessage);
+        yield patchWithoutCommitMessage;
+      }
+      case COMMIT_MESSAGE -> {
+        String commitMessage = filterCommitMessage(formattedPatch);
+        log.debug(
+            "Patch filtered by command scope to include only commit message: {}",
+            commitMessage);
+        yield commitMessage;
+      }
+    };
   }
 }

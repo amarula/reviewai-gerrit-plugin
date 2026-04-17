@@ -16,11 +16,15 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
+import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
@@ -35,9 +39,13 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.List;
+import java.util.Map;
+
 import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.SupportedEvents;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TemplateUtils.renderTemplate;
 import static org.mockito.Mockito.when;
 
 @Slf4j
@@ -73,6 +81,15 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
             OpenAiResponsesResponse.class);
     response.getOutput().subList(from, to).clear();
     return getGson().toJson(response);
+  }
+
+  private void setupCommandComment(String command) throws RestApiException {
+    String commentJson =
+        renderTemplate(
+            readTestFile("__files/commands/commandCommentTemplate.json"),
+            Map.of("command", command));
+    Map<String, List<CommentInfo>> comments = readContentToType(commentJson, COMMENTS_GERRIT_TYPE);
+    mockGerritChangeCommentsApiCall(comments);
   }
 
   @Test
@@ -133,6 +150,26 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
+  }
+
+  @Test
+  public void commandReviewPatchsetScopeBypassesTaskSpecificCommitMessageStage() throws Exception {
+    setupCommandComment("/review --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
+
+    handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(1, getCapturedComments(captor, "test_file_1.py").size());
+    Assert.assertNull(captor.getValue().comments.get(GERRIT_PATCH_SET_FILENAME));
+    Assert.assertFalse(requestContent.contains("Subject: Minor fixes"));
+    Assert.assertTrue(requestContent.contains("diff --git"));
+    Assert.assertFalse(
+        aiRequestBody
+            .get("instructions")
+            .getAsString()
+            .contains("You MUST review the commit message"));
+    WireMock.verify(
+        1, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
   }
 
   private IAiPrompt getAiPrompt(ReviewAssistantStages reviewAssistantStage) {

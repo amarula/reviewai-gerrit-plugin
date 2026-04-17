@@ -67,7 +67,7 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws AiConnectionFailException {
     log.debug("Task-specific OpenAI ask method called with changeId: {}", change.getFullChangeId());
-    if (change.getIsCommentEvent()) {
+    if (change.getIsCommentEvent() || changeSetData.getForcedStagedReview()) {
       return super.ask(changeSetData, change, patchSet);
     }
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();

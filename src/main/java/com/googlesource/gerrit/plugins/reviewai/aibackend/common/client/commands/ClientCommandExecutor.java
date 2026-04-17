@@ -27,7 +27,9 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
 
@@ -216,6 +218,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     changeSetData.setHideOpenAiReview(false);
     changeSetData.setReviewSystemMessage(null);
     log.info("Forced review command applied to the entire Change Set");
+    applyReviewScopeOption();
     if (baseOptions.containsKey(BaseOptionSet.FILTER)) {
       boolean value = Boolean.parseBoolean(baseOptions.get(BaseOptionSet.FILTER));
       log.debug("Option 'replyFilterEnabled' set to {}", value);
@@ -224,6 +227,27 @@ public class ClientCommandExecutor extends ClientCommandBase {
       log.debug("Response Mode set to Debug");
       changeSetData.setDebugReviewMode(true);
       changeSetData.setReplyFilterEnabled(false);
+    }
+  }
+
+  private void applyReviewScopeOption() {
+    if (!baseOptions.containsKey(BaseOptionSet.SCOPE)) {
+      return;
+    }
+    ReviewScope scope =
+        ReviewScope.fromCommandOption(baseOptions.get(BaseOptionSet.SCOPE));
+    changeSetData.setReviewScope(scope);
+    switch (scope) {
+      case PATCHSET -> {
+        changeSetData.setForcedStagedReview(true);
+        changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_CODE);
+        log.info("Forced review command scoped to the PatchSet");
+      }
+      case COMMIT_MESSAGE -> {
+        changeSetData.setForcedStagedReview(true);
+        changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+        log.info("Forced review command scoped to the commit message");
+      }
     }
   }
 
