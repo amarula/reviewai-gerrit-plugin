@@ -4,6 +4,7 @@
   const agentConfig = {
     responseTimeoutMs: 120000,
   };
+  const defaultActionId = 'review-change';
 
   function buildChatResponse(text) {
     return {
@@ -66,7 +67,7 @@
     }
     return JSON.stringify({
       overridesPreviousTurn: true,
-      actionId: 'ask-reviewai',
+      actionId: defaultActionId,
       contextItems: [],
       isBackgroundRequest: false,
     });
@@ -139,7 +140,7 @@
     async getActions() {
       return {
         actions: this._actions(),
-        default_action_id: 'ask-reviewai',
+        default_action_id: defaultActionId,
       };
     }
 
@@ -194,11 +195,6 @@
 
     _actions() {
       return [
-        {
-          id: 'ask-reviewai',
-          display_text: 'Ask ReviewAI',
-          hover_text: 'Ask a question about this change',
-        },
         {
           id: 'review-change',
           display_text: 'Review change',
