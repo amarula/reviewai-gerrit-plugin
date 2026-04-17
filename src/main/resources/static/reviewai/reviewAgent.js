@@ -197,10 +197,24 @@
       return [
         {
           id: 'review-change',
-          display_text: 'Review change',
+          display_text: 'Full Review',
           hover_text: 'Run /review for the full change',
           enable_send_without_input: true,
           initial_user_prompt: '/review',
+        },
+        {
+          id: 'review-patchset',
+          display_text: 'Review Patch Set Only',
+          hover_text: 'Run /review --scope=patchset to review the patchset only',
+          enable_send_without_input: true,
+          initial_user_prompt: '/review --scope=patchset',
+        },
+        {
+          id: 'review-commit-message',
+          display_text: 'Review Commit Message Only',
+          hover_text: 'Run /review --scope=commit_message to review the commit message only',
+          enable_send_without_input: true,
+          initial_user_prompt: '/review --scope=commit_message',
         },
         {
           id: 'reviewai-help',
