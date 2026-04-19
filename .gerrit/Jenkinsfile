@@ -1,0 +1,12 @@
+#!groovy
+
+node {
+  checkout scm
+  try {
+    stage('Build') {
+      sh 'printenv'
+    }
+  } catch (e) {
+    throw e
+  }
+}
