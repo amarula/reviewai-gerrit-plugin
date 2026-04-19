@@ -1,0 +1,17 @@
+# Module fragment used to wire plugin Bazel modules into the Gerrit
+# in-tree build. Plugins that declare external dependencies can expose
+# their repositories (e.g. repositories created via rules_jvm_external)
+# through this file.
+
+bazel_dep(name = "reviewai-gerrit-plugin")
+local_path_override(
+    module_name = "reviewai-gerrit-plugin",
+    path = "plugins/reviewai-gerrit-plugin",
+)
+
+# Expose the plugin's scoped dependencies to the main build
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+use_repo(
+    maven,
+    "reviewai_plugin_deps",
+)
