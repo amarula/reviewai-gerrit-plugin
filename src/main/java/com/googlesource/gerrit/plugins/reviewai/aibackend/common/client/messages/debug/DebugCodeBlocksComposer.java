@@ -36,14 +36,12 @@ public abstract class DebugCodeBlocksComposer {
   }
 
   protected String getDebugCodeBlock(List<String> panelItems) {
-    return joinWithNewLine(
-        new ArrayList<>() {
-          {
-            add(commentOpening);
-            addAll(panelItems);
-            add(CODE_DELIMITER);
-          }
-        });
+    List<String> items = new ArrayList<>();
+    items.add(commentOpening);
+    items.addAll(panelItems);
+    items.add(CODE_DELIMITER);
+
+    return joinWithNewLine(items);
   }
 
   protected String getAsTitle(String title) {

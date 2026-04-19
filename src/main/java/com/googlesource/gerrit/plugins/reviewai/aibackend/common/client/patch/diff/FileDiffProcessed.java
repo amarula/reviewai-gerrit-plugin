@@ -61,12 +61,8 @@ public class FileDiffProcessed {
   }
 
   private void updateContent(GerritPatchSetFileDiff gerritPatchSetFileDiff) {
-    newContent =
-        new ArrayList<>() {
-          {
-            add("DUMMY LINE #0");
-          }
-        };
+    newContent = new ArrayList<>();
+    newContent.add("DUMMY LINE #0");
     lineNum = 1;
     reviewDiffContent = new ArrayList<>();
     codeFinderDiffs = new ArrayList<>();
