@@ -30,11 +30,14 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewMessage.Input> {
   private final ConfigCreator configCreator;
   private final GerritApi gerritApi;
+  private final AiReviewPermission aiReviewPermission;
 
   @Inject
-  AiReviewMessage(ConfigCreator configCreator, GerritApi gerritApi) {
+  AiReviewMessage(
+      ConfigCreator configCreator, GerritApi gerritApi, AiReviewPermission aiReviewPermission) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
+    this.aiReviewPermission = aiReviewPermission;
   }
 
   @Override
@@ -44,10 +47,13 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       throw new BadRequestException("message is required");
     }
 
-    Configuration config = configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
+    Configuration config =
+        configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
+    aiReviewPermission.checkCanAiReview(resource);
     String projectName = GerritChange.getProjectName(resource.getChange().getProject());
     ReviewInput reviewInput =
-        ReviewInput.create().patchSetLevelComment("@" + config.getGerritUserName() + " " + message);
+        ReviewInput.create()
+            .patchSetLevelComment("@" + config.getGerritUserName() + " " + message);
     gerritApi
         .changes()
         .id(projectName, resource.getChange().getChangeId())

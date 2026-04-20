@@ -127,6 +127,11 @@
         plugin.restApi().get(`/changes/${change._number}/${pluginName}~ai-review-history`);
     },
 
+    createFetchModelInfo(plugin, pluginName) {
+      return change =>
+        plugin.restApi().get(`/changes/${change._number}/${pluginName}~ai-review-agent-model`);
+    },
+
     createSendMessage(plugin, pluginName) {
       return (change, message) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {

@@ -34,6 +34,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 import java.time.Instant;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -41,16 +43,19 @@ public class ReviewAgentModelTest extends TestBase {
   @Mock private ChangeResource changeResource;
   @Mock private ConfigCreator configCreator;
   @Mock private Configuration config;
+  @Mock private AiReviewPermission aiReviewPermission;
 
   private ReviewAgentModel view;
 
   @Before
   public void setUp() throws Exception {
-    Change change = new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
+    Change change =
+        new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
-    view = new ReviewAgentModel(configCreator);
+    when(aiReviewPermission.canAiReview(changeResource)).thenReturn(true);
+    view = new ReviewAgentModel(configCreator, aiReviewPermission);
   }
 
   @Test
@@ -63,6 +68,7 @@ public class ReviewAgentModelTest extends TestBase {
     assertEquals("OPENAI", response.value().aiBackend);
     assertEquals("OPENAI", response.value().provider);
     assertEquals("gpt-4.1", response.value().aiModel);
+    assertTrue(response.value().canAiReview);
   }
 
   @Test
@@ -76,5 +82,17 @@ public class ReviewAgentModelTest extends TestBase {
     assertEquals("LANGCHAIN", response.value().aiBackend);
     assertEquals("GEMINI", response.value().provider);
     assertEquals("gemini-2.5-pro", response.value().aiModel);
+    assertTrue(response.value().canAiReview);
+  }
+
+  @Test
+  public void exposesCanAiReviewFalseWhenPermissionIsDenied() throws Exception {
+    when(config.getAiBackend()).thenReturn(AiBackends.OPENAI);
+    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(aiReviewPermission.canAiReview(changeResource)).thenReturn(false);
+
+    Response<ReviewAgentModel.Output> response = view.apply(changeResource);
+
+    assertFalse(response.value().canAiReview);
   }
 }

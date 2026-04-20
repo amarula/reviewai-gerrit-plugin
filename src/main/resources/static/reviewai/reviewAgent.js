@@ -105,6 +105,24 @@
       .join(' ');
   }
 
+  function emptyModelsResponse() {
+    return {
+      models: [],
+      custom_actions: [],
+    };
+  }
+
+  function emptyActionsResponse() {
+    return {
+      actions: [],
+      default_action_id: null,
+    };
+  }
+
+  function canAiReview(modelInfo) {
+    return !(modelInfo && modelInfo.can_ai_review === false);
+  }
+
   class ReviewAiCodeReviewProvider {
     constructor(plugin, pluginName) {
       this.plugin = plugin;
@@ -118,6 +136,10 @@
 
     async getModels(change) {
       const modelInfo = await this._fetchModelInfo(change);
+      if (!canAiReview(modelInfo)) {
+        return emptyModelsResponse();
+      }
+
       const provider = toDisplayName(modelInfo && modelInfo.provider);
       const model = modelInfo && modelInfo.ai_model;
       const fullDisplayText = model
@@ -137,7 +159,14 @@
       };
     }
 
-    async getActions() {
+    async getActions(change) {
+      if (change && getChangeNumber(change)) {
+        const modelInfo = await this._fetchModelInfo(change);
+        if (!canAiReview(modelInfo)) {
+          return emptyActionsResponse();
+        }
+      }
+
       return {
         actions: this._actions(),
         default_action_id: defaultActionId,
@@ -231,6 +260,11 @@
         const change = req.change;
         if (!getChangeNumber(change)) {
           throw new Error('ReviewAI needs a loaded Gerrit change to answer.');
+        }
+
+        const modelInfo = await this._fetchModelInfo(change);
+        if (!canAiReview(modelInfo)) {
+          throw new Error('ReviewAI is not allowed for this change.');
         }
 
         const prompt = this._normalizePrompt(req);

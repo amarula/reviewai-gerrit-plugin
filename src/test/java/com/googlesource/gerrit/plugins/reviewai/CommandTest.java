@@ -121,6 +121,51 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandReviewAllowedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
+    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
+        .thenReturn(false);
+
+    setupCommandComment("/review");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+  }
+
+  @Test
+  public void commandReviewSkippedWhenAiReviewAccessIsExplicitlyDisallowed()
+      throws RestApiException {
+    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
+        .thenReturn(true);
+
+    setupCommandComment("/review");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
+  }
+
+  @Test
+  public void commandReviewSkippedWhenAiReviewAccessIsExplicitlyDisallowedAndEventHasOnlyUsername()
+      throws RestApiException {
+    includeEventAccountId = false;
+    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
+        .thenReturn(true);
+
+    setupCommandComment("/review");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(aiReviewPermission)
+        .isAiReviewExplicitlyDisallowed(PROJECT_NAME, BRANCH_NAME.branch(), eventUser);
+    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
+  }
+
+  @Test
   public void commandHelp() throws Exception {
     setupCommandComment("/help");
 

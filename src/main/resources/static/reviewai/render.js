@@ -43,6 +43,10 @@
     },
 
     createHistoryBody(view) {
+      if (view._canAiReview === false) {
+        return this.createState('ReviewAI is not allowed for this change.');
+      }
+
       if (view._loadingChangeNumber !== null) {
         return this.createState('Loading AI review history...');
       }
@@ -69,6 +73,7 @@
       const composer = reviewAiDom.createElement('form', {
         className: 'reviewai-history__composer',
       });
+      view._composer = composer;
       composer.addEventListener('submit', event => view._submitMessage(event));
 
       const label = reviewAiDom.createElement('div', {
@@ -140,8 +145,9 @@
       if (view._composerInput.value !== view._draftMessage) {
         view._composerInput.value = view._draftMessage;
       }
-      view._composerInput.disabled = view._submitting;
-      view._composerButton.disabled = view._submitting;
+      view._composer.hidden = view._canAiReview === false;
+      view._composerInput.disabled = view._submitting || view._canAiReview === false;
+      view._composerButton.disabled = view._submitting || view._canAiReview === false;
       view._composerButton.textContent = view._submitting ? 'Sending...' : 'Send';
       view._resizeComposerInput(view._composerInput);
     },

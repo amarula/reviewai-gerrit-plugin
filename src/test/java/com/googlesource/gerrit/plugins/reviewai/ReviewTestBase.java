@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
 import com.google.gerrit.extensions.api.GerritApi;
@@ -64,6 +65,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
+import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 
 import lombok.NonNull;
 import org.junit.After;
@@ -128,6 +130,9 @@ public class ReviewTestBase extends TestBase {
   @Mock protected CommentsRequest commentsRequestMock;
   @Mock protected AccountCache accountCacheMock;
   @Mock protected ChangeSetDataProvider changeSetDataProvider;
+  @Mock protected AiReviewPermission aiReviewPermission;
+  @Mock protected IdentifiedUser.GenericFactory identifiedUserFactory;
+  @Mock protected IdentifiedUser eventUser;
 
   protected PluginConfig globalConfig;
   protected PluginConfig projectConfig;
@@ -139,6 +144,7 @@ public class ReviewTestBase extends TestBase {
   protected JsonObject aiRequestBody;
   protected String promptTagComments;
   protected Localizer localizer;
+  protected boolean includeEventAccountId = true;
 
   @Before
   public void before() throws RestApiException {
@@ -223,6 +229,12 @@ public class ReviewTestBase extends TestBase {
 
     // Mock the pluginDataHandlerProvider to return the mocked Change pluginDataHandler
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(pluginDataHandler);
+    lenient()
+        .when(identifiedUserFactory.create(Account.id(GERRIT_USER_ACCOUNT_ID)))
+        .thenReturn(eventUser);
+    lenient()
+        .when(identifiedUserFactory.create(Mockito.any(AccountState.class)))
+        .thenReturn(eventUser);
   }
 
   protected void mockGerritUiPromptsApiCall() {
@@ -336,7 +348,9 @@ public class ReviewTestBase extends TestBase {
                     bind(ChangeSetDataProvider.class).toInstance(changeSetDataProvider);
                     bind(PatchSetReviewer.class).toInstance(patchSetReviewer);
                     bind(PluginDataHandlerProvider.class).toInstance(pluginDataHandlerProvider);
-                    bind(AccountCache.class).toInstance(mockAccountCache());
+                    bind(AiReviewPermission.class).toInstance(aiReviewPermission);
+                    bind(IdentifiedUser.GenericFactory.class).toInstance(identifiedUserFactory);
+                    bind(AccountCache.class).toInstance(accountCacheMock);
                   }
                 })
             .getInstance(EventHandlerTask.class);
@@ -397,6 +411,9 @@ public class ReviewTestBase extends TestBase {
     accountAttribute.name = GERRIT_USER_ACCOUNT_NAME;
     accountAttribute.username = GERRIT_USER_USERNAME;
     accountAttribute.email = GERRIT_USER_ACCOUNT_EMAIL;
+    if (includeEventAccountId) {
+      accountAttribute.accountId = GERRIT_USER_ACCOUNT_ID;
+    }
     return accountAttribute;
   }
 
@@ -421,12 +438,14 @@ public class ReviewTestBase extends TestBase {
       case PATCH_SET_CREATED ->
           event -> {
             PatchSetCreatedEvent patchEvent = (PatchSetCreatedEvent) event;
+            patchEvent.uploader = this::createTestAccountAttribute;
             patchEvent.patchSet = this::createPatchSetAttribute;
             when(patchEvent.getType()).thenReturn("patchset-created");
           };
       case CHANGE_MERGED ->
           event -> {
             ChangeMergedEvent mergedEvent = (ChangeMergedEvent) event;
+            mergedEvent.submitter = this::createTestAccountAttribute;
             when(mergedEvent.getType()).thenReturn("change-merged");
           };
     };
