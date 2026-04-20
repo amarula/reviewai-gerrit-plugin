@@ -26,31 +26,39 @@ import com.googlesource.gerrit.plugins.reviewai.settings.Settings.AiBackends;
 
 public class ReviewAgentModel implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
+  private final AiReviewPermission aiReviewPermission;
 
   @Inject
-  ReviewAgentModel(ConfigCreator configCreator) {
+  ReviewAgentModel(ConfigCreator configCreator, AiReviewPermission aiReviewPermission) {
     this.configCreator = configCreator;
+    this.aiReviewPermission = aiReviewPermission;
   }
 
   @Override
   public Response<Output> apply(ChangeResource resource) throws Exception {
-    Configuration config = configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
+    Configuration config =
+        configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
     return Response.ok(
         new Output(
             config.getAiBackend().name(),
-            config.getAiBackend() == AiBackends.OPENAI ? AiBackends.OPENAI.name() : config.getLcProvider().name(),
-            config.getAiModel()));
+            config.getAiBackend() == AiBackends.OPENAI
+                ? AiBackends.OPENAI.name()
+                : config.getLcProvider().name(),
+            config.getAiModel(),
+            aiReviewPermission.canAiReview(resource)));
   }
 
   public static class Output {
     public final String aiBackend;
     public final String provider;
     public final String aiModel;
+    public final Boolean canAiReview;
 
-    public Output(String aiBackend, String provider, String aiModel) {
+    public Output(String aiBackend, String provider, String aiModel, Boolean canAiReview) {
       this.aiBackend = aiBackend;
       this.provider = provider;
       this.aiModel = aiModel;
+      this.canAiReview = canAiReview;
     }
   }
 }

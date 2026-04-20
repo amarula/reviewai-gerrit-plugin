@@ -18,6 +18,11 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
+import com.google.gerrit.entities.Account;
+import com.google.gerrit.server.CurrentUser;
+import com.google.gerrit.server.IdentifiedUser;
+import com.google.gerrit.server.account.AccountCache;
+import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.ChangeMergedEvent;
 import com.google.gerrit.server.events.CommentAddedEvent;
@@ -31,6 +36,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -71,6 +77,9 @@ public class EventHandlerTask implements Runnable {
   private final PatchSetReviewer reviewer;
   private final ICodeContextPolicy codeContextPolicy;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
+  private final AiReviewPermission aiReviewPermission;
+  private final IdentifiedUser.GenericFactory identifiedUserFactory;
+  private final AccountCache accountCache;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -83,7 +92,10 @@ public class EventHandlerTask implements Runnable {
       PatchSetReviewer reviewer,
       GerritClient gerritClient,
       ICodeContextPolicy codeContextPolicy,
-      PluginDataHandlerProvider pluginDataHandlerProvider) {
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      AiReviewPermission aiReviewPermission,
+      IdentifiedUser.GenericFactory identifiedUserFactory,
+      AccountCache accountCache) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -91,6 +103,9 @@ public class EventHandlerTask implements Runnable {
     this.config = config;
     this.codeContextPolicy = codeContextPolicy;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
+    this.aiReviewPermission = aiReviewPermission;
+    this.identifiedUserFactory = identifiedUserFactory;
+    this.accountCache = accountCache;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -170,6 +185,17 @@ public class EventHandlerTask implements Runnable {
   }
 
   private boolean isReviewEnabled(GerritChange change) {
+    CurrentUser eventUser = getEventUser();
+    if (eventUser != null
+        && aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            change.getProjectNameKey(), change.getBranchNameKey().branch(), eventUser)) {
+      log.debug(
+          "AI review access is explicitly denied for project {} and branch {}",
+          change.getProjectNameKey(),
+          change.getBranchNameKey());
+      return false;
+    }
+
     List<String> enabledProjects =
         Splitter.on(",").omitEmptyStrings().splitToList(config.getEnabledProjects());
     if (!config.isGlobalEnable()
@@ -186,6 +212,38 @@ public class EventHandlerTask implements Runnable {
       return false;
     }
     return true;
+  }
+
+  private CurrentUser getEventUser() {
+    Optional<AccountAttribute> eventAccount = getEventAccount();
+    if (eventAccount.isEmpty()) {
+      return null;
+    }
+
+    AccountAttribute account = eventAccount.get();
+    if (account.accountId != null) {
+      return identifiedUserFactory.create(Account.id(account.accountId));
+    }
+    return Optional.ofNullable(account.username)
+        .flatMap(accountCache::getByUsername)
+        .map(identifiedUserFactory::create)
+        .orElse(null);
+  }
+
+  private Optional<AccountAttribute> getEventAccount() {
+    try {
+      return switch (processing_event_type) {
+        case COMMENT_ADDED ->
+            Optional.ofNullable(((CommentAddedEvent) change.getPatchSetEvent()).author.get());
+        case PATCH_SET_CREATED ->
+            Optional.ofNullable(((PatchSetCreatedEvent) change.getPatchSetEvent()).uploader.get());
+        case CHANGE_MERGED ->
+            Optional.ofNullable(((ChangeMergedEvent) change.getPatchSetEvent()).submitter.get());
+      };
+    } catch (RuntimeException e) {
+      log.debug("Failed to retrieve event account for change {}", change.getFullChangeId(), e);
+      return Optional.empty();
+    }
   }
 
   private Optional<String> getTopic(GerritChange change) {

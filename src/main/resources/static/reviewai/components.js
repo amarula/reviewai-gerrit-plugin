@@ -12,11 +12,13 @@
       super();
       this._change = null;
       this._fetchHistory = null;
+      this._fetchModelInfo = null;
       this._sendMessage = null;
       this._loadedChangeNumber = null;
       this._loadingChangeNumber = null;
       this._entries = [];
       this._error = null;
+      this._canAiReview = true;
       this._submitting = false;
       this._pollHandle = null;
       this._draftMessage = '';
@@ -30,6 +32,7 @@
 
       this._upgradeProperty('change');
       this._upgradeProperty('fetchHistory');
+      this._upgradeProperty('fetchModelInfo');
       this._upgradeProperty('sendMessage');
     }
 
@@ -50,6 +53,7 @@
       this._change = change;
       this._loadedChangeNumber = null;
       this._error = null;
+      this._canAiReview = true;
       this._draftMessage = '';
       this._awaitingResponse = false;
       this._pendingPrompt = null;
@@ -58,6 +62,12 @@
 
     set fetchHistory(fetchHistory) {
       this._fetchHistory = fetchHistory;
+      this._loadIfReady();
+    }
+
+    set fetchModelInfo(fetchModelInfo) {
+      this._fetchModelInfo = fetchModelInfo;
+      this._loadedChangeNumber = null;
       this._loadIfReady();
     }
 
@@ -77,6 +87,10 @@
         return;
       }
 
+      if (!(await this._refreshCapability(changeNumber))) {
+        return;
+      }
+
       await this._refreshHistory({
         changeNumber,
         showLoadingState: true,
@@ -84,9 +98,39 @@
       });
     }
 
+    async _refreshCapability(changeNumber) {
+      if (!this._fetchModelInfo) {
+        this._canAiReview = true;
+        return true;
+      }
+
+      try {
+        const modelInfo = await this._fetchModelInfo(this._change);
+        if (this._getChangeNumber() !== changeNumber) {
+          return false;
+        }
+
+        this._setCanAiReview(changeNumber, !(modelInfo && modelInfo.can_ai_review === false));
+        return this._canAiReview;
+      } catch (error) {
+        this._canAiReview = true;
+        return true;
+      }
+    }
+
+    _setCanAiReview(changeNumber, canAiReview) {
+      this._canAiReview = canAiReview;
+      if (!this._canAiReview) {
+        this._entries = [];
+        this._loadedChangeNumber = changeNumber;
+        this._error = null;
+        this._render();
+      }
+    }
+
     async _submitMessage(event) {
       event.preventDefault();
-      if (!this._sendMessage || !this._change || this._submitting) {
+      if (!this._sendMessage || !this._change || !this._canAiReview || this._submitting) {
         return;
       }
 
@@ -129,7 +173,7 @@
       }
 
       const changeNumber = this._getChangeNumber();
-      if (!this._fetchHistory || !changeNumber) {
+      if (!this._fetchHistory || !changeNumber || !this._canAiReview) {
         return;
       }
 
@@ -159,6 +203,9 @@
       try {
         const result = await this._fetchHistory(requestedChange);
         if (this._getChangeNumber() !== changeNumber) {
+          return;
+        }
+        if (!this._canAiReview) {
           return;
         }
 

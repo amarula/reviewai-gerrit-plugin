@@ -90,6 +90,8 @@ Gerrit.install(plugin => {
     .onAttached(view => {
       view.fetchHistory = change =>
         plugin.restApi().get(`/changes/${change._number}/${pluginName}~ai-review-history`);
+      view.fetchModelInfo = change =>
+        plugin.restApi().get(`/changes/${change._number}/${pluginName}~ai-review-agent-model`);
       view.sendMessage = (change, message) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
