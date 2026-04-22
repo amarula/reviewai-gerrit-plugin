@@ -24,6 +24,7 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,6 +43,7 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private Configuration config;
   @Mock private GerritApi gerritApi;
   @Mock private AiReviewPermission aiReviewPermission;
+  @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
 
   private AiReviewMessage view;
 
@@ -52,7 +54,9 @@ public class AiReviewMessageTest extends TestBase {
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
-    view = new AiReviewMessage(configCreator, gerritApi, aiReviewPermission);
+    view =
+        new AiReviewMessage(
+            configCreator, gerritApi, aiReviewPermission, pluginDataHandlerBaseProvider);
   }
 
   @Test(expected = AuthException.class)

@@ -19,12 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai;
 import static org.junit.Assert.assertEquals;
 
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
-import com.google.gerrit.extensions.api.GerritApi;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.AiBackends;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
+import java.util.List;
 import org.eclipse.jgit.lib.Config;
 import org.junit.Test;
 
@@ -33,62 +32,55 @@ public class ConfigurationDefaultsTest {
   private static final String PLUGIN_NAME = "reviewai-gerrit-plugin";
 
   @Test
-  public void shouldDefaultToLangChainGeminiModelWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.GEMINI);
-    assertEquals(Configuration.DEFAULT_GEMINI_AI_MODEL, configuration.getAiModel());
-  }
+  public void shouldDefaultToOpenAiProviderAndModelWhenUnset() {
+    Configuration configuration = createConfiguration();
 
-  @Test
-  public void shouldDefaultToLangChainMoonshotModelWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.MOONSHOT);
-    assertEquals(Configuration.DEFAULT_MOONSHOT_AI_MODEL, configuration.getAiModel());
-  }
-
-  @Test
-  public void shouldDefaultToLangChainOpenAiModelWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.OPENAI);
+    assertEquals(List.of("OpenAI"), configuration.getAiProvider());
+    assertEquals(List.of("OpenAI/" + Configuration.DEFAULT_AI_MODEL), configuration.getAiModels());
     assertEquals(Configuration.DEFAULT_AI_MODEL, configuration.getAiModel());
-  }
-
-  @Test
-  public void shouldDefaultToOpenAiModelForNonLangChainBackend() {
-    Configuration configuration = createConfiguration(AiBackends.OPENAI, LangChainProviders.OPENAI);
-    assertEquals(Configuration.DEFAULT_AI_MODEL, configuration.getAiModel());
-  }
-
-  @Test
-  public void shouldDefaultToLangChainGeminiDomainWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.GEMINI);
-    assertEquals(Configuration.GEMINI_DOMAIN, configuration.getAiDomain());
-  }
-
-  @Test
-  public void shouldDefaultToLangChainMoonshotDomainWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.MOONSHOT);
-    assertEquals(Configuration.MOONSHOT_DOMAIN, configuration.getAiDomain());
-  }
-
-  @Test
-  public void shouldDefaultToLangChainOpenAiDomainWhenUnset() {
-    Configuration configuration = createConfiguration(AiBackends.LANGCHAIN, LangChainProviders.OPENAI);
     assertEquals(Configuration.OPENAI_DOMAIN, configuration.getAiDomain());
   }
 
   @Test
-  public void shouldDefaultToOpenAiDomainForNonLangChainBackend() {
-    Configuration configuration = createConfiguration(AiBackends.OPENAI, LangChainProviders.OPENAI);
-    assertEquals(Configuration.OPENAI_DOMAIN, configuration.getAiDomain());
+  public void shouldExposeModelsForConfiguredProviderRoutes() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI", "LangChain/OpenAI", "LangChain/MoonShot"},
+            new String[] {"OpenAI/gpt-4.1", "OpenAI/gpt-4o", "MoonShot/moonshot-v1-8k"});
+
+    assertEquals(
+        List.of(
+            "OpenAI/gpt-4.1",
+            "OpenAI/gpt-4o",
+            "LangChain/OpenAI/gpt-4.1",
+            "LangChain/OpenAI/gpt-4o",
+            "LangChain/MoonShot/moonshot-v1-8k"),
+        configuration.getAiModels());
+  }
+
+  @Test
+  public void shouldUseDefaultModelForProviderWithoutConfiguredModels() {
+    Configuration configuration =
+        createConfiguration(new String[] {"LangChain/MoonShot"}, new String[] {});
+
+    assertEquals(
+        List.of("LangChain/MoonShot/" + Configuration.DEFAULT_MOONSHOT_AI_MODEL),
+        configuration.getAiModels());
   }
 
   @Test
   public void shouldDefaultNeutralReviewScoreConversionToEnabled() {
-    Configuration configuration = createConfiguration(AiBackends.OPENAI, LangChainProviders.OPENAI);
+    Configuration configuration = createConfiguration();
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());
   }
 
-  private Configuration createConfiguration(AiBackends backend, LangChainProviders provider) {
+  private Configuration createConfiguration() {
+    return createConfiguration(new String[] {}, new String[] {});
+  }
+
+  private Configuration createConfiguration(String[] providers, String[] models) {
     PluginConfig projectConfig = emptyPluginConfig();
-    PluginConfig globalConfig = pluginConfigWithBackend(backend, provider);
+    PluginConfig globalConfig = pluginConfig(providers, models);
 
     return new Configuration(
         (OneOffRequestContext) null,
@@ -99,10 +91,10 @@ public class ConfigurationDefaultsTest {
         Account.id(ReviewTestBase.GERRIT_USER_ACCOUNT_ID));
   }
 
-  private PluginConfig pluginConfigWithBackend(AiBackends backend, LangChainProviders provider) {
+  private PluginConfig pluginConfig(String[] providers, String[] models) {
     Config cfg = new Config();
-    cfg.setString("plugin", PLUGIN_NAME, "aiBackend", backend.name());
-    cfg.setString("plugin", PLUGIN_NAME, "lcProvider", provider.name());
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiProvider", List.of(providers));
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiModels", List.of(models));
     return PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg);
   }
 

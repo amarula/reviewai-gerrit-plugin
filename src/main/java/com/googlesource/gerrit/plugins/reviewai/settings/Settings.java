@@ -36,15 +36,4 @@ public class Settings {
 
   public static final String OPENAI_ROLE_USER = "user";
   public static final String OPENAI_ROLE_ASSISTANT = "assistant";
-
-  public enum AiBackends {
-    OPENAI,
-    LANGCHAIN
-  }
-
-  public enum LangChainProviders {
-    OPENAI,
-    GEMINI,
-    MOONSHOT
-  }
 }

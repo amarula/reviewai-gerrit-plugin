@@ -123,11 +123,26 @@
     return !(modelInfo && modelInfo.can_ai_review === false);
   }
 
+  function configuredModels(modelInfo) {
+    if (Array.isArray(modelInfo && modelInfo.models)) {
+      return modelInfo.models;
+    }
+    if (!modelInfo) {
+      return [];
+    }
+    return [
+      {
+        model_id: 'reviewai/default',
+        provider: modelInfo.provider,
+        ai_model: modelInfo.ai_model,
+      },
+    ];
+  }
+
   class ReviewAiCodeReviewProvider {
     constructor(plugin, pluginName) {
       this.plugin = plugin;
       this.pluginName = pluginName;
-      this.defaultModel = 'reviewai/default';
       this.supports_add_context = false;
       this.supports_history = true;
       this.supports_more_menu = false;
@@ -140,21 +155,22 @@
         return emptyModelsResponse();
       }
 
-      const provider = toDisplayName(modelInfo && modelInfo.provider);
-      const model = modelInfo && modelInfo.ai_model;
-      const fullDisplayText = model
-        ? `${provider} (${model})`
-        : provider;
+      const models = configuredModels(modelInfo).map(model => {
+        const provider = model && model.provider;
+        const aiModel = model && (model.model || model.ai_model);
+        const modelId = (model && model.model_id) || `${model.provider}/${aiModel}`;
+        const fullDisplayText = aiModel ? `${provider} (${aiModel})` : provider;
+        return {
+          model_id: modelId,
+          short_text: provider,
+          full_display_text: fullDisplayText,
+        };
+      });
 
       return {
-        models: [
-          {
-            model_id: this.defaultModel,
-            short_text: provider,
-            full_display_text: fullDisplayText,
-          },
-        ],
-        default_model_id: this.defaultModel,
+        models,
+        default_model_id:
+          (modelInfo && modelInfo.default_model_id) || (models[0] && models[0].model_id) || null,
         custom_actions: this._actions(),
       };
     }
@@ -280,7 +296,7 @@
         const baselineKeys = new Set(baselineEntries.map(entryKey));
         const conversationId = this._getRequestConversationId(req, change);
 
-        await this._sendMessage(change, prompt);
+        await this._sendMessage(change, prompt, this._getRequestModelId(req));
 
         const responseText = await this._waitForAssistantReply(change, baselineKeys);
         await this._storeConversationTurn(change, req, conversationId, prompt, responseText);
@@ -342,8 +358,16 @@
       return reviewAi.api.createFetchHistory(this.plugin, this.pluginName)(change);
     }
 
-    _sendMessage(change, message) {
-      return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(change, message);
+    _sendMessage(change, message, modelId) {
+      return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(change, message, modelId);
+    }
+
+    _getRequestModelId(req) {
+      return (
+        (req && (req.model_id || req.modelId)) ||
+        (req && req.model && (req.model.model_id || req.model.modelId)) ||
+        ''
+      );
     }
 
     async _canAiReviewChange(change) {

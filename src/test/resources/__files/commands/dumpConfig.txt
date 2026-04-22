@@ -3,15 +3,17 @@
 ```
 CONFIGURATION SETTINGS
 
-aiBackend: OPENAI
 aiCommentTemperature: 1.0
 aiConnectionMaxRetryAttempts: 1
 aiConnectionTimeout: 30
 aiDomain: http://localhost:9527
 aiFullFileReview: true
-aiModel: gpt-4o
+aiMaxMemoryTokens: 16384
+aiModels: [OpenAI/gpt-4o]
 aiPollingInterval: 1000
 aiPollingTimeout: 180
+aiProvider: 
+    OpenAI
 aiRelevanceRules: 
 aiReviewCommitMessages: true
 aiReviewPatchSet: true
@@ -61,8 +63,6 @@ gerritUserName: gpt
 ignoreOutdatedInlineComments: false
 ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
-lcMaxMemoryTokens: 16384
-lcProvider: OPENAI
 maxReviewLines: 1000
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 

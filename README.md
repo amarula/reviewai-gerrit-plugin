@@ -30,10 +30,12 @@ shows command reference directly in Gerrit.
 
    `[plugin "reviewai-gerrit-plugin"]`:
 
-- `aiToken`: AI token.
+- `aiProvider`: AI provider routes exposed to the Review Agent AI.
+- `aiModels`: AI model routes exposed to the Review Agent AI.
+- `aiTokens`: AI provider token routes.
 - `gerritUserName`: Gerrit username of AI user.
 
-  For enhanced security, consider storing sensitive information like aiToken in a secure location or file.
+  For enhanced security, consider storing sensitive information like aiTokens in a secure location or file.
   Detailed instructions on how to do this will be provided later in this document.
 
 4. **Verify:** After restarting Gerrit, you can see the following information in Gerrit's logs:
@@ -78,23 +80,29 @@ as follows:
 ```
 [plugin "reviewai-gerrit-plugin"]
     # Required parameters
-    aiToken = {aiToken}
+    aiProvider = OpenAI
+    aiModels = OpenAI/gpt-4o
+    aiTokens = OpenAI/{openAiToken}
     ...
 
     # Optional parameters
-    aiModel = {aiModel}
+    aiProvider = LangChain/OpenAI
+    aiProvider = LangChain/MoonShot
+    aiModels = OpenAI/gpt-4.1
+    aiModels = MoonShot/moonshot-v1-8k
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
 
 #### Secure Configuration
 
-It is highly recommended to store sensitive information such as `aiToken` in the `secure.config` file. Please edit the
+It is highly recommended to store sensitive information such as `aiTokens` in the `secure.config` file. Please edit the
 file at $gerrit_site/etc/`secure.config` and include the following details:
 
 ```
 [plugin "reviewai-gerrit-plugin"]
-    aiToken = {aiToken}
+    aiTokens = OpenAI/{openAiToken}
+    aiTokens = MoonShot/{moonShotToken}
 ```
 
 If you wish to encrypt the information within the `secure.config` file, you can refer
@@ -111,47 +119,70 @@ To add the following content, please edit the `project.config` file in `refs/met
     ...
 
     # Optional parameters
-    aiBackend = {aiBackend}
-    aiModel = {aiModel}
+    aiProvider = {providerRoute}
+    aiModels = {providerModelRoute}
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
 
 #### Secure Configuration
 
-Please ensure **strict control over the access permissions of `refs/meta/config`** since sensitive information such as
-`aiToken` is configured in the `project.config` file within `refs/meta/config`.
+Please ensure **strict control over the access permissions of `refs/meta/config`** if sensitive information such as
+`aiTokens` is configured in the `project.config` file within `refs/meta/config`.
 
-## AI Backends
+## AI Provider Routes
 
-The plugin supports multiple Backends, giving flexibility in selecting an AI provider. Backends may represent AI
-providers themselves or frameworks that connect to them.
+The plugin supports multiple provider routes, giving flexibility in selecting a direct provider or a framework-backed
+provider. The Review Agent AI exposes each configured route/model combination using `/` syntax.
 
-### OpenAI Backend
+Supported provider routes are:
 
-OpenAI Backend uses the **Assistant** resource to maintain a richer interaction context. This backend is designed to:
+- `OpenAI`: direct OpenAI connection.
+- `LangChain/OpenAI`: OpenAI through LangChain.
+- `LangChain/MoonShot`: MoonShot through LangChain.
+
+Model and token settings are grouped by the provider part of the route:
+
+```
+[plugin "reviewai-gerrit-plugin"]
+    aiProvider = OpenAI
+    aiProvider = LangChain/OpenAI
+    aiProvider = LangChain/MoonShot
+
+    aiModels = OpenAI/gpt-4o
+    aiModels = OpenAI/gpt-4.1
+    aiModels = MoonShot/moonshot-v1-8k
+
+    aiTokens = OpenAI/{openAiToken}
+    aiTokens = MoonShot/{moonShotToken}
+```
+
+With this configuration, the Review Agent AI exposes `OpenAI/gpt-4o`, `OpenAI/gpt-4.1`,
+`LangChain/OpenAI/gpt-4o`, `LangChain/OpenAI/gpt-4.1`, and `LangChain/MoonShot/moonshot-v1-8k`.
+
+### OpenAI Route
+
+The direct OpenAI route uses the **Assistant** resource to maintain a richer interaction context. This route is designed to:
 
 - Leverage OpenAI Conversations plus Responses to preserve the memory of interactions related to each Change Set.
 - Link these Threads with OpenAI Assistants that are specialized according to the response needed.
 - Associate the Assistants with the complete Codebase of the Git project related to the Change, which is updated
   each time commits are merged in Gerrit.
 
-### LangChain Backend
+### LangChain Routes
 
-The LangChain backend relies on the LangChain framework to connect with an AI provider.
-OpenAI is used by default, and you can select Google Gemini or Moonshot by configuring the `lcProvider` parameter.
+LangChain routes rely on the LangChain framework to connect with an AI provider.
 
 ## Optional Parameters
 
-- `aiBackend`: Selects the AI Backend for request processing. The currently supported Backend options are:
-    - **OPENAI** (The default value)
-    - **LANGCHAIN**
+- `aiProvider`: Selects provider routes to expose. The default value is `OpenAI`.
+- `aiModels`: Selects model routes by provider. OpenAI uses `gpt-4o` by default and MoonShot uses
+  `moonshot-v1-8k` by default. You can expose multiple compatible models for the same provider.
+- `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on.
 - `aiDomain`: Defines the base endpoint for the selected provider, either direct or through LangChain. By default, it
   uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
   (Gemini), or `https://api.moonshot.ai` (Moonshot). Override only when you need a custom endpoint; leaving it unset
   lets the plugin pick the provider default automatically.
-- `aiModel`: Each provider has its own default model. OpenAI uses `gpt-4o`, Gemini uses `gemini-2.5-flash` and Moonshot
-  `moonshot-v1-8k`. You can override the setting with other compatible models such as `gpt-4.1` or `gemini-2.5-pro`.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
@@ -237,12 +268,9 @@ directive = End each reply with \"Hope this helps!\"
 
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
-### Optional Parameters Specific to LangChain Backend
+### Optional Parameters Specific to LangChain Routes
 
-- `lcProvider`: Selects the LangChain provider (requires `aiBackend = LANGCHAIN`). Supported providers are `OPENAI`
-  (default), `GEMINI`, and `MOONSHOT`. When a provider different from `OPENAI` is selected, and `aiDomain` retains its
-  default value, the default endpoint of the selected provider is applied automatically.
-- `lcMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
+- `aiMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
 
 ### Advanced Connection Parameters for OpenAI
 
@@ -469,7 +497,8 @@ originalLogLevel: INFO
 ### Change Scope
 conversationId: conv_XXXXXXXXXXXXXXXXXXXX
 dynamicConfig:
-    aiBackend: OPENAI
+    aiModels:
+        OpenAI/gpt-4o
     enabledVoting: true
 ```
 
@@ -486,11 +515,13 @@ Example of the response:
 ```
 CONFIGURATION SETTINGS
 
-aiBackend: OPENAI
 aiCommentTemperature: 1.0
 aiDomain: https://api.openai.com
 aiFullFileReview: true
-aiModel: gpt-4-turbo
+aiModels:
+    OpenAI/gpt-4-turbo
+aiProvider:
+    OpenAI
 aiReviewCommitMessages: true
 aiReviewPatchSet: true
 aiReviewTemperature: 0.2
@@ -670,7 +701,7 @@ Following this configuration, a new Change Set review can be initiated with:
 It's also possible to make multiple changes at once:
 
 ```
-@gpt /configure --aiBackend=OPENAI --aiModel=gpt-4-turbo
+@gpt /configure --aiProvider=["OpenAI"] --aiModels=["OpenAI/gpt-4-turbo"]
 ```
 
 ## License

@@ -35,7 +35,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.*;
 
 @Slf4j
 public abstract class ConfigCore {
-  private static final Set<String> EXCLUDE_FROM_DUMP = Set.of("KEY_AI_TOKEN");
+  private static final Set<String> EXCLUDE_FROM_DUMP = Set.of("KEY_AI_TOKENS");
   private static final String GLOBAL_CONFIG = "GlobalConfig";
   private static final String PROJECT_CONFIG = "ProjectConfig";
 

@@ -267,8 +267,8 @@ public class CommandTest extends OpenAiReviewTestBase {
 
   @Test
   public void commandConfigure() throws Exception {
-    String dynamicKey = "aiModel";
-    String dynamicValue = "DUMMY_MODEL";
+    String dynamicKey = "aiModels";
+    String dynamicValue = getGson().toJson(List.of("OpenAI/DUMMY_MODEL"));
     setupCommandComment(String.format("/configure --%s=%s", dynamicKey, dynamicValue));
     enableMessageDebugging();
     PluginDataHandler changeHandler = getChangeDataHandler();

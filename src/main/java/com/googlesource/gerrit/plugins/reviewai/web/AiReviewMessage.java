@@ -26,18 +26,29 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 
 public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewMessage.Input> {
   private final ConfigCreator configCreator;
   private final GerritApi gerritApi;
   private final AiReviewPermission aiReviewPermission;
+  private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
 
   @Inject
   AiReviewMessage(
-      ConfigCreator configCreator, GerritApi gerritApi, AiReviewPermission aiReviewPermission) {
+      ConfigCreator configCreator,
+      GerritApi gerritApi,
+      AiReviewPermission aiReviewPermission,
+      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
+    this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
   }
 
   @Override
@@ -50,6 +61,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     Configuration config =
         configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
     aiReviewPermission.checkCanAiReview(resource);
+    storeSelectedModel(resource, input);
     String projectName = GerritChange.getProjectName(resource.getChange().getProject());
     ReviewInput reviewInput =
         ReviewInput.create()
@@ -64,6 +76,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
 
   public static class Input {
     public String message;
+    public String modelId;
   }
 
   public static class Output {
@@ -72,5 +85,20 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     public Output(boolean ok) {
       this.ok = ok;
     }
+  }
+
+  private void storeSelectedModel(ChangeResource resource, Input input) {
+    if (input == null || input.modelId == null || input.modelId.isBlank()) {
+      return;
+    }
+    PluginDataHandler changeDataHandler =
+        pluginDataHandlerBaseProvider.get(resource.getChange().getKey().toString());
+    Map<String, String> dynamicConfig =
+        changeDataHandler.getJsonObjectValue(KEY_DYNAMIC_CONFIG, String.class);
+    if (dynamicConfig == null) {
+      dynamicConfig = new HashMap<>();
+    }
+    dynamicConfig.put("selectedAiModel", input.modelId.trim());
+    changeDataHandler.setJsonValue(KEY_DYNAMIC_CONFIG, dynamicConfig);
   }
 }

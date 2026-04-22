@@ -16,27 +16,28 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.server.change.ChangeResource;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.AiBackends;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
+import java.time.Instant;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-
-import java.time.Instant;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ReviewAgentModelTest extends TestBase {
@@ -59,36 +60,31 @@ public class ReviewAgentModelTest extends TestBase {
   }
 
   @Test
-  public void openAiBackendUsesOpenAiProvider() throws Exception {
-    when(config.getAiBackend()).thenReturn(AiBackends.OPENAI);
-    when(config.getAiModel()).thenReturn("gpt-4.1");
+  public void exposesConfiguredProviderModelRoutes() throws Exception {
+    when(config.getAiModels())
+        .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(
+            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, "gpt-4.1"));
 
     Response<ReviewAgentModel.Output> response = view.apply(changeResource);
 
-    assertEquals("OPENAI", response.value().aiBackend);
-    assertEquals("OPENAI", response.value().provider);
-    assertEquals("gpt-4.1", response.value().aiModel);
-    assertTrue(response.value().canAiReview);
-  }
-
-  @Test
-  public void langChainBackendUsesConfiguredLangChainProvider() throws Exception {
-    when(config.getAiBackend()).thenReturn(AiBackends.LANGCHAIN);
-    when(config.getLcProvider()).thenReturn(LangChainProviders.GEMINI);
-    when(config.getAiModel()).thenReturn("gemini-2.5-pro");
-
-    Response<ReviewAgentModel.Output> response = view.apply(changeResource);
-
-    assertEquals("LANGCHAIN", response.value().aiBackend);
-    assertEquals("GEMINI", response.value().provider);
-    assertEquals("gemini-2.5-pro", response.value().aiModel);
+    assertEquals("OpenAI/gpt-4.1", response.value().defaultModelId);
+    assertEquals(2, response.value().models.size());
+    assertEquals("OpenAI/gpt-4.1", response.value().models.get(0).modelId);
+    assertEquals("OpenAI", response.value().models.get(0).provider);
+    assertEquals("gpt-4.1", response.value().models.get(0).model);
+    assertEquals("LangChain/MoonShot", response.value().models.get(1).provider);
+    assertEquals("moonshot-v1-8k", response.value().models.get(1).model);
     assertTrue(response.value().canAiReview);
   }
 
   @Test
   public void exposesCanAiReviewFalseWhenPermissionIsDenied() throws Exception {
-    when(config.getAiBackend()).thenReturn(AiBackends.OPENAI);
-    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(config.getAiModels()).thenReturn(List.of("OpenAI/gpt-4.1"));
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(
+            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, "gpt-4.1"));
     when(aiReviewPermission.canAiReview(changeResource)).thenReturn(false);
 
     Response<ReviewAgentModel.Output> response = view.apply(changeResource);

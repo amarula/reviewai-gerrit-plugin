@@ -79,7 +79,7 @@ public class GeminiLangChainProvider implements ILangChainProvider {
     } catch (RuntimeException e) {
       estimatorAvailable = false;
       log.warn(
-          "aiToken is not configured. Falling back to approximate token estimator: {}",
+          "aiTokens is not configured. Falling back to approximate token estimator: {}",
           e.getMessage());
       return Optional.empty();
     } catch (InvocationTargetException e) {

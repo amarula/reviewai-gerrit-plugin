@@ -36,7 +36,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -105,7 +105,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ChatMemory memory =
           TokenWindowChatMemory.builder()
               .id(memoryId)
-              .maxTokens(config.getLcMaxMemoryTokens(), tokenEstimatorProvider.get())
+              .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get())
               .build();
 
       memory.add(LangChainChatMessages.systemMessage(systemInstructions));
@@ -125,7 +125,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               ? Double.parseDouble(config.getAiCommentTemperature())
               : Double.parseDouble(config.getAiReviewTemperature());
 
-      LangChainProviders providerType = config.getLcProvider();
+      AiProviderType providerType = config.getAiProviderType();
       ILangChainProvider provider = LangChainProviderFactory.get(providerType);
       LangChainProvider providerModel = provider.buildChatModel(config, temperature);
       ChatModel model = providerModel.getModel();

@@ -22,7 +22,7 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.AiBackends;
+import java.util.List;
 
 public class ReviewAgentModel implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
@@ -40,25 +40,40 @@ public class ReviewAgentModel implements RestReadView<ChangeResource> {
         configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
     return Response.ok(
         new Output(
-            config.getAiBackend().name(),
-            config.getAiBackend() == AiBackends.OPENAI
-                ? AiBackends.OPENAI.name()
-                : config.getLcProvider().name(),
-            config.getAiModel(),
+            config.getAiModels().stream().map(Model::fromRoute).toList(),
+            config.getSelectedAiModelRoute().modelRoute(),
             aiReviewPermission.canAiReview(resource)));
   }
 
   public static class Output {
-    public final String aiBackend;
-    public final String provider;
-    public final String aiModel;
+    public final List<Model> models;
+    public final String defaultModelId;
     public final Boolean canAiReview;
 
-    public Output(String aiBackend, String provider, String aiModel, Boolean canAiReview) {
-      this.aiBackend = aiBackend;
-      this.provider = provider;
-      this.aiModel = aiModel;
+    public Output(List<Model> models, String defaultModelId, Boolean canAiReview) {
+      this.models = models;
+      this.defaultModelId = defaultModelId;
       this.canAiReview = canAiReview;
+    }
+  }
+
+  public static class Model {
+    public final String modelId;
+    public final String provider;
+    public final String model;
+
+    public Model(String modelId, String provider, String model) {
+      this.modelId = modelId;
+      this.provider = provider;
+      this.model = model;
+    }
+
+    private static Model fromRoute(String route) {
+      int separator = route.lastIndexOf("/");
+      if (separator <= 0 || separator == route.length() - 1) {
+        return new Model(route, route, "");
+      }
+      return new Model(route, route.substring(0, separator), route.substring(separator + 1));
     }
   }
 }

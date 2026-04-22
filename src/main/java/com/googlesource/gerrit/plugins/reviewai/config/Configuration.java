@@ -20,13 +20,13 @@ import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 import java.util.*;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt.getJsonPromptValues;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.AiBackends;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
 
 public class Configuration extends ConfigCore {
   // Config Constants
@@ -43,8 +43,10 @@ public class Configuration extends ConfigCore {
   public static final double DEFAULT_AI_REVIEW_TEMPERATURE = 0.2;
   public static final double DEFAULT_AI_COMMENT_TEMPERATURE = 1.0;
 
-  private static final String DEFAULT_AI_BACKEND = "OPENAI";
-  private static final String DEFAULT_LC_PROVIDER = "OPENAI";
+  private static final List<String> DEFAULT_AI_PROVIDER = List.of("OpenAI");
+  private static final String KEY_AI_TOKENS = "aiTokens";
+  private static final String KEY_AI_MODELS = "aiModels";
+  private static final String KEY_AI_PROVIDER = "aiProvider";
   private static final boolean DEFAULT_REVIEW_PATCH_SET = true;
   private static final boolean DEFAULT_REVIEW_COMMIT_MESSAGES = true;
   private static final boolean DEFAULT_FULL_FILE_REVIEW = true;
@@ -80,7 +82,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_POLLING_TIMEOUT = 180;
   private static final int DEFAULT_AI_POLLING_INTERVAL = 1000;
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
-  private static final int DEFAULT_LC_MAX_MEMORY_TOKENS = 16384;
+  private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final boolean DEFAULT_ENABLE_MESSAGE_DEBUGGING = false;
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
 
@@ -97,12 +99,15 @@ public class Configuration extends ConfigCore {
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
-      Set.of(KEY_DIRECTIVES, KEY_SELECTIVE_LOG_LEVEL_OVERRIDE);
+      Set.of(
+          KEY_DIRECTIVES,
+          KEY_SELECTIVE_LOG_LEVEL_OVERRIDE,
+          KEY_AI_PROVIDER,
+          KEY_AI_MODELS,
+          KEY_AI_TOKENS);
 
-  private static final String KEY_AI_TOKEN = "aiToken";
+  private static final String SELECTED_AI_MODEL = "selectedAiModel";
   private static final String KEY_AI_DOMAIN = "aiDomain";
-  private static final String KEY_AI_MODEL = "aiModel";
-  private static final String KEY_AI_BACKEND = "aiBackend";
   private static final String KEY_REVIEW_COMMIT_MESSAGES = "aiReviewCommitMessages";
   private static final String KEY_REVIEW_PATCH_SET = "aiReviewPatchSet";
   private static final String KEY_FULL_FILE_REVIEW = "aiFullFileReview";
@@ -120,8 +125,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_FILTER_RELEVANT_COMMENTS = "filterRelevantComments";
   private static final String KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD =
       "filterCommentsRelevanceThreshold";
-  private static final String KEY_LC_MAX_MEMORY_TOKENS = "lcMaxMemoryTokens";
-  private static final String KEY_LC_PROVIDER = "lcProvider";
+  private static final String KEY_AI_MAX_MEMORY_TOKENS = "aiMaxMemoryTokens";
   private static final String KEY_INLINE_COMMENTS_AS_RESOLVED = "inlineCommentsAsResolved";
   private static final String KEY_PATCH_SET_COMMENTS_AS_RESOLVED = "patchSetCommentsAsResolved";
   private static final String KEY_IGNORE_OUTDATED_INLINE_COMMENTS = "ignoreOutdatedInlineComments";
@@ -145,7 +149,15 @@ public class Configuration extends ConfigCore {
   }
 
   public String getAiToken() {
-    return getValidatedOrThrow(KEY_AI_TOKEN);
+    return getAiToken(getSelectedAiModelRoute().provider());
+  }
+
+  public String getAiToken(AiProviderType provider) {
+    String token = getAiTokens().get(provider.getConfigName());
+    if (token == null || token.isBlank()) {
+      throw new RuntimeException(String.format(NOT_CONFIGURED_ERROR_MSG, KEY_AI_TOKENS));
+    }
+    return token;
   }
 
   public String getGerritUserName() {
@@ -158,24 +170,80 @@ public class Configuration extends ConfigCore {
       return aiDomain;
     }
 
-    if (getAiBackend() == AiBackends.LANGCHAIN) {
-      return getDefaultLangChainDomain();
-    }
-
-    return OPENAI_DOMAIN;
+    return getDefaultAiDomain(getSelectedAiModelRoute().provider());
   }
 
   public String getAiModel() {
-    String model = getString(KEY_AI_MODEL);
-    if (model != null && !model.isEmpty()) {
-      return model;
-    }
+    return getSelectedAiModelRoute().model();
+  }
 
-    if (getAiBackend() == AiBackends.LANGCHAIN) {
-      return getDefaultLangChainModel();
-    }
+  public List<String> getAiProvider() {
+    List<String> providers = splitListIntoItems(KEY_AI_PROVIDER, DEFAULT_AI_PROVIDER);
+    return providers.stream()
+        .map(this::canonicalProviderRoute)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .distinct()
+        .toList();
+  }
 
-    return DEFAULT_AI_MODEL;
+  public List<String> getAiModels() {
+    List<String> configuredModels = splitListIntoItems(KEY_AI_MODELS, List.of());
+    Map<AiProviderType, List<String>> modelMap = getAiModelMap(configuredModels);
+    return getAiProviderRoutes().stream()
+        .flatMap(
+            providerRoute ->
+                modelMap
+                    .getOrDefault(
+                        providerRoute.provider(),
+                        List.of(getDefaultAiModel(providerRoute.provider())))
+                    .stream()
+                    .map(
+                        model ->
+                            new AiModelRoute(
+                                providerRoute.transport(), providerRoute.provider(), model)))
+        .map(AiModelRoute::modelRoute)
+        .distinct()
+        .toList();
+  }
+
+  public Map<String, String> getAiTokens() {
+    Map<String, String> tokens = new LinkedHashMap<>();
+    for (String configuredTokenRoute : splitListIntoItems(KEY_AI_TOKENS, List.of())) {
+      String tokenRoute = unwrapDumpQuotes(configuredTokenRoute);
+      int separator = tokenRoute.indexOf("/");
+      if (separator <= 0 || separator == tokenRoute.length() - 1) {
+        continue;
+      }
+      AiProviderType.fromConfigName(tokenRoute.substring(0, separator))
+          .ifPresent(
+              provider ->
+                  tokens.put(provider.getConfigName(), tokenRoute.substring(separator + 1)));
+    }
+    return tokens;
+  }
+
+  public AiModelRoute getSelectedAiModelRoute() {
+    String selectedRoute = getString(SELECTED_AI_MODEL);
+    if (!selectedRoute.isBlank()) {
+      Optional<AiModelRoute> parsedRoute = AiModelRoute.parse(selectedRoute);
+      if (parsedRoute.isPresent() && getAiModels().contains(parsedRoute.get().modelRoute())) {
+        return parsedRoute.get();
+      }
+    }
+    return getAiModels().stream()
+        .findFirst()
+        .flatMap(AiModelRoute::parse)
+        .orElse(
+            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, DEFAULT_AI_MODEL));
+  }
+
+  public AiProviderType getAiProviderType() {
+    return getSelectedAiModelRoute().provider();
+  }
+
+  public AiProviderTransport getAiProviderTransport() {
+    return getSelectedAiModelRoute().transport();
   }
 
   // The default system prompt/instructions are specified in the prompt files and are passed as a
@@ -200,14 +268,6 @@ public class Configuration extends ConfigCore {
 
   public boolean getAiReviewPatchSet() {
     return getBoolean(KEY_REVIEW_PATCH_SET, DEFAULT_REVIEW_PATCH_SET);
-  }
-
-  public AiBackends getAiBackend() {
-    return getEnum(KEY_AI_BACKEND, DEFAULT_AI_BACKEND, AiBackends.class);
-  }
-
-  public LangChainProviders getLcProvider() {
-    return getEnum(KEY_LC_PROVIDER, DEFAULT_LC_PROVIDER, LangChainProviders.class);
   }
 
   public boolean getAiReviewCommitMessages() {
@@ -315,8 +375,8 @@ public class Configuration extends ConfigCore {
     return getInt(KEY_AI_CONNECTION_TIMEOUT, DEFAULT_AI_CONNECTION_TIMEOUT);
   }
 
-  public int getLcMaxMemoryTokens() {
-    return getInt(KEY_LC_MAX_MEMORY_TOKENS, DEFAULT_LC_MAX_MEMORY_TOKENS);
+  public int getAiMaxMemoryTokens() {
+    return getInt(KEY_AI_MAX_MEMORY_TOKENS, DEFAULT_AI_MAX_MEMORY_TOKENS);
   }
 
   public int getAiConnectionMaxRetryAttempts() {
@@ -348,20 +408,77 @@ public class Configuration extends ConfigCore {
         KEY_SELECTIVE_LOG_LEVEL_OVERRIDE, DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE);
   }
 
-  private String getDefaultLangChainModel() {
-    return switch (getLcProvider()) {
+  private List<AiProviderRoute> getAiProviderRoutes() {
+    return getAiProvider().stream()
+        .map(this::parseProviderRoute)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .toList();
+  }
+
+  private Optional<String> canonicalProviderRoute(String providerRoute) {
+    return parseProviderRoute(providerRoute).map(AiProviderRoute::id);
+  }
+
+  private Optional<AiProviderRoute> parseProviderRoute(String providerRoute) {
+    providerRoute = unwrapDumpQuotes(providerRoute);
+    if (providerRoute == null || providerRoute.isBlank()) {
+      return Optional.empty();
+    }
+    String[] parts = providerRoute.trim().split("/", 2);
+    if (parts.length == 1) {
+      return AiProviderType.fromConfigName(parts[0])
+          .filter(provider -> provider == AiProviderType.OPENAI)
+          .map(provider -> new AiProviderRoute(AiProviderTransport.OPENAI, provider));
+    }
+
+    Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
+    Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
+    if (transport.isPresent() && provider.isPresent()) {
+      return Optional.of(new AiProviderRoute(transport.get(), provider.get()));
+    }
+    return Optional.empty();
+  }
+
+  private Map<AiProviderType, List<String>> getAiModelMap(List<String> configuredModels) {
+    Map<AiProviderType, List<String>> modelMap = new LinkedHashMap<>();
+    for (String configuredModelRoute : configuredModels) {
+      String modelRoute = unwrapDumpQuotes(configuredModelRoute);
+      int separator = modelRoute.indexOf("/");
+      if (separator <= 0 || separator == modelRoute.length() - 1) {
+        continue;
+      }
+      AiProviderType.fromConfigName(modelRoute.substring(0, separator))
+          .ifPresent(
+              provider ->
+                  modelMap
+                      .computeIfAbsent(provider, ignored -> new ArrayList<>())
+                      .add(modelRoute.substring(separator + 1)));
+    }
+    return modelMap;
+  }
+
+  private String getDefaultAiModel(AiProviderType provider) {
+    return switch (provider) {
       case GEMINI -> DEFAULT_GEMINI_AI_MODEL;
       case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODEL;
       case OPENAI -> DEFAULT_AI_MODEL;
     };
   }
 
-  private String getDefaultLangChainDomain() {
-    return switch (getLcProvider()) {
+  private String getDefaultAiDomain(AiProviderType provider) {
+    return switch (provider) {
       case GEMINI -> GEMINI_DOMAIN;
       case MOONSHOT -> MOONSHOT_DOMAIN;
       case OPENAI -> OPENAI_DOMAIN;
     };
+  }
+
+  private String unwrapDumpQuotes(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.replaceAll("^\"|\"$", "");
   }
 
   private static boolean isBlank(String value) {
@@ -374,5 +491,14 @@ public class Configuration extends ConfigCore {
 
   public TreeMap<String, String> dumpConfigMap() {
     return dumpConfigMap(this.getClass());
+  }
+
+  private record AiProviderRoute(AiProviderTransport transport, AiProviderType provider) {
+    private String id() {
+      if (transport == AiProviderTransport.OPENAI) {
+        return provider.getConfigName();
+      }
+      return transport.getConfigName() + "/" + provider.getConfigName();
+    }
   }
 }

@@ -20,7 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.gem
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.moonshot.MoonshotLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 public final class LangChainProviderFactory {
 
@@ -30,7 +30,7 @@ public final class LangChainProviderFactory {
 
   private LangChainProviderFactory() {}
 
-  public static ILangChainProvider get(LangChainProviders provider) {
+  public static ILangChainProvider get(AiProviderType provider) {
     return switch (provider) {
       case OPENAI -> OPENAI_PROVIDER;
       case GEMINI -> GEMINI_PROVIDER;

@@ -133,9 +133,10 @@
     },
 
     createSendMessage(plugin, pluginName) {
-      return (change, message) =>
+      return (change, message, modelId) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
+          modelId,
         });
     },
   };

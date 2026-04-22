@@ -168,7 +168,7 @@ public class ReviewTestBase extends TestBase {
         };
 
     // Mock the Global Config values not provided by Default
-    when(globalConfig.getString("aiToken")).thenReturn(AI_TOKEN);
+    when(globalConfig.getStringList("aiTokens")).thenReturn(new String[] {"OpenAI/" + AI_TOKEN});
 
     // Mock the Global Config values to the Defaults passed as second arguments of the `get*`
     // methods.
@@ -442,20 +442,16 @@ public class ReviewTestBase extends TestBase {
   }
 
   private IAiClient getOpenAIClient() {
-    return switch (config.getAiBackend()) {
-      case OPENAI ->
-          config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-              ? new OpenAiTaskSpecificReviewClient(
-                  config, getCodeContextPolicy(), pluginDataHandlerProvider, Runnable::run)
-              : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
-      case LANGCHAIN ->
-          new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
-    };
+    if (config.getSelectedAiModelRoute().isLangChain()) {
+      return new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
+    }
+    return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
+        ? new OpenAiTaskSpecificReviewClient(
+            config, getCodeContextPolicy(), pluginDataHandlerProvider, Runnable::run)
+        : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
   }
 
   private IGerritClientPatchSet getGerritClientPatchSet() {
-    return switch (config.getAiBackend()) {
-      case OPENAI, LANGCHAIN -> new GerritClientPatchSetOpenAi(config, accountCacheMock);
-    };
+    return new GerritClientPatchSetOpenAi(config, accountCacheMock);
   }
 }

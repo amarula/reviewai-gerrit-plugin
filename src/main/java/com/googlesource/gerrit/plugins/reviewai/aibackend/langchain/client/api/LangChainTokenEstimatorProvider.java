@@ -20,7 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings.LangChainProviders;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.TokenCountEstimator;
 import java.util.concurrent.CompletableFuture;
@@ -51,7 +51,7 @@ class LangChainTokenEstimatorProvider {
       if (cachedEstimator != null) {
         return cachedEstimator;
       }
-      LangChainProviders provider = config.getLcProvider();
+      AiProviderType provider = config.getAiProviderType();
       try {
         log.info(
             "Initializing {} token estimator for model {}", provider, config.getAiModel());
@@ -72,7 +72,7 @@ class LangChainTokenEstimatorProvider {
     }
   }
 
-  private TokenCountEstimator createEstimator(LangChainProviders provider) {
+  private TokenCountEstimator createEstimator(AiProviderType provider) {
     ILangChainProvider adapter = LangChainProviderFactory.get(provider);
     return adapter.createTokenEstimator(config).orElse(APPROXIMATE_ESTIMATOR);
   }

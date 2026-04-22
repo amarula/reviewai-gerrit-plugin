@@ -35,7 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.google.inject.Scopes.SINGLETON;
@@ -76,26 +76,23 @@ public class GerritEventContextModule extends FactoryModule {
   }
 
   private Class<? extends IAiClient> getAiClient() {
-    return switch (config.getAiBackend()) {
-      case OPENAI ->
-          config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-              ? OpenAiTaskSpecificReviewClient.class
-              : OpenAiReviewClient.class;
-      case LANGCHAIN -> LangChainClient.class;
-    };
+    if (config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN) {
+      return LangChainClient.class;
+    }
+    return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
+        ? OpenAiTaskSpecificReviewClient.class
+        : OpenAiReviewClient.class;
   }
 
   private Class<? extends IGerritClientPatchSet> getClientPatchSet() {
-    return switch (config.getAiBackend()) {
-      case OPENAI, LANGCHAIN -> GerritClientPatchSetOpenAi.class;
-    };
+    return GerritClientPatchSetOpenAi.class;
   }
 
   private Class<? extends ICodeContextPolicy> getCodeContextPolicy() {
     return switch (config.getCodeContextPolicy()) {
       case NONE -> CodeContextPolicyNone.class;
       case ON_DEMAND ->
-          config.getAiBackend() == Settings.AiBackends.OPENAI
+          !config.getSelectedAiModelRoute().isLangChain()
               ? OpenAiCodeContextPolicyOnDemand.class
               : CodeContextPolicyOnDemand.class;
     };
