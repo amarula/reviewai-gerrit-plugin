@@ -185,6 +185,16 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandHelpDoesNotRetrievePatchSet() throws Exception {
+    setupCommandComment("/help");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(revisionApiMock, Mockito.never()).patch();
+    Mockito.verify(revisionApiMock, Mockito.never()).file(Mockito.anyString());
+  }
+
+  @Test
   public void commandHelpSpecificCommand() throws Exception {
     setupCommandComment("/help /review");
 
@@ -334,6 +344,17 @@ public class CommandTest extends OpenAiReviewTestBase {
     Assert.assertTrue(reviewMessage.contains("PROMPTS CURRENTLY USED"));
     Assert.assertTrue(reviewMessage.contains("Review the following Patch Set:  ` ` `"));
     Assert.assertTrue(reviewMessage.contains("\n```\n"));
+  }
+
+  @Test
+  public void commandShowPromptsDoesNotRetrievePatchSet() throws Exception {
+    setupCommandComment("/show --prompts");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(revisionApiMock, Mockito.never()).patch();
+    Mockito.verify(revisionApiMock, Mockito.never()).file(Mockito.anyString());
   }
 
   @Test

@@ -81,30 +81,33 @@ public class PatchSetReviewer {
     log.debug("Starting review process for change: {}", change.getFullChangeId());
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
+    if (!changeSetData.shouldRequestAiReview()) {
+      log.debug("Skipping patch retrieval and AI request because only a system response is needed.");
+      clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
+      return;
+    }
     commentProperties = gerritClient.getClientData(change).getCommentProperties();
     gerritCommentRange = new GerritCommentRange(gerritClient, change);
     String patchSet = gerritClient.getPatchSet(change);
     ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
 
-    if (changeSetData.shouldRequestAiReview()) {
-      AiResponseContent reviewReply = null;
-      try {
-        reviewReply = getReviewReply(change, patchSet);
-        log.debug("OpenAI final response: {}", reviewReply);
-      } catch (AiConnectionFailException e) {
-        log.error(
-            "OpenAI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
-            change.getFullChangeId(),
-            config.getAiDomain(),
-            config.getAiModel(),
-            openAiClient.getRequestBody() == null ? "<unavailable>" : openAiClient.getRequestBody(),
-            e.getMessage(),
-            e);
-        changeSetData.setReviewSystemMessage(localizer.getText("message.openai.connection.error"));
-      }
-      if (reviewReply != null) {
-        retrieveReviewBatches(reviewReply, change);
-      }
+    AiResponseContent reviewReply = null;
+    try {
+      reviewReply = getReviewReply(change, patchSet);
+      log.debug("OpenAI final response: {}", reviewReply);
+    } catch (AiConnectionFailException e) {
+      log.error(
+          "OpenAI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
+          change.getFullChangeId(),
+          config.getAiDomain(),
+          config.getAiModel(),
+          openAiClient.getRequestBody() == null ? "<unavailable>" : openAiClient.getRequestBody(),
+          e.getMessage(),
+          e);
+      changeSetData.setReviewSystemMessage(localizer.getText("message.openai.connection.error"));
+    }
+    if (reviewReply != null) {
+      retrieveReviewBatches(reviewReply, change);
     }
     clientReviewProvider
         .get()
