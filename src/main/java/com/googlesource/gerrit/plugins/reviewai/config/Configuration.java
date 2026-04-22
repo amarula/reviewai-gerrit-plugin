@@ -44,6 +44,7 @@ public class Configuration extends ConfigCore {
   public static final double DEFAULT_AI_COMMENT_TEMPERATURE = 1.0;
 
   private static final List<String> DEFAULT_AI_PROVIDER = List.of("OpenAI");
+  private static final int DEFAULT_AI_MODELS_DEFAULT_INDEX = 1;
   private static final String KEY_AI_TOKENS = "aiTokens";
   private static final String KEY_AI_MODELS = "aiModels";
   private static final String KEY_AI_PROVIDER = "aiProvider";
@@ -125,6 +126,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_FILTER_RELEVANT_COMMENTS = "filterRelevantComments";
   private static final String KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD =
       "filterCommentsRelevanceThreshold";
+  private static final String KEY_AI_MODELS_DEFAULT_INDEX = "aiModelsDefaultIndex";
   private static final String KEY_AI_MAX_MEMORY_TOKENS = "aiMaxMemoryTokens";
   private static final String KEY_INLINE_COMMENTS_AS_RESOLVED = "inlineCommentsAsResolved";
   private static final String KEY_PATCH_SET_COMMENTS_AS_RESOLVED = "patchSetCommentsAsResolved";
@@ -207,6 +209,10 @@ public class Configuration extends ConfigCore {
         .toList();
   }
 
+  public int getAiModelsDefaultIndex() {
+    return getInt(KEY_AI_MODELS_DEFAULT_INDEX, DEFAULT_AI_MODELS_DEFAULT_INDEX);
+  }
+
   public Map<String, String> getAiTokens() {
     Map<String, String> tokens = new LinkedHashMap<>();
     for (String configuredTokenRoute : splitListIntoItems(KEY_AI_TOKENS, List.of())) {
@@ -231,9 +237,7 @@ public class Configuration extends ConfigCore {
         return parsedRoute.get();
       }
     }
-    return getAiModels().stream()
-        .findFirst()
-        .flatMap(AiModelRoute::parse)
+    return getDefaultAiModelRoute()
         .orElse(
             new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, DEFAULT_AI_MODEL));
   }
@@ -418,6 +422,15 @@ public class Configuration extends ConfigCore {
 
   private Optional<String> canonicalProviderRoute(String providerRoute) {
     return parseProviderRoute(providerRoute).map(AiProviderRoute::id);
+  }
+
+  private Optional<AiModelRoute> getDefaultAiModelRoute() {
+    List<String> models = getAiModels();
+    int zeroBasedIndex = getAiModelsDefaultIndex() - 1;
+    if (zeroBasedIndex >= 0 && zeroBasedIndex < models.size()) {
+      return AiModelRoute.parse(models.get(zeroBasedIndex));
+    }
+    return models.stream().findFirst().flatMap(AiModelRoute::parse);
   }
 
   private Optional<AiProviderRoute> parseProviderRoute(String providerRoute) {

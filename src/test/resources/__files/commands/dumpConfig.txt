@@ -10,6 +10,7 @@ aiDomain: http://localhost:9527
 aiFullFileReview: true
 aiMaxMemoryTokens: 16384
 aiModels: [OpenAI/gpt-4o]
+aiModelsDefaultIndex: 1
 aiPollingInterval: 1000
 aiPollingTimeout: 180
 aiProvider: 

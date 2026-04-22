@@ -90,6 +90,7 @@ as follows:
     aiProvider = LangChain/MoonShot
     aiModels = OpenAI/gpt-4.1
     aiModels = MoonShot/moonshot-v1-8k
+    aiModelsDefaultIndex = 1
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
@@ -152,6 +153,7 @@ Model and token settings are grouped by the provider part of the route:
     aiModels = OpenAI/gpt-4o
     aiModels = OpenAI/gpt-4.1
     aiModels = MoonShot/moonshot-v1-8k
+    aiModelsDefaultIndex = 1
 
     aiTokens = OpenAI/{openAiToken}
     aiTokens = MoonShot/{moonShotToken}
@@ -178,6 +180,9 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
 - `aiProvider`: Selects provider routes to expose. The default value is `OpenAI`.
 - `aiModels`: Selects model routes by provider. OpenAI uses `gpt-4o` by default and MoonShot uses
   `moonshot-v1-8k` by default. You can expose multiple compatible models for the same provider.
+- `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
+  value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
+  when no model has been selected yet.
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on.
 - `aiDomain`: Defines the base endpoint for the selected provider, either direct or through LangChain. By default, it
   uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
@@ -520,6 +525,7 @@ aiDomain: https://api.openai.com
 aiFullFileReview: true
 aiModels:
     OpenAI/gpt-4-turbo
+aiModelsDefaultIndex: 1
 aiProvider:
     OpenAI
 aiReviewCommitMessages: true
@@ -701,7 +707,7 @@ Following this configuration, a new Change Set review can be initiated with:
 It's also possible to make multiple changes at once:
 
 ```
-@gpt /configure --aiProvider=["OpenAI"] --aiModels=["OpenAI/gpt-4-turbo"]
+@gpt /configure --aiProvider=["OpenAI"] --aiModels=["OpenAI/gpt-4-turbo"] --aiModelsDefaultIndex=1
 ```
 
 ## License
