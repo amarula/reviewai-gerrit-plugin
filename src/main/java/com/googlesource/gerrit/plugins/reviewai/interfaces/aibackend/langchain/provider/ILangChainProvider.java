@@ -22,6 +22,7 @@ import dev.langchain4j.model.TokenCountEstimator;
 import java.util.Optional;
 
 public interface ILangChainProvider {
+  int LANGCHAIN_MAX_RETRIES = 1;
 
   LangChainProvider buildChatModel(Configuration config, double temperature);
 
