@@ -51,6 +51,7 @@ public class GeminiLangChainProvider implements ILangChainProvider {
             .modelName(config.getAiModel())
             .temperature(temperature)
             .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
+            .maxRetries(LANGCHAIN_MAX_RETRIES)
             .build();
 
     return new LangChainProvider(model, endpoint);
