@@ -35,7 +35,7 @@ public class MoonshotLangChainProviderTest {
     when(config.getAiDomain()).thenReturn(Configuration.MOONSHOT_DOMAIN);
     when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("moonshot-v1-8k");
-    when(config.getAiConnectionTimeout()).thenReturn(30);
+    when(config.getAiConnectionTimeout()).thenReturn(180);
 
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.0);
 

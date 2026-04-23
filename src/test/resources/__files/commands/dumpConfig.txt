@@ -5,7 +5,7 @@ CONFIGURATION SETTINGS
 
 aiCommentTemperature: 1.0
 aiConnectionMaxRetryAttempts: 1
-aiConnectionTimeout: 30
+aiConnectionTimeout: 180
 aiDomain: http://localhost:9527
 aiFullFileReview: true
 aiMaxMemoryTokens: 16384
