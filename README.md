@@ -178,8 +178,10 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
 ## Optional Parameters
 
 - `aiProviders`: Selects provider routes to expose. The default value is `OpenAI`.
-- `aiModels`: Selects model routes by provider. OpenAI uses `gpt-4o` by default and MoonShot uses
-  `moonshot-v1-8k` by default. You can expose multiple compatible models for the same provider.
+- `aiModels`: Selects model routes by provider. When no models are configured for an exposed provider, the plugin
+  exposes built-in defaults. OpenAI defaults to `gpt-4o`, `gpt-4.1`, `gpt-5.2`, and `gpt-5.4`; MoonShot defaults to
+  `moonshot-v1-8k`, `moonshot-v1-32k`, and `moonshot-v1-128k`; Gemini defaults to `gemini-2.5-flash`,
+  `gemini-2.5-pro`, and `gemini-2.5-flash-lite`.
 - `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
   value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
   when no model has been selected yet.

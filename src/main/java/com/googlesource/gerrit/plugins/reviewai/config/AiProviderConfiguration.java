@@ -31,6 +31,12 @@ final class AiProviderConfiguration {
   static final String DEFAULT_OPENAI_AI_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
+  static final List<String> DEFAULT_OPENAI_AI_MODELS =
+      List.of("gpt-5.4", "gpt-5.2", "gpt-4.1", DEFAULT_OPENAI_AI_MODEL);
+  static final List<String> DEFAULT_GEMINI_AI_MODELS =
+      List.of("gemini-3.1-pro", "gemini-3.1-flash", "gemini-2.5-pro", DEFAULT_GEMINI_AI_MODEL);
+  static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
+      List.of("kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-thinking-turbo", "kimi-k2-turbo-preview", DEFAULT_MOONSHOT_AI_MODEL);
 
   static final String KEY_AI_TOKENS = "aiTokens";
   static final String KEY_AI_MODELS = "aiModels";
@@ -94,7 +100,7 @@ final class AiProviderConfiguration {
                 modelMap
                     .getOrDefault(
                         providerRoute.provider(),
-                        List.of(getDefaultAiModel(providerRoute.provider())))
+                        getDefaultAiModels(providerRoute.provider()))
                     .stream()
                     .map(
                         model ->
@@ -216,11 +222,11 @@ final class AiProviderConfiguration {
     return modelMap;
   }
 
-  private String getDefaultAiModel(AiProviderType provider) {
+  private List<String> getDefaultAiModels(AiProviderType provider) {
     return switch (provider) {
-      case GEMINI -> DEFAULT_GEMINI_AI_MODEL;
-      case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODEL;
-      case OPENAI -> DEFAULT_OPENAI_AI_MODEL;
+      case GEMINI -> DEFAULT_GEMINI_AI_MODELS;
+      case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODELS;
+      case OPENAI -> DEFAULT_OPENAI_AI_MODELS;
     };
   }
 
