@@ -44,7 +44,7 @@ public class GeminiLangChainProviderTest {
     when(config.getAiDomain()).thenReturn(Configuration.GEMINI_DOMAIN);
     when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("gemini-2.5-flash");
-    when(config.getAiConnectionTimeout()).thenReturn(30);
+    when(config.getAiConnectionTimeout()).thenReturn(180);
 
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.0);
 

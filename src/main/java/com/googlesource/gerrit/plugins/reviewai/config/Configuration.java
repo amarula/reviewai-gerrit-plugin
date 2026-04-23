@@ -81,7 +81,7 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS = false;
   private static final boolean DEFAULT_IGNORE_RESOLVED_AI_COMMENTS = true;
   private static final boolean DEFAULT_TASK_SPECIFIC_ASSISTANTS = false;
-  private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 30;
+  private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
   private static final int DEFAULT_AI_POLLING_TIMEOUT = 180;
   private static final int DEFAULT_AI_POLLING_INTERVAL = 1000;
