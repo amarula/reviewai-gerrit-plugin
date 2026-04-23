@@ -81,7 +81,7 @@ as follows:
 [plugin "reviewai-gerrit-plugin"]
     # Required parameters
     aiProviders = OpenAI
-    aiModels = OpenAI/gpt-4o
+    aiModels = OpenAI/gpt-5.4-mini
     aiTokens = OpenAI/{openAiToken}
     ...
 
@@ -150,7 +150,7 @@ Model and token settings are grouped by the provider part of the route:
     aiProviders = LangChain/OpenAI
     aiProviders = LangChain/MoonShot
 
-    aiModels = OpenAI/gpt-4o
+    aiModels = OpenAI/gpt-5.4-mini
     aiModels = OpenAI/gpt-4.1
     aiModels = MoonShot/moonshot-v1-8k
     aiModelsDefaultIndex = 1
@@ -159,8 +159,8 @@ Model and token settings are grouped by the provider part of the route:
     aiTokens = MoonShot/{moonShotToken}
 ```
 
-With this configuration, the Review Agent AI exposes `OpenAI/gpt-4o`, `OpenAI/gpt-4.1`,
-`LangChain/OpenAI/gpt-4o`, `LangChain/OpenAI/gpt-4.1`, and `LangChain/MoonShot/moonshot-v1-8k`.
+With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4-mini`, `OpenAI/gpt-4.1`,
+`LangChain/OpenAI/gpt-5.4-mini`, `LangChain/OpenAI/gpt-4.1`, and `LangChain/MoonShot/moonshot-v1-8k`.
 
 ### OpenAI Route
 
@@ -178,8 +178,8 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
 ## Optional Parameters
 
 - `aiProviders`: Selects provider routes to expose. The default value is `OpenAI`.
-- `aiModels`: Selects model routes by provider. OpenAI uses `gpt-4o` by default and MoonShot uses
-  `moonshot-v1-8k` by default. You can expose multiple compatible models for the same provider.
+- `aiModels`: Selects model routes by provider. When no models are configured for an exposed provider, the plugin
+  exposes built-in defaults.
 - `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
   value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
   when no model has been selected yet.
@@ -503,7 +503,7 @@ originalLogLevel: INFO
 conversationId: conv_XXXXXXXXXXXXXXXXXXXX
 dynamicConfig:
     aiModels:
-        OpenAI/gpt-4o
+        OpenAI/gpt-5.4-mini
     enabledVoting: true
 ```
 

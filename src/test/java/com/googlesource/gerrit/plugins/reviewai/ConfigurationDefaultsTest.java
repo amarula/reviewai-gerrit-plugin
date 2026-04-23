@@ -36,8 +36,11 @@ public class ConfigurationDefaultsTest {
     Configuration configuration = createConfiguration();
 
     assertEquals(List.of("OpenAI"), configuration.getAiProviders());
-    assertEquals(List.of("OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL), configuration.getAiModels());
-    assertEquals(Configuration.DEFAULT_OPENAI_AI_MODEL, configuration.getAiModel());
+    List<String> models = configuration.getAiModels();
+    assertEquals(
+        "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL,
+        models.getLast());
+    assertEquals(models.getFirst(), "OpenAI/" + configuration.getAiModel());
     assertEquals(Configuration.OPENAI_DOMAIN, configuration.getAiDomain());
   }
 
@@ -46,14 +49,14 @@ public class ConfigurationDefaultsTest {
     Configuration configuration =
         createConfiguration(
             new String[] {"OpenAI", "LangChain/OpenAI", "LangChain/MoonShot"},
-            new String[] {"OpenAI/gpt-4.1", "OpenAI/gpt-4o", "MoonShot/moonshot-v1-8k"});
+            new String[] {"OpenAI/gpt-4.1", "OpenAI/gpt-5.4-mini", "MoonShot/moonshot-v1-8k"});
 
     assertEquals(
         List.of(
             "OpenAI/gpt-4.1",
-            "OpenAI/gpt-4o",
+            "OpenAI/gpt-5.4-mini",
             "LangChain/OpenAI/gpt-4.1",
-            "LangChain/OpenAI/gpt-4o",
+            "LangChain/OpenAI/gpt-5.4-mini",
             "LangChain/MoonShot/moonshot-v1-8k"),
         configuration.getAiModels());
   }
@@ -84,13 +87,23 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
-  public void shouldUseDefaultModelForProviderWithoutConfiguredModels() {
+  public void shouldUseDefaultModelsForProviderWithoutConfiguredModels() {
     Configuration configuration =
-        createConfiguration(new String[] {"LangChain/MoonShot"}, new String[] {});
+        createConfiguration(new String[] {"MoonShot"}, new String[] {});
 
     assertEquals(
-        List.of("LangChain/MoonShot/" + Configuration.DEFAULT_MOONSHOT_AI_MODEL),
-        configuration.getAiModels());
+        "LangChain/MoonShot/" + Configuration.DEFAULT_MOONSHOT_AI_MODEL,
+        configuration.getAiModels().getLast());
+  }
+
+  @Test
+  public void shouldUseDefaultModelsForGeminiProviderWithoutConfiguredModels() {
+    Configuration configuration =
+        createConfiguration(new String[] {"Gemini"}, new String[] {});
+
+    assertEquals(
+        "LangChain/Gemini/" + Configuration.DEFAULT_GEMINI_AI_MODEL,
+        configuration.getAiModels().getLast());
   }
 
   @Test
