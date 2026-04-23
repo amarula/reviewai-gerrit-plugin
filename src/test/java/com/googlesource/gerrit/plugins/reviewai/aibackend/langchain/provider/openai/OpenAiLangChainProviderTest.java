@@ -20,7 +20,7 @@ public class OpenAiLangChainProviderTest {
     when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(30);
+    when(config.getAiConnectionTimeout()).thenReturn(180);
 
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.0);
 
