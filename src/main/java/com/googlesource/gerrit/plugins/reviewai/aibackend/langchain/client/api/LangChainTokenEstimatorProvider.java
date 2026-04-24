@@ -52,19 +52,17 @@ class LangChainTokenEstimatorProvider {
         return cachedEstimator;
       }
       AiProviderType provider = config.getAiProviderType();
+      String estimatorModel = getEstimatorModel(provider);
       try {
-        log.info(
-            "Initializing {} token estimator for model {}", provider, config.getAiModel());
-        TokenCountEstimator estimator =
-            CompletableFuture.supplyAsync(() -> createEstimator(provider))
-                .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        cachedEstimator = estimator;
-        log.info("Initialized {} token estimator for model {}", provider, config.getAiModel());
+        log.info("Initializing {} token estimator for model {}", provider, estimatorModel);
+        cachedEstimator = CompletableFuture.supplyAsync(() -> createEstimator(provider))
+            .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        log.info("Initialized {} token estimator for model {}", provider, estimatorModel);
       } catch (Exception e) {
         log.warn(
             "Failed to initialize {} token estimator for model {}. Using approximate estimator.",
             provider,
-            config.getAiModel(),
+            estimatorModel,
             e);
         cachedEstimator = APPROXIMATE_ESTIMATOR;
       }
@@ -75,6 +73,14 @@ class LangChainTokenEstimatorProvider {
   private TokenCountEstimator createEstimator(AiProviderType provider) {
     ILangChainProvider adapter = LangChainProviderFactory.get(provider);
     return adapter.createTokenEstimator(config).orElse(APPROXIMATE_ESTIMATOR);
+  }
+
+  private static String getEstimatorModel(AiProviderType provider) {
+    return switch (provider) {
+      case OPENAI -> Configuration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
+      case GEMINI -> Configuration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
+      case MOONSHOT -> Configuration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
+    };
   }
 
   private static final class ApproximateTokenCountEstimator implements TokenCountEstimator {
