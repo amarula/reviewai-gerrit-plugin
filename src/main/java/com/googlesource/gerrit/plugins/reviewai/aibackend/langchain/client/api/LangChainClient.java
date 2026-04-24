@@ -100,7 +100,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       Object memoryId = change.getFullChangeId();
 
       log.info("LangChain system instructions for {}: {}", memoryId, systemInstructions);
-      log.info("LangChain user prompt for {} patchSet {}: {}", memoryId, patchSet, userMessage);
+      log.info("LangChain user prompt for {}: {}", memoryId,userMessage);
 
       ChatMemory memory =
           TokenWindowChatMemory.builder()
