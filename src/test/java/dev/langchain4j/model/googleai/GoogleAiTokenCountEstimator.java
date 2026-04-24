@@ -30,8 +30,18 @@ public class GoogleAiTokenCountEstimator implements TokenCountEstimator {
   }
 
   public static final class Builder {
+    private static String lastModelName;
+
     private String apiKey;
     private String modelName;
+
+    public static void reset() {
+      lastModelName = null;
+    }
+
+    public static String getLastModelName() {
+      return lastModelName;
+    }
 
     public Builder apiKey(String apiKey) {
       this.apiKey = apiKey;
@@ -47,6 +57,7 @@ public class GoogleAiTokenCountEstimator implements TokenCountEstimator {
     }
 
     public GoogleAiTokenCountEstimator build() {
+      lastModelName = modelName;
       if (modelName != null && modelName.startsWith("gemini-")) {
         throw new IllegalArgumentException("Unknown Gemini model: " + modelName);
       }
@@ -57,4 +68,3 @@ public class GoogleAiTokenCountEstimator implements TokenCountEstimator {
     }
   }
 }
-
