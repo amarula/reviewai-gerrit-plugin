@@ -71,12 +71,16 @@ public abstract class ClientCommandBase extends ClientBase {
       Pattern.compile("\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.MESSAGE) + "\\b(.*)$", Pattern.DOTALL);
   protected static final Pattern DIRECTIVE_COMMAND_PATTERN =
       Pattern.compile("\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.DIRECTIVES) + "\\b.*$");
-  protected static final Pattern COMMAND_PATTERN =
+  public static final Pattern COMMAND_PATTERN =
       Pattern.compile("/(\\w+)\\b((?:\\s+--\\w+(?:=(?:" + OPTION_VALUES + "))?)+)?");
   protected static final Pattern OPTIONS_PATTERN =
       Pattern.compile("--(\\w+)(?:=(" + OPTION_VALUES + "))?");
 
   public ClientCommandBase(Configuration config) {
     super(config);
+  }
+
+  public static String commandName(CommandSet command) {
+    return COMMAND_MAP_INVERSE.get(command);
   }
 }
