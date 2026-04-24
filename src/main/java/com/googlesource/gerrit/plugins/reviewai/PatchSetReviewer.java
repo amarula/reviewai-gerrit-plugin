@@ -57,7 +57,7 @@ public class PatchSetReviewer {
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
   private List<GerritComment> commentProperties;
-  private List<Integer> reviewScores;
+  private List<Double> reviewScores;
 
   @Inject
   PatchSetReviewer(
@@ -149,7 +149,7 @@ public class PatchSetReviewer {
     }
     for (AiReplyItem replyItem : reviewReply.getReplies()) {
       String reply = replyItem.getReply();
-      Integer score = replyItem.getScore();
+      Double score = replyItem.getScore();
       boolean isNotNegative = isNotNegativeReply(score);
       boolean isIrrelevant = isIrrelevantReply(replyItem);
       boolean isHidden =
@@ -198,7 +198,7 @@ public class PatchSetReviewer {
       if (change.getIsCommentEvent()) {
         return null;
       }
-      Integer reviewScore = reviewScores.isEmpty() ? 0 : Collections.min(reviewScores);
+      int reviewScore = reviewScores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(reviewScores));
       if (reviewScore == 0
           && config.getConvertNeutralReviewScoreToPositive()
           && changeSetData.getVotingMaxScore() >= 1) {
@@ -210,7 +210,14 @@ public class PatchSetReviewer {
     }
   }
 
-  private boolean isNotNegativeReply(Integer score) {
+  private int normalizeReviewScore(double score) {
+    // Gerrit labels are integers. Keep decimal scores for filtering, but normalize the
+    // aggregated vote to the configured integer range at submission time.
+    return Math.clamp((int) Math.floor(score),
+        changeSetData.getVotingMinScore(), changeSetData.getVotingMaxScore());
+  }
+
+  private boolean isNotNegativeReply(Double score) {
     return score != null
         && config.getFilterNegativeComments()
         && score >= config.getFilterCommentsBelowScore();

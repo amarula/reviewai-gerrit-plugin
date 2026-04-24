@@ -10,7 +10,7 @@
       "content": [
         {
           "type": "output_text",
-          "text": "{\n  \"replies\": [\n    {\n      \"reply\": \"The change in the `rsplit` function call from `rsplit('.', 1)` to `rsplit('.', 2)` might lead to a `ValueError` if the `module_name` does not contain any dots. This change assumes that there is always at least one dot in the `module_name`. Ensure that the module naming convention enforces this or add error handling for the case where `module_name` does not contain a dot.\",\n      \"score\": -1,\n      \"relevance\": 0.9,\n      \"repeated\": false,\n      \"conflicting\": false,\n      \"filename\": \"test_file_1.py\",\n      \"lineNumber\": 18,\n      \"codeSnippet\": \"module_name, class_name = module_name.rsplit('.', 2)\"\n    }\n  ],\n  \"changeId\": \"myProject~myBranchName~myChangeId\"\n}"
+          "text": "{\n  \"replies\": [\n    {\n      \"reply\": \"The change in the `rsplit` function call from `rsplit('.', 1)` to `rsplit('.', 2)` might lead to a `ValueError` if the `module_name` does not contain any dots. This change assumes that there is always at least one dot in the `module_name`. Ensure that the module naming convention enforces this or add error handling for the case where `module_name` does not contain a dot.\",\n      \"score\": -1.0,\n      \"relevance\": 0.9,\n      \"repeated\": false,\n      \"conflicting\": false,\n      \"filename\": \"test_file_1.py\",\n      \"lineNumber\": 18,\n      \"codeSnippet\": \"module_name, class_name = module_name.rsplit('.', 2)\"\n    }\n  ],\n  \"changeId\": \"myProject~myBranchName~myChangeId\"\n}"
         }
       ]
     },
@@ -21,7 +21,7 @@
       "content": [
         {
           "type": "output_text",
-          "text": "{\n  \"replies\": [\n    {\n      \"reply\": \"The commit message 'Minor Fixes' is too vague and does not provide adequate information about the changes made in the PatchSet. A more descriptive message would help understand the nature and objective of the changes. Please consider revising it to include details of what is being fixed and why.\",\n      \"score\": -1,\n      \"relevance\": 0.8,\n      \"repeated\": false,\n      \"conflicting\": false\n    }\n  ],\n  \"changeId\": \"myProject~myBranchName~myChangeId\"\n}"
+          "text": "{\n  \"replies\": [\n    {\n      \"reply\": \"The commit message 'Minor Fixes' is too vague and does not provide adequate information about the changes made in the PatchSet. A more descriptive message would help understand the nature and objective of the changes. Please consider revising it to include details of what is being fixed and why.\",\n      \"score\": -1.0,\n      \"relevance\": 0.8,\n      \"repeated\": false,\n      \"conflicting\": false\n    }\n  ],\n  \"changeId\": \"myProject~myBranchName~myChangeId\"\n}"
         }
       ]
     }
