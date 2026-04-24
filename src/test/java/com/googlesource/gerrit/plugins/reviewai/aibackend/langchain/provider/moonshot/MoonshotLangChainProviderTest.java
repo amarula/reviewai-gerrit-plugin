@@ -19,9 +19,11 @@ public class MoonshotLangChainProviderTest {
   private final MoonshotLangChainProvider provider = new MoonshotLangChainProvider();
 
   @Test
-  public void fallsBackToCl100kWhenMoonshotModelUnsupported() {
+  public void createTokenEstimatorUsesDefaultMoonshotModel() {
     Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiModel()).thenReturn("moonshot-v1-8k");
+    // Deliberately return a different provider model to prove the estimator ignores config and
+    // uses the Moonshot default model constant instead.
+    when(config.getAiModel()).thenReturn("gpt-4.1");
 
     Optional<TokenCountEstimator> estimator = provider.createTokenEstimator(config);
 

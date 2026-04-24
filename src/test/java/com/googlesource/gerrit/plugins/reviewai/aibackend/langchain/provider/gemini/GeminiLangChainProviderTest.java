@@ -24,18 +24,24 @@ public class GeminiLangChainProviderTest {
     Field field = GeminiLangChainProvider.class.getDeclaredField("estimatorAvailable");
     field.setAccessible(true);
     field.set(null, null);
+    dev.langchain4j.model.googleai.GoogleAiTokenCountEstimator.Builder.reset();
   }
 
   @Test
-  public void fallsBackToCl100kWhenGeminiModelUnsupported() {
+  public void createTokenEstimatorUsesDefaultGeminiModel() {
     Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiModel()).thenReturn("gemini-fake-model");
+    // Deliberately return a different provider model to prove the estimator ignores config and
+    // uses the OpenAI default model constant instead.
+    when(config.getAiModel()).thenReturn("gpt-4.1");
     when(config.getAiToken()).thenReturn("dummy-token");
 
     Optional<TokenCountEstimator> estimator = provider.createTokenEstimator(config);
 
     assertTrue(estimator.isPresent());
     assertTrue(estimator.get() instanceof FallbackTokenCountEstimator);
+    assertEquals(
+        Configuration.DEFAULT_GEMINI_ESTIMATOR_MODEL,
+        dev.langchain4j.model.googleai.GoogleAiTokenCountEstimator.Builder.getLastModelName());
   }
 
   @Test

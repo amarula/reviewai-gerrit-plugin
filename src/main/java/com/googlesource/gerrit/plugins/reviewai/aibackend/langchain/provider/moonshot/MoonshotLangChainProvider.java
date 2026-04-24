@@ -58,7 +58,7 @@ public class MoonshotLangChainProvider implements ILangChainProvider {
 
   @Override
   public Optional<TokenCountEstimator> createTokenEstimator(Configuration config) {
-    String model = config.getAiModel();
+    String model = Configuration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
     try {
       return Optional.of(new OpenAiTokenCountEstimator(model));
     } catch (IllegalArgumentException e) {
