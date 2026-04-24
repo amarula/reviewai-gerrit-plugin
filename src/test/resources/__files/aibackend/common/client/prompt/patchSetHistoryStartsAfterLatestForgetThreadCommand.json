@@ -1,0 +1,54 @@
+{
+  "patchSetComments": [
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "msg-1",
+      "updated": "2026-04-09 10:00:00.000000",
+      "message": "Patch Set 5:\n\n@gpt first question",
+      "filename": "/PATCHSET_LEVEL"
+    },
+    {
+      "author": {
+        "_account_id": 7
+      },
+      "patch_set": 1,
+      "id": "msg-2",
+      "updated": "2026-04-09 10:01:00.000000",
+      "message": "first answer",
+      "filename": "/PATCHSET_LEVEL"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "msg-3",
+      "updated": "2026-04-09 10:02:00.000000",
+      "message": "Patch Set 5:\n\n@gpt /review --debug /forget_thread",
+      "filename": "/PATCHSET_LEVEL"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "msg-4",
+      "updated": "2026-04-09 10:03:00.000000",
+      "message": "Patch Set 5:\n\n@gpt second question",
+      "filename": "/PATCHSET_LEVEL"
+    },
+    {
+      "author": {
+        "_account_id": 7
+      },
+      "patch_set": 1,
+      "id": "msg-5",
+      "updated": "2026-04-09 10:04:00.000000",
+      "message": "second answer",
+      "filename": "/PATCHSET_LEVEL"
+    }
+  ]
+}
