@@ -51,12 +51,13 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
 
   @Override
   public Optional<TokenCountEstimator> createTokenEstimator(Configuration config) {
+    String model = Configuration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
     try {
-      return Optional.of(new OpenAiTokenCountEstimator(config.getAiModel()));
+      return Optional.of(new OpenAiTokenCountEstimator(model));
     } catch (Throwable t) {
       log.warn(
           "OpenAI token estimator unavailable for model {}. Using approximate estimator.",
-          config.getAiModel(),
+          model,
           t);
       return Optional.empty();
     }

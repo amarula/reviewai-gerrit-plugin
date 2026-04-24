@@ -45,6 +45,9 @@ public class Configuration extends ConfigCore {
   public static final String DEFAULT_OPENAI_AI_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_AI_MODEL;
   public static final String DEFAULT_GEMINI_AI_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_AI_MODEL;
   public static final String DEFAULT_MOONSHOT_AI_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_AI_MODEL;
+  public static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
+  public static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
+  public static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
   public static final double DEFAULT_AI_REVIEW_TEMPERATURE = 0.2;
   public static final double DEFAULT_AI_COMMENT_TEMPERATURE = 1.0;
 
