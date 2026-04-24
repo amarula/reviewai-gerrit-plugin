@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 public class AiReplyItem extends AiDialogueItem {
   private String reply;
-  private Integer score;
+  private Double score;
   private Double relevance;
   private boolean repeated;
   private boolean conflicting;
