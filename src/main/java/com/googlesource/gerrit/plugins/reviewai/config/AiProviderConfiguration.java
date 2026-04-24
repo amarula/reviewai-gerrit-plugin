@@ -31,6 +31,9 @@ final class AiProviderConfiguration {
   static final String DEFAULT_OPENAI_AI_MODEL = "gpt-4.1";
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
+  static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
+  static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
+  static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
       List.of("gpt-5.4", "gpt-5.2", DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =

@@ -62,7 +62,7 @@ public class GeminiLangChainProvider implements ILangChainProvider {
     if (Boolean.FALSE.equals(estimatorAvailable)) {
       return Optional.empty();
     }
-    String model = config.getAiModel();
+    String model = Configuration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
     try {
       String token = config.getAiToken();
       Class<?> estimatorClass = Class.forName(TOKEN_ESTIMATOR_CLASS);
