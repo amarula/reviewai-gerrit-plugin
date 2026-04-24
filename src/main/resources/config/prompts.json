@@ -12,7 +12,7 @@
   "DEFAULT_AI_REPLIES_ATTRIBUTES": {
     "reply": "contains the text of the insight",
     "id": "corresponds to the `id` value from the related request in the request JSON array",
-    "score": "represents a rating (an integer from %d to %d) attributed to the change being addressed in your reply, based on the reply content",
+    "score": "represents a rating (a floating-point number from %d to %d, decimals allowed) attributed to the change being addressed in your reply, based on the reply content",
     "relevance": "is a floating-point number ranging from 0 to 1, representing the importance you assign to the reply following the rules: %s",
     "changeId": "must be included in the response, mirroring the value provided in the corresponding request",
     "repeated": "is marked true if any message in the history either contains the same core message as the `reply` or addresses the same code snippet, and is marked false otherwise",
