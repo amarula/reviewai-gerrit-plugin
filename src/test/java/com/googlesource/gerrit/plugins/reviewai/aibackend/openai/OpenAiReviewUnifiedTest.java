@@ -408,7 +408,7 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
         .thenReturn(true);
     setupMockRequestCreateResponseFromBody(
         readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
-            .replace("\\\"score\\\": -1", "\\\"score\\\": 0"),
+            .replace("\\\"score\\\": -1.0", "\\\"score\\\": 0.0"),
         null,
         null);
 
@@ -416,6 +416,21 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
     Assert.assertEquals(1, captor.getValue().labels.get("Code-Review").intValue());
+  }
+
+  @Test
+  public void patchSetCreatedAcceptsDecimalNegativeReviewScoreForVoting() throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean())).thenReturn(true);
+    setupMockRequestCreateResponseFromBody(
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
+            .replace("\\\"score\\\": -1.0", "\\\"score\\\": -0.4"),
+        null,
+        null);
+
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(-1, captor.getValue().labels.get("Code-Review").intValue());
   }
 
   private void setupReiterateScenarioResponse(

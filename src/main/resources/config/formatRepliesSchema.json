@@ -17,7 +17,7 @@
               "type": "string"
             },
             "score": {
-              "type": "integer"
+              "type": "number"
             },
             "relevance": {
               "type": "number"
