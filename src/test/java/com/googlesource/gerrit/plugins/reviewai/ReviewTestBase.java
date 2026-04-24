@@ -42,6 +42,7 @@ import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -443,7 +444,10 @@ public class ReviewTestBase extends TestBase {
 
   private IAiClient getOpenAIClient() {
     if (config.getSelectedAiModelRoute().isLangChain()) {
-      return new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
+      return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
+          ? new LangChainTaskSpecificReviewClient(
+              config, getCodeContextPolicy(), gerritClient, localizer, Runnable::run)
+          : new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
     }
     return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
         ? new OpenAiTaskSpecificReviewClient(
