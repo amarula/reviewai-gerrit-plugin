@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiClientBase;
@@ -45,6 +46,7 @@ import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import java.util.List;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.isJsonObjectAsString;
@@ -66,6 +68,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainToolExecutor toolExecutor;
 
   private String requestBody;
+
+  @Getter
+  protected static class ReviewRequestResult {
+    private final AiResponseContent responseContent;
+    private final String requestBody;
+
+    protected ReviewRequestResult(AiResponseContent responseContent, String requestBody) {
+      this.responseContent = responseContent;
+      this.requestBody = requestBody;
+    }
+  }
 
   @Inject
   public LangChainClient(
@@ -93,6 +106,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @Override
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    ReviewRequestResult reviewRequestResult = askSingleRequest(changeSetData, change, patchSet);
+    requestBody = reviewRequestResult == null ? null : reviewRequestResult.getRequestBody();
+    return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
+  }
+
+  @VisibleForTesting
+  protected ReviewRequestResult askSingleRequest(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     try {
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
       String systemInstructions = prompt.getDefaultAiAssistantInstructions();
@@ -118,7 +139,6 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       }
 
       memory.add(LangChainChatMessages.userMessage(userMessage));
-      requestBody = userMessage; // exposed for tests/inspection
 
       double temperature =
           change.getIsCommentEvent()
@@ -154,13 +174,18 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       }
 
       if (isJsonObjectAsString(responseText)) {
-        return convertResponseContentFromJson(unwrapJsonCode(responseText));
+        return new ReviewRequestResult(
+            convertResponseContentFromJson(unwrapJsonCode(responseText)), userMessage);
       }
-      return new AiResponseContent(responseText);
+      return new ReviewRequestResult(new AiResponseContent(responseText), userMessage);
     } catch (Exception e) {
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
     }
+  }
+
+  protected void setRequestBody(String requestBody) {
+    this.requestBody = requestBody;
   }
 
   @Override
