@@ -239,6 +239,40 @@ public class GerritAiReviewHistoryCollectorTest {
   }
 
   @Test
+  public void collectsScoreOnlyAiPatchSetMessages() {
+    Configuration config = mock(Configuration.class);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("message.dump.dynamic.configuration.title"))
+        .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
+
+    GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
+
+    GerritComment positiveReview =
+        newComment(
+            "msg-positive-score-only",
+            7,
+            "ReviewAI",
+            "Patch Set 5: Code-Review+1",
+            "2026-04-09 10:01:00.000000",
+            5,
+            null,
+            null);
+
+    AiReviewHistoryInfo info =
+        collector.collect(config, localizer, 7, Map.of("/PATCHSET_LEVEL", List.of(positiveReview)));
+
+    assertEquals(1, info.getEntries().size());
+    AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
+    assertEquals("assistant", entry.getRole());
+    assertEquals("+1", entry.getReviewScore());
+    assertEquals("", entry.getMessage());
+  }
+
+  @Test
   public void collectsSystemMessagesEvenWhenPrefixedByPatchSetHeader() {
     Configuration config = mock(Configuration.class);
     when(config.getGerritUserName()).thenReturn("reviewai");
