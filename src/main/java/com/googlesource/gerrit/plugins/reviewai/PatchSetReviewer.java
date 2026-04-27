@@ -34,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -89,6 +90,15 @@ public class PatchSetReviewer {
     commentProperties = gerritClient.getClientData(change).getCommentProperties();
     gerritCommentRange = new GerritCommentRange(gerritClient, change);
     String patchSet = gerritClient.getPatchSet(change);
+    if (shouldSkipAiReviewForEmptyPatchSet(change)) {
+      log.debug(
+          "Skipping AI review for change {} because no files remain after patch filtering.",
+          change.getFullChangeId());
+      if (change.getIsCommentEvent() || changeSetData.getForcedReview()) {
+        clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
+      }
+      return;
+    }
     ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
 
     AiResponseContent reviewReply = null;
@@ -112,6 +122,15 @@ public class PatchSetReviewer {
     clientReviewProvider
         .get()
         .setReview(change, reviewBatches, changeSetData, getReviewScore(change));
+  }
+
+  private boolean shouldSkipAiReviewForEmptyPatchSet(GerritChange change) {
+    if (changeSetData.getReviewScope() == ReviewScope.COMMIT_MESSAGE) {
+      return false;
+    }
+    List<String> patchSetFiles =
+        gerritClient.getClientData(change).getGerritClientPatchSet().getPatchSetFiles();
+    return patchSetFiles == null || patchSetFiles.isEmpty();
   }
 
   private void setCommentBatchMap(ReviewBatch batchMap, Integer batchID) {
