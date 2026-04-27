@@ -163,11 +163,16 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
       return filterPatchByReviewScope(formattedPatch);
     }
     if (config.getAiReviewCommitMessages()) {
-      String patchWithCommitMessage = filterPatchWithCommitMessage(formattedPatch);
+      String patchWithCommitMessage =
+          filterPatchByEnabledFileExtensions(
+              filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
       log.debug("Patch filtered to include commit messages: {}", patchWithCommitMessage);
       return patchWithCommitMessage;
     } else {
-      String patchWithoutCommitMessage = filterPatchWithoutCommitMessage(change, formattedPatch);
+      String patchWithoutCommitMessage =
+          filterPatchByEnabledFileExtensions(
+              filterPatchWithoutCommitMessage(change, formattedPatch),
+              config.getEnabledFileExtensions());
       log.debug("Patch filtered to exclude commit messages: {}", patchWithoutCommitMessage);
       return patchWithoutCommitMessage;
     }
@@ -177,7 +182,9 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
     return switch (changeSetData.getReviewScope()) {
       case PATCHSET -> {
         String patchWithoutCommitMessage =
-            filterPatchWithoutCommitMessage(change, formattedPatch);
+            filterPatchByEnabledFileExtensions(
+                filterPatchWithoutCommitMessage(change, formattedPatch),
+                config.getEnabledFileExtensions());
         log.debug(
             "Patch filtered by command scope to exclude commit messages: {}",
             patchWithoutCommitMessage);

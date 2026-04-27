@@ -1,0 +1,6 @@
+diff --git a/ignored.txt b/ignored.txt
+--- a/ignored.txt
++++ b/ignored.txt
+@@ -1 +1 @@
+-before
++after
