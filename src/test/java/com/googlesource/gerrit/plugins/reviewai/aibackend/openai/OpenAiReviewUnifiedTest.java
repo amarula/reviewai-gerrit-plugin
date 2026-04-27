@@ -20,6 +20,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.common.net.HttpHeaders;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
+import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gson.JsonArray;
@@ -434,6 +435,30 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
     Assert.assertEquals(1, captor.getValue().labels.get("Code-Review").intValue());
+  }
+
+  @Test
+  public void patchSetCreatedShowsSystemMessageWhenPositiveReviewAlreadyExists() throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean())).thenReturn(true);
+    when(
+            globalConfig.getBoolean(
+                Mockito.eq("convertNeutralReviewScoreToPositive"), Mockito.anyBoolean()))
+        .thenReturn(true);
+    ChangeInfo changeInfo = readTestFileToClass("__files/gerritPatchSetDetail.json", ChangeInfo.class);
+    changeInfo.labels.get("Code-Review").all.get(0)._accountId = GERRIT_AI_ACCOUNT_ID;
+    when(changeApiMock.get()).thenReturn(changeInfo);
+    setupMockRequestCreateResponseFromBody(
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
+            .replace("\\\"score\\\": -1.0", "\\\"score\\\": 0.0"),
+        null,
+        null);
+
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(1, captor.getValue().labels.get("Code-Review").intValue());
+    Assert.assertEquals(
+        "SYSTEM MESSAGE: No update to show for this Change Set", captor.getValue().message);
   }
 
   @Test
