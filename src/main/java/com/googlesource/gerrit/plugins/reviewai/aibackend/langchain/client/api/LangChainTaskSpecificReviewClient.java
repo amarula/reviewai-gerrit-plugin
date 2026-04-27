@@ -19,9 +19,9 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiResponseContentMerger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
@@ -106,7 +106,7 @@ public class LangChainTaskSpecificReviewClient extends LangChainClient implement
     if (latestReviewRequest != null) {
       setRequestBody(latestReviewRequest.getRequestBody());
     }
-    return mergeResponses(aiResponseContents);
+    return AiResponseContentMerger.merge(aiResponseContents);
   }
 
   private ReviewRequestResult askStage(
@@ -121,17 +121,4 @@ public class LangChainTaskSpecificReviewClient extends LangChainClient implement
     return askSingleRequest(stageChangeSetData, change, patchSet);
   }
 
-  private AiResponseContent mergeResponses(List<AiResponseContent> aiResponseContents) {
-    log.debug("Merging responses from different LangChain task-specific stages.");
-    AiResponseContent mergedResponse = aiResponseContents.remove(0);
-    for (AiResponseContent aiResponseContent : aiResponseContents) {
-      List<AiReplyItem> replies = aiResponseContent.getReplies();
-      if (replies != null) {
-        mergedResponse.getReplies().addAll(replies);
-      } else {
-        mergedResponse.setMessageContent(aiResponseContent.getMessageContent());
-      }
-    }
-    return mergedResponse;
-  }
 }

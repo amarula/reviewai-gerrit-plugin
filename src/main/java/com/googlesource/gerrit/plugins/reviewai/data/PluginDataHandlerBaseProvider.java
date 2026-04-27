@@ -22,6 +22,8 @@ import com.google.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Singleton
 @Slf4j
@@ -30,6 +32,7 @@ public class PluginDataHandlerBaseProvider implements Provider<PluginDataHandler
   private static final String PATH_GLOBAL = "global";
 
   private final Path defaultPluginDataPath;
+  private final Map<Path, PluginDataHandler> handlers = new ConcurrentHashMap<>();
 
   @Inject
   public PluginDataHandlerBaseProvider(
@@ -41,7 +44,8 @@ public class PluginDataHandlerBaseProvider implements Provider<PluginDataHandler
   }
 
   public PluginDataHandler get(String path) {
-    return new PluginDataHandler(defaultPluginDataPath.resolve(path + PATH_SUFFIX));
+    Path dataFile = defaultPluginDataPath.resolve(path + PATH_SUFFIX);
+    return handlers.computeIfAbsent(dataFile, PluginDataHandler::new);
   }
 
   @Override
