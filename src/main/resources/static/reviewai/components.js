@@ -17,6 +17,7 @@
       this._loadedChangeNumber = null;
       this._loadingChangeNumber = null;
       this._entries = [];
+      this._localEntries = [];
       this._error = null;
       this._canAiReview = true;
       this._submitting = false;
@@ -57,6 +58,7 @@
       this._draftMessage = '';
       this._awaitingResponse = false;
       this._pendingPrompt = null;
+      this._localEntries = [];
       this._loadIfReady();
     }
 
@@ -145,7 +147,30 @@
       this._render();
 
       try {
-        await this._sendMessage(this._change, text);
+        const result = await this._sendMessage(this._change, text);
+        const directResponse = result && (result.response_text || result.responseText);
+        if (directResponse) {
+          this._localEntries = this._localEntries.concat([
+            {
+              role: 'user',
+              author: 'You',
+              message: text,
+            },
+            {
+              role: 'assistant',
+              author: 'ReviewAI',
+              message: directResponse,
+            },
+          ]);
+          this._entries = this._entries.concat(this._localEntries.slice(-2));
+          this._awaitingResponse = false;
+          this._pendingPrompt = null;
+          this._draftMessage = '';
+          if (input) {
+            input.value = '';
+          }
+          return;
+        }
         this._awaitingResponse = true;
         this._pendingPrompt = text;
         this._draftMessage = '';
@@ -210,7 +235,7 @@
         }
 
         const entries = reviewAi.entries.fromResult(result);
-        this._entries = entries;
+        this._entries = entries.concat(this._localEntries);
         if (
           this._awaitingResponse &&
           reviewAi.entries.hasAssistantReplyForPendingPrompt(entries, this._pendingPrompt)

@@ -39,6 +39,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
@@ -46,6 +47,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,6 +74,7 @@ public class AiReviewMessageTest extends TestBase {
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getGerritUserName()).thenReturn("gpt");
+    when(config.getLocaleDefault()).thenReturn(Locale.ENGLISH);
     when(config.getAiModels())
         .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
     when(gerritApi.changes()).thenReturn(changes);
@@ -81,7 +84,11 @@ public class AiReviewMessageTest extends TestBase {
     when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(pluginDataHandler);
     view =
         new AiReviewMessage(
-            configCreator, gerritApi, aiReviewPermission, pluginDataHandlerBaseProvider);
+            configCreator,
+            gerritApi,
+            aiReviewPermission,
+            pluginDataHandlerBaseProvider,
+            mockPluginDataPath);
   }
 
   @Test(expected = AuthException.class)
@@ -121,6 +128,32 @@ public class AiReviewMessageTest extends TestBase {
     ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
     verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
     assertEquals("OpenAI/gpt-4.1", captor.getValue().get("selectedAiModel"));
+  }
+
+  @Test
+  public void helpCommandReturnsDirectResponseWithoutPostingGerritMessage() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/help";
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    org.junit.Assert.assertTrue(output.responseText.contains("AVAILABLE COMMANDS"));
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void showCommandReturnsDirectResponseWithoutPostingGerritMessage() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/show --config";
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertEquals(
+        "Unable to execute command: Message Debugging functionalities are disabled",
+        output.responseText);
+    verify(revisionApi, never()).review(any());
   }
 
   @Test(expected = BadRequestException.class)
