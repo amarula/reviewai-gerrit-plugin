@@ -129,6 +129,22 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void reviewCommitMessageMessageIncludesFullPatchSetContext() {
+    IAiPrompt commitMessagePrompt = getAiPrompt(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+
+    String reviewCommitMessage =
+        commitMessagePrompt.getDefaultAiThreadReviewMessage(formattedPatchContent);
+
+    String commitMessagePromptTemplate =
+        (String)
+            AiPrompt.getJsonPromptValues("promptsOpenAiReviewCommitMessage")
+                .get("DEFAULT_AI_MESSAGE_REVIEW");
+    Assert.assertTrue(
+        reviewCommitMessage.startsWith(getTemplatePrefix(commitMessagePromptTemplate)));
+    Assert.assertTrue(reviewCommitMessage.contains(formattedPatchContent));
+  }
+
+  @Test
   public void patchSetCreatedOrUpdated() throws Exception {
     String reviewMessageCode =
         getReviewMessage(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json", 0);
@@ -147,6 +163,7 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     Assert.assertEquals(1, getCapturedComments(captor, GERRIT_PATCH_SET_FILENAME).size());
 
     Assert.assertEquals(reviewPrompt, requestContent);
+    Assert.assertTrue(requestContent.contains(formattedPatchContent));
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
@@ -180,5 +197,9 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
   private String sectionHeader(String title) {
     return "# " + title + "\n\n";
+  }
+
+  private String getTemplatePrefix(String template) {
+    return template.substring(0, template.indexOf("%s"));
   }
 }
