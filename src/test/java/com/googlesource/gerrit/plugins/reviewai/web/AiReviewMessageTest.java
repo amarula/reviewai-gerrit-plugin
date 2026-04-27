@@ -37,15 +37,19 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +67,7 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private RevisionApi revisionApi;
 
   private AiReviewMessage view;
+  private Path realChangeDataPath;
 
   @Before
   public void setUp() throws Exception {
@@ -72,6 +77,7 @@ public class AiReviewMessageTest extends TestBase {
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getGerritUserName()).thenReturn("gpt");
+    when(config.getLocaleDefault()).thenReturn(Locale.ENGLISH);
     when(config.getAiModels())
         .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
     when(gerritApi.changes()).thenReturn(changes);
@@ -79,9 +85,15 @@ public class AiReviewMessageTest extends TestBase {
     when(changeApi.current()).thenReturn(revisionApi);
     when(revisionApi.review(any())).thenReturn(null);
     when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(pluginDataHandler);
+    realChangeDataPath = tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data");
+    when(mockPluginDataPath.resolve(CHANGE_ID + ".data")).thenReturn(realChangeDataPath);
     view =
         new AiReviewMessage(
-            configCreator, gerritApi, aiReviewPermission, pluginDataHandlerBaseProvider);
+            configCreator,
+            gerritApi,
+            aiReviewPermission,
+            pluginDataHandlerBaseProvider,
+            mockPluginDataPath);
   }
 
   @Test(expected = AuthException.class)
@@ -121,6 +133,61 @@ public class AiReviewMessageTest extends TestBase {
     ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
     verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
     assertEquals("OpenAI/gpt-4.1", captor.getValue().get("selectedAiModel"));
+  }
+
+  @Test
+  public void reviewAgentHelpCommandReturnsDirectResponseWithoutPostingGerritMessage()
+      throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/help";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.responseText.contains("AVAILABLE COMMANDS"));
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentShowCommandReturnsDirectResponseWithoutPostingGerritMessage()
+      throws Exception {
+    new PluginDataHandler(realChangeDataPath)
+        .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/show --config";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
+    assertTrue(
+        output.responseText.contains(
+            "Unable to execute command: Message Debugging functionalities are disabled"));
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void helpCommandFromNonReviewAgentPathPostsGerritMessage() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/help";
+
+    view.apply(changeResource, input);
+
+    verify(revisionApi).review(any());
+  }
+
+  @Test
+  public void reviewAgentMessageCommandContainingHelpPostsGerritMessage() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/message explain /help";
+    input.reviewAgent = true;
+
+    view.apply(changeResource, input);
+
+    verify(revisionApi).review(any());
   }
 
   @Test(expected = BadRequestException.class)
