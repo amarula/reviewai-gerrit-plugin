@@ -116,7 +116,8 @@ public class GerritAiReviewHistoryCollector {
       cleaner.removeHeadings();
       cleanedMessage = cleaner.getMessage().trim();
     }
-    if (cleanedMessage.isEmpty()) {
+    String reviewScore = fromAi ? getCodeReviewScore(comment) : null;
+    if (cleanedMessage.isEmpty() && reviewScore == null) {
       return;
     }
 
@@ -130,7 +131,7 @@ public class GerritAiReviewHistoryCollector {
             comment.getPatchSet(),
             toDisplayFilename(comment.getFilename()),
             comment.getLine(),
-            fromAi ? getCodeReviewScore(comment) : null,
+            reviewScore,
             cleanedMessage));
   }
 
