@@ -52,6 +52,8 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
   private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
   private static final String VERBOSE_RENAME_PATCH_FILE =
       "__files/openai/gerritVerboseRenamePatch.txt";
+  private static final String MIXED_EXTENSION_PATCH_FILE =
+      "__files/openai/mixedExtensionPatch.txt";
 
   @Mock private Configuration config;
   @Mock private AccountCache accountCache;
@@ -79,6 +81,31 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
     Assert.assertFalse(patchSet.contains("deleted file mode"));
     Assert.assertFalse(patchSet.contains("new file mode"));
     Assert.assertEquals(List.of("new_name.py"), client.getPatchSetFiles());
+  }
+
+  @Test
+  public void getPatchSetExcludesFilesOutsideEnabledExtensions() throws Exception {
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getMixedExtensionPatch()));
+    when(config.getAiReviewCommitMessages()).thenReturn(false);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+
+    when(revisionApi.file("allowed.py")).thenReturn(fileApi);
+    DiffInfo diffInfo = new DiffInfo();
+    diffInfo.content = new ArrayList<>();
+    when(fileApi.diff(0)).thenReturn(diffInfo);
+
+    GerritClientPatchSetOpenAi client = new GerritClientPatchSetOpenAi(config, accountCache);
+    String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
+
+    Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
+    Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));
+    Assert.assertFalse(patchSet.contains("ignored change"));
+    Assert.assertEquals(List.of("allowed.py"), client.getPatchSetFiles());
   }
 
   private RevCommit createRenameCommit() throws Exception {
@@ -123,5 +150,9 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
 
   private String getVerboseRenamePatch() throws Exception {
     return Files.readString(TEST_RESOURCES_PATH.resolve(VERBOSE_RENAME_PATCH_FILE));
+  }
+
+  private String getMixedExtensionPatch() throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(MIXED_EXTENSION_PATCH_FILE));
   }
 }
