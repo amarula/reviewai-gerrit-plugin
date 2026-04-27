@@ -191,11 +191,13 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
         yield patchWithoutCommitMessage;
       }
       case COMMIT_MESSAGE -> {
-        String commitMessage = filterCommitMessage(formattedPatch);
+        String patchWithCommitMessage =
+            filterPatchByEnabledFileExtensions(
+                filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
         log.debug(
-            "Patch filtered by command scope to include only commit message: {}",
-            commitMessage);
-        yield commitMessage;
+            "Patch filtered by command scope to include commit message and patch context: {}",
+            patchWithCommitMessage);
+        yield patchWithCommitMessage;
       }
     };
   }
