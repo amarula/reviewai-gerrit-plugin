@@ -79,8 +79,8 @@ public class GerritClientReview extends GerritClientAccount {
     log.debug("Setting review for change ID: {}", change.getFullChangeId());
     this.change = change;
     ReviewInput reviewInput = buildReview(reviewBatches, changeSetData, reviewScore);
-    if (reviewInput.comments == null && reviewInput.message == null) {
-      log.debug("No comments or messages to post for review.");
+    if (reviewInput.comments == null && reviewInput.message == null && reviewInput.labels == null) {
+      log.debug("No comments, messages, or labels to post for review.");
       return;
     }
     try (ManualRequestContext requestContext = config.openRequestContext()) {
@@ -122,7 +122,9 @@ public class GerritClientReview extends GerritClientAccount {
         reviewInput.label(LabelId.CODE_REVIEW, reviewScore);
       }
     }
-    updateSystemMessage(changeSetData, reviewInput, comments.isEmpty(), systemMessage);
+    if (!shouldSuppressSystemMessage(changeSetData, reviewScore)) {
+      updateSystemMessage(changeSetData, reviewInput, comments.isEmpty(), systemMessage);
+    }
 
     if (!comments.isEmpty()) {
       reviewInput.comments = comments;
@@ -152,6 +154,23 @@ public class GerritClientReview extends GerritClientAccount {
       reviewInput.message(joinWithDoubleNewLine(messages));
     }
     log.debug("System messages for review set: {}", messages);
+  }
+
+  private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
+    if (reviewScore == null || reviewScore != 1 || changeSetData.getReviewSystemMessage() != null) {
+      return false;
+    }
+    Integer existingReviewScore = getCurrentCodeReviewValue(changeSetData);
+    return existingReviewScore == null || existingReviewScore != 1;
+  }
+
+  private Integer getCurrentCodeReviewValue(ChangeSetData changeSetData) {
+    try {
+      return new GerritClientDetail(config, changeSetData).getCodeReviewValue(change);
+    } catch (RuntimeException e) {
+      log.warn("Could not determine current Code-Review value for change {}", change.getFullChangeId(), e);
+      return null;
+    }
   }
 
   private Map<String, List<CommentInput>> getReviewComments(List<ReviewBatch> reviewBatches) {

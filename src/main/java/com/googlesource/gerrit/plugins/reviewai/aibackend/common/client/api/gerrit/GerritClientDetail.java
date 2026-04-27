@@ -90,6 +90,23 @@ public class GerritClientDetail {
     return null;
   }
 
+  public Integer getCodeReviewValue(GerritChange change) {
+    loadPatchSetDetail(change);
+    if (gerritPatchSetDetail == null
+        || gerritPatchSetDetail.getLabels() == null
+        || gerritPatchSetDetail.getLabels().getCodeReview() == null
+        || gerritPatchSetDetail.getLabels().getCodeReview().getAll() == null) {
+      return null;
+    }
+    for (GerritPatchSetDetail.Permission permission :
+        gerritPatchSetDetail.getLabels().getCodeReview().getAll()) {
+      if (permission.getAccountId() == aiAccountId) {
+        return permission.getValue();
+      }
+    }
+    return null;
+  }
+
   private void loadPatchSetDetail(GerritChange change) {
     if (gerritPatchSetDetail != null) {
       return;
