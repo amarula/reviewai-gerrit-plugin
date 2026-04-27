@@ -37,6 +37,8 @@ public class PluginDataTest extends TestBase {
 
     // Mock the PluginData annotation global behavior
     when(mockPluginDataPath.resolve("global.data")).thenReturn(realPluginDataPath);
+    when(mockPluginDataPath.resolve(CHANGE_ID + ".data"))
+        .thenReturn(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"));
   }
 
   @Test
@@ -91,5 +93,42 @@ public class PluginDataTest extends TestBase {
     assertTrue(
         "The config file should exist after initializing the handler.",
         Files.exists(realPluginDataPath));
+  }
+
+  @Test
+  public void testHandlersForSameScopeShareWrites() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+    PluginDataHandler firstHandler = provider.getChangeScope();
+    PluginDataHandler secondHandler = provider.getChangeScope();
+
+    firstHandler.setValue("firstKey", "firstValue");
+    secondHandler.setValue("secondKey", "secondValue");
+
+    assertEquals("firstValue", firstHandler.getValue("firstKey"));
+    assertEquals("secondValue", firstHandler.getValue("secondKey"));
+    assertEquals("firstValue", secondHandler.getValue("firstKey"));
+    assertEquals("secondValue", secondHandler.getValue("secondKey"));
+  }
+
+  @Test
+  public void testHandlersFromDifferentProvidersMergeWritesToSameFile() throws Exception {
+    PluginDataHandlerProvider firstProvider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+    PluginDataHandlerProvider secondProvider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+    PluginDataHandler firstHandler = firstProvider.getChangeScope();
+    PluginDataHandler secondHandler = secondProvider.getChangeScope();
+
+    firstHandler.setValue("conversationId.review_code", "review-code-conversation");
+    secondHandler.setValue("dynamicConfig", "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}");
+
+    assertEquals("review-code-conversation", firstHandler.getValue("conversationId.review_code"));
+    assertEquals(
+        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}",
+        firstHandler.getValue("dynamicConfig"));
+    String dataFile = Files.readString(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"));
+    assertTrue(dataFile.contains("conversationId.review_code=review-code-conversation"));
+    assertTrue(dataFile.contains("dynamicConfig="));
   }
 }

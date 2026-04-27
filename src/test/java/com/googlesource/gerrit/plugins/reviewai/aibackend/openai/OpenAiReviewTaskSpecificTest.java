@@ -17,7 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.openai;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import com.google.common.net.HttpHeaders;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.RestApiException;
@@ -25,12 +27,14 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponsesResponse;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.entity.ContentType;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,6 +56,11 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   private static final String SECOND_CALL = "second-call";
+  private static final String SECOND_CONVERSATION = "second-conversation";
+  private static final String CONVERSATION_SCENARIO = "Create-Conversation Scenario";
+  private static final String REVIEW_CODE_CONVERSATION_ID = "conv_REVIEW_CODE";
+  private static final String REVIEW_COMMIT_MESSAGE_CONVERSATION_ID =
+      "conv_REVIEW_COMMIT_MESSAGE";
 
   public OpenAiReviewTaskSpecificTest() {
     MockitoAnnotations.openMocks(this);
@@ -72,6 +81,10 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     setupMockRequestCreateResponseFromBody(
         filterOutSubsetResponse(1, 2), Scenario.STARTED, SECOND_CALL);
     setupMockRequestCreateResponseFromBody(filterOutSubsetResponse(0, 1), SECOND_CALL, null);
+    setupMockRequestCreateConversation(
+        REVIEW_CODE_CONVERSATION_ID, Scenario.STARTED, SECOND_CONVERSATION);
+    setupMockRequestCreateConversation(
+        REVIEW_COMMIT_MESSAGE_CONVERSATION_ID, SECOND_CONVERSATION, null);
   }
 
   private String filterOutSubsetResponse(int from, int to) {
@@ -90,6 +103,26 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
             Map.of("command", command));
     Map<String, List<CommentInfo>> comments = readContentToType(commentJson, COMMENTS_GERRIT_TYPE);
     mockGerritChangeCommentsApiCall(comments);
+  }
+
+  private void setupMockRequestCreateConversation(
+      String conversationId, String fromState, String toState) {
+    MappingBuilder mappingBuilder =
+        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.conversationsUri()))
+            .atPriority(1);
+    if (fromState != null) {
+      mappingBuilder =
+          mappingBuilder
+              .inScenario(CONVERSATION_SCENARIO)
+              .whenScenarioStateIs(fromState)
+              .willSetStateTo(toState);
+    }
+    WireMock.stubFor(
+        mappingBuilder.willReturn(
+            WireMock.aResponse()
+                .withStatus(200)
+                .withHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.toString())
+                .withBody("{\"id\": \"" + conversationId + "\"}")));
   }
 
   @Test
@@ -164,6 +197,17 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
     Assert.assertEquals(reviewPrompt, requestContent);
     Assert.assertTrue(requestContent.contains(formattedPatchContent));
+    Mockito.verify(pluginDataHandler)
+        .setValue(
+            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE),
+            REVIEW_CODE_CONVERSATION_ID);
+    Mockito.verify(pluginDataHandler)
+        .setValue(
+            OpenAiConversation.getTaskSpecificConversationKey(
+                ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
+            REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
+    Mockito.verify(pluginDataHandler, Mockito.never())
+        .setValue(Mockito.eq(OpenAiConversation.KEY_CONVERSATION_ID), Mockito.anyString());
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
@@ -171,6 +215,9 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
 
   @Test
   public void commandReviewPatchsetScopeBypassesTaskSpecificCommitMessageStage() throws Exception {
+    when(pluginDataHandler.getValue(
+            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE)))
+        .thenReturn(REVIEW_CODE_CONVERSATION_ID);
     setupCommandComment("/review --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
 
     handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
@@ -178,6 +225,8 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
     Assert.assertEquals(1, getCapturedComments(captor, "test_file_1.py").size());
     Assert.assertNull(captor.getValue().comments.get(GERRIT_PATCH_SET_FILENAME));
+    Assert.assertEquals(
+        REVIEW_CODE_CONVERSATION_ID, aiRequestBody.get("conversation").getAsString());
     Assert.assertFalse(requestContent.contains("Subject: Minor fixes"));
     Assert.assertTrue(requestContent.contains("diff --git"));
     Assert.assertFalse(
@@ -187,6 +236,61 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
             .contains("You MUST review the commit message"));
     WireMock.verify(
         1, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
+  }
+
+  @Test
+  public void commandReviewCommitMessageScopeUsesStoredCommitMessageConversation() throws Exception {
+    when(pluginDataHandler.getValue(
+            OpenAiConversation.getTaskSpecificConversationKey(
+                ReviewAssistantStages.REVIEW_COMMIT_MESSAGE)))
+        .thenReturn(REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
+    setupCommandComment("/review --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+
+    handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    Assert.assertEquals(
+        REVIEW_COMMIT_MESSAGE_CONVERSATION_ID, aiRequestBody.get("conversation").getAsString());
+    Assert.assertTrue(requestContent.contains("Subject: Minor fixes"));
+    Assert.assertTrue(requestContent.contains("diff --git"));
+    Assert.assertTrue(
+        aiRequestBody
+            .get("instructions")
+            .getAsString()
+            .contains("Git commit message expert"));
+    WireMock.verify(
+        1, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
+  }
+
+  @Test
+  public void commandReviewUsesStoredTaskSpecificConversations() throws Exception {
+    when(pluginDataHandler.getValue(
+            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE)))
+        .thenReturn(REVIEW_CODE_CONVERSATION_ID);
+    when(pluginDataHandler.getValue(
+            OpenAiConversation.getTaskSpecificConversationKey(
+                ReviewAssistantStages.REVIEW_COMMIT_MESSAGE)))
+        .thenReturn(REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
+    setupCommandComment("/review");
+
+    handleEventBasedOnType(SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    WireMock.verify(
+        1,
+        WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .withRequestBody(
+                WireMock.matchingJsonPath(
+                    "$.conversation", WireMock.equalTo(REVIEW_CODE_CONVERSATION_ID))));
+    WireMock.verify(
+        1,
+        WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .withRequestBody(
+                WireMock.matchingJsonPath(
+                    "$.conversation", WireMock.equalTo(REVIEW_COMMIT_MESSAGE_CONVERSATION_ID))));
+    WireMock.verify(
+        0,
+        WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.conversationsUri())));
   }
 
   private IAiPrompt getAiPrompt(ReviewAssistantStages reviewAssistantStage) {
