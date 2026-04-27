@@ -26,21 +26,29 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Singleton
 @Slf4j
 public class PluginDataHandler {
+  private static final Map<Path, Object> FILE_LOCKS = new ConcurrentHashMap<>();
+
   private final Path configFile;
+  private final Object fileLock;
   private final Properties configProperties = new Properties();
 
   @Inject
   public PluginDataHandler(Path configFilePath) {
     this.configFile = configFilePath;
+    this.fileLock =
+        FILE_LOCKS.computeIfAbsent(configFile.toAbsolutePath().normalize(), path -> new Object());
     try {
       log.debug("Loading or creating properties file at: {}", configFilePath);
-      loadOrCreateProperties();
+      synchronized (fileLock) {
+        loadOrCreateProperties();
+      }
     } catch (IOException e) {
       log.error("Failed to load or create properties", e);
       throw new RuntimeException(e);
@@ -49,8 +57,11 @@ public class PluginDataHandler {
 
   public synchronized void setValue(String key, String value) {
     log.debug("Setting value for key: {} with value: {}", key, value);
-    configProperties.setProperty(key, value);
-    storeProperties();
+    synchronized (fileLock) {
+      loadOrCreatePropertiesUnchecked();
+      configProperties.setProperty(key, value);
+      storeProperties();
+    }
   }
 
   public synchronized void setJsonValue(String key, Object value) {
@@ -60,7 +71,10 @@ public class PluginDataHandler {
 
   public String getValue(String key) {
     log.debug("Getting value for key: {}", key);
-    return configProperties.getProperty(key);
+    synchronized (fileLock) {
+      loadOrCreatePropertiesUnchecked();
+      return configProperties.getProperty(key);
+    }
   }
 
   public <T> List<T> getJsonArrayValue(String key, Class<T> clazz) {
@@ -85,38 +99,56 @@ public class PluginDataHandler {
 
   public Map<String, String> getAllValues() {
     log.debug("Getting all properties");
-    Map<String, String> allProperties = new HashMap<>();
-    for (String key : configProperties.stringPropertyNames()) {
-      allProperties.put(key, configProperties.getProperty(key));
+    synchronized (fileLock) {
+      loadOrCreatePropertiesUnchecked();
+      Map<String, String> allProperties = new HashMap<>();
+      for (String key : configProperties.stringPropertyNames()) {
+        allProperties.put(key, configProperties.getProperty(key));
+      }
+      return allProperties;
     }
-    return allProperties;
   }
 
   public synchronized <T> void appendJsonValue(String key, T value, Class<T> clazz) {
     log.debug("Updating JSON value for key: {}", key);
-    List<T> jsonProperty = getJsonArrayValue(key, clazz);
-    if (jsonProperty == null) {
-      jsonProperty = new ArrayList<>();
+    synchronized (fileLock) {
+      loadOrCreatePropertiesUnchecked();
+      Type typeOfArray = TypeToken.getParameterized(List.class, clazz).getType();
+      String jsonValue = configProperties.getProperty(key);
+      List<T> jsonProperty =
+          jsonValue == null || jsonValue.isEmpty()
+              ? null
+              : getGson().fromJson(jsonValue, typeOfArray);
+      if (jsonProperty == null) {
+        jsonProperty = new ArrayList<>();
+      }
+      jsonProperty.add(value);
+      configProperties.setProperty(key, getGson().toJson(jsonProperty));
+      storeProperties();
     }
-    jsonProperty.add(value);
-    setJsonValue(key, jsonProperty);
   }
 
   public synchronized void removeValue(String key) {
     log.debug("Removing value for key: {}", key);
-    if (configProperties.containsKey(key)) {
-      configProperties.remove(key);
-      storeProperties();
+    synchronized (fileLock) {
+      loadOrCreatePropertiesUnchecked();
+      if (configProperties.containsKey(key)) {
+        configProperties.remove(key);
+        storeProperties();
+      }
     }
   }
 
   public synchronized void destroy() {
     log.debug("Destroying configuration file at: {}", configFile);
-    try {
-      Files.deleteIfExists(configFile);
-    } catch (IOException e) {
-      log.error("Failed to delete the config file: " + configFile, e);
-      throw new RuntimeException("Failed to delete the config file: " + configFile, e);
+    synchronized (fileLock) {
+      try {
+        Files.deleteIfExists(configFile);
+        configProperties.clear();
+      } catch (IOException e) {
+        log.error("Failed to delete the config file: " + configFile, e);
+        throw new RuntimeException("Failed to delete the config file: " + configFile, e);
+      }
     }
   }
 
@@ -132,6 +164,7 @@ public class PluginDataHandler {
 
   private void loadOrCreateProperties() throws IOException {
     log.debug("Checking existence of the configuration file: {}", configFile);
+    configProperties.clear();
     if (Files.notExists(configFile)) {
       log.debug("Configuration file not found, creating new one at: {}", configFile);
       Files.createFile(configFile);
@@ -140,6 +173,15 @@ public class PluginDataHandler {
       try (var input = Files.newInputStream(configFile)) {
         configProperties.load(input);
       }
+    }
+  }
+
+  private void loadOrCreatePropertiesUnchecked() {
+    try {
+      loadOrCreateProperties();
+    } catch (IOException e) {
+      log.error("Failed to load or create properties", e);
+      throw new RuntimeException(e);
     }
   }
 }
