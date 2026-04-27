@@ -25,9 +25,11 @@ import java.util.regex.Pattern;
 
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.COMMIT_MESSAGE_FILTER_OUT_PREFIXES;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_COMMIT_MESSAGE_PREFIX;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.matchesExtensionList;
 
 @Slf4j
 public class GerritClientPatchSetHelper {
+  private static final Pattern DIFF_START_PATTERN = Pattern.compile("(?m)^diff --git ");
   private static final Pattern EXTRACT_B_FILENAMES_FROM_PATCH_SET =
       Pattern.compile("^diff --git .*? b/(.*)$", Pattern.MULTILINE);
   private static final String GERRIT_COMMIT_MESSAGE_PATTERN =
@@ -92,5 +94,43 @@ public class GerritClientPatchSetHelper {
     }
     log.debug("Total files extracted from patch: {}", files.size());
     return files;
+  }
+
+  public static String filterPatchByEnabledFileExtensions(
+      String formattedPatch, List<String> enabledFileExtensions) {
+    Matcher diffStartMatcher = DIFF_START_PATTERN.matcher(formattedPatch);
+    if (!diffStartMatcher.find()) {
+      return formattedPatch;
+    }
+
+    List<Integer> diffSectionStarts = new ArrayList<>();
+    diffSectionStarts.add(diffStartMatcher.start());
+    while (diffStartMatcher.find()) {
+      diffSectionStarts.add(diffStartMatcher.start());
+    }
+
+    StringBuilder filteredPatch = new StringBuilder();
+    filteredPatch.append(formattedPatch, 0, diffSectionStarts.get(0));
+    diffSectionStarts.add(formattedPatch.length());
+    for (int i = 0; i < diffSectionStarts.size() - 1; i++) {
+      String diffSection =
+          formattedPatch.substring(diffSectionStarts.get(i), diffSectionStarts.get(i + 1));
+      String filename = extractFilenameFromPatchSection(diffSection);
+      if (filename != null && matchesExtensionList(filename, enabledFileExtensions)) {
+        filteredPatch.append(diffSection);
+      }
+    }
+
+    String result = filteredPatch.toString();
+    log.debug("Patch filtered by enabled file extensions: {}", result);
+    return result;
+  }
+
+  private static String extractFilenameFromPatchSection(String diffSection) {
+    Matcher extractFilenameMatcher = EXTRACT_B_FILENAMES_FROM_PATCH_SET.matcher(diffSection);
+    if (!extractFilenameMatcher.find()) {
+      return null;
+    }
+    return extractFilenameMatcher.group(1);
   }
 }

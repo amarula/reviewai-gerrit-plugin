@@ -20,6 +20,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.common.net.HttpHeaders;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
+import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -42,12 +43,16 @@ import org.mockito.junit.MockitoJUnitRunner;
 import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.SupportedEvents;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
 public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
   private static final String REITERATE_SECOND_CALL = "reiterate-second-call";
+  private static final String UNSUPPORTED_ONLY_PATCH_FILE =
+      RESOURCE_OPENAI_PATH + "unsupportedOnlyPatchWithCommitMessage.txt";
 
   @Rule public TestName testName = new TestName();
 
@@ -175,6 +180,19 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
+  }
+
+  @Test
+  public void patchSetCreatedSkipsAiReviewWhenNoFilesRemainAfterFiltering() throws Exception {
+    when(globalConfig.getString(Mockito.eq("enabledFileExtensions"), Mockito.anyString()))
+        .thenReturn(".py");
+    when(revisionApiMock.patch())
+        .thenReturn(BinaryResult.create(readTestFile(UNSUPPORTED_ONLY_PATCH_FILE)));
+
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+
+    WireMock.verify(0, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
+    verify(revisionApiMock, never()).review(Mockito.any());
   }
 
   @Test
