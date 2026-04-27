@@ -21,7 +21,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBa
 import com.google.common.collect.ImmutableBiMap;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 public abstract class ClientCommandBase extends ClientBase {
@@ -62,17 +64,29 @@ public abstract class ClientCommandBase extends ClientBase {
           "show", CommandSet.SHOW);
   private static final ImmutableBiMap<CommandSet, String> COMMAND_MAP_INVERSE =
       COMMAND_MAP.inverse();
+  public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
+      Set.of(CommandSet.HELP, CommandSet.SHOW);
 
   // Option values can be either a sequence of chars enclosed in double quotes or a sequence of
   // non-space chars.
   private static final String OPTION_VALUES = "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\"|\\S+";
 
   protected static final Pattern MESSAGE_COMMAND_PATTERN =
-      Pattern.compile("\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.MESSAGE) + "\\b(.*)$", Pattern.DOTALL);
+      Pattern.compile(
+          "\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.MESSAGE) + "\\b(.*)$", Pattern.DOTALL);
   protected static final Pattern DIRECTIVE_COMMAND_PATTERN =
       Pattern.compile("\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.DIRECTIVES) + "\\b.*$");
   public static final Pattern COMMAND_PATTERN =
       Pattern.compile("/(\\w+)\\b((?:\\s+--\\w+(?:=(?:" + OPTION_VALUES + "))?)+)?");
+  private static final Pattern GERRIT_MESSAGE_SKIPPED_COMMAND_PATTERN =
+      Pattern.compile(
+          "\\s*/(?:"
+              + GERRIT_MESSAGE_SKIPPED_COMMANDS.stream()
+                  .map(COMMAND_MAP_INVERSE::get)
+                  .map(Pattern::quote)
+                  .collect(Collectors.joining("|"))
+              + ")\\b.*",
+          Pattern.DOTALL);
   protected static final Pattern OPTIONS_PATTERN =
       Pattern.compile("--(\\w+)(?:=(" + OPTION_VALUES + "))?");
 
@@ -82,5 +96,9 @@ public abstract class ClientCommandBase extends ClientBase {
 
   public static String commandName(CommandSet command) {
     return COMMAND_MAP_INVERSE.get(command);
+  }
+
+  public static boolean shouldSkipGerritMessage(String message) {
+    return message != null && GERRIT_MESSAGE_SKIPPED_COMMAND_PATTERN.matcher(message).matches();
   }
 }

@@ -306,9 +306,11 @@
         const baselineKeys = new Set(baselineEntries.map(entryKey));
         const conversationId = this._getRequestConversationId(req, change);
 
-        await this._sendMessage(change, prompt, this._getRequestModelId(req));
-
-        const responseText = await this._waitForAssistantReply(change, baselineKeys);
+        const sendResult = await this._sendMessage(change, prompt, this._getRequestModelId(req));
+        const directResponse =
+          sendResult && (sendResult.response_text || sendResult.responseText);
+        const responseText =
+          directResponse || (await this._waitForAssistantReply(change, baselineKeys));
         await this._storeConversationTurn(change, req, conversationId, prompt, responseText);
         listener.emitResponse(buildChatResponse(responseText));
         listener.done();
@@ -369,7 +371,12 @@
     }
 
     _sendMessage(change, message, modelId) {
-      return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(change, message, modelId);
+      return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(
+        change,
+        message,
+        modelId,
+        true
+      );
     }
 
     _getRequestModelId(req) {
