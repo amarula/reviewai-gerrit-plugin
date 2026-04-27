@@ -26,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.filterCommitMessage;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 @Slf4j
@@ -110,12 +109,5 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
         "Compiled Commit Message Review specific AI Assistant Instructions: {}",
         compiledInstructions);
     return compiledInstructions;
-  }
-
-  @Override
-  public String getDefaultAiThreadReviewMessage(String patchSet) {
-    String filteredPatchSet = filterCommitMessage(patchSet);
-    log.debug("Filtered Commit Message for Patch Set: {}", filteredPatchSet);
-    return super.getDefaultAiThreadReviewMessage(filteredPatchSet);
   }
 }
