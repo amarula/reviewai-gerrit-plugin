@@ -19,13 +19,13 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.ope
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiResponseContentMerger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
@@ -67,11 +67,24 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws AiConnectionFailException {
     log.debug("Task-specific OpenAI ask method called with changeId: {}", change.getFullChangeId());
-    if (change.getIsCommentEvent() || changeSetData.getForcedStagedReview()) {
+    if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       return super.ask(changeSetData, change, patchSet);
     }
+    if (changeSetData.getForcedStagedReview()) {
+      return askStages(
+          changeSetData, change, patchSet, List.of(changeSetData.getReviewAssistantStage()));
+    }
+    return askStages(changeSetData, change, patchSet, TASK_SPECIFIC_ASSISTANT_STAGES);
+  }
+
+  private AiResponseContent askStages(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      List<ReviewAssistantStages> assistantStages)
+      throws AiConnectionFailException {
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
-    for (ReviewAssistantStages assistantStage : TASK_SPECIFIC_ASSISTANT_STAGES) {
+    for (ReviewAssistantStages assistantStage : assistantStages) {
       reviewRequestFutures.add(
           CompletableFuture.supplyAsync(
               () -> {
@@ -101,14 +114,8 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
 
     if (latestReviewRequest != null) {
       requestBody = latestReviewRequest.getRequestBody();
-      String conversationId = latestReviewRequest.getConversationId();
-      if (conversationId != null) {
-        getPluginDataHandlerProvider()
-            .getChangeScope()
-            .setValue(OpenAiConversation.KEY_CONVERSATION_ID, conversationId);
-      }
     }
-    return mergeResponses(aiResponseContents);
+    return AiResponseContentMerger.merge(aiResponseContents);
   }
 
   private ReviewRequestResult askStage(
@@ -127,18 +134,4 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
         OpenAiConversation.getTaskSpecificConversationKey(assistantStage));
   }
 
-  private AiResponseContent mergeResponses(List<AiResponseContent> aiResponseContents) {
-    log.debug("Merging responses from different task-specific stages.");
-    AiResponseContent mergedResponse = aiResponseContents.remove(0);
-    for (AiResponseContent aiResponseContent : aiResponseContents) {
-      List<AiReplyItem> replies = aiResponseContent.getReplies();
-      if (replies != null) {
-        mergedResponse.getReplies().addAll(replies);
-      } else {
-        mergedResponse.setMessageContent(aiResponseContent.getMessageContent());
-      }
-    }
-    log.debug("Merged response content: {}", mergedResponse.getMessageContent());
-    return mergedResponse;
-  }
 }
