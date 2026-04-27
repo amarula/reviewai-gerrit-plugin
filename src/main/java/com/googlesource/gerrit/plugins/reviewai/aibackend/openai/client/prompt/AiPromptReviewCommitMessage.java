@@ -41,6 +41,7 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
     loadDefaultPrompts("promptsOpenAiReviewCommitMessage");
+    this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_REVIEW;
     log.debug(
         "Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
   }
