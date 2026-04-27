@@ -225,7 +225,7 @@ public class CommandTest extends OpenAiReviewTestBase {
 
     testRequestSent();
     Assert.assertTrue(getInputContent().contains("Minor fixes"));
-    Assert.assertFalse(getInputContent().contains("diff --git"));
+    Assert.assertTrue(getInputContent().contains("diff --git"));
     Assert.assertTrue(
         aiRequestBody
             .get("instructions")
