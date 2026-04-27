@@ -16,8 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
+import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
@@ -26,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.OpenAiReviewTestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,6 +47,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.sortTextL
 import static org.mockito.Mockito.when;
 
 public class CommandTest extends OpenAiReviewTestBase {
+  private static final String UNSUPPORTED_ONLY_PATCH_FILE = "__files/commands/unsupportedOnlyPatch.txt";
 
   @Before
   public void setUp() {
@@ -244,6 +248,25 @@ public class CommandTest extends OpenAiReviewTestBase {
             .get("instructions")
             .getAsString()
             .contains("You MUST review the commit message"));
+  }
+
+  @Test
+  public void commandReviewShowsSystemMessageWhenNoFilesRemainAfterFiltering() throws Exception {
+    when(globalConfig.getString(Mockito.eq("enabledFileExtensions"), Mockito.anyString()))
+        .thenReturn(".py");
+    when(revisionApiMock.patch())
+        .thenReturn(BinaryResult.create(readTestFile(UNSUPPORTED_ONLY_PATCH_FILE)));
+    setupCommandComment("/review");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    Mockito.verify(revisionApiMock).review(captor.capture());
+    Assert.assertEquals(
+        "SYSTEM MESSAGE: No update to show for this Change Set", captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+    WireMock.verify(
+        0, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
   }
 
   @Test
