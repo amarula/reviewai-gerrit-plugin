@@ -20,6 +20,7 @@ gerrit_plugin(
         "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
         "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
         "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
         "@reviewai_plugin_deps//:com_openai_openai_java_client_okhttp",
         "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
     ],
