@@ -12,7 +12,11 @@
     },
 
     createHistoryItem(entry) {
-      const role = entry.systemMessage ? 'system' : entry.role === 'assistant' ? 'assistant' : 'user';
+      const role = entry.systemMessage
+        ? 'system'
+        : entry.role === 'assistant'
+          ? 'assistant'
+          : 'user';
       const pendingClass = entry.pending ? ' reviewai-history__item--pending' : '';
       const item = reviewAiDom.createElement('section', {
         className: `reviewai-history__item reviewai-history__item--${role}${pendingClass}`,
@@ -125,7 +129,8 @@
         reviewAiDom.createElement('p', {
           className: 'reviewai-history__intro',
           textContent:
-            'Chat with the AI by sending a patch set comment addressed to the bot. AI review comments remain in the normal Gerrit discussion.',
+            'Chat with the AI by sending a patch set comment addressed to the bot. AI review ' +
+            'comments remain in the normal Gerrit discussion.',
         })
       );
       view._content = reviewAiDom.createElement('div');
