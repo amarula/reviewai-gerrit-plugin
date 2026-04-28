@@ -53,12 +53,34 @@
     return timestamp ? timestamp.getTime() : Date.now();
   }
 
-  function formatAgentEntry(entry) {
-    const location = reviewAi.entries.formatLocation(entry);
+  function formatAgentEntry(entry, options) {
+    const config = options || {};
+    const reviewScore = reviewAi.entries.formatReviewScore(entry);
+    const includeReviewScore = config.includeReviewScore !== false;
+    const suppressScoredPatchSetLocation =
+      config.suppressScoredPatchSetLocation && reviewScore && !entry.filename;
+    const location = suppressScoredPatchSetLocation
+      ? 'Change thread'
+      : includeReviewScore
+        ? reviewAi.entries.formatLocationWithReviewScore(entry)
+        : reviewAi.entries.formatLocation(entry);
     if (location && location !== 'Change thread') {
       return `**${location}**\n${entry.message || ''}`;
     }
     return entry.message || '';
+  }
+
+  function formatAgentEntries(entries) {
+    const reviewScore = entries.map(reviewAi.entries.formatReviewScore).find(Boolean);
+    const messages = entries
+      .map(entry =>
+        formatAgentEntry(entry, {
+          includeReviewScore: false,
+          suppressScoredPatchSetLocation: true,
+        })
+      )
+      .filter(Boolean);
+    return (reviewScore ? [`**${reviewScore}**`].concat(messages) : messages).join('\n\n');
   }
 
   function buildClientData(overridesPreviousTurn) {
@@ -238,7 +260,7 @@
       }
       const storedConversation = await this._getStoredConversation(change, conversationId);
       if (storedConversation) {
-        return storedConversation.turns || [];
+        return this._getHistoryBackedStoredTurns(change, storedConversation);
       }
 
       if (!isSameConversationId(conversationId, this._conversationId(change))) {
@@ -250,6 +272,33 @@
       return this._entriesToConversationTurns(
         this._filterStoredConversationEntries(change, entries, storedConversations)
       );
+    }
+
+    async _getHistoryBackedStoredTurns(change, storedConversation) {
+      const storedTurns = Array.isArray(storedConversation && storedConversation.turns)
+        ? storedConversation.turns
+        : [];
+      const storedConversationId = storedConversation && storedConversation.id;
+      const includeNewTurns = isSameConversationId(
+        storedConversationId,
+        this._conversationId(change)
+      );
+
+      try {
+        const storedConversations = await this._listStoredConversations(change);
+        const entries = await this._fetchEntries(change);
+        const historyTurns = this._entriesToConversationTurns(
+          this._filterStoredConversationEntries(
+            change,
+            entries,
+            storedConversations,
+            storedConversationId
+          )
+        );
+        return this._mergeStoredTurnsWithHistory(storedTurns, historyTurns, includeNewTurns);
+      } catch (error) {
+        return storedTurns;
+      }
     }
 
     _actions() {
@@ -351,7 +400,7 @@
           entry => isAssistantEntry(entry) && !baselineKeys.has(entryKey(entry))
         );
         if (newAssistantEntries.length) {
-          return newAssistantEntries.map(formatAgentEntry).join('\n\n');
+          return formatAgentEntries(newAssistantEntries);
         }
       }
 
@@ -439,13 +488,17 @@
       );
     }
 
-    _filterStoredConversationEntries(change, entries, conversations) {
+    _filterStoredConversationEntries(change, entries, conversations, ignoredConversationId) {
       const conversationId = this._conversationId(change);
       const userMessages = new Map();
       const assistantMessages = new Map();
 
       conversations.forEach(conversation => {
-        if (!conversation || isSameConversationId(conversation.id, conversationId)) {
+        if (
+          !conversation ||
+          isSameConversationId(conversation.id, conversationId) ||
+          isSameConversationId(conversation.id, ignoredConversationId)
+        ) {
           return;
         }
         const turns = Array.isArray(conversation.turns) ? conversation.turns : [];
@@ -476,6 +529,63 @@
         return '';
       }
       return responseParts.map(part => (part && part.text) || '').join('\n\n');
+    }
+
+    _turnUserQuestion(turn) {
+      const userInput = turn && turn.user_input;
+      return (userInput && userInput.user_question) || '';
+    }
+
+    _mergeStoredTurnsWithHistory(storedTurns, historyTurns, includeNewTurns) {
+      if (!historyTurns.length) {
+        return storedTurns;
+      }
+
+      const mergedTurns = storedTurns.slice();
+      historyTurns.forEach(historyTurn => {
+        const storedTurnIndex = mergedTurns.findIndex(
+          storedTurn => this._turnUserQuestion(storedTurn) === this._turnUserQuestion(historyTurn)
+        );
+        if (storedTurnIndex !== -1) {
+          mergedTurns[storedTurnIndex] = this._mergeTurnWithHistory(
+            mergedTurns[storedTurnIndex],
+            historyTurn
+          );
+        } else if (includeNewTurns) {
+          mergedTurns.push(historyTurn);
+        }
+      });
+      return mergedTurns;
+    }
+
+    _mergeTurnWithHistory(storedTurn, historyTurn) {
+      const refreshedResponse = historyTurn.response || historyTurn.chat_response;
+      return {
+        ...storedTurn,
+        response: refreshedResponse || storedTurn.response,
+        chat_response: refreshedResponse || storedTurn.chat_response,
+        timestamp_millis: historyTurn.timestamp_millis || storedTurn.timestamp_millis,
+      };
+    }
+
+    _applyReviewScoreToTurn(turn, reviewScore) {
+      if (!reviewScore || !turn || !turn.response) {
+        return;
+      }
+
+      const scoreHeader = `**${reviewScore}**`;
+      const responseParts = turn.response.response_parts;
+      if (!Array.isArray(responseParts) || !responseParts.length) {
+        turn.response.response_parts = [{id: 0, text: scoreHeader}];
+        return;
+      }
+
+      const firstPart = responseParts[0];
+      const firstText = (firstPart && firstPart.text) || '';
+      if (firstText.startsWith(scoreHeader)) {
+        return;
+      }
+      firstPart.text = firstText ? `${scoreHeader}\n\n${firstText}` : scoreHeader;
     }
 
     _incrementMessageCount(messages, message) {
@@ -535,14 +645,21 @@
           hasClientDataOverride = true;
         }
 
+        const reviewScore = reviewAi.entries.formatReviewScore(entry);
+        const entryText = formatAgentEntry(entry, {
+          includeReviewScore: false,
+          suppressScoredPatchSetLocation: true,
+        });
+
         if (!currentTurn.response) {
-          currentTurn.response = buildChatResponse(formatAgentEntry(entry));
+          currentTurn.response = buildChatResponse(entryText);
         } else {
           currentTurn.response.response_parts.push({
             id: currentTurn.response.response_parts.length,
-            text: formatAgentEntry(entry),
+            text: entryText,
           });
         }
+        this._applyReviewScoreToTurn(currentTurn, reviewScore);
         currentTurn.response.timestamp_millis = parseTimestampMillis(entry.updated);
       });
 
