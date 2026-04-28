@@ -409,6 +409,7 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
     testRequestSent();
 
+    Assert.assertTrue(aiRequestBody.has("temperature"));
     Assert.assertEquals(
         "json_schema",
         aiRequestBody.getAsJsonObject("text").getAsJsonObject("format").get("type").getAsString());
@@ -416,6 +417,28 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
         "format_replies",
         aiRequestBody.getAsJsonObject("text").getAsJsonObject("format").get("name").getAsString());
     Assert.assertFalse(aiRequestBody.has("tools"));
+  }
+
+  @Test
+  public void responseCreateRequestOmitsTemperatureForGpt55() throws Exception {
+    when(globalConfig.getStringList("aiModels")).thenReturn(new String[] {"OpenAI/gpt-5.5"});
+    initConfig();
+    initTest();
+
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+    testRequestSent();
+    JsonObject sdkRequestBody =
+        readContentToType(
+            WireMock.findAll(
+                    WireMock.postRequestedFor(
+                        WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())))
+                .get(0)
+                .getBodyAsString(),
+            JsonObject.class);
+
+    Assert.assertEquals("gpt-5.5", aiRequestBody.get("model").getAsString());
+    Assert.assertFalse(aiRequestBody.has("temperature"));
+    Assert.assertFalse(sdkRequestBody.has("temperature"));
   }
 
   @Test
