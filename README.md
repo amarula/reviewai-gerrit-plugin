@@ -140,7 +140,8 @@ Supported provider routes are:
 
 - `OpenAI`: direct OpenAI connection.
 - `LangChain/OpenAI`: OpenAI through LangChain.
-- `LangChain/MoonShot`: MoonShot through LangChain.
+- `LangChain/MoonShot` or simply `MoonShot`: MoonShot through LangChain.
+- `LangChain/Ollama` or simply `Ollama`: Ollama through LangChain.
 
 Model and token settings are grouped by the provider part of the route:
 
@@ -149,10 +150,12 @@ Model and token settings are grouped by the provider part of the route:
     aiProviders = OpenAI
     aiProviders = LangChain/OpenAI
     aiProviders = LangChain/MoonShot
+    aiProviders = Ollama
 
     aiModels = OpenAI/gpt-5.4
     aiModels = OpenAI/gpt-4.1
     aiModels = MoonShot/moonshot-v1-8k
+    aiModels = llama3.2
     aiModelsDefaultIndex = 1
 
     aiTokens = OpenAI/{openAiToken}
@@ -160,7 +163,10 @@ Model and token settings are grouped by the provider part of the route:
 ```
 
 With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`,
-`LangChain/OpenAI/gpt-5.4`, `LangChain/OpenAI/gpt-4.1`, and `LangChain/MoonShot/moonshot-v1-8k`.
+`LangChain/OpenAI/gpt-5.4`, `LangChain/OpenAI/gpt-4.1`, `LangChain/MoonShot/moonshot-v1-8k`, and
+`LangChain/Ollama/llama3.2`. Ollama does not require an `aiTokens` entry. A bare model can also be configured as
+`aiModels = llama3.2`; when no configured provider token identifies the model route, the plugin guesses
+`LangChain/Ollama/llama3.2`.
 
 ### OpenAI Route
 
@@ -183,11 +189,12 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
 - `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
   value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
   when no model has been selected yet.
-- `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on.
+- `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on. Ollama
+  does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider, either direct or through LangChain. By default, it
   uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
-  (Gemini), or `https://api.moonshot.ai` (Moonshot). Override only when you need a custom endpoint; leaving it unset
-  lets the plugin pick the provider default automatically.
+  (Gemini), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a
+  custom endpoint; leaving it unset lets the plugin pick the provider default automatically.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
