@@ -185,6 +185,24 @@
       return 'Change thread';
     },
 
+    formatReviewScore(entry) {
+      const score =
+        entry && entry.reviewScore !== undefined ? entry.reviewScore : entry && entry.review_score;
+      if (score === null || score === undefined || String(score).trim() === '') {
+        return '';
+      }
+      return `Code-Review ${String(score).trim()}`;
+    },
+
+    formatLocationWithReviewScore(entry) {
+      const location = this.formatLocation(entry);
+      const score = this.formatReviewScore(entry);
+      if (!score) {
+        return location;
+      }
+      return location && location !== 'Change thread' ? `${location} - ${score}` : score;
+    },
+
     parseTimestamp(value) {
       if (!value) {
         return null;
