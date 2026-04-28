@@ -9,7 +9,7 @@ aiConnectionTimeout: 180
 aiDomain: http://localhost:9527
 aiFullFileReview: true
 aiMaxMemoryTokens: 16384
-aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.2, OpenAI/gpt-4.1]
+aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.5, OpenAI/gpt-5.2, OpenAI/gpt-4.1]
 aiModelsDefaultIndex: 1
 aiPollingInterval: 1000
 aiPollingTimeout: 180
