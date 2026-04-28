@@ -23,23 +23,29 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 final class AiProviderConfiguration {
   static final String OPENAI_DOMAIN = "https://api.openai.com";
   static final String GEMINI_DOMAIN = "https://generativelanguage.googleapis.com";
   static final String MOONSHOT_DOMAIN = "https://api.moonshot.ai";
+  static final String OLLAMA_DOMAIN = "http://localhost:11434";
   static final String DEFAULT_OPENAI_AI_MODEL = "gpt-4.1";
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
+  static final String DEFAULT_OLLAMA_AI_MODEL = "llama3.2";
   static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
+  static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = DEFAULT_OLLAMA_AI_MODEL;
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
       List.of("gpt-5.4", "gpt-5.2", DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =
       List.of("gemini-3.1-pro", "gemini-3.1-flash", "gemini-2.5-pro", DEFAULT_GEMINI_AI_MODEL);
   static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
       List.of("kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-thinking-turbo", "kimi-k2-turbo-preview", DEFAULT_MOONSHOT_AI_MODEL);
+  static final List<String> DEFAULT_OLLAMA_AI_MODELS = List.of(DEFAULT_OLLAMA_AI_MODEL);
 
   static final String KEY_AI_TOKENS = "aiTokens";
   static final String KEY_AI_MODELS = "aiModels";
@@ -85,25 +91,41 @@ final class AiProviderConfiguration {
   }
 
   List<String> getAiProviders() {
-    List<String> providers = config.splitListIntoItems(KEY_AI_PROVIDER, DEFAULT_AI_PROVIDER);
-    return providers.stream()
-        .map(this::canonicalProviderRoute)
+    List<String> configuredProviders = config.splitListIntoItems(KEY_AI_PROVIDER, List.of());
+    List<String> configuredModels = config.splitListIntoItems(KEY_AI_MODELS, List.of());
+    List<String> providers =
+        configuredProviders.isEmpty() && !hasProviderRouteModel(configuredModels)
+            ? DEFAULT_AI_PROVIDER
+            : configuredProviders;
+    Map<String, AiProviderRoute> providerRoutes = new LinkedHashMap<>();
+    providers.stream()
+        .map(this::parseProviderRoute)
         .filter(Optional::isPresent)
         .map(Optional::get)
-        .distinct()
-        .toList();
+        .forEach(route -> providerRoutes.putIfAbsent(route.id(), route));
+    getInferredProviderRoutes(configuredModels, configuredProviders.isEmpty())
+        .forEach(route -> providerRoutes.putIfAbsent(route.id(), route));
+    List<String> resolvedProviders = providerRoutes.keySet().stream().toList();
+    log.debug(
+        "AI provider routes resolved. configuredProviders={}, configuredModels={}, tokenProviders={}, resolvedProviders={}",
+        configuredProviders,
+        configuredModels,
+        getAiTokenProviders(),
+        resolvedProviders);
+    return resolvedProviders;
   }
 
   List<String> getAiModels() {
     List<String> configuredModels = config.splitListIntoItems(KEY_AI_MODELS, List.of());
-    Map<AiProviderType, List<String>> modelMap = getAiModelMap(configuredModels);
-    return getAiProviderRoutes().stream()
+    List<AiProviderRoute> providerRoutes = getAiProviderRoutes();
+    ConfiguredAiModels modelMap = getAiModelMap(configuredModels, providerRoutes);
+    List<String> resolvedModels =
+        providerRoutes.stream()
         .flatMap(
             providerRoute ->
                 modelMap
-                    .getOrDefault(
-                        providerRoute.provider(),
-                        getDefaultAiModels(providerRoute.provider()))
+                    .getModels(providerRoute)
+                    .orElseGet(() -> getDefaultAiModels(providerRoute.provider()))
                     .stream()
                     .map(
                         model ->
@@ -112,6 +134,13 @@ final class AiProviderConfiguration {
         .map(AiModelRoute::modelRoute)
         .distinct()
         .toList();
+    log.debug(
+        "AI model routes resolved. configuredModels={}, resolvedProviders={}, tokenProviders={}, resolvedModels={}",
+        configuredModels,
+        providerRoutes.stream().map(AiProviderRoute::id).toList(),
+        getAiTokenProviders(),
+        resolvedModels);
+    return resolvedModels;
   }
 
   Map<String, String> getAiTokens() {
@@ -162,10 +191,6 @@ final class AiProviderConfiguration {
         .toList();
   }
 
-  private Optional<String> canonicalProviderRoute(String providerRoute) {
-    return parseProviderRoute(providerRoute).map(AiProviderRoute::id);
-  }
-
   private Optional<AiModelRoute> getDefaultAiModelRoute() {
     List<String> models = getAiModels();
     int zeroBasedIndex = getAiModelsDefaultIndex() - 1;
@@ -193,6 +218,7 @@ final class AiProviderConfiguration {
         && supportsTransport(transport.get(), provider.get())) {
       return Optional.of(new AiProviderRoute(transport.get(), provider.get()));
     }
+    log.warn("Ignoring invalid AI provider route `{}`", providerRoute);
     return Optional.empty();
   }
 
@@ -207,28 +233,53 @@ final class AiProviderConfiguration {
     return transport != AiProviderTransport.OPENAI || provider.supportsDirectConnection();
   }
 
-  private Map<AiProviderType, List<String>> getAiModelMap(List<String> configuredModels) {
-    Map<AiProviderType, List<String>> modelMap = new LinkedHashMap<>();
+  private ConfiguredAiModels getAiModelMap(
+      List<String> configuredModels, List<AiProviderRoute> providerRoutes) {
+    Map<AiProviderRoute, List<String>> routeModelMap = new LinkedHashMap<>();
+    Map<AiProviderType, List<String>> providerModelMap = new LinkedHashMap<>();
     for (String configuredModelRoute : configuredModels) {
       String modelRoute = unwrapDumpQuotes(configuredModelRoute);
-      int separator = modelRoute.indexOf("/");
-      if (separator <= 0 || separator == modelRoute.length() - 1) {
+      if (modelRoute == null || modelRoute.isBlank()) {
         continue;
       }
-      AiProviderType.fromConfigName(modelRoute.substring(0, separator))
+      String[] parts = modelRoute.trim().split("/", 3);
+      if (parts.length == 3) {
+        Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
+        Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
+        if (transport.isPresent()
+            && provider.isPresent()
+            && supportsTransport(transport.get(), provider.get())) {
+          AiProviderRoute providerRoute = new AiProviderRoute(transport.get(), provider.get());
+          routeModelMap.computeIfAbsent(providerRoute, ignored -> new ArrayList<>()).add(parts[2]);
+        } else {
+          log.warn("Ignoring invalid AI model route `{}`", modelRoute);
+        }
+        continue;
+      }
+      if (parts.length == 2) {
+        AiProviderType.fromConfigName(parts[0])
+            .ifPresent(
+                provider ->
+                    providerModelMap
+                        .computeIfAbsent(provider, ignored -> new ArrayList<>())
+                        .add(parts[1]));
+        continue;
+      }
+      guessProviderRoute(parts[0], providerRoutes, configuredModels)
           .ifPresent(
-              provider ->
-                  modelMap
-                      .computeIfAbsent(provider, ignored -> new ArrayList<>())
-                      .add(modelRoute.substring(separator + 1)));
+              providerRoute ->
+                  routeModelMap
+                      .computeIfAbsent(providerRoute, ignored -> new ArrayList<>())
+                      .add(parts[0]));
     }
-    return modelMap;
+    return new ConfiguredAiModels(routeModelMap, providerModelMap);
   }
 
   private List<String> getDefaultAiModels(AiProviderType provider) {
     return switch (provider) {
       case GEMINI -> DEFAULT_GEMINI_AI_MODELS;
       case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODELS;
+      case OLLAMA -> DEFAULT_OLLAMA_AI_MODELS;
       case OPENAI -> DEFAULT_OPENAI_AI_MODELS;
     };
   }
@@ -237,8 +288,168 @@ final class AiProviderConfiguration {
     return switch (provider) {
       case GEMINI -> GEMINI_DOMAIN;
       case MOONSHOT -> MOONSHOT_DOMAIN;
+      case OLLAMA -> OLLAMA_DOMAIN;
       case OPENAI -> OPENAI_DOMAIN;
     };
+  }
+
+  private boolean hasProviderRouteModel(List<String> configuredModels) {
+    return configuredModels.stream()
+        .map(this::unwrapDumpQuotes)
+        .anyMatch(
+            modelRoute ->
+                modelRoute != null
+                    && !getInferredProviderRoutes(List.of(modelRoute), true).isEmpty());
+  }
+
+  private List<AiProviderRoute> getInferredProviderRoutes(
+      List<String> configuredModels, boolean inferBareModels) {
+    List<AiProviderRoute> providerRoutes = new ArrayList<>();
+    for (String configuredModelRoute : configuredModels) {
+      String modelRoute = unwrapDumpQuotes(configuredModelRoute);
+      if (modelRoute == null || modelRoute.isBlank()) {
+        continue;
+      }
+      String[] parts = modelRoute.trim().split("/", 3);
+      if (parts.length == 3) {
+        Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
+        Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
+        if (transport.isPresent()
+            && provider.isPresent()
+            && supportsTransport(transport.get(), provider.get())) {
+          providerRoutes.add(new AiProviderRoute(transport.get(), provider.get()));
+        } else {
+          log.warn("Cannot infer provider from invalid AI model route `{}`", modelRoute);
+        }
+        continue;
+      }
+      if (parts.length == 2) {
+        AiProviderType.fromConfigName(parts[0])
+            .map(provider -> new AiProviderRoute(getDefaultTransport(provider), provider))
+            .ifPresent(providerRoutes::add);
+        continue;
+      }
+      if (inferBareModels) {
+        guessBareModelProviderRoute(parts[0], providerRoutes, configuredModels)
+            .ifPresent(providerRoutes::add);
+      }
+    }
+    return providerRoutes;
+  }
+
+  private Optional<AiProviderRoute> guessProviderRoute(
+      String model, List<AiProviderRoute> providerRoutes, List<String> configuredModels) {
+    return guessBareModelProviderRoute(model, providerRoutes, configuredModels);
+  }
+
+  private Optional<AiProviderRoute> guessBareModelProviderRoute(
+      String model, List<AiProviderRoute> providerRoutes, List<String> configuredModels) {
+    if (model == null || model.isBlank()) {
+      return Optional.empty();
+    }
+    List<AiProviderRoute> candidateRoutes =
+        providerRoutes.isEmpty() ? getTokenProviderRoutes() : providerRoutes;
+    List<AiProviderRoute> matchingTokenRoutes =
+        candidateRoutes.stream()
+            .filter(providerRoute -> hasAiToken(providerRoute.provider()))
+            .filter(
+                providerRoute ->
+                    providerModelListContains(providerRoute.provider(), model, configuredModels))
+            .toList();
+    if (!matchingTokenRoutes.isEmpty()) {
+      AiProviderRoute matchedRoute = matchingTokenRoutes.getFirst();
+      if (matchingTokenRoutes.size() > 1) {
+        log.debug(
+            "AI model `{}` matches multiple token-backed provider routes {}. Using `{}`.",
+            model,
+            matchingTokenRoutes.stream().map(AiProviderRoute::id).toList(),
+            matchedRoute.id());
+      } else {
+        log.debug(
+            "AI model `{}` matched token-backed provider route `{}` by configured/default model list.",
+            model,
+            matchedRoute.id());
+      }
+      return Optional.of(matchedRoute);
+    }
+
+    Optional<AiProviderRoute> ollamaRoute = getOllamaProviderRoute(providerRoutes);
+    if (ollamaRoute.isPresent()) {
+      log.debug(
+          "AI model `{}` is not present in configured/default model lists for token-backed providers {}. Guessing `{}`.",
+          model,
+          candidateRoutes.stream()
+              .filter(providerRoute -> hasAiToken(providerRoute.provider()))
+              .map(AiProviderRoute::id)
+              .toList(),
+          ollamaRoute.get().id());
+      return ollamaRoute;
+    }
+
+    log.warn(
+        "Cannot guess provider for AI model `{}`. It is not present in configured/default model lists for token-backed providers {}, and Ollama is not configured.",
+        model,
+        candidateRoutes.stream()
+            .filter(providerRoute -> hasAiToken(providerRoute.provider()))
+            .map(AiProviderRoute::id)
+            .toList());
+    return Optional.empty();
+  }
+
+  private boolean hasAiToken(AiProviderType provider) {
+    String token = getAiTokens().get(provider.getConfigName());
+    return token != null && !token.isBlank();
+  }
+
+  private List<AiProviderRoute> getTokenProviderRoutes() {
+    return getAiTokens().keySet().stream()
+        .map(AiProviderType::fromConfigName)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .map(provider -> new AiProviderRoute(getDefaultTransport(provider), provider))
+        .toList();
+  }
+
+  private boolean providerModelListContains(
+      AiProviderType provider, String model, List<String> configuredModels) {
+    return getConfiguredModelsForProvider(provider, configuredModels).contains(model)
+        || getDefaultAiModels(provider).contains(model);
+  }
+
+  private List<String> getConfiguredModelsForProvider(
+      AiProviderType targetProvider, List<String> configuredModels) {
+    List<String> providerModels = new ArrayList<>();
+    for (String configuredModelRoute : configuredModels) {
+      String modelRoute = unwrapDumpQuotes(configuredModelRoute);
+      if (modelRoute == null || modelRoute.isBlank()) {
+        continue;
+      }
+      String[] parts = modelRoute.trim().split("/", 3);
+      if (parts.length == 3) {
+        AiProviderType.fromConfigName(parts[1])
+            .filter(provider -> provider == targetProvider)
+            .ifPresent(provider -> providerModels.add(parts[2]));
+        continue;
+      }
+      if (parts.length == 2) {
+        AiProviderType.fromConfigName(parts[0])
+            .filter(provider -> provider == targetProvider)
+            .ifPresent(provider -> providerModels.add(parts[1]));
+      }
+    }
+    return providerModels;
+  }
+
+  private Optional<AiProviderRoute> getOllamaProviderRoute(List<AiProviderRoute> providerRoutes) {
+    return providerRoutes.isEmpty()
+        ? Optional.of(new AiProviderRoute(AiProviderTransport.LANGCHAIN, AiProviderType.OLLAMA))
+        : providerRoutes.stream()
+            .filter(providerRoute -> providerRoute.provider() == AiProviderType.OLLAMA)
+            .findFirst();
+  }
+
+  private List<String> getAiTokenProviders() {
+    return getAiTokens().keySet().stream().toList();
   }
 
   private String unwrapDumpQuotes(String value) {
@@ -254,6 +465,18 @@ final class AiProviderConfiguration {
         return provider.getConfigName();
       }
       return transport.getConfigName() + "/" + provider.getConfigName();
+    }
+  }
+
+  private record ConfiguredAiModels(
+      Map<AiProviderRoute, List<String>> routeModelMap,
+      Map<AiProviderType, List<String>> providerModelMap) {
+    private Optional<List<String>> getModels(AiProviderRoute providerRoute) {
+      List<String> routeModels = routeModelMap.get(providerRoute);
+      if (routeModels != null) {
+        return Optional.of(routeModels);
+      }
+      return Optional.ofNullable(providerModelMap.get(providerRoute.provider()));
     }
   }
 }
