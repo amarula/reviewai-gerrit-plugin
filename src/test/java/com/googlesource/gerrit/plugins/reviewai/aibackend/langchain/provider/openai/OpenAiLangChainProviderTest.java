@@ -1,6 +1,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -8,6 +9,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangCh
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import java.lang.reflect.Field;
 import java.util.Optional;
@@ -29,6 +31,20 @@ public class OpenAiLangChainProviderTest {
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.0);
 
     assertEquals(ILangChainProvider.LANGCHAIN_MAX_RETRIES, getMaxRetries(langChainProvider));
+  }
+
+  @Test
+  public void omitsTemperatureForGpt55() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-5.5");
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+
+    LangChainProvider langChainProvider = provider.buildChatModel(config, 0.2);
+    OpenAiChatModel model = (OpenAiChatModel) langChainProvider.getModel();
+
+    assertNull(model.defaultRequestParameters().temperature());
   }
 
   @Test
