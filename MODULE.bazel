@@ -13,6 +13,7 @@ maven.install(
         "dev.langchain4j:langchain4j:1.13.0",
         "dev.langchain4j:langchain4j-open-ai:1.13.0",
         "dev.langchain4j:langchain4j-google-ai-gemini:1.13.0",
+        "dev.langchain4j:langchain4j-ollama:1.13.0",
         "com.openai:openai-java-client-okhttp:4.31.0",
         "org.apache.commons:commons-collections4:4.5.0",
         "org.wiremock:wiremock-standalone:3.13.1",

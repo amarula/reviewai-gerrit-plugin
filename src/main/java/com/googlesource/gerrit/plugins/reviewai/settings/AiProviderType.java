@@ -23,7 +23,8 @@ import java.util.Set;
 public enum AiProviderType {
   OPENAI("OpenAI"),
   GEMINI("Gemini"),
-  MOONSHOT("MoonShot");
+  MOONSHOT("MoonShot"),
+  OLLAMA("Ollama");
 
   private static final Set<AiProviderType> DIRECT_CONNECTION_PROVIDERS = EnumSet.of(OPENAI);
 
