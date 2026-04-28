@@ -154,6 +154,7 @@ public class GerritAiReviewHistoryCollectorTest {
     assertNotNull(patchSetReviewEntry);
     assertEquals("ReviewAI", patchSetReviewEntry.getAuthor());
     assertEquals("assistant", patchSetReviewEntry.getRole());
+    assertNull(patchSetReviewEntry.getReviewScore());
     assertNull(patchSetReviewEntry.getFilename());
 
     AiReviewHistoryInfo.Entry inlinePromptEntry =
@@ -183,6 +184,58 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals("Dave", commandEntry.getAuthor());
     assertEquals("user", commandEntry.getRole());
     assertNull(commandEntry.getFilename());
+  }
+
+  @Test
+  public void collectsCodeReviewScoresFromAiPatchSetMessages() {
+    Configuration config = mock(Configuration.class);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("message.dump.dynamic.configuration.title"))
+        .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
+
+    GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
+
+    GerritComment positiveReview =
+        newComment(
+            "msg-positive",
+            7,
+            "ReviewAI",
+            "Patch Set 5: Code-Review+1\n\nThis is the positive AI review output.",
+            "2026-04-09 10:01:00.000000",
+            5,
+            null,
+            null);
+    GerritComment negativeReview =
+        newComment(
+            "msg-negative",
+            7,
+            "ReviewAI",
+            "Patch Set 6: Code-Review-1\n\nThis is the negative AI review output.",
+            "2026-04-09 10:02:00.000000",
+            6,
+            null,
+            null);
+
+    AiReviewHistoryInfo info =
+        collector.collect(
+            config,
+            localizer,
+            7,
+            Map.of("/PATCHSET_LEVEL", List.of(positiveReview, negativeReview)));
+
+    AiReviewHistoryInfo.Entry positiveEntry =
+        findEntry(info, "This is the positive AI review output.");
+    assertNotNull(positiveEntry);
+    assertEquals("+1", positiveEntry.getReviewScore());
+
+    AiReviewHistoryInfo.Entry negativeEntry =
+        findEntry(info, "This is the negative AI review output.");
+    assertNotNull(negativeEntry);
+    assertEquals("-1", negativeEntry.getReviewScore());
   }
 
   @Test
