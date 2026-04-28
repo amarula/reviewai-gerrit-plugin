@@ -47,11 +47,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class AiReviewHistory implements RestReadView<ChangeResource> {
   private static final SimpleDateFormat DATE_FORMAT = newFormat();
+  private static final Pattern CODE_REVIEW_SCORE_PATTERN =
+      Pattern.compile(
+          "^"
+              + Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET
+              + " \\d+:[^\\n]*\\bCode-Review([+-]\\d+)\\b");
 
   private final ConfigCreator configCreator;
   private final GerritAiReviewHistoryCollector collector;
@@ -102,9 +108,15 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
 
     for (ChangeMessageInfo changeMessage : changeMessages) {
       GerritComment patchSetComment = toComment(changeMessage);
-      boolean duplicate =
-          mergedPatchSetComments.stream().anyMatch(existing -> isDuplicatePatchSetMessage(existing, patchSetComment));
-      if (!duplicate) {
+      Optional<GerritComment> duplicate =
+          mergedPatchSetComments.stream()
+              .filter(existing -> isDuplicatePatchSetMessage(existing, patchSetComment))
+              .findFirst();
+      if (duplicate.isPresent()) {
+        if (patchSetComment.getReviewScore() != null) {
+          duplicate.get().setReviewScore(patchSetComment.getReviewScore());
+        }
+      } else {
         mergedPatchSetComments.add(patchSetComment);
       }
     }
@@ -167,6 +179,7 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     comment.setMessage(messageInfo.message);
     comment.setPatchSet(messageInfo._revisionNumber);
     comment.setFilename(Settings.GERRIT_PATCH_SET_FILENAME);
+    comment.setReviewScore(getCodeReviewScore(messageInfo.message));
     return comment;
   }
 
@@ -174,6 +187,14 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     return Stream.of(existing.getChangeMessageId(), existing.getId())
         .filter(Objects::nonNull)
         .anyMatch(existingId -> existingId.equals(incoming.getId()));
+  }
+
+  private static String getCodeReviewScore(String message) {
+    return Optional.ofNullable(message)
+        .map(CODE_REVIEW_SCORE_PATTERN::matcher)
+        .filter(matcher -> matcher.find())
+        .map(matcher -> matcher.group(1))
+        .orElse(null);
   }
 
   private static GerritComment.Author toAuthor(AccountInfo authorInfo) {

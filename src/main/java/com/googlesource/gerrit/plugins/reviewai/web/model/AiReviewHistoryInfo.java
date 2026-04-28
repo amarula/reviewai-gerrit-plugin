@@ -37,6 +37,7 @@ public class AiReviewHistoryInfo {
     private final Integer patchSet;
     private final String filename;
     private final Integer line;
+    private final String reviewScore;
     private final String message;
   }
 }
