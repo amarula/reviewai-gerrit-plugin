@@ -25,6 +25,10 @@
           textContent: reviewAiEntries.formatLocation(entry),
         })
       );
+      const reviewScore = reviewAiEntries.formatReviewScore(entry);
+      if (reviewScore) {
+        meta.appendChild(reviewAiDom.createElement('span', {textContent: reviewScore}));
+      }
 
       if (entry.updated) {
         meta.appendChild(
