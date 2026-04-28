@@ -51,6 +51,9 @@ public class GerritComment {
   // Metadata field that is set to the commented filename
   private String filename;
 
+  // Metadata field populated from Gerrit change messages when a label vote is attached.
+  private String reviewScore;
+
   @Data
   public static class Author {
     @SerializedName("_account_id")

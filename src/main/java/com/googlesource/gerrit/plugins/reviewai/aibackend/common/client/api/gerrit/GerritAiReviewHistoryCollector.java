@@ -46,6 +46,11 @@ public class GerritAiReviewHistoryCollector {
               + Settings.GERRIT_DEFAULT_MESSAGE_COMMENTS
               + "?\\)\\s*)?\\n*",
           Pattern.DOTALL);
+  private static final Pattern CODE_REVIEW_SCORE_PATTERN =
+      Pattern.compile(
+          "^"
+              + Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET
+              + " \\d+:[^\\n]*\\bCode-Review([+-]\\d+)\\b");
 
   public AiReviewHistoryInfo collect(
       Configuration config,
@@ -125,7 +130,19 @@ public class GerritAiReviewHistoryCollector {
             comment.getPatchSet(),
             toDisplayFilename(comment.getFilename()),
             comment.getLine(),
+            fromAi ? getCodeReviewScore(comment) : null,
             cleanedMessage));
+  }
+
+  private String getCodeReviewScore(GerritComment comment) {
+    if (comment.getReviewScore() != null) {
+      return comment.getReviewScore();
+    }
+    return Optional.ofNullable(comment.getMessage())
+        .map(CODE_REVIEW_SCORE_PATTERN::matcher)
+        .filter(matcher -> matcher.find())
+        .map(matcher -> matcher.group(1))
+        .orElse(null);
   }
 
   private boolean isDirectedToAi(GerritComment comment, int aiAccountId, Pattern botMentionPattern) {
