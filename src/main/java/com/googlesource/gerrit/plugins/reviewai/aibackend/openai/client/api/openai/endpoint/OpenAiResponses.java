@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiParameters;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiPoller;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiSdkClientFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.OpenAiModelCompatibility;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiAssistantTools;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiCreateResponseRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseFormatSchema;
@@ -114,9 +115,11 @@ public class OpenAiResponses {
             .model(model)
             .instructions(instructions)
             .input(input)
-            .temperature(temperature)
             .text(buildResponseText())
             .tools(openAiAssistantTools.getTools().isEmpty() ? null : openAiAssistantTools.getTools());
+    if (OpenAiModelCompatibility.supportsTemperature(model)) {
+      requestBuilder.temperature(temperature);
+    }
     if (conversationId != null) {
       requestBuilder.conversation(conversationId);
     }
@@ -167,8 +170,10 @@ public class OpenAiResponses {
         ResponseCreateParams.builder()
             .model(model)
             .instructions(instructions)
-            .temperature(temperature)
             .text(toSdkTextConfig(buildResponseText()));
+    if (OpenAiModelCompatibility.supportsTemperature(model)) {
+      builder.temperature(temperature);
+    }
 
     if (previousResponseId != null) {
       builder.previousResponseId(previousResponseId);
