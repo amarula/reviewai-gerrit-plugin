@@ -1,6 +1,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.moonshot;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -9,6 +10,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.Fal
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.lang.reflect.Field;
 import java.util.Optional;
 import org.junit.Test;
@@ -42,6 +44,25 @@ public class MoonshotLangChainProviderTest {
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.0);
 
     assertEquals(ILangChainProvider.LANGCHAIN_MAX_RETRIES, getMaxRetries(langChainProvider));
+  }
+
+  @Test
+  public void omitsTemperatureForKimiK25AndK26() {
+    assertTemperatureOmitted("kimi-k2.5");
+    assertTemperatureOmitted("kimi-k2.6");
+  }
+
+  private void assertTemperatureOmitted(String modelName) {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.MOONSHOT_DOMAIN);
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn(modelName);
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+
+    LangChainProvider langChainProvider = provider.buildChatModel(config, 0.2);
+    OpenAiChatModel model = (OpenAiChatModel) langChainProvider.getModel();
+
+    assertNull(model.defaultRequestParameters().temperature());
   }
 
   private static int getMaxRetries(LangChainProvider langChainProvider) throws Exception {
