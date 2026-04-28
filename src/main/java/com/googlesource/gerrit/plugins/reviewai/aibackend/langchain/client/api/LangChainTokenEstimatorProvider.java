@@ -80,6 +80,7 @@ class LangChainTokenEstimatorProvider {
       case OPENAI -> Configuration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
       case GEMINI -> Configuration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
       case MOONSHOT -> Configuration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
+      case OLLAMA -> Configuration.DEFAULT_OLLAMA_ESTIMATOR_MODEL;
     };
   }
 

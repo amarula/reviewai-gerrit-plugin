@@ -322,6 +322,11 @@
             <version>1.13.0</version>
         </dependency>
         <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-ollama</artifactId>
+            <version>1.13.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.openai</groupId>
             <artifactId>openai-java-client-okhttp</artifactId>
             <version>4.31.0</version>
