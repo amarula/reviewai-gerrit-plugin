@@ -17,12 +17,16 @@
 package com.googlesource.gerrit.plugins.reviewai;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.eclipse.jgit.lib.Config;
 import org.junit.Test;
@@ -107,6 +111,105 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldUseDefaultModelsForOllamaProviderWithoutConfiguredModels() {
+    Configuration configuration =
+        createConfiguration(new String[] {"Ollama"}, new String[] {});
+
+    assertEquals(
+        "LangChain/Ollama/" + Configuration.DEFAULT_OLLAMA_AI_MODEL,
+        configuration.getAiModels().getLast());
+  }
+
+  @Test
+  public void shouldExposeOllamaModelFromFullLangChainRoute() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"LangChain/Ollama"},
+            new String[] {"LangChain/Ollama/llama3.2"});
+
+    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("LangChain/Ollama/llama3.2"), configuration.getAiModels());
+    assertEquals("llama3.2", configuration.getAiModel());
+    assertEquals(Configuration.OLLAMA_DOMAIN, configuration.getAiDomain());
+  }
+
+  @Test
+  public void shouldGuessOllamaRouteForBareLlamaModel() {
+    Configuration configuration =
+        createConfiguration(new String[] {}, new String[] {"llama3.2"});
+
+    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("LangChain/Ollama/llama3.2"), configuration.getAiModels());
+    assertEquals("llama3.2", configuration.getAiModel());
+    assertEquals(Configuration.OLLAMA_DOMAIN, configuration.getAiDomain());
+  }
+
+  @Test
+  public void shouldGuessOllamaRouteForBareModelWithoutToken() {
+    Configuration configuration =
+        createConfiguration(new String[] {}, new String[] {"custom-local-model"});
+
+    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("LangChain/Ollama/custom-local-model"), configuration.getAiModels());
+  }
+
+  @Test
+  public void shouldGuessOllamaRoutesForMultipleBareModelsWithoutTokens() throws Exception {
+    Configuration configuration =
+        createConfigurationFromResource("src/test/resources/__files/config/ollamaBareModels.config");
+
+    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
+    assertEquals(
+        List.of(
+            "LangChain/Ollama/llama3.2",
+            "LangChain/Ollama/deepseek-r1:1.5b",
+            "LangChain/Ollama/gemini-3-flash-preview"),
+        configuration.getAiModels());
+  }
+
+  @Test
+  public void shouldGuessTokenProviderRouteForBareModelInDefaultProviderModels() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {},
+            new String[] {"gpt-4.1"},
+            null,
+            new String[] {"OpenAI/test-token"});
+
+    assertEquals(List.of("OpenAI"), configuration.getAiProviders());
+    assertEquals(List.of("OpenAI/gpt-4.1"), configuration.getAiModels());
+  }
+
+  @Test
+  public void shouldGuessExplicitProviderRouteForBareModelWithCorrespondingToken() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI"},
+            new String[] {"gpt-4.1"},
+            null,
+            new String[] {"OpenAI/test-token"});
+
+    assertEquals(List.of("OpenAI"), configuration.getAiProviders());
+    assertEquals(List.of("OpenAI/gpt-4.1"), configuration.getAiModels());
+  }
+
+  @Test
+  public void shouldGuessOllamaForBareModelNotInTokenBackedProviderModels() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI", "LangChain/OpenAI", "LangChain/MoonShot", "LangChain/Ollama"},
+            new String[] {"deepseek-r1:1.5b"},
+            null,
+            new String[] {"OpenAI/test-token", "MoonShot/test-token"});
+
+    List<String> models = configuration.getAiModels();
+    assertTrue(models.contains("LangChain/Ollama/deepseek-r1:1.5b"));
+    assertTrue(!models.contains("OpenAI/deepseek-r1:1.5b"));
+    assertTrue(!models.contains("LangChain/OpenAI/deepseek-r1:1.5b"));
+    assertTrue(!models.contains("LangChain/MoonShot/deepseek-r1:1.5b"));
+  }
+
+  @Test
   public void shouldGuessProviderRouteForBareProviderNames() {
     Configuration configuration =
         createConfiguration(
@@ -135,9 +238,25 @@ public class ConfigurationDefaultsTest {
 
   private Configuration createConfiguration(
       String[] providers, String[] models, Integer defaultIndex) {
-    PluginConfig projectConfig = emptyPluginConfig();
-    PluginConfig globalConfig = pluginConfig(providers, models, defaultIndex);
+    return createConfiguration(providers, models, defaultIndex, new String[] {});
+  }
 
+  private Configuration createConfiguration(
+      String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
+    PluginConfig projectConfig = emptyPluginConfig();
+    PluginConfig globalConfig = pluginConfig(providers, models, defaultIndex, tokens);
+
+    return createConfiguration(globalConfig, projectConfig);
+  }
+
+  private Configuration createConfigurationFromResource(String resourcePath) throws Exception {
+    Config cfg = new Config();
+    cfg.fromText(Files.readString(Path.of(resourcePath), StandardCharsets.UTF_8));
+    return createConfiguration(
+        PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+  }
+
+  private Configuration createConfiguration(PluginConfig globalConfig, PluginConfig projectConfig) {
     return new Configuration(
         (OneOffRequestContext) null,
         (GerritApi) null,
@@ -147,10 +266,12 @@ public class ConfigurationDefaultsTest {
         Account.id(ReviewTestBase.GERRIT_USER_ACCOUNT_ID));
   }
 
-  private PluginConfig pluginConfig(String[] providers, String[] models, Integer defaultIndex) {
+  private PluginConfig pluginConfig(
+      String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
     Config cfg = new Config();
     cfg.setStringList("plugin", PLUGIN_NAME, "aiProviders", List.of(providers));
     cfg.setStringList("plugin", PLUGIN_NAME, "aiModels", List.of(models));
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiTokens", List.of(tokens));
     if (defaultIndex != null) {
       cfg.setInt("plugin", PLUGIN_NAME, "aiModelsDefaultIndex", defaultIndex);
     }
