@@ -41,7 +41,21 @@ const reviewAiLoader = (() => {
   return {
     load(plugin) {
       if (!loadPromise) {
-        const scriptPaths = ['shared.js', 'reviewAgent.js', 'render.js', 'components.js', 'register.js'];
+        const scriptPaths = [
+          'shared.js',
+          'dom.js',
+          'api.js',
+          'entries.js',
+          'reviewAgent/reviewAgentUtils.js',
+          'reviewAgent/reviewAgentModels.js',
+          'reviewAgent/reviewAgentConversationStore.js',
+          'reviewAgent/reviewAgentConversationTurns.js',
+          'reviewAgent/reviewAgentConversations.js',
+          'reviewAgent/reviewAgent.js',
+          'render.js',
+          'components.js',
+          'register.js',
+        ];
 
         loadPromise = scriptPaths
           .reduce(
