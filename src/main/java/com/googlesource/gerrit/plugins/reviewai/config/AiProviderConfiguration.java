@@ -41,7 +41,7 @@ final class AiProviderConfiguration {
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = DEFAULT_OLLAMA_AI_MODEL;
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
-      List.of("gpt-5.4", "gpt-5.2", DEFAULT_OPENAI_AI_MODEL);
+      List.of("gpt-5.4", "gpt-5.5", "gpt-5.2", DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =
       List.of("gemini-3.1-pro", "gemini-3.1-flash", "gemini-2.5-pro", DEFAULT_GEMINI_AI_MODEL);
   static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
