@@ -74,6 +74,7 @@ public class Configuration extends ConfigCore {
           });
   private static final List<String> DEFAULT_DIRECTIVES = new ArrayList<>();
   private static final int DEFAULT_MAX_REVIEW_LINES = 1000;
+  private static final int DEFAULT_PATCH_CONTEXT_LINES = 3;
   private static final boolean DEFAULT_ENABLED_VOTING = false;
   private static final boolean DEFAULT_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE = true;
   private static final boolean DEFAULT_FILTER_NEGATIVE_COMMENTS = true;
@@ -127,6 +128,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_DISABLED_TOPIC_FILTER = "disabledTopicFilter";
   private static final String KEY_ENABLED_TOPIC_FILTER = "enabledTopicFilter";
   private static final String KEY_MAX_REVIEW_LINES = "maxReviewLines";
+  private static final String KEY_PATCH_CONTEXT_LINES = "patchContextLines";
   private static final String KEY_ENABLED_FILE_EXTENSIONS = "enabledFileExtensions";
   private static final String KEY_ENABLED_VOTING = "enabledVoting";
   private static final String KEY_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE =
@@ -263,6 +265,13 @@ public class Configuration extends ConfigCore {
 
   public int getMaxReviewLines() {
     return getInt(KEY_MAX_REVIEW_LINES, DEFAULT_MAX_REVIEW_LINES);
+  }
+
+  public int getPatchContextLines() {
+    return Math.max(
+        0,
+        Integer.parseInt(
+            getString(KEY_PATCH_CONTEXT_LINES, String.valueOf(DEFAULT_PATCH_CONTEXT_LINES))));
   }
 
   public List<String> getEnabledFileExtensions() {

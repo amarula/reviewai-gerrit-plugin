@@ -66,6 +66,7 @@ ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiAddress: 
+patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 
 taskSpecificAssistants: false

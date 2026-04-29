@@ -287,6 +287,27 @@ public class ConfigurationDefaultsTest {
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());
   }
 
+  @Test
+  public void shouldDefaultPatchContextLinesToJGitDefault() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(3, configuration.getPatchContextLines());
+  }
+
+  @Test
+  public void shouldAllowProjectPatchContextLinesOverrideToZero() {
+    Config globalCfg = new Config();
+    globalCfg.setInt("plugin", PLUGIN_NAME, "patchContextLines", 8);
+    Config projectCfg = new Config();
+    projectCfg.setInt("plugin", PLUGIN_NAME, "patchContextLines", 0);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, globalCfg),
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, projectCfg));
+
+    assertEquals(0, configuration.getPatchContextLines());
+  }
+
   private Configuration createConfiguration() {
     return createConfiguration(new String[] {}, new String[] {});
   }
