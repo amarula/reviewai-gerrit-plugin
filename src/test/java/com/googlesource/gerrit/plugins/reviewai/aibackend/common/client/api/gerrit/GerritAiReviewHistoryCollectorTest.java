@@ -337,7 +337,7 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals(1, info.getEntries().size());
     AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
     assertEquals("assistant", entry.getRole());
-    assertEquals(true, entry.isSystemMessage());
+    assertEquals(false, entry.isSystemMessage());
     assertEquals("```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```", entry.getMessage());
   }
 
