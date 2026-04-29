@@ -271,6 +271,8 @@ directive = End each reply with \"Hope this helps!\"
   default, this is set to false, meaning all inline comments are used for generating new responses and identifying
   repetitions. If enabled (true), inline comments from previous Patch Sets are excluded from these considerations.
 - `maxReviewLines`: The default value is 1000. This sets a limit on the number of lines of code included in the review.
+- `patchContextLines`: The default value is 3. This sets how many unchanged context lines are included around each
+  changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.
 - `codeContextPolicy`: Defines the code context policy to provide AI with the missing code context from the ChangeSet.
   The currently supported policies are:
     - **ON_DEMAND**: Fetches just the minimal set of code artifacts requested by the Model. These artifacts can be
@@ -570,6 +572,7 @@ ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewFileSize: 20000
 maxReviewLines: 1000
+patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
 taskSpecificAssistants: false
