@@ -3,6 +3,7 @@
 
   const agentConfig = {
     responseTimeoutMs: 120000,
+    responseSettleMs: 2000,
   };
   const defaultActionId = 'review-change';
 
@@ -42,10 +43,56 @@
     return entry && (entry.role === 'assistant' || entry.systemMessage);
   }
 
+  function isDynamicConfigurationEntry(entry) {
+    return /\bDYNAMIC CONFIGURATION SETTINGS\b/.test((entry && entry.message) || '');
+  }
+
+  function orderAgentEntries(entries) {
+    return entries
+      .map((entry, index) => ({entry, index}))
+      .sort((left, right) => {
+        const leftOrder = isDynamicConfigurationEntry(left.entry) ? 0 : 1;
+        const rightOrder = isDynamicConfigurationEntry(right.entry) ? 0 : 1;
+        return leftOrder - rightOrder || left.index - right.index;
+      })
+      .map(item => item.entry);
+  }
+
+  function orderAssistantEntriesWithinTurns(entries) {
+    const orderedEntries = [];
+    let assistantEntries = [];
+    const flushAssistantEntries = () => {
+      orderedEntries.push(...orderAgentEntries(assistantEntries));
+      assistantEntries = [];
+    };
+
+    entries.forEach(entry => {
+      if (isAssistantEntry(entry)) {
+        assistantEntries.push(entry);
+        return;
+      }
+      flushAssistantEntries();
+      orderedEntries.push(entry);
+    });
+    flushAssistantEntries();
+    return orderedEntries;
+  }
+
   function isCommandPrompt(prompt) {
     return /^\s*\/(?:help|message|review|directives|forget_thread|configure|show)\b/.test(
       prompt
     );
+  }
+
+  function isDirectResponsePrompt(prompt) {
+    return /^\s*\/(?:help|show)\b/.test(prompt || '');
+  }
+
+  function joinAgentResponses() {
+    return Array.from(arguments)
+      .map(text => (text || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   function parseTimestampMillis(value) {
@@ -71,8 +118,9 @@
   }
 
   function formatAgentEntries(entries) {
-    const reviewScore = entries.map(reviewAi.entries.formatReviewScore).find(Boolean);
-    const messages = entries
+    const orderedEntries = orderAgentEntries(entries);
+    const reviewScore = orderedEntries.map(reviewAi.entries.formatReviewScore).find(Boolean);
+    const messages = orderedEntries
       .map(entry =>
         formatAgentEntry(entry, {
           includeReviewScore: false,
@@ -176,7 +224,12 @@
     getChangeNumber,
     entryKey,
     isAssistantEntry,
+    isDynamicConfigurationEntry,
+    orderAgentEntries,
+    orderAssistantEntriesWithinTurns,
     isCommandPrompt,
+    isDirectResponsePrompt,
+    joinAgentResponses,
     parseTimestampMillis,
     formatAgentEntry,
     formatAgentEntries,

@@ -170,6 +170,23 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
+  public void reviewAgentReviewCommandReturnsDynamicConfigPreambleAndPostsGerritMessage()
+      throws Exception {
+    new PluginDataHandler(realChangeDataPath)
+        .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/forget_thread /review";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
+    verify(revisionApi).review(any());
+  }
+
+  @Test
   public void helpCommandFromNonReviewAgentPathPostsGerritMessage() throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/help";
