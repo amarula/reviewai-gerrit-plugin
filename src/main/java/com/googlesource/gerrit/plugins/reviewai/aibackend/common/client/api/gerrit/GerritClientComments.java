@@ -24,6 +24,7 @@ import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageParser;
@@ -51,6 +52,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final ChangeSetData changeSetData;
   private final ICodeContextPolicy codeContextPolicy;
   private final GitRepoFiles gitRepoFiles;
+  private final IGerritClientPatchSet gerritClientPatchSet;
   private final HashMap<String, GerritComment> commentMap;
   private final HashMap<String, GerritComment> patchSetCommentMap;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
@@ -67,12 +69,14 @@ public class GerritClientComments extends GerritClientAccount {
       ChangeSetData changeSetData,
       ICodeContextPolicy codeContextPolicy,
       GitRepoFiles gitRepoFiles,
+      IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
     super(config, accountCache);
     this.changeSetData = changeSetData;
     this.codeContextPolicy = codeContextPolicy;
     this.gitRepoFiles = gitRepoFiles;
+    this.gerritClientPatchSet = gerritClientPatchSet;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
     commentProperties = new ArrayList<>();
@@ -179,7 +183,8 @@ public class GerritClientComments extends GerritClientAccount {
             codeContextPolicy,
             gitRepoFiles,
             pluginDataHandlerProvider,
-            localizer);
+            localizer,
+            () -> gerritClientPatchSet.getPatchSet(changeSetData, change));
     try {
       List<GerritComment> latestComments = retrieveComments(change);
       if (latestComments == null) {
