@@ -102,8 +102,13 @@ public class ClientCommandParser extends ClientCommandBase {
   }
 
   public boolean parseCommands(String comment) {
+    return parseCommands(comment, true);
+  }
+
+  public boolean parseCommands(String comment, boolean executeCommands) {
     boolean commandFound = false;
     log.debug("Parsing commands from comment: {}", comment);
+    changeSetData.setShowDynamicConfigMessage(false);
     if (parseMessageCommand(comment)) {
       log.debug("Message command detected: parsing complete.");
       return false;
@@ -113,7 +118,11 @@ public class ClientCommandParser extends ClientCommandBase {
     while (commandMatcher.find()) {
       log.debug("Parsing command: {} - Parsing args: {}", commandMatcher.group(1), commandMatcher.group(2));
       CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
-      if (!parseSingleCommand(comment, commandMatcher)) {
+      if (command != null) {
+        changeSetData.setShowDynamicConfigMessage(
+            DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
+      }
+      if (!parseSingleCommand(comment, commandMatcher, executeCommands)) {
         return false;
       }
       commandFound = true;
@@ -132,7 +141,7 @@ public class ClientCommandParser extends ClientCommandBase {
     return messageCommandMatcher.find();
   }
 
-  private boolean parseSingleCommand(String comment, Matcher commandMatcher) {
+  private boolean parseSingleCommand(String comment, Matcher commandMatcher, boolean executeCommands) {
     baseOptions = new HashMap<>();
     dynamicOptions = new HashMap<>();
     CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
@@ -145,9 +154,11 @@ public class ClientCommandParser extends ClientCommandBase {
     }
     parseOptions(commandMatcher);
     if (validateCommand(command)) {
-      clientCommandExecutor.executeCommand(
-          command, baseOptions, dynamicOptions, comment.substring(commandMatcher.end()));
-      clientCommandExecutor.postExecuteCommand();
+      if (executeCommands) {
+        clientCommandExecutor.executeCommand(
+            command, baseOptions, dynamicOptions, comment.substring(commandMatcher.end()));
+        clientCommandExecutor.postExecuteCommand();
+      }
     } else {
       log.info("Command in comment `{}` not validated", comment);
     }
