@@ -131,6 +131,7 @@ public class ClientCommandParser extends ClientCommandBase {
     boolean commandFound = false;
     log.debug("Parsing commands from comment: {}", comment);
     changeSetData.setShowDynamicConfigMessage(false);
+    changeSetData.clearParsedCommands();
     if (parseMessageCommand(comment)) {
       log.debug("Message command detected: parsing complete.");
       return false;
@@ -141,10 +142,11 @@ public class ClientCommandParser extends ClientCommandBase {
       log.debug("Parsing command: {} - Parsing args: {}", commandMatcher.group(1), commandMatcher.group(2));
       CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
       if (command != null) {
+        changeSetData.addParsedCommand(commandMatcher.group(1));
         changeSetData.setShowDynamicConfigMessage(
             DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
       }
-      if (!parseSingleCommand(comment, commandMatcher, executeCommands)) {
+      if (!parseSingleCommand(comment, commandMatcher, command, executeCommands)) {
         return false;
       }
       commandFound = true;
@@ -163,10 +165,10 @@ public class ClientCommandParser extends ClientCommandBase {
     return messageCommandMatcher.find();
   }
 
-  private boolean parseSingleCommand(String comment, Matcher commandMatcher, boolean executeCommands) {
+  private boolean parseSingleCommand(
+      String comment, Matcher commandMatcher, CommandSet command, boolean executeCommands) {
     baseOptions = new HashMap<>();
     dynamicOptions = new HashMap<>();
-    CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
     if (command == null) {
       changeSetData.setReviewSystemMessage(
           String.format(
