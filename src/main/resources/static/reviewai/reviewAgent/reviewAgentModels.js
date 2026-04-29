@@ -17,7 +17,7 @@
         const fullDisplayText = aiModel ? `${provider} (${aiModel})` : provider;
         return {
           model_id: modelId,
-          short_text: provider,
+          short_text: fullDisplayText,
           full_display_text: fullDisplayText,
         };
       });
