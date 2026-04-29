@@ -397,6 +397,37 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandShowInstructionsIncludesAllReviewScopes() throws Exception {
+    setupCommandComment("/show --instructions");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    List<String> expectedTitles =
+        List.of(readTestFile("__files/commands/showInstructionsTitles.txt").split("\\R"));
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(systemMessage.contains(expectedTitle));
+    }
+    List<String> removedTitles =
+        List.of(readTestFile("__files/commands/showInstructionsRemovedTitle.txt").split("\\R"));
+    for (String removedTitle : removedTitles) {
+      Assert.assertFalse(systemMessage.contains(removedTitle));
+    }
+    Assert.assertTrue(
+        systemMessage.indexOf(expectedTitles.get(0))
+            < systemMessage.indexOf(expectedTitles.get(1)));
+    Assert.assertTrue(
+        systemMessage.indexOf(expectedTitles.get(1))
+            < systemMessage.indexOf(expectedTitles.get(2)));
+    String codeFence = readTestFile("__files/commands/codeFence.txt").strip();
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(systemMessage.contains(codeFence + "\n" + expectedTitle));
+    }
+    Assert.assertEquals(6, systemMessage.split(codeFence, -1).length - 1);
+  }
+
+  @Test
   public void commandUnknown() throws Exception {
     String command = "/UNKNOWN";
     setupCommandComment(command);
