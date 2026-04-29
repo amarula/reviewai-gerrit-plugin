@@ -22,6 +22,9 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @RequiredArgsConstructor
 @Data
 @Slf4j
@@ -43,6 +46,19 @@ public class ChangeSetData {
   private Boolean hideDynamicConfigMessage = false;
   private Boolean showDynamicConfigMessage = false;
   private String reviewSystemMessage;
+  private Set<String> parsedCommands = new HashSet<>();
+
+  public void clearParsedCommands() {
+    parsedCommands.clear();
+  }
+
+  public void addParsedCommand(String command) {
+    parsedCommands.add(command);
+  }
+
+  public Boolean hasParsedCommand(String command) {
+    return parsedCommands.contains(command);
+  }
 
   public Boolean shouldHideOpenAiReview() {
     return hideOpenAiReview && !forcedReview;
@@ -66,6 +82,7 @@ public class ChangeSetData {
     copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
     copy.setShowDynamicConfigMessage(showDynamicConfigMessage);
     copy.setReviewSystemMessage(reviewSystemMessage);
+    copy.setParsedCommands(new HashSet<>(parsedCommands));
     return copy;
   }
 }
