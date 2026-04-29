@@ -68,6 +68,7 @@ inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiModel: debug
 mockAiModelConfigPath: config/mockAiModel.json
+patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 
 taskSpecificAssistants: false
