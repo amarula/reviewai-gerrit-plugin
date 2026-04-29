@@ -34,10 +34,10 @@ import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.p
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
 
 public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksComposer {
-  private final Configuration config;
-  private final ChangeSetData changeSetData;
-  private final GerritChange change;
-  private final ICodeContextPolicy codeContextPolicy;
+  protected final Configuration config;
+  protected final ChangeSetData changeSetData;
+  protected final GerritChange change;
+  protected final ICodeContextPolicy codeContextPolicy;
   protected final LinkedHashMap<String, String> promptingParameters = new LinkedHashMap<>();
 
   protected IAiPrompt aIPrompt;
