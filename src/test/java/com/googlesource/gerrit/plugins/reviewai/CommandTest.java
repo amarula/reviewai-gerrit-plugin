@@ -380,18 +380,20 @@ public class CommandTest extends OpenAiReviewTestBase {
     Assert.assertTrue(reviewMessage.contains("SYSTEM MESSAGE:"));
     Assert.assertTrue(reviewMessage.contains("PROMPTS CURRENTLY USED"));
     Assert.assertTrue(reviewMessage.contains("Review the following Patch Set:  ` ` `"));
+    Assert.assertTrue(reviewMessage.contains("Subject: Minor fixes"));
+    Assert.assertTrue(reviewMessage.contains("diff --git a/test_file_1.py b/test_file_1.py"));
     Assert.assertTrue(reviewMessage.contains("\n```\n"));
   }
 
   @Test
-  public void commandShowPromptsDoesNotRetrievePatchSet() throws Exception {
+  public void commandShowPromptsRetrievesPatchSet() throws Exception {
     setupCommandComment("/show --prompts");
     enableMessageDebugging();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
-    Mockito.verify(revisionApiMock, Mockito.never()).patch();
-    Mockito.verify(revisionApiMock, Mockito.never()).file(Mockito.anyString());
+    Mockito.verify(revisionApiMock).patch();
+    Mockito.verify(revisionApiMock).file("test_file_1.py");
   }
 
   @Test

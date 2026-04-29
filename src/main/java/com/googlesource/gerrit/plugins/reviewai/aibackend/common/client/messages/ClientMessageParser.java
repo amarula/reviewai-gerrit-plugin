@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,26 @@ public class ClientMessageParser extends ClientMessageBase {
       GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        gitRepoFiles,
+        pluginDataHandlerProvider,
+        localizer,
+        null);
+  }
+
+  public ClientMessageParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      GitRepoFiles gitRepoFiles,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider) {
     super(config);
     clientCommandParser =
         new ClientCommandParser(
@@ -49,7 +70,8 @@ public class ClientMessageParser extends ClientMessageBase {
             codeContextPolicy,
             gitRepoFiles,
             pluginDataHandlerProvider,
-            localizer);
+            localizer,
+            IPatchSetProvider);
     log.debug("ClientMessageParser initialized with bot mention pattern: {}", botMentionPattern);
   }
 
