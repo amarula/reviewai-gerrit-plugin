@@ -21,15 +21,21 @@ import com.google.gerrit.entities.Change;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.Changes;
+import com.google.gerrit.extensions.api.changes.FileApi;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
+import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.BadRequestException;
+import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import com.google.gerrit.server.account.AccountCache;
+import com.google.gerrit.json.OutputFormat;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,6 +44,8 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -62,9 +70,12 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private AiReviewPermission aiReviewPermission;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
+  @Mock private AccountCache accountCache;
+  @Mock private GitRepositoryManager repositoryManager;
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
   @Mock private RevisionApi revisionApi;
+  @Mock private FileApi fileApi;
 
   private AiReviewMessage view;
   private Path realChangeDataPath;
@@ -77,11 +88,16 @@ public class AiReviewMessageTest extends TestBase {
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getGerritUserName()).thenReturn("gpt");
+    when(config.getGerritApi()).thenReturn(gerritApi);
     when(config.getLocaleDefault()).thenReturn(Locale.ENGLISH);
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getAiModels())
         .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
     when(gerritApi.changes()).thenReturn(changes);
     when(changes.id(PROJECT_NAME.get(), change.getChangeId())).thenReturn(changeApi);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
     when(changeApi.current()).thenReturn(revisionApi);
     when(revisionApi.review(any())).thenReturn(null);
     when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(pluginDataHandler);
@@ -93,6 +109,8 @@ public class AiReviewMessageTest extends TestBase {
             gerritApi,
             aiReviewPermission,
             pluginDataHandlerBaseProvider,
+            accountCache,
+            repositoryManager,
             mockPluginDataPath);
   }
 
@@ -170,6 +188,28 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
+  public void reviewAgentShowPromptsReturnsRealPrompt() throws Exception {
+    when(config.getEnableMessageDebugging()).thenReturn(true);
+    String patch = readTestFile("__files/openai/gerritFormattedPatch.txt");
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(patch));
+    when(revisionApi.file("test_file_1.py")).thenReturn(fileApi);
+    DiffInfo diffInfo = readTestFileToClass("__files/openai/gerritPatchSetDiffTestFile.json");
+    when(fileApi.diff(0)).thenReturn(diffInfo);
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/show --prompts";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.responseText.contains("PROMPTS CURRENTLY USED"));
+    assertTrue(output.responseText.contains("Subject: Minor fixes"));
+    assertTrue(output.responseText.contains("diff --git a/test_file_1.py b/test_file_1.py"));
+    verify(revisionApi).patch();
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
   public void reviewAgentReviewCommandReturnsDynamicConfigPreambleAndPostsGerritMessage()
       throws Exception {
     new PluginDataHandler(realChangeDataPath)
@@ -214,5 +254,13 @@ public class AiReviewMessageTest extends TestBase {
     input.modelName = "OpenAI/not-configured";
 
     view.apply(changeResource, input);
+  }
+
+  private String readTestFile(String filename) throws Exception {
+    return Files.readString(Paths.get("src/test/resources").resolve(filename));
+  }
+
+  private DiffInfo readTestFileToClass(String filename) throws Exception {
+    return OutputFormat.JSON.newGson().fromJson(readTestFile(filename), DiffInfo.class);
   }
 }
