@@ -479,9 +479,7 @@ Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <
 Similarly, running `@gpt /show --instructions` will display something like:
 
 ```
-INSTRUCTIONS CURRENTLY USED
-
-### Assistant Instructions
+INSTRUCTIONS FOR FULL REVIEW
 Act as a PatchSet Reviewer. Disregard missing implementations of methods or other code entities, as the full ...
 RULE #1: You MUST take into account of the messages previously exchanged in the conversation for your review. ...
 RULE #2: You MUST only evaluate the code that has been modified in the patch, specifically the lines of the patch ...
@@ -496,6 +494,16 @@ Here are other guidelines for reviewing the patch: A. Identify any potential pro
 User: Review the following Patch Set:  ` ` `<PATCH_SET_BODY> ` ` `
 Assistant: {"replies": [{"reply": "<REVIEW_1>", "score": 0, "relevance": 0.8, "repeated": false, ...
 The answer object includes the string attributes  `reply `,  `score `,  `relevance `,  `repeated `,  ...
+```
+
+```
+INSTRUCTIONS FOR PATCH SET ONLY
+...
+```
+
+```
+INSTRUCTIONS FOR COMMIT MESSAGE ONLY
+...
 ```
 
 #### Showing Locally Stored Data
