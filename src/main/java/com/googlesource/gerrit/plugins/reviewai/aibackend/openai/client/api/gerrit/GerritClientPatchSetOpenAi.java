@@ -126,6 +126,7 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
       RevCommit commit = revWalk.parseCommit(ObjectId.fromString(commitId));
       diffFormatter.setRepository(repository);
       diffFormatter.setDetectRenames(true);
+      diffFormatter.setContext(config.getPatchContextLines());
 
       if (commit.getParentCount() == 0) {
         formatRootCommitDiff(repository, commit, diffFormatter);
