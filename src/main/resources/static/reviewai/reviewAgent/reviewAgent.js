@@ -40,8 +40,14 @@
         const sendResult = await this._sendMessage(change, prompt, this._getRequestModelId(req));
         const directResponse =
           sendResult && (sendResult.response_text || sendResult.responseText);
-        const responseText =
-          directResponse || (await this._waitForAssistantReply(change, baselineKeys));
+        const responseText = agentUtils.isDirectResponsePrompt(prompt)
+          ? directResponse
+          : agentUtils.joinAgentResponses(
+              directResponse,
+              await this._waitForAssistantReply(change, baselineKeys, {
+                excludeDynamicConfiguration: Boolean(directResponse),
+              })
+            );
         await this._storeConversationTurn(change, req, conversationId, prompt, responseText);
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
@@ -72,19 +78,48 @@
       );
     }
 
-    async _waitForAssistantReply(change, baselineKeys) {
+    async _waitForAssistantReply(change, baselineKeys, options) {
+      const config = options || {};
       const deadline = Date.now() + agentUtils.agentConfig.responseTimeoutMs;
+      const settleMs = agentUtils.agentConfig.responseSettleMs;
+      let newAssistantEntries = [];
+      let newAssistantEntryKeys = '';
+      let stableSince = null;
 
       while (Date.now() < deadline) {
-        await agentUtils.sleep(reviewAi.config.pollIntervalMs);
-        const entries = await this._fetchEntries(change);
-        const newAssistantEntries = entries.filter(
-          entry =>
-            agentUtils.isAssistantEntry(entry) && !baselineKeys.has(agentUtils.entryKey(entry))
+        await agentUtils.sleep(
+          newAssistantEntries.length
+            ? Math.min(reviewAi.config.pollIntervalMs, settleMs)
+            : reviewAi.config.pollIntervalMs
         );
-        if (newAssistantEntries.length) {
+        const entries = await this._fetchEntries(change);
+        const latestNewAssistantEntries = entries.filter(
+          entry =>
+            agentUtils.isAssistantEntry(entry) &&
+            !baselineKeys.has(agentUtils.entryKey(entry)) &&
+            !(config.excludeDynamicConfiguration && agentUtils.isDynamicConfigurationEntry(entry))
+        );
+        if (!latestNewAssistantEntries.length) {
+          continue;
+        }
+
+        const latestNewAssistantEntryKeys = latestNewAssistantEntries
+          .map(agentUtils.entryKey)
+          .join('\u0000');
+        if (latestNewAssistantEntryKeys !== newAssistantEntryKeys) {
+          newAssistantEntries = latestNewAssistantEntries;
+          newAssistantEntryKeys = latestNewAssistantEntryKeys;
+          stableSince = Date.now();
+          continue;
+        }
+
+        if (Date.now() - stableSince >= settleMs) {
           return agentUtils.formatAgentEntries(newAssistantEntries);
         }
+      }
+
+      if (newAssistantEntries.length) {
+        return agentUtils.formatAgentEntries(newAssistantEntries);
       }
 
       return (
