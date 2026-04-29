@@ -98,11 +98,13 @@ public class GerritAiReviewHistoryCollector {
       int aiAccountId,
       GerritComment comment) {
     boolean fromAi = isFromAi(comment, aiAccountId);
-    boolean systemMessage = fromAi && isPreservedAssistantMessage(comment, localizer);
+    boolean systemMessage = fromAi && isSystemMessage(comment, localizer);
+    boolean preservedAssistantMessage =
+        systemMessage || fromAi && isDynamicConfigurationMessage(comment, localizer);
 
     ClientMessageCleaner cleaner =
         new ClientMessageCleaner(config, Optional.ofNullable(comment.getMessage()).orElse(""), localizer);
-    if (fromAi && !systemMessage) {
+    if (fromAi && !preservedAssistantMessage) {
       cleaner.removeDebugCodeBlocks();
     } else {
       if (!fromAi) {
@@ -110,7 +112,7 @@ public class GerritAiReviewHistoryCollector {
       }
     }
     String cleanedMessage = cleaner.getMessage();
-    if (systemMessage) {
+    if (preservedAssistantMessage) {
       cleanedMessage = cleanPreservedAssistantMessage(cleanedMessage, localizer);
     } else {
       cleaner.removeHeadings();
@@ -170,10 +172,6 @@ public class GerritAiReviewHistoryCollector {
 
   private boolean isFromAi(GerritComment comment, int aiAccountId) {
     return comment.getAuthor() != null && comment.getAuthor().getAccountId() == aiAccountId;
-  }
-
-  private boolean isPreservedAssistantMessage(GerritComment comment, Localizer localizer) {
-    return isSystemMessage(comment, localizer) || isDynamicConfigurationMessage(comment, localizer);
   }
 
   private boolean isSystemMessage(GerritComment comment, Localizer localizer) {
