@@ -36,15 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 @Slf4j
 public class ClientCommandExecutor extends ClientCommandBase {
-  private static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
-      Set.of(CommandSet.REVIEW, CommandSet.CONFIGURE, CommandSet.SHOW);
-
   private final ChangeSetData changeSetData;
   private final GerritChange change;
   private final ICodeContextPolicy codeContextPolicy;
@@ -100,9 +96,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
   }
 
   public void postExecuteCommand() {
-    if (!DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command)) {
-      changeSetData.setHideDynamicConfigMessage(true);
-    }
+    changeSetData.setHideDynamicConfigMessage(!DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
   }
 
   private void commandHelp() {

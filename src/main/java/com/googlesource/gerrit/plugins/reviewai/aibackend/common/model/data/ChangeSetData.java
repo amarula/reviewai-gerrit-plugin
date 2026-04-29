@@ -41,6 +41,7 @@ public class ChangeSetData {
   private Boolean debugReviewMode = false;
   private Boolean hideOpenAiReview = false;
   private Boolean hideDynamicConfigMessage = false;
+  private Boolean showDynamicConfigMessage = false;
   private String reviewSystemMessage;
 
   public Boolean shouldHideOpenAiReview() {
@@ -63,6 +64,7 @@ public class ChangeSetData {
     copy.setDebugReviewMode(debugReviewMode);
     copy.setHideOpenAiReview(hideOpenAiReview);
     copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
+    copy.setShowDynamicConfigMessage(showDynamicConfigMessage);
     copy.setReviewSystemMessage(reviewSystemMessage);
     return copy;
   }
