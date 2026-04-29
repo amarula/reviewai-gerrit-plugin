@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.command
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -86,6 +87,26 @@ public class ClientCommandParser extends ClientCommandBase {
       GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        gitRepoFiles,
+        pluginDataHandlerProvider,
+        localizer,
+        null);
+  }
+
+  public ClientCommandParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      GitRepoFiles gitRepoFiles,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
@@ -97,7 +118,8 @@ public class ClientCommandParser extends ClientCommandBase {
             codeContextPolicy,
             gitRepoFiles,
             pluginDataHandlerProvider,
-            localizer);
+            localizer,
+            IPatchSetProvider);
     log.debug("ClientCommandParser initialized.");
   }
 

@@ -23,7 +23,9 @@ import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
+import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -35,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -59,6 +62,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   private final GerritApi gerritApi;
   private final AiReviewPermission aiReviewPermission;
   private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
+  private final AccountCache accountCache;
+  private final GitRepositoryManager repositoryManager;
   private final Path pluginDataPath;
 
   @Inject
@@ -67,11 +72,15 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GerritApi gerritApi,
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      AccountCache accountCache,
+      GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+    this.accountCache = accountCache;
+    this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
   }
 
@@ -191,6 +200,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     Localizer localizer = new Localizer(config);
     PluginDataHandlerProvider pluginDataHandlerProvider =
         new PluginDataHandlerProvider(pluginDataPath, change);
+    GerritClientPatchSetOpenAi gerritClientPatchSet =
+        new GerritClientPatchSetOpenAi(config, accountCache, repositoryManager);
     new ClientCommandParser(
             config,
             changeSetData,
@@ -198,7 +209,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             getCodeContextPolicy(config, change),
             new GitRepoFiles(),
             pluginDataHandlerProvider,
-            localizer)
+            localizer,
+            () -> gerritClientPatchSet.getPatchSet(changeSetData, change))
         .parseCommands(message, executeCommands);
     return new ReviewAgentCommandContext(changeSetData, pluginDataHandlerProvider, localizer);
   }
