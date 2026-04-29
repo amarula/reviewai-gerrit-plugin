@@ -65,7 +65,7 @@
       let currentTurn = null;
       let hasClientDataOverride = false;
 
-      entries.forEach(entry => {
+      agentUtils.orderAssistantEntriesWithinTurns(entries).forEach(entry => {
         if (entry.role === 'user' && !entry.systemMessage) {
           currentTurn = {
             user_input: {
