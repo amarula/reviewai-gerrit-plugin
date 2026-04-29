@@ -23,6 +23,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.DynamicDirectivesModifyException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
@@ -47,6 +48,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private final GitRepoFiles gitRepoFiles;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
+  private final IPatchSetProvider IPatchSetProvider;
 
   private CommandSet command;
   private Map<BaseOptionSet, String> baseOptions;
@@ -60,7 +62,8 @@ public class ClientCommandExecutor extends ClientCommandBase {
       ICodeContextPolicy codeContextPolicy,
       GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
@@ -68,6 +71,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.codeContextPolicy = codeContextPolicy;
     this.gitRepoFiles = gitRepoFiles;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
+    this.IPatchSetProvider = IPatchSetProvider;
     log.debug("ClientCommandExecutor initialized.");
   }
 
@@ -302,7 +306,13 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private void commandShow() {
     ClientCommandShowExecutor clientCommandShowExecutor =
         new ClientCommandShowExecutor(
-            config, changeSetData, change, codeContextPolicy, pluginDataHandlerProvider, localizer);
+            config,
+            changeSetData,
+            change,
+            codeContextPolicy,
+            pluginDataHandlerProvider,
+            localizer,
+            IPatchSetProvider);
     clientCommandShowExecutor.executeShowCommand(baseOptions);
   }
 }
