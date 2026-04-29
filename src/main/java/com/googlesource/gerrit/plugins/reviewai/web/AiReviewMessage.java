@@ -90,6 +90,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     if (directResponse.isPresent()) {
       return Response.ok(directResponse.get());
     }
+    String reviewAgentPreamble = getReviewAgentPreamble(resource, config, input, message);
     String projectName = GerritChange.getProjectName(resource.getChange().getProject());
     ReviewInput reviewInput =
         ReviewInput.create()
@@ -99,7 +100,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         .id(projectName, resource.getChange().getChangeId())
         .current()
         .review(reviewInput);
-    return Response.ok(new Output(true));
+    return Response.ok(new Output(true, reviewAgentPreamble));
   }
 
   public static class Input {
@@ -139,6 +140,48 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       return Optional.empty();
     }
 
+    ReviewAgentCommandContext commandContext =
+        parseReviewAgentCommand(resource, config, message, true);
+    return Optional.of(
+        new Output(
+            true,
+            getDirectResponseText(
+                commandContext.changeSetData(),
+                commandContext.pluginDataHandlerProvider(),
+                commandContext.localizer())));
+  }
+
+  private String getDirectResponseText(
+      ChangeSetData changeSetData,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer) {
+    List<String> messages = new ArrayList<>();
+    if (!changeSetData.getHideDynamicConfigMessage()) {
+      Optional.ofNullable(getDynamicConfigurationMessage(pluginDataHandlerProvider, localizer))
+          .ifPresent(messages::add);
+    }
+    if (changeSetData.getReviewSystemMessage() != null) {
+      messages.add(changeSetData.getReviewSystemMessage());
+    }
+    return joinWithDoubleNewLine(messages);
+  }
+
+  private String getReviewAgentPreamble(
+      ChangeResource resource, Configuration config, Input input, String message) {
+    if (input == null || !Boolean.TRUE.equals(input.reviewAgent)) {
+      return null;
+    }
+    ReviewAgentCommandContext commandContext =
+        parseReviewAgentCommand(resource, config, message, false);
+    if (!commandContext.changeSetData().getShowDynamicConfigMessage()) {
+      return null;
+    }
+    return getDynamicConfigurationMessage(
+        commandContext.pluginDataHandlerProvider(), commandContext.localizer());
+  }
+
+  private ReviewAgentCommandContext parseReviewAgentCommand(
+      ChangeResource resource, Configuration config, String message, boolean executeCommands) {
     GerritChange change =
         new GerritChange(
             resource.getProject(), resource.getChange().getDest(), resource.getChange().getKey());
@@ -156,28 +199,24 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             new GitRepoFiles(),
             pluginDataHandlerProvider,
             localizer)
-        .parseCommands(message);
-    return Optional.of(
-        new Output(true, getDirectResponseText(changeSetData, pluginDataHandlerProvider, localizer)));
+        .parseCommands(message, executeCommands);
+    return new ReviewAgentCommandContext(changeSetData, pluginDataHandlerProvider, localizer);
   }
 
-  private String getDirectResponseText(
+  private String getDynamicConfigurationMessage(
+      PluginDataHandlerProvider pluginDataHandlerProvider, Localizer localizer) {
+    Map<String, String> dynamicConfig =
+        new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfig();
+    if (dynamicConfig == null || dynamicConfig.isEmpty()) {
+      return null;
+    }
+    return new DebugCodeBlocksDynamicConfiguration(localizer).getDebugCodeBlock(dynamicConfig);
+  }
+
+  private record ReviewAgentCommandContext(
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
-    List<String> messages = new ArrayList<>();
-    if (!changeSetData.getHideDynamicConfigMessage()) {
-      Map<String, String> dynamicConfig =
-          new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfig();
-      if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
-        messages.add(new DebugCodeBlocksDynamicConfiguration(localizer).getDebugCodeBlock(dynamicConfig));
-      }
-    }
-    if (changeSetData.getReviewSystemMessage() != null) {
-      messages.add(changeSetData.getReviewSystemMessage());
-    }
-    return joinWithDoubleNewLine(messages);
-  }
+      Localizer localizer) {}
 
   private int getAiAccountId(Configuration config) {
     return Optional.ofNullable(config.getUserId()).map(Account.Id::get).orElse(0);

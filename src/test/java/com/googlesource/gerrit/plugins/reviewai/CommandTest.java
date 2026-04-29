@@ -125,6 +125,20 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandReviewShowsDynamicConfigAfterChainedForgetThreadCommand() throws Exception {
+    PluginDataHandler changeHandler = getChangeDataHandler();
+    changeHandler.setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
+    setupCommandComment("/forget_thread /review");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertTrue(captor.getValue().message.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    Assert.assertTrue(captor.getValue().message.contains("OpenAI/gpt-4.1"));
+  }
+
+  @Test
   public void commandReviewAllowedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
     when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
             PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
