@@ -54,6 +54,12 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
       "__files/openai/gerritVerboseRenamePatch.txt";
   private static final String MIXED_EXTENSION_PATCH_FILE =
       "__files/openai/mixedExtensionPatch.txt";
+  private static final String CONTEXT_LINES_PATCH_FILE =
+      "__files/openai/gerritContextLinesPatch.txt";
+  private static final String CONTEXT_PATCH_ORIGINAL_FILE =
+      "__files/openai/contextPatchOriginal.py";
+  private static final String CONTEXT_PATCH_MODIFIED_FILE =
+      "__files/openai/contextPatchModified.py";
 
   @Mock private Configuration config;
   @Mock private AccountCache accountCache;
@@ -81,6 +87,24 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
     Assert.assertFalse(patchSet.contains("deleted file mode"));
     Assert.assertFalse(patchSet.contains("new file mode"));
     Assert.assertEquals(List.of("new_name.py"), client.getPatchSetFiles());
+  }
+
+  @Test
+  public void getPatchSetUsesConfiguredPatchContextLines() throws Exception {
+    RevCommit modifyCommit = createModifyCommit();
+    mockGerritPatch(modifyCommit, getContextLinesPatch(), "context.py", 0);
+
+    GerritClientPatchSetOpenAi client =
+        new GerritClientPatchSetOpenAi(config, accountCache, repositoryManager);
+    String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
+
+    String[] originalLines = getContextPatchOriginal().split("\\R");
+    String[] modifiedLines = getContextPatchModified().split("\\R");
+    Assert.assertTrue(patchSet.contains("-" + originalLines[2]));
+    Assert.assertTrue(patchSet.contains("+" + modifiedLines[2]));
+    Assert.assertFalse(patchSet.contains(" " + originalLines[1]));
+    Assert.assertFalse(patchSet.contains(" " + originalLines[3]));
+    Assert.assertEquals(List.of("context.py"), client.getPatchSetFiles());
   }
 
   @Test
@@ -124,16 +148,40 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
     }
   }
 
+  private RevCommit createModifyCommit() throws Exception {
+    try (Git git = Git.init().setDirectory(tempFolder.newFolder("repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+
+      Files.writeString(workTree.resolve("context.py"), getContextPatchOriginal());
+      git.add().addFilepattern("context.py").call();
+      git.commit().setMessage("Add context file").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(workTree.resolve("context.py"), getContextPatchModified());
+      git.add().addFilepattern("context.py").call();
+      return git.commit()
+          .setMessage("Modify context file")
+          .setAuthor("Test", "test@example.com")
+          .call();
+    }
+  }
+
   private void mockGerritPatch(RevCommit renameCommit) throws Exception {
+    mockGerritPatch(renameCommit, getVerboseRenamePatch(), "new_name.py", 3);
+  }
+
+  private void mockGerritPatch(
+      RevCommit commit, String formattedPatch, String fileName, int patchContextLines)
+      throws Exception {
     when(config.getGerritApi()).thenReturn(gerritApi);
     when(gerritApi.changes()).thenReturn(changes);
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
         .thenReturn(changeApi);
     when(changeApi.current()).thenReturn(revisionApi);
-    when(revisionApi.patch()).thenReturn(BinaryResult.create(getVerboseRenamePatch()));
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(formattedPatch));
 
     CommitInfo commitInfo = new CommitInfo();
-    commitInfo.commit = renameCommit.getName();
+    commitInfo.commit = commit.getName();
     when(revisionApi.commit(false)).thenReturn(commitInfo);
 
     when(repositoryManager.openRepository(any()))
@@ -142,7 +190,8 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
                 new FileRepositoryBuilder().setGitDir(gitDir.toFile()).setMustExist(true).build());
 
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
-    when(revisionApi.file("new_name.py")).thenReturn(fileApi);
+    when(config.getPatchContextLines()).thenReturn(patchContextLines);
+    when(revisionApi.file(fileName)).thenReturn(fileApi);
     DiffInfo diffInfo = new DiffInfo();
     diffInfo.content = new ArrayList<>();
     when(fileApi.diff(0)).thenReturn(diffInfo);
@@ -154,5 +203,17 @@ public class GerritClientPatchSetOpenAiTest extends TestBase {
 
   private String getMixedExtensionPatch() throws Exception {
     return Files.readString(TEST_RESOURCES_PATH.resolve(MIXED_EXTENSION_PATCH_FILE));
+  }
+
+  private String getContextLinesPatch() throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(CONTEXT_LINES_PATCH_FILE));
+  }
+
+  private String getContextPatchOriginal() throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(CONTEXT_PATCH_ORIGINAL_FILE));
+  }
+
+  private String getContextPatchModified() throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(CONTEXT_PATCH_MODIFIED_FILE));
   }
 }
