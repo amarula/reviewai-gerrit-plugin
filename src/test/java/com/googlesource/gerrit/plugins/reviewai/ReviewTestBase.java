@@ -347,6 +347,7 @@ public class ReviewTestBase extends TestBase {
     when(changeSetDataProvider.get()).thenReturn(changeSetData);
 
     localizer = new Localizer(config);
+    IGerritClientPatchSet gerritClientPatchSet = getGerritClientPatchSet();
     gerritClient =
         new GerritClient(
             new GerritClientFacade(
@@ -358,9 +359,10 @@ public class ReviewTestBase extends TestBase {
                     changeSetData,
                     getCodeContextPolicy(),
                     gitRepoFiles,
+                    gerritClientPatchSet,
                     pluginDataHandlerProvider,
                     localizer),
-                getGerritClientPatchSet()));
+                gerritClientPatchSet));
     patchSetReviewer =
         new PatchSetReviewer(
             gerritClient,
