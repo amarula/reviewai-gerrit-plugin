@@ -66,6 +66,8 @@ public abstract class ClientCommandBase extends ClientBase {
       COMMAND_MAP.inverse();
   public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
       Set.of(CommandSet.HELP, CommandSet.SHOW);
+  public static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
+      Set.of(CommandSet.REVIEW, CommandSet.CONFIGURE, CommandSet.SHOW);
 
   // Option values can be either a sequence of chars enclosed in double quotes or a sequence of
   // non-space chars.
