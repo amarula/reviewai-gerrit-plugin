@@ -34,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -182,7 +183,10 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     ReviewAgentCommandContext commandContext =
         parseReviewAgentCommand(resource, config, message, false);
-    if (!commandContext.changeSetData().getShowDynamicConfigMessage()) {
+    if (!commandContext.changeSetData().getShowDynamicConfigMessage()
+        || commandContext
+            .changeSetData()
+            .hasParsedCommand(ClientCommandBase.commandName(CommandSet.CONFIGURE))) {
       return null;
     }
     return getDynamicConfigurationMessage(

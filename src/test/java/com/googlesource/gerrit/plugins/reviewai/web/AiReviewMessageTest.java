@@ -227,6 +227,21 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
+  public void reviewAgentConfigureCommandWaitsForPostedCommandResponse() throws Exception {
+    new PluginDataHandler(realChangeDataPath)
+        .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/configure";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertEquals(null, output.responseText);
+    verify(revisionApi).review(any());
+  }
+
+  @Test
   public void helpCommandFromNonReviewAgentPathPostsGerritMessage() throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/help";
