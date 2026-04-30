@@ -34,10 +34,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -183,14 +185,39 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     ReviewAgentCommandContext commandContext =
         parseReviewAgentCommand(resource, config, message, false);
+    List<String> messages = new ArrayList<>();
+    Optional.ofNullable(getPartialReviewPositiveScoreMessage(commandContext))
+        .ifPresent(messages::add);
     if (!commandContext.changeSetData().getShowDynamicConfigMessage()
         || commandContext
             .changeSetData()
             .hasParsedCommand(ClientCommandBase.commandName(CommandSet.CONFIGURE))) {
+      return messages.isEmpty() ? null : joinWithDoubleNewLine(messages);
+    }
+    Optional.ofNullable(
+            getDynamicConfigurationMessage(
+                commandContext.pluginDataHandlerProvider(), commandContext.localizer()))
+        .ifPresent(messages::add);
+    return messages.isEmpty() ? null : joinWithDoubleNewLine(messages);
+  }
+
+  private String getPartialReviewPositiveScoreMessage(ReviewAgentCommandContext commandContext) {
+    ChangeSetData changeSetData = commandContext.changeSetData();
+    boolean partialReview =
+        changeSetData.hasParsedCommandOption(
+                ClientCommandBase.commandName(CommandSet.REVIEW),
+                BaseOptionSet.SCOPE.name(),
+                ReviewScope.PATCHSET.getCommandOptionValue())
+            || changeSetData.hasParsedCommandOption(
+                ClientCommandBase.commandName(CommandSet.REVIEW),
+                BaseOptionSet.SCOPE.name(),
+                ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+    if (!partialReview) {
       return null;
     }
-    return getDynamicConfigurationMessage(
-        commandContext.pluginDataHandlerProvider(), commandContext.localizer());
+    Localizer localizer = commandContext.localizer();
+    return getPrefixedSystemMessage(
+        localizer, localizer.getText("message.review.partial.positive.score.skipped"));
   }
 
   private ReviewAgentCommandContext parseReviewAgentCommand(

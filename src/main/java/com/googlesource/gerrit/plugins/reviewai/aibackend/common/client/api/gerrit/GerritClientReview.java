@@ -145,6 +145,12 @@ public class GerritClientReview extends GerritClientAccount {
         messages.add(debugCodeBlocksDynamicConfiguration.getDebugCodeBlock(dynamicConfig));
       }
     }
+    if (changeSetData.getReviewNoticeMessage() != null) {
+      messages.add(
+          localizer.getText("system.message.prefix")
+              + ' '
+              + changeSetData.getReviewNoticeMessage());
+    }
     if (emptyComments) {
       messages.add(localizer.getText("system.message.prefix") + ' ' + systemMessage);
     }
@@ -168,7 +174,10 @@ public class GerritClientReview extends GerritClientAccount {
     try {
       return new GerritClientDetail(config, changeSetData).getCodeReviewValue(change);
     } catch (RuntimeException e) {
-      log.warn("Could not determine current Code-Review value for change {}", change.getFullChangeId(), e);
+      log.warn(
+          "Could not determine current Code-Review value for change {}",
+          change.getFullChangeId(),
+          e);
       return null;
     }
   }
