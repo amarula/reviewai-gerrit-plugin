@@ -58,9 +58,8 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.CONFIG,
                   BaseOptionSet.LOCAL_DATA,
                   BaseOptionSet.PROMPTS,
-                  BaseOptionSet.INSTRUCTIONS));
-  private static final Map<BaseOptionSet, List<String>> BASE_OPTION_VALID_VALUES_MAP =
-      Map.of(BaseOptionSet.SCOPE, ReviewScope.commandOptionValues());
+                  BaseOptionSet.INSTRUCTIONS,
+                  BaseOptionSet.SCOPE));
   private static final List<CommandSet> REVIEW_COMMANDS =
       new ArrayList<>(List.of(CommandSet.REVIEW));
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
@@ -228,7 +227,10 @@ public class ClientCommandParser extends ClientCommandBase {
           String.format(localizer.getText("message.command.option.invalid"), command, baseOptions));
       return true;
     }
-    if (baseOptionValuesMismatch()) {
+    if (showScopeOptionMismatch(command)) {
+      return true;
+    }
+    if (baseOptionValuesMismatch(command)) {
       return true;
     }
     if (!dynamicOptions.isEmpty()) {
@@ -244,9 +246,22 @@ public class ClientCommandParser extends ClientCommandBase {
     return false;
   }
 
-  private boolean baseOptionValuesMismatch() {
+  private boolean showScopeOptionMismatch(CommandSet command) {
+    if (command != CommandSet.SHOW || !baseOptions.containsKey(BaseOptionSet.SCOPE)) {
+      return false;
+    }
+    if (baseOptions.containsKey(BaseOptionSet.PROMPTS)
+        || baseOptions.containsKey(BaseOptionSet.INSTRUCTIONS)) {
+      return false;
+    }
+    changeSetData.setReviewSystemMessage(
+        String.format(localizer.getText("message.command.option.invalid"), command, baseOptions));
+    return true;
+  }
+
+  private boolean baseOptionValuesMismatch(CommandSet command) {
     for (Map.Entry<BaseOptionSet, String> baseOption : baseOptions.entrySet()) {
-      List<String> validValues = BASE_OPTION_VALID_VALUES_MAP.get(baseOption.getKey());
+      List<String> validValues = getValidBaseOptionValues(command, baseOption.getKey());
       if (validValues != null && !validValues.contains(baseOption.getValue())) {
         changeSetData.setReviewSystemMessage(
             String.format(
@@ -263,6 +278,15 @@ public class ClientCommandParser extends ClientCommandBase {
       }
     }
     return false;
+  }
+
+  private List<String> getValidBaseOptionValues(CommandSet command, BaseOptionSet option) {
+    if (option != BaseOptionSet.SCOPE) {
+      return null;
+    }
+    return command == CommandSet.REVIEW
+        ? ReviewScope.reviewCommandOptionValues()
+        : ReviewScope.commandOptionValues();
   }
 
   private boolean configurationOptionsMismatch() {
