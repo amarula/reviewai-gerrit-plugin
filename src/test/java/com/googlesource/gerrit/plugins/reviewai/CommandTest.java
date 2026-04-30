@@ -379,11 +379,31 @@ public class CommandTest extends OpenAiReviewTestBase {
 
     String reviewMessage = captor.getValue().message;
     Assert.assertTrue(reviewMessage.contains("SYSTEM MESSAGE:"));
-    Assert.assertTrue(reviewMessage.contains("PROMPTS CURRENTLY USED"));
+    List<String> expectedTitles =
+        List.of(readTestFile("__files/commands/showPromptsTitles.txt").split("\\R"));
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(reviewMessage.contains(expectedTitle));
+    }
+    List<String> removedTitles =
+        List.of(readTestFile("__files/commands/showPromptsRemovedTitle.txt").split("\\R"));
+    for (String removedTitle : removedTitles) {
+      Assert.assertFalse(reviewMessage.contains(removedTitle));
+    }
+    Assert.assertTrue(
+        reviewMessage.indexOf(expectedTitles.get(0))
+            < reviewMessage.indexOf(expectedTitles.get(1)));
+    Assert.assertTrue(
+        reviewMessage.indexOf(expectedTitles.get(1))
+            < reviewMessage.indexOf(expectedTitles.get(2)));
     Assert.assertTrue(reviewMessage.contains("Review the following Patch Set:  ` ` `"));
+    Assert.assertTrue(reviewMessage.contains("Review the following Commit Message:  ` ` `"));
     Assert.assertTrue(reviewMessage.contains("Subject: Minor fixes"));
     Assert.assertTrue(reviewMessage.contains("diff --git a/test_file_1.py b/test_file_1.py"));
-    Assert.assertTrue(reviewMessage.contains("\n```\n"));
+    String codeFence = TextUtils.CODE_DELIMITER;
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(reviewMessage.contains(codeFence + "\n" + expectedTitle));
+    }
+    Assert.assertEquals(6, reviewMessage.split(codeFence, -1).length - 1);
   }
 
   @Test
