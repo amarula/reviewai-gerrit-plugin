@@ -70,6 +70,7 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewPermission aiReviewPermission;
   private final IdentifiedUser.GenericFactory identifiedUserFactory;
   private final AccountCache accountCache;
+  private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -83,7 +84,8 @@ public class EventHandlerTask implements Runnable {
       GerritClient gerritClient,
       AiReviewPermission aiReviewPermission,
       IdentifiedUser.GenericFactory identifiedUserFactory,
-      AccountCache accountCache) {
+      AccountCache accountCache,
+      ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -92,6 +94,7 @@ public class EventHandlerTask implements Runnable {
     this.aiReviewPermission = aiReviewPermission;
     this.identifiedUserFactory = identifiedUserFactory;
     this.accountCache = accountCache;
+    this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -105,9 +108,12 @@ public class EventHandlerTask implements Runnable {
   @VisibleForTesting
   public Result execute() {
     log.debug("Starting event processing for change ID: {}", change.getFullChangeId());
+    ReviewAgentEventRequestStatusUpdater.PendingRequest reviewAgentRequest =
+        reviewAgentRequestStatusUpdater.getPendingRequest();
     if (!preProcessEvent()) {
       log.debug(
           "Preprocessing event not supported or failed for event type: {}", change.getEventType());
+      reviewAgentRequest.completeNoUpdate();
       return Result.NOT_SUPPORTED;
     }
 
@@ -117,11 +123,13 @@ public class EventHandlerTask implements Runnable {
       log.info("Finished processing event for change ID: {}", change.getFullChangeId());
     } catch (Exception e) {
       log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);
+      reviewAgentRequest.fail(e.getMessage());
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
       return Result.FAILURE;
     }
+    reviewAgentRequest.completeReview();
     return Result.OK;
   }
 
