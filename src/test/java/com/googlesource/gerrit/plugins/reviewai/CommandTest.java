@@ -266,6 +266,42 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandReviewPatchsetScopeSkipsPositiveGlobalScore() throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean()))
+        .thenReturn(true);
+    setupCommandComment(reviewCommandWithScope(ReviewScope.PATCHSET) + " --filter=false");
+    setupMockRequestCreateResponseFromBody(positiveReviewResponse(), null, null);
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertNull(captor.getValue().labels);
+    Assert.assertEquals(
+        readTestFile("__files/commands/partialReviewPositiveScoreNoVoteSystemMessage.txt")
+            .stripTrailing(),
+        captor.getValue().message);
+    Assert.assertFalse(captor.getValue().comments.isEmpty());
+  }
+
+  @Test
+  public void commandReviewCommitMessageScopeSkipsPositiveGlobalScore() throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean()))
+        .thenReturn(true);
+    setupCommandComment(reviewCommandWithScope(ReviewScope.COMMIT_MESSAGE) + " --filter=false");
+    setupMockRequestCreateResponseFromBody(positiveReviewResponse(), null, null);
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertNull(captor.getValue().labels);
+    Assert.assertEquals(
+        readTestFile("__files/commands/partialReviewPositiveScoreNoVoteSystemMessage.txt")
+            .stripTrailing(),
+        captor.getValue().message);
+    Assert.assertFalse(captor.getValue().comments.isEmpty());
+  }
+
+  @Test
   public void commandReviewShowsSystemMessageWhenNoFilesRemainAfterFiltering() throws Exception {
     when(globalConfig.getString(Mockito.eq("enabledFileExtensions"), Mockito.anyString()))
         .thenReturn(".py");
@@ -301,6 +337,11 @@ public class CommandTest extends OpenAiReviewTestBase {
 
   private String reviewCommandWithScope(ReviewScope reviewScope) {
     return "/review --scope=" + reviewScope.getCommandOptionValue();
+  }
+
+  private String positiveReviewResponse() {
+    return readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
+        .replace("\\\"score\\\": -1.0", "\\\"score\\\": 1.0");
   }
 
   @Test
