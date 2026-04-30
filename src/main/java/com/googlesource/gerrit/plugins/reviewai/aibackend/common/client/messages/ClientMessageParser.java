@@ -91,6 +91,7 @@ public class ClientMessageParser extends ClientMessageBase {
 
   public boolean parseCommands(String comment) {
     log.debug("Parsing commands from comment: {}", comment);
-    return clientCommandParser.parseCommands(comment);
+    return clientCommandParser.parseCommands(
+        ReviewAgentMessageSanitizer.removeLegacyRequestMarker(comment));
   }
 }

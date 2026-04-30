@@ -38,7 +38,7 @@ public class ClientMessageCleaner extends ClientMessageBase {
 
   public ClientMessageCleaner(Configuration config, String message, Localizer localizer) {
     super(config);
-    this.message = message;
+    this.message = ReviewAgentMessageSanitizer.removeLegacyRequestMarker(message);
     debugCodeBlocksCleaner = new DebugCodeBlocksCleaner(localizer);
     clientCommandCleaner = new ClientCommandCleaner(config);
     messageHeadingPattern =

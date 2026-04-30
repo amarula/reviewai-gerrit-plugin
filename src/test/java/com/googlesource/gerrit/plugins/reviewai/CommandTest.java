@@ -25,6 +25,7 @@ import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.OpenAiReviewTestBase;
@@ -318,6 +319,25 @@ public class CommandTest extends OpenAiReviewTestBase {
     Assert.assertNull(captor.getValue().comments);
     WireMock.verify(
         0, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
+  }
+
+  @Test
+  public void commandReviewCompletesPendingReviewAgentStatusWhenNoCommentsRequireAction()
+      throws Exception {
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review");
+    mockGerritChangeCommentsApiCall(Map.of());
+
+    EventHandlerTask.Result result =
+        handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(EventHandlerTask.Result.NOT_SUPPORTED, result);
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertEquals(
+        "SYSTEM MESSAGE: No update to show for this Change Set",
+        status.responseText);
   }
 
   @Test
