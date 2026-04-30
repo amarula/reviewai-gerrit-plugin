@@ -217,16 +217,27 @@ public class PatchSetReviewer {
       if (change.getIsCommentEvent()) {
         return null;
       }
-      int reviewScore = reviewScores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(reviewScores));
+      int reviewScore =
+          reviewScores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(reviewScores));
       if (reviewScore == 0
           && config.getConvertNeutralReviewScoreToPositive()
           && changeSetData.getVotingMaxScore() >= 1) {
-        return 1;
+        reviewScore = 1;
+      }
+      if (reviewScore > 0 && isPartialReview()) {
+        changeSetData.setReviewNoticeMessage(
+            localizer.getText("message.review.partial.positive.score.skipped"));
+        return null;
       }
       return reviewScore;
     } else {
       return null;
     }
+  }
+
+  private boolean isPartialReview() {
+    return changeSetData.getReviewScope() == ReviewScope.PATCHSET
+        || changeSetData.getReviewScope() == ReviewScope.COMMIT_MESSAGE;
   }
 
   private int normalizeReviewScore(double score) {

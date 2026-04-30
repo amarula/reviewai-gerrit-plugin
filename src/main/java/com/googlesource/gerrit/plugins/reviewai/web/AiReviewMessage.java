@@ -34,10 +34,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -132,13 +134,36 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     @SerializedName(value = "response_text", alternate = {"responseText"})
     public final String responseText;
 
+    @SerializedName(value = "wait_for_assistant_reply", alternate = {"waitForAssistantReply"})
+    public final boolean waitForAssistantReply;
+
+    @SerializedName(value = "request_id", alternate = {"requestId"})
+    public final String requestId;
+
     public Output(boolean ok) {
-      this(ok, null);
+      this(ok, null, true);
     }
 
     public Output(boolean ok, String responseText) {
+      this(ok, responseText, true);
+    }
+
+    public Output(boolean ok, String responseText, boolean waitForAssistantReply) {
+      this(ok, responseText, waitForAssistantReply, null);
+    }
+
+    public Output(boolean ok, String responseText, boolean waitForAssistantReply, String requestId) {
       this.ok = ok;
       this.responseText = responseText;
+      this.waitForAssistantReply = waitForAssistantReply;
+      this.requestId = requestId;
+    }
+
+    public Output withRequestId(String requestId) {
+      if (requestId == null || requestId.isBlank()) {
+        return this;
+      }
+      return new Output(ok, responseText, waitForAssistantReply, requestId);
     }
   }
 
@@ -183,14 +208,48 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     ReviewAgentCommandContext commandContext =
         parseReviewAgentCommand(resource, config, message, false);
+    List<String> messages = new ArrayList<>();
+    Optional.ofNullable(getPartialReviewPositiveScoreMessage(commandContext))
+        .ifPresent(messages::add);
     if (!commandContext.changeSetData().getShowDynamicConfigMessage()
         || commandContext
             .changeSetData()
             .hasParsedCommand(ClientCommandBase.commandName(CommandSet.CONFIGURE))) {
+      return messages.isEmpty() ? null : joinWithDoubleNewLine(messages);
+    }
+    Optional.ofNullable(
+            getDynamicConfigurationMessage(
+                commandContext.pluginDataHandlerProvider(), commandContext.localizer()))
+        .ifPresent(messages::add);
+    return messages.isEmpty() ? null : joinWithDoubleNewLine(messages);
+  }
+
+  private String getPrefixedSystemMessage(Localizer localizer, String message) {
+    String prefix =
+        Optional.ofNullable(localizer.getText("system.message.prefix")).orElse("").trim();
+    if (prefix.isEmpty() || message.stripLeading().startsWith(prefix)) {
+      return message;
+    }
+    return prefix + ' ' + message;
+  }
+
+  private String getPartialReviewPositiveScoreMessage(ReviewAgentCommandContext commandContext) {
+    ChangeSetData changeSetData = commandContext.changeSetData();
+    boolean partialReview =
+        changeSetData.hasParsedCommandOption(
+                ClientCommandBase.commandName(CommandSet.REVIEW),
+                BaseOptionSet.SCOPE.name(),
+                ReviewScope.PATCHSET.getCommandOptionValue())
+            || changeSetData.hasParsedCommandOption(
+                ClientCommandBase.commandName(CommandSet.REVIEW),
+                BaseOptionSet.SCOPE.name(),
+                ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+    if (!partialReview) {
       return null;
     }
-    return getDynamicConfigurationMessage(
-        commandContext.pluginDataHandlerProvider(), commandContext.localizer());
+    Localizer localizer = commandContext.localizer();
+    return getPrefixedSystemMessage(
+        localizer, localizer.getText("message.review.partial.positive.score.skipped"));
   }
 
   private ReviewAgentCommandContext parseReviewAgentCommand(
