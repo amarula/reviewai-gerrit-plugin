@@ -3,7 +3,8 @@
 
   const agentConfig = {
     responseTimeoutMs: 120000,
-    responseSettleMs: 2000,
+    responsePollIntervalMs: 1000,
+    responseSettleMs: 500,
   };
   const defaultActionId = 'review-change';
 
