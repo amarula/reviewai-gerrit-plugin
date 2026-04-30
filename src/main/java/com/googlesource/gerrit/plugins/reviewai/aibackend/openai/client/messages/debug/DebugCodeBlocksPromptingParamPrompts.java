@@ -21,8 +21,23 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCode;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCommitMessage;
+
+import java.util.List;
+
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER_BEGIN;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPromptingParamBase {
+  private static final String TITLE_FULL_REVIEW = "PROMPT FOR FULL REVIEW";
+  private static final String TITLE_PATCH_SET_ONLY = "PROMPT FOR PATCH SET ONLY";
+  private static final String TITLE_COMMIT_MESSAGE_ONLY = "PROMPT FOR COMMIT MESSAGE ONLY";
+
   private final String patchSet;
 
   public DebugCodeBlocksPromptingParamPrompts(
@@ -38,22 +53,46 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
   }
 
   @Override
-  protected void populateOpenAISpecializedCodeReviewParameters() {
-    promptingParameters.put(
-        "ReviewCodePrompt", aIPrompt.getDefaultAiThreadReviewMessage(patchSet));
+  public String getDebugCodeBlock() {
+    populateOpenAiParameters();
+    List<String> sections =
+        List.of(
+            getSection(TITLE_FULL_REVIEW, promptingParameters.get(TITLE_FULL_REVIEW)),
+            getSection(TITLE_PATCH_SET_ONLY, promptingParameters.get(TITLE_PATCH_SET_ONLY)),
+            getSection(
+                TITLE_COMMIT_MESSAGE_ONLY, promptingParameters.get(TITLE_COMMIT_MESSAGE_ONLY)));
+    return joinWithDoubleNewLine(sections);
   }
 
   @Override
-  protected void populateOpenAISpecializedCommitMessageReviewParameters() {
+  protected void populateOpenAiParameters() {
     promptingParameters.put(
-        "ReviewCommitMessagePrompt",
-        aIPrompt.getDefaultAiThreadReviewMessage(patchSet));
+        TITLE_FULL_REVIEW,
+        new AiPromptReview(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+    promptingParameters.put(
+        TITLE_PATCH_SET_ONLY,
+        new AiPromptReviewCode(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+    promptingParameters.put(
+        TITLE_COMMIT_MESSAGE_ONLY,
+        new AiPromptReviewCommitMessage(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+  }
+
+  private String getSection(String title, String prompt) {
+    return CODE_DELIMITER_BEGIN
+        + joinWithNewLine(List.of(title, distanceCodeDelimiter(prompt)))
+        + "\n"
+        + CODE_DELIMITER;
   }
 
   @Override
-  protected void populateOpenAIReviewParameters() {
-    promptingParameters.put(
-        "ReviewPrompt",
-        aIPrompt.getDefaultAiThreadReviewMessage(patchSet));
-  }
+  protected void populateOpenAISpecializedCodeReviewParameters() {}
+
+  @Override
+  protected void populateOpenAISpecializedCommitMessageReviewParameters() {}
+
+  @Override
+  protected void populateOpenAIReviewParameters() {}
 }
