@@ -470,10 +470,18 @@ configuration.
 For example, running `@gpt /show --prompts` will return something like:
 
 ```
-PROMPTS CURRENTLY USED
-
-### Review Prompt
+PROMPT FOR FULL REVIEW
 Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
+```
+
+```
+PROMPT FOR PATCH SET ONLY
+Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
+```
+
+```
+PROMPT FOR COMMIT MESSAGE ONLY
+Review the following Commit Message:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
 ```
 
 Similarly, running `@gpt /show --instructions` will display something like:
