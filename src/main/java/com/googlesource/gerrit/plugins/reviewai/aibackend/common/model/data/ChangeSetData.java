@@ -22,7 +22,9 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @RequiredArgsConstructor
@@ -46,18 +48,30 @@ public class ChangeSetData {
   private Boolean hideDynamicConfigMessage = false;
   private Boolean showDynamicConfigMessage = false;
   private String reviewSystemMessage;
+  private String reviewNoticeMessage;
   private Set<String> parsedCommands = new HashSet<>();
+  private Map<String, Map<String, String>> parsedCommandOptions = new HashMap<>();
 
   public void clearParsedCommands() {
     parsedCommands.clear();
+    parsedCommandOptions.clear();
   }
 
   public void addParsedCommand(String command) {
+    addParsedCommand(command, Map.of());
+  }
+
+  public void addParsedCommand(String command, Map<String, String> options) {
     parsedCommands.add(command);
+    parsedCommandOptions.put(command, new HashMap<>(options));
   }
 
   public Boolean hasParsedCommand(String command) {
     return parsedCommands.contains(command);
+  }
+
+  public Boolean hasParsedCommandOption(String command, String option, String value) {
+    return value.equals(parsedCommandOptions.getOrDefault(command, Map.of()).get(option));
   }
 
   public Boolean shouldHideOpenAiReview() {
@@ -82,7 +96,12 @@ public class ChangeSetData {
     copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
     copy.setShowDynamicConfigMessage(showDynamicConfigMessage);
     copy.setReviewSystemMessage(reviewSystemMessage);
+    copy.setReviewNoticeMessage(reviewNoticeMessage);
     copy.setParsedCommands(new HashSet<>(parsedCommands));
+    Map<String, Map<String, String>> copiedParsedCommandOptions = new HashMap<>();
+    parsedCommandOptions.forEach(
+        (command, options) -> copiedParsedCommandOptions.put(command, new HashMap<>(options)));
+    copy.setParsedCommandOptions(copiedParsedCommandOptions);
     return copy;
   }
 }
