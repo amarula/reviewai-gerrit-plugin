@@ -1,0 +1,18 @@
+Patch Set 5:
+
+SYSTEM MESSAGE:
+
+```
+PROMPT FOR FULL REVIEW
+Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
+```
+
+```
+PROMPT FOR PATCH SET ONLY
+Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
+```
+
+```
+PROMPT FOR COMMIT MESSAGE ONLY
+Review the following Commit Message:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
+```
