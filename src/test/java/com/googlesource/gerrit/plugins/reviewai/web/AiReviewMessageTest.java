@@ -22,7 +22,9 @@ import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.Changes;
 import com.google.gerrit.extensions.api.changes.FileApi;
+import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
+import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.BadRequestException;
@@ -54,9 +56,11 @@ import java.util.Map;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -75,6 +79,7 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private GitRepositoryManager repositoryManager;
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
+  @Mock private ChangeApi.CommentsRequest commentsRequest;
   @Mock private RevisionApi revisionApi;
   @Mock private FileApi fileApi;
 
@@ -100,6 +105,8 @@ public class AiReviewMessageTest extends TestBase {
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
         .thenReturn(changeApi);
     when(changeApi.current()).thenReturn(revisionApi);
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get()).thenReturn(Map.of());
     when(revisionApi.review(any())).thenReturn(null);
     when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(pluginDataHandler);
     realChangeDataPath = tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data");
@@ -164,6 +171,7 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
     assertTrue(output.responseText.contains("AVAILABLE COMMANDS"));
     verify(revisionApi, never()).review(any());
   }
@@ -180,6 +188,7 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
     assertTrue(
@@ -231,9 +240,39 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
     verify(revisionApi).review(any());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void reviewAgentReviewCommandUsesGerritMessageIdForRequestStatus() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.reviewAgent = true;
+    input.requestId = "request-1";
+    CommentInfo postedComment = new CommentInfo();
+    postedComment.id = "comment-1";
+    postedComment.message = "@gpt /review";
+    postedComment.changeMessageId = "message-1";
+    postedComment.setUpdated(Instant.parse("2026-04-30T10:00:00Z"));
+    when(commentsRequest.get()).thenReturn(Map.of("/PATCHSET_LEVEL", List.of(postedComment)));
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals("message-1", output.requestId);
+    ArgumentCaptor<ReviewInput> reviewCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewCaptor.capture());
+    assertTrue(
+        reviewCaptor.getValue().comments.values().stream()
+            .flatMap(List::stream)
+            .anyMatch(comment -> "@gpt /review".equals(comment.message)));
+    ArgumentCaptor<Map<String, Object>> statusCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(pluginDataHandler, atLeastOnce())
+        .setJsonValue(eq("reviewAgentRequestStatuses"), statusCaptor.capture());
+    assertNotNull(statusCaptor.getValue().get("message-1"));
   }
 
   @Test
@@ -255,7 +294,26 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
-  public void reviewAgentConfigureCommandWaitsForPostedCommandResponse() throws Exception {
+  public void reviewAgentInvalidReviewScopeReturnsDirectSystemMessageWithoutPostingGerritMessage()
+      throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review --scope=wrong";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertEquals(
+        "SYSTEM MESSAGE: Invalid value for option `SCOPE`: `wrong`. Supported values are: [patchset, " +
+            "commit_message]",
+        output.responseText);
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentConfigureCommandBlockedByDebuggingReturnsDirectSystemMessage()
+      throws Exception {
     new PluginDataHandler(realChangeDataPath)
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
@@ -265,6 +323,28 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertEquals(
+        readTestFile("__files/commands/debuggingMessagesDisabledSystemMessage.txt")
+            .stripTrailing(),
+        output.responseText);
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentConfigureCommandWithDebuggingWaitsForPostedCommandResponse()
+      throws Exception {
+    when(config.getEnableMessageDebugging()).thenReturn(true);
+    new PluginDataHandler(realChangeDataPath)
+        .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/configure";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
     assertEquals(null, output.responseText);
     verify(revisionApi).review(any());
   }
