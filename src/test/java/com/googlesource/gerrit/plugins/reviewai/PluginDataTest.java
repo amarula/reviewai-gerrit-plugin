@@ -23,6 +23,7 @@ import java.nio.file.Files;
 
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -130,5 +131,20 @@ public class PluginDataTest extends TestBase {
     String dataFile = Files.readString(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"));
     assertTrue(dataFile.contains("conversationId.review_code=review-code-conversation"));
     assertTrue(dataFile.contains("dynamicConfig="));
+  }
+
+  @Test
+  public void testReviewAgentPendingRequestResolutionFollowsMovedRequest() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(provider.getChangeScope());
+
+    statusStore.pending("request-1", "/review");
+    String initialRequestId = statusStore.getLatestPendingRequestId().orElseThrow();
+    statusStore.move("request-1", "message-1");
+
+    assertEquals(
+        "message-1", statusStore.getPendingRequestId(initialRequestId).orElseThrow());
   }
 }
