@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.messages.debug.DebugCodeBlocksPromptingParamInstructions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.messages.debug.DebugCodeBlocksPromptingParamPrompts;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -69,8 +70,9 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
       switch (baseOption) {
         case CONFIG -> commandDumpConfig();
         case LOCAL_DATA -> commandDumpStoredData();
-        case PROMPTS -> commandShowPrompts();
-        case INSTRUCTIONS -> commandShowInstructions();
+        case PROMPTS -> commandShowPrompts(baseOptions);
+        case INSTRUCTIONS -> commandShowInstructions(baseOptions);
+        case SCOPE -> {}
       }
     }
     changeSetData.setReviewSystemMessage(joinWithDoubleNewLine(itemsToShow));
@@ -88,7 +90,7 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
     itemsToShow.add(debugCodeBlocksDataDump.getDebugCodeBlock());
   }
 
-  private void commandShowPrompts() {
+  private void commandShowPrompts(Map<BaseOptionSet, String> baseOptions) {
     String patchSet = "";
     if (IPatchSetProvider != null) {
       try {
@@ -99,14 +101,32 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
     }
     DebugCodeBlocksPromptingParamPrompts debugCodeBlocksPromptingParamPrompts =
         new DebugCodeBlocksPromptingParamPrompts(
-            localizer, config, changeSetData, change, codeContextPolicy, patchSet);
+            localizer,
+            config,
+            changeSetData,
+            change,
+            codeContextPolicy,
+            patchSet,
+            getReviewScope(baseOptions));
     itemsToShow.add(debugCodeBlocksPromptingParamPrompts.getDebugCodeBlock());
   }
 
-  private void commandShowInstructions() {
+  private void commandShowInstructions(Map<BaseOptionSet, String> baseOptions) {
     DebugCodeBlocksPromptingParamInstructions debugCodeBlocksPromptingParamInstructions =
         new DebugCodeBlocksPromptingParamInstructions(
-            localizer, config, changeSetData, change, codeContextPolicy);
+            localizer,
+            config,
+            changeSetData,
+            change,
+            codeContextPolicy,
+            getReviewScope(baseOptions));
     itemsToShow.add(debugCodeBlocksPromptingParamInstructions.getDebugCodeBlock());
+  }
+
+  private ReviewScope getReviewScope(Map<BaseOptionSet, String> baseOptions) {
+    if (!baseOptions.containsKey(BaseOptionSet.SCOPE)) {
+      return null;
+    }
+    return ReviewScope.fromCommandOption(baseOptions.get(BaseOptionSet.SCOPE));
   }
 }
