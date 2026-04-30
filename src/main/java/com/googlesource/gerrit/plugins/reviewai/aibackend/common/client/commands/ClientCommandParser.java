@@ -141,7 +141,6 @@ public class ClientCommandParser extends ClientCommandBase {
       log.debug("Parsing command: {} - Parsing args: {}", commandMatcher.group(1), commandMatcher.group(2));
       CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
       if (command != null) {
-        changeSetData.addParsedCommand(commandMatcher.group(1));
         changeSetData.setShowDynamicConfigMessage(
             DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
       }
@@ -176,6 +175,7 @@ public class ClientCommandParser extends ClientCommandBase {
       return false;
     }
     parseOptions(commandMatcher);
+    changeSetData.addParsedCommand(commandMatcher.group(1), getParsedOptions());
     if (validateCommand(command)) {
       if (executeCommands) {
         clientCommandExecutor.executeCommand(
@@ -331,5 +331,14 @@ public class ClientCommandParser extends ClientCommandBase {
     } else {
       dynamicOptions.put(optionKey, optionValue);
     }
+  }
+
+  private Map<String, String> getParsedOptions() {
+    Map<String, String> parsedOptions = new HashMap<>();
+    for (Map.Entry<BaseOptionSet, String> baseOption : baseOptions.entrySet()) {
+      parsedOptions.put(baseOption.getKey().name(), baseOption.getValue());
+    }
+    parsedOptions.putAll(dynamicOptions);
+    return parsedOptions;
   }
 }
