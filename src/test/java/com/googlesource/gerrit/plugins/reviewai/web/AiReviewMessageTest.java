@@ -53,6 +53,7 @@ import java.util.Map;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -202,7 +203,16 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
-    assertTrue(output.responseText.contains("PROMPTS CURRENTLY USED"));
+    List<String> expectedTitles =
+        List.of(readTestFile("__files/commands/showPromptsTitles.txt").split("\\R"));
+    for (String expectedTitle : expectedTitles) {
+      assertTrue(output.responseText.contains(expectedTitle));
+    }
+    List<String> removedTitles =
+        List.of(readTestFile("__files/commands/showPromptsRemovedTitle.txt").split("\\R"));
+    for (String removedTitle : removedTitles) {
+      assertFalse(output.responseText.contains(removedTitle));
+    }
     assertTrue(output.responseText.contains("Subject: Minor fixes"));
     assertTrue(output.responseText.contains("diff --git a/test_file_1.py b/test_file_1.py"));
     verify(revisionApi).patch();
