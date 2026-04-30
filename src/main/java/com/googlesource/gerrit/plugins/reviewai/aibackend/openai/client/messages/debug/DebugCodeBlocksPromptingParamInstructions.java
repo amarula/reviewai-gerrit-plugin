@@ -21,10 +21,12 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCommitMessage;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
@@ -37,13 +39,15 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
   private static final String TITLE_FULL_REVIEW = "INSTRUCTIONS FOR FULL REVIEW";
   private static final String TITLE_PATCH_SET_ONLY = "INSTRUCTIONS FOR PATCH SET ONLY";
   private static final String TITLE_COMMIT_MESSAGE_ONLY = "INSTRUCTIONS FOR COMMIT MESSAGE ONLY";
+  private final ReviewScope reviewScope;
 
   public DebugCodeBlocksPromptingParamInstructions(
       Localizer localizer,
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
-      ICodeContextPolicy codeContextPolicy) {
+      ICodeContextPolicy codeContextPolicy,
+      ReviewScope reviewScope) {
     super(
         localizer,
         "message.dump.instructions.title",
@@ -51,17 +55,24 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
         changeSetData,
         change,
         codeContextPolicy);
+    this.reviewScope = reviewScope;
   }
 
   @Override
   public String getDebugCodeBlock() {
     populateOpenAiParameters();
-    List<String> sections =
-        List.of(
-            getSection(TITLE_FULL_REVIEW, promptingParameters.get(TITLE_FULL_REVIEW)),
-            getSection(TITLE_PATCH_SET_ONLY, promptingParameters.get(TITLE_PATCH_SET_ONLY)),
-            getSection(
-                TITLE_COMMIT_MESSAGE_ONLY, promptingParameters.get(TITLE_COMMIT_MESSAGE_ONLY)));
+    List<String> sections = new ArrayList<>();
+    if (shouldInclude(ReviewScope.FULL)) {
+      sections.add(getSection(TITLE_FULL_REVIEW, promptingParameters.get(TITLE_FULL_REVIEW)));
+    }
+    if (shouldInclude(ReviewScope.PATCHSET)) {
+      sections.add(getSection(TITLE_PATCH_SET_ONLY, promptingParameters.get(TITLE_PATCH_SET_ONLY)));
+    }
+    if (shouldInclude(ReviewScope.COMMIT_MESSAGE)) {
+      sections.add(
+          getSection(
+              TITLE_COMMIT_MESSAGE_ONLY, promptingParameters.get(TITLE_COMMIT_MESSAGE_ONLY)));
+    }
     return joinWithDoubleNewLine(sections);
   }
 
@@ -86,6 +97,10 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
         + joinWithNewLine(List.of(title, distanceCodeDelimiter(instructions)))
         + "\n"
         + CODE_DELIMITER;
+  }
+
+  private boolean shouldInclude(ReviewScope scope) {
+    return reviewScope == null || reviewScope == scope;
   }
 
   @Override

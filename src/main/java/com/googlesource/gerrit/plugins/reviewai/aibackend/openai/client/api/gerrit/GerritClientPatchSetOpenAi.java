@@ -181,6 +181,13 @@ public class GerritClientPatchSetOpenAi extends GerritClientPatchSet
 
   private String filterPatchByReviewScope(String formattedPatch) {
     return switch (changeSetData.getReviewScope()) {
+      case FULL -> {
+        String fullPatch =
+            filterPatchByEnabledFileExtensions(
+                filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
+        log.debug("Patch filtered by command scope to include the full Change Set: {}", fullPatch);
+        yield fullPatch;
+      }
       case PATCHSET -> {
         String patchWithoutCommitMessage =
             filterPatchByEnabledFileExtensions(

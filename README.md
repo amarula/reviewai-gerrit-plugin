@@ -460,6 +460,9 @@ fine-tuning purposes. Below are the currently supported options and their associ
 - `local_data`: Shows locally stored data
 - `config`: Shows the current configuration
 
+For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a
+single review mode.
+
 **NOTE**: This command is available when the `enableMessageDebugging` configuration setting is enabled.
 
 #### Showing Prompting Parameters
@@ -483,6 +486,9 @@ Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <
 PROMPT FOR COMMIT MESSAGE ONLY
 Review the following Commit Message:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
 ```
+
+Running `@gpt /show --prompts --scope=patchset` will return only the `PROMPT FOR PATCH SET ONLY`
+block.
 
 Similarly, running `@gpt /show --instructions` will display something like:
 
@@ -513,6 +519,9 @@ INSTRUCTIONS FOR PATCH SET ONLY
 INSTRUCTIONS FOR COMMIT MESSAGE ONLY
 ...
 ```
+
+Running `@gpt /show --instructions --scope=commit_message` will return only the
+`INSTRUCTIONS FOR COMMIT MESSAGE ONLY` block.
 
 #### Showing Locally Stored Data
 
