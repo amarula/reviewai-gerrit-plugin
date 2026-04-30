@@ -81,17 +81,18 @@
     async _waitForAssistantReply(change, baselineKeys, options) {
       const config = options || {};
       const deadline = Date.now() + agentUtils.agentConfig.responseTimeoutMs;
-      const settleMs = agentUtils.agentConfig.responseSettleMs;
+      const pollIntervalMs =
+        agentUtils.agentConfig.responsePollIntervalMs || reviewAi.config.pollIntervalMs;
+      const settleMs = agentUtils.agentConfig.responseSettleMs || 0;
       let newAssistantEntries = [];
       let newAssistantEntryKeys = '';
       let stableSince = null;
+      let nextPollDelayMs = 0;
 
       while (Date.now() < deadline) {
-        await agentUtils.sleep(
-          newAssistantEntries.length
-            ? Math.min(reviewAi.config.pollIntervalMs, settleMs)
-            : reviewAi.config.pollIntervalMs
-        );
+        if (nextPollDelayMs > 0) {
+          await agentUtils.sleep(nextPollDelayMs);
+        }
         const entries = await this._fetchEntries(change);
         const latestNewAssistantEntries = entries.filter(
           entry =>
@@ -100,6 +101,7 @@
             !(config.excludeDynamicConfiguration && agentUtils.isDynamicConfigurationEntry(entry))
         );
         if (!latestNewAssistantEntries.length) {
+          nextPollDelayMs = pollIntervalMs;
           continue;
         }
 
@@ -110,12 +112,17 @@
           newAssistantEntries = latestNewAssistantEntries;
           newAssistantEntryKeys = latestNewAssistantEntryKeys;
           stableSince = Date.now();
+          nextPollDelayMs = Math.min(pollIntervalMs, settleMs);
           continue;
         }
 
         if (Date.now() - stableSince >= settleMs) {
           return agentUtils.formatAgentEntries(newAssistantEntries);
         }
+        nextPollDelayMs = Math.max(
+          0,
+          Math.min(pollIntervalMs, settleMs - (Date.now() - stableSince))
+        );
       }
 
       if (newAssistantEntries.length) {
