@@ -22,6 +22,8 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import org.junit.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -350,7 +352,11 @@ public class GerritAiReviewHistoryCollectorTest {
     Localizer localizer = mock(Localizer.class);
     when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
     when(localizer.filterProperties("message.dump.", ".title"))
-        .thenReturn(List.of("PROMPTS CURRENTLY USED", "INSTRUCTIONS CURRENTLY USED"));
+        .thenReturn(
+            List.of(
+                "PROMPT FOR FULL REVIEW",
+                "PROMPT FOR PATCH SET ONLY",
+                "PROMPT FOR COMMIT MESSAGE ONLY"));
 
     GerritAiReviewHistoryCollector collector = new GerritAiReviewHistoryCollector();
 
@@ -359,9 +365,7 @@ public class GerritAiReviewHistoryCollectorTest {
             "msg-show",
             7,
             "ReviewAI",
-            "Patch Set 5:\n\nSYSTEM MESSAGE:\n\n```\nPROMPTS CURRENTLY USED\n\n### Review Prompt\n"
-                + "Review the following Patch Set:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ..."
-                + " <PATCH_SET> ` ` `\n```\n",
+            readTestFile("__files/commands/showPromptsSystemMessage.txt"),
             "2026-04-09 10:05:00.000000",
             5,
             null,
@@ -375,9 +379,18 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals("assistant", entry.getRole());
     assertEquals(true, entry.isSystemMessage());
     assertTrue(entry.getMessage().contains("SYSTEM MESSAGE:"));
-    assertTrue(entry.getMessage().contains("PROMPTS CURRENTLY USED"));
-    assertTrue(entry.getMessage().contains("### Review Prompt"));
+    assertTrue(entry.getMessage().contains("PROMPT FOR FULL REVIEW"));
+    assertTrue(entry.getMessage().contains("PROMPT FOR PATCH SET ONLY"));
+    assertTrue(entry.getMessage().contains("PROMPT FOR COMMIT MESSAGE ONLY"));
     assertTrue(entry.getMessage().contains("Review the following Patch Set:  ` ` `"));
+  }
+
+  private static String readTestFile(String filename) {
+    try {
+      return Files.readString(Paths.get("src/test/resources").resolve(filename));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static AiReviewHistoryInfo.Entry findEntry(AiReviewHistoryInfo info, String message) {
