@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 
 import java.util.LinkedHashMap;
@@ -31,9 +32,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory.getAiPrompt;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER_BEGIN;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksComposer {
+  protected record ScopedPromptingParameter(ReviewScope scope, String title) {}
+
   protected final Configuration config;
   protected final ChangeSetData changeSetData;
   protected final GerritChange change;
@@ -87,9 +93,31 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
     }
   }
 
-  protected abstract void populateOpenAISpecializedCodeReviewParameters();
+  protected String getScopedDebugCodeBlock(
+      ReviewScope reviewScope, List<ScopedPromptingParameter> scopedParameters) {
+    populateOpenAiParameters();
+    return scopedParameters.stream()
+        .filter(parameter -> shouldInclude(reviewScope, parameter.scope()))
+        .map(
+            parameter ->
+                getDelimitedSection(parameter.title(), promptingParameters.get(parameter.title())))
+        .collect(Collectors.joining("\n\n"));
+  }
 
-  protected abstract void populateOpenAISpecializedCommitMessageReviewParameters();
+  private String getDelimitedSection(String title, String body) {
+    return CODE_DELIMITER_BEGIN
+        + joinWithNewLine(List.of(title, distanceCodeDelimiter(body)))
+        + "\n"
+        + CODE_DELIMITER;
+  }
 
-  protected abstract void populateOpenAIReviewParameters();
+  private boolean shouldInclude(ReviewScope requestedScope, ReviewScope scope) {
+    return requestedScope == null || requestedScope == scope;
+  }
+
+  protected void populateOpenAISpecializedCodeReviewParameters() {}
+
+  protected void populateOpenAISpecializedCommitMessageReviewParameters() {}
+
+  protected void populateOpenAIReviewParameters() {}
 }
