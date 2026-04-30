@@ -26,19 +26,17 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewCommitMessage;
 
-import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER_BEGIN;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPromptingParamBase {
   private static final String TITLE_FULL_REVIEW = "PROMPT FOR FULL REVIEW";
   private static final String TITLE_PATCH_SET_ONLY = "PROMPT FOR PATCH SET ONLY";
   private static final String TITLE_COMMIT_MESSAGE_ONLY = "PROMPT FOR COMMIT MESSAGE ONLY";
+  private static final List<ScopedPromptingParameter> SCOPED_PARAMETERS =
+      List.of(
+          new ScopedPromptingParameter(ReviewScope.FULL, TITLE_FULL_REVIEW),
+          new ScopedPromptingParameter(ReviewScope.PATCHSET, TITLE_PATCH_SET_ONLY),
+          new ScopedPromptingParameter(ReviewScope.COMMIT_MESSAGE, TITLE_COMMIT_MESSAGE_ONLY));
 
   private final String patchSet;
   private final ReviewScope reviewScope;
@@ -59,20 +57,7 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
 
   @Override
   public String getDebugCodeBlock() {
-    populateOpenAiParameters();
-    List<String> sections = new ArrayList<>();
-    if (shouldInclude(ReviewScope.FULL)) {
-      sections.add(getSection(TITLE_FULL_REVIEW, promptingParameters.get(TITLE_FULL_REVIEW)));
-    }
-    if (shouldInclude(ReviewScope.PATCHSET)) {
-      sections.add(getSection(TITLE_PATCH_SET_ONLY, promptingParameters.get(TITLE_PATCH_SET_ONLY)));
-    }
-    if (shouldInclude(ReviewScope.COMMIT_MESSAGE)) {
-      sections.add(
-          getSection(
-              TITLE_COMMIT_MESSAGE_ONLY, promptingParameters.get(TITLE_COMMIT_MESSAGE_ONLY)));
-    }
-    return joinWithDoubleNewLine(sections);
+    return getScopedDebugCodeBlock(reviewScope, SCOPED_PARAMETERS);
   }
 
   @Override
@@ -90,24 +75,4 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
         new AiPromptReviewCommitMessage(config, changeSetData.copy(), change, codeContextPolicy)
             .getDefaultAiThreadReviewMessage(patchSet));
   }
-
-  private String getSection(String title, String prompt) {
-    return CODE_DELIMITER_BEGIN
-        + joinWithNewLine(List.of(title, distanceCodeDelimiter(prompt)))
-        + "\n"
-        + CODE_DELIMITER;
-  }
-
-  private boolean shouldInclude(ReviewScope scope) {
-    return reviewScope == null || reviewScope == scope;
-  }
-
-  @Override
-  protected void populateOpenAISpecializedCodeReviewParameters() {}
-
-  @Override
-  protected void populateOpenAISpecializedCommitMessageReviewParameters() {}
-
-  @Override
-  protected void populateOpenAIReviewParameters() {}
 }
