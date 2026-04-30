@@ -237,6 +237,24 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
+  public void reviewAgentPatchsetScopeReviewReturnsPartialReviewPreambleAndPostsGerritMessage()
+      throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review --scope=patchset";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    assertEquals(
+        readTestFile("__files/commands/partialReviewPositiveScoreNoVoteSystemMessage.txt")
+            .stripTrailing(),
+        output.responseText);
+    verify(revisionApi).review(any());
+  }
+
+  @Test
   public void reviewAgentConfigureCommandWaitsForPostedCommandResponse() throws Exception {
     new PluginDataHandler(realChangeDataPath)
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
