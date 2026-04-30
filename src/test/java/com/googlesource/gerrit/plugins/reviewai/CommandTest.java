@@ -295,7 +295,7 @@ public class CommandTest extends OpenAiReviewTestBase {
             localizer.getText("message.command.option.value.invalid"),
             "SCOPE",
             "full",
-            ReviewScope.commandOptionValues()),
+            ReviewScope.reviewCommandOptionValues()),
         changeSetData.getReviewSystemMessage());
   }
 
@@ -418,6 +418,47 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandShowPromptsFullScopeIncludesOnlyFullReviewPrompt() throws Exception {
+    setupCommandComment("/show --prompts --scope=" + ReviewScope.FULL.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showPromptsTitles.txt",
+        ReviewScope.FULL);
+  }
+
+  @Test
+  public void commandShowPromptsPatchSetScopeIncludesOnlyPatchSetPrompt() throws Exception {
+    setupCommandComment("/show --prompts --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showPromptsTitles.txt",
+        ReviewScope.PATCHSET);
+  }
+
+  @Test
+  public void commandShowPromptsCommitMessageScopeIncludesOnlyCommitMessagePrompt()
+      throws Exception {
+    setupCommandComment(
+        "/show --prompts --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showPromptsTitles.txt",
+        ReviewScope.COMMIT_MESSAGE);
+  }
+
+  @Test
   public void commandShowInstructionsIncludesAllReviewScopes() throws Exception {
     setupCommandComment("/show --instructions");
     enableMessageDebugging();
@@ -449,6 +490,64 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandShowInstructionsFullScopeIncludesOnlyFullReviewInstructions()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --scope=" + ReviewScope.FULL.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showInstructionsTitles.txt",
+        ReviewScope.FULL);
+  }
+
+  @Test
+  public void commandShowInstructionsPatchSetScopeIncludesOnlyPatchSetInstructions()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showInstructionsTitles.txt",
+        ReviewScope.PATCHSET);
+  }
+
+  @Test
+  public void commandShowInstructionsCommitMessageScopeIncludesOnlyCommitMessageInstructions()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedShowBlock(
+        changeSetData.getReviewSystemMessage(),
+        "__files/commands/showInstructionsTitles.txt",
+        ReviewScope.COMMIT_MESSAGE);
+  }
+
+  @Test
+  public void commandShowScopeWithoutPromptsOrInstructionsIsRejected() throws Exception {
+    setupCommandComment("/show --config --scope=" + ReviewScope.FULL.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertTrue(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(String.format("Invalid option for command `%s`", "SHOW")));
+  }
+
+  @Test
   public void commandUnknown() throws Exception {
     String command = "/UNKNOWN";
     setupCommandComment(command);
@@ -461,5 +560,29 @@ public class CommandTest extends OpenAiReviewTestBase {
             localizer.getText("message.command.unknown"),
             "@" + GERRIT_AI_USERNAME + " " + command);
     Assert.assertEquals(systemMessage, changeSetData.getReviewSystemMessage());
+  }
+
+  private void assertOnlyScopedShowBlock(
+      String systemMessage, String titlesResource, ReviewScope reviewScope) {
+    List<String> titles = List.of(readTestFile(titlesResource).split("\\R"));
+    String includedTitle = titles.get(reviewScopeTitleIndex(reviewScope));
+    for (String title : titles) {
+      if (title.equals(includedTitle)) {
+        Assert.assertTrue(systemMessage.contains(title));
+      } else {
+        Assert.assertFalse(systemMessage.contains(title));
+      }
+    }
+    String codeFence = TextUtils.CODE_DELIMITER;
+    Assert.assertTrue(systemMessage.contains(codeFence + "\n" + includedTitle));
+    Assert.assertEquals(2, systemMessage.split(codeFence, -1).length - 1);
+  }
+
+  private int reviewScopeTitleIndex(ReviewScope reviewScope) {
+    return switch (reviewScope) {
+      case FULL -> 0;
+      case PATCHSET -> 1;
+      case COMMIT_MESSAGE -> 2;
+    };
   }
 }
