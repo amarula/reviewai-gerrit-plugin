@@ -13,13 +13,24 @@
     },
 
     createSendMessage(plugin, pluginName) {
-      return (change, message, modelId, reviewAgent) =>
+      return (change, message, modelId, reviewAgent, requestId) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
           model_id: modelId,
           model_name: modelId,
           review_agent: Boolean(reviewAgent),
+          request_id: requestId,
         });
+    },
+
+    createFetchMessageStatus(plugin, pluginName) {
+      return (change, requestId) =>
+        plugin.restApi().post(
+          `/changes/${change._number}/${pluginName}~ai-review-message-status`,
+          {
+            request_id: requestId,
+          }
+        );
     },
   };
 })(window);

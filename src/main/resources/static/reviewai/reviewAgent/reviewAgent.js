@@ -36,15 +36,30 @@
         const baselineEntries = await this._fetchEntries(change);
         const baselineKeys = new Set(baselineEntries.map(agentUtils.entryKey));
         const conversationId = this._getRequestConversationId(req, change);
+        const requestId = this._newRequestId(change);
 
-        const sendResult = await this._sendMessage(change, prompt, this._getRequestModelId(req));
+        const sendResult = await this._sendMessage(
+          change,
+          prompt,
+          this._getRequestModelId(req),
+          requestId
+        );
         const directResponse =
           sendResult && (sendResult.response_text || sendResult.responseText);
-        const responseText = agentUtils.isDirectResponsePrompt(prompt)
+        const sentRequestId =
+          (sendResult && (sendResult.request_id || sendResult.requestId)) || requestId;
+        const shouldWaitForAssistantReply =
+          !agentUtils.isDirectResponsePrompt(prompt) &&
+          !(
+            sendResult &&
+            (sendResult.wait_for_assistant_reply === false ||
+              sendResult.waitForAssistantReply === false)
+          );
+        const responseText = !shouldWaitForAssistantReply
           ? directResponse
           : agentUtils.joinAgentResponses(
               directResponse,
-              await this._waitForAssistantReply(change, baselineKeys, {
+              await this._waitForAssistantReply(change, sentRequestId, baselineKeys, {
                 excludeDynamicConfiguration: Boolean(directResponse),
               })
             );
@@ -52,7 +67,9 @@
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
       } catch (error) {
-        listener.emitError(error instanceof Error ? error.message : String(error));
+        listener.emitResponse(
+          agentUtils.buildChatResponse(error instanceof Error ? error.message : String(error))
+        );
         listener.done();
       }
     }
@@ -78,61 +95,67 @@
       );
     }
 
-    async _waitForAssistantReply(change, baselineKeys, options) {
+    async _waitForAssistantReply(change, requestId, baselineKeys, options) {
       const config = options || {};
       const deadline = Date.now() + agentUtils.agentConfig.responseTimeoutMs;
       const pollIntervalMs =
         agentUtils.agentConfig.responsePollIntervalMs || reviewAi.config.pollIntervalMs;
-      const settleMs = agentUtils.agentConfig.responseSettleMs || 0;
-      let newAssistantEntries = [];
-      let newAssistantEntryKeys = '';
-      let stableSince = null;
-      let nextPollDelayMs = 0;
 
       while (Date.now() < deadline) {
-        if (nextPollDelayMs > 0) {
-          await agentUtils.sleep(nextPollDelayMs);
+        await agentUtils.sleep(pollIntervalMs);
+        let status = null;
+        try {
+          status = await this._fetchMessageStatus(change, requestId);
+        } catch {
+          const historyResponse = await this._getNewAssistantHistoryResponse(
+            change,
+            baselineKeys,
+            config
+          );
+          if (historyResponse) {
+            return historyResponse;
+          }
+          continue;
         }
-        const entries = await this._fetchEntries(change);
-        const latestNewAssistantEntries = entries.filter(
-          entry =>
-            agentUtils.isAssistantEntry(entry) &&
-            !baselineKeys.has(agentUtils.entryKey(entry)) &&
-            !(config.excludeDynamicConfiguration && agentUtils.isDynamicConfigurationEntry(entry))
-        );
-        if (!latestNewAssistantEntries.length) {
-          nextPollDelayMs = pollIntervalMs;
+        const state = status && status.status;
+        const statusResponse =
+          status && (status.response_text || status.responseText);
+        if (state === 'failed') {
+          return statusResponse || 'ReviewAI request failed.';
+        }
+        if (state !== 'completed') {
           continue;
         }
 
-        const latestNewAssistantEntryKeys = latestNewAssistantEntries
-          .map(agentUtils.entryKey)
-          .join('\u0000');
-        if (latestNewAssistantEntryKeys !== newAssistantEntryKeys) {
-          newAssistantEntries = latestNewAssistantEntries;
-          newAssistantEntryKeys = latestNewAssistantEntryKeys;
-          stableSince = Date.now();
-          nextPollDelayMs = Math.min(pollIntervalMs, settleMs);
-          continue;
-        }
-
-        if (Date.now() - stableSince >= settleMs) {
-          return agentUtils.formatAgentEntries(newAssistantEntries);
-        }
-        nextPollDelayMs = Math.max(
-          0,
-          Math.min(pollIntervalMs, settleMs - (Date.now() - stableSince))
+        const historyResponse = await this._getNewAssistantHistoryResponse(
+          change,
+          baselineKeys,
+          config
         );
-      }
-
-      if (newAssistantEntries.length) {
-        return agentUtils.formatAgentEntries(newAssistantEntries);
+        if (historyResponse) {
+          return historyResponse;
+        }
+        return statusResponse || 'ReviewAI completed the request without a visible update.';
       }
 
       return (
         'ReviewAI accepted the request. The answer is still being generated and will appear ' +
         'in Gerrit comments and in the AI Assistant tab.'
       );
+    }
+
+    async _getNewAssistantHistoryResponse(change, baselineKeys, config) {
+      const latestNewAssistantEntries = (await this._fetchEntries(change)).filter(
+        entry =>
+          agentUtils.isAssistantEntry(entry) &&
+          !baselineKeys.has(agentUtils.entryKey(entry)) &&
+          !(
+            config &&
+            config.excludeDynamicConfiguration &&
+            agentUtils.isDynamicConfigurationEntry(entry)
+          )
+      );
+      return agentUtils.formatAgentEntries(latestNewAssistantEntries);
     }
 
     async _fetchEntries(change) {
@@ -144,13 +167,26 @@
       return reviewAi.api.createFetchHistory(this.plugin, this.pluginName)(change);
     }
 
-    _sendMessage(change, message, modelId) {
+    _sendMessage(change, message, modelId, requestId) {
       return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(
         change,
         message,
         modelId,
-        true
+        true,
+        requestId
       );
+    }
+
+    _fetchMessageStatus(change, requestId) {
+      return reviewAi.api.createFetchMessageStatus(this.plugin, this.pluginName)(
+        change,
+        requestId
+      );
+    }
+
+    _newRequestId(change) {
+      const changeNumber = agentUtils.getChangeNumber(change) || 'change';
+      return `${changeNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
 
     _getRequestModelId(req) {
