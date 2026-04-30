@@ -236,6 +236,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
         ReviewScope.fromCommandOption(baseOptions.get(BaseOptionSet.SCOPE));
     changeSetData.setReviewScope(scope);
     switch (scope) {
+      case FULL -> log.info("Forced review command scoped to the full Change Set");
       case PATCHSET -> {
         changeSetData.setForcedStagedReview(true);
         changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_CODE);

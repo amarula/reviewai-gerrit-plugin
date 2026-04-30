@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public enum ReviewScope {
+  FULL("full"),
   PATCHSET("patchset"),
   COMMIT_MESSAGE("commit_message");
 
@@ -35,6 +36,10 @@ public enum ReviewScope {
 
   public static List<String> commandOptionValues() {
     return Arrays.stream(values()).map(ReviewScope::getCommandOptionValue).toList();
+  }
+
+  public static List<String> reviewCommandOptionValues() {
+    return List.of(PATCHSET.getCommandOptionValue(), COMMIT_MESSAGE.getCommandOptionValue());
   }
 
   public static ReviewScope fromCommandOption(String value) {
