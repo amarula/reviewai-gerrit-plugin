@@ -58,8 +58,15 @@ public class OpenAiCodeContextPolicyOnDemand extends CodeContextPolicyOnDemand i
 
   @Override
   public void updateOpenAiTools(OpenAiAssistantTools openAiAssistantTools) {
-    OpenAiTools openAiGetContextTools = new OpenAiTools(OpenAiTools.Functions.getContext);
-    openAiAssistantTools.getTools().add(openAiGetContextTools.retrieveFunctionTool());
+    openAiAssistantTools
+        .getTools()
+        .add(new OpenAiTools(OpenAiTools.Functions.tree).retrieveFunctionTool());
+    openAiAssistantTools
+        .getTools()
+        .add(new OpenAiTools(OpenAiTools.Functions.getContent).retrieveFunctionTool());
+    openAiAssistantTools
+        .getTools()
+        .add(new OpenAiTools(OpenAiTools.Functions.grep).retrieveFunctionTool());
     log.debug(
         "Updated Assistant Tools for On-Demand code context policy: {}", openAiAssistantTools);
   }
