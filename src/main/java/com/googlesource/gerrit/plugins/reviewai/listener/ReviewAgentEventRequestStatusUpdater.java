@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.gerrit.server.events.CommentAddedEvent;
+import com.google.gerrit.server.data.AccountAttribute;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -31,6 +32,7 @@ class ReviewAgentEventRequestStatusUpdater {
   private final GerritChange change;
   private final ReviewAgentRequestStatusStore statusStore;
   private final Localizer localizer;
+  private final Configuration config;
 
   @Inject
   ReviewAgentEventRequestStatusUpdater(
@@ -43,14 +45,32 @@ class ReviewAgentEventRequestStatusUpdater {
     this.statusStore =
         new ReviewAgentRequestStatusStore(pluginDataHandlerProvider.getChangeScope());
     this.localizer = new Localizer(config);
+    this.config = config;
   }
 
   PendingRequest getPendingRequest() {
     if (!(change.getPatchSetEvent() instanceof CommentAddedEvent)) {
       return PendingRequest.empty();
     }
+    if (isFromAi((CommentAddedEvent) change.getPatchSetEvent())) {
+      return PendingRequest.empty();
+    }
     return new PendingRequest(
         statusStore, statusStore.getLatestPendingRequestId(), localizer, changeSetData);
+  }
+
+  private boolean isFromAi(CommentAddedEvent event) {
+    if (event.author == null || event.author.get() == null) {
+      return false;
+    }
+    AccountAttribute author = event.author.get();
+    if (config.getUserId() != null
+        && author.accountId != null
+        && author.accountId.equals(config.getUserId().get())) {
+      return true;
+    }
+    return config.getGerritUserName().equals(author.username)
+        || config.getGerritUserEmail().equals(author.email);
   }
 
   static class PendingRequest {
