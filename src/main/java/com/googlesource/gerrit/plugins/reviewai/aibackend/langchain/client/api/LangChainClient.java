@@ -57,7 +57,8 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwra
 public class LangChainClient extends AiClientBase implements IAiClient {
 
   private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
-  private static final String GET_CONTEXT_TOOL_RESOURCE = "config/getContextTool.json";
+  private static final List<String> ON_DEMAND_TOOL_RESOURCES =
+      List.of("config/treeTool.json", "config/getContentTool.json", "config/grepTool.json");
 
   private final ICodeContextPolicy codeContextPolicy;
   private final LangChainTokenEstimatorProvider tokenEstimatorProvider;
@@ -94,12 +95,23 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
-    ToolSpecification contextTool = null;
+    List<ToolSpecification> contextTools = List.of();
     if (config != null && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND) {
-      contextTool =
-          new LangChainToolSpecificationFactory(GET_CONTEXT_TOOL_RESOURCE).loadToolSpecification();
+      contextTools =
+          ON_DEMAND_TOOL_RESOURCES.stream()
+              .map(
+                  resource ->
+                      new LangChainToolSpecificationFactory(resource).loadToolSpecification())
+              .filter(toolSpecification -> toolSpecification != null)
+              .toList();
     }
-    this.toolExecutor = new LangChainToolExecutor(config, structuredResponseFormat, contextTool);
+    boolean requireInitialToolUse =
+        config != null
+            && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
+            && config.getAiProviderType() == AiProviderType.OPENAI;
+    this.toolExecutor =
+        new LangChainToolExecutor(
+            config, structuredResponseFormat, contextTools, requireInitialToolUse);
     log.debug("Initialized LangChainClient");
   }
 
