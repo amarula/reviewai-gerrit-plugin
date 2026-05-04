@@ -341,6 +341,45 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void commandReviewDoesNotCompletePendingReviewAgentStatusForAiAuthoredMessage()
+      throws Exception {
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review");
+    eventAccountId = GERRIT_AI_ACCOUNT_ID;
+    eventAccountName = GERRIT_AI_USERNAME;
+    eventAccountEmail = config.getGerritUserEmail();
+    eventAccountUsername = GERRIT_AI_USERNAME;
+    mockGerritChangeCommentsApiCall(Map.of());
+
+    EventHandlerTask.Result result =
+        handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(EventHandlerTask.Result.NOT_SUPPORTED, result);
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_PENDING, status.status);
+    Assert.assertNull(status.responseText);
+  }
+
+  @Test
+  public void commandReviewCompletesPendingReviewAgentStatusWithOpenAiConnectionError()
+      throws Exception {
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review");
+    setupCommandComment("/review");
+    WireMock.stubFor(
+        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .willReturn(WireMock.aResponse().withStatus(400)));
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertEquals("SYSTEM MESSAGE: Error connecting to OpenAI server", status.responseText);
+  }
+
+  @Test
   public void commandReviewScopeRejectsUnsupportedValue() throws Exception {
     setupCommandComment("/review --scope=full");
 
