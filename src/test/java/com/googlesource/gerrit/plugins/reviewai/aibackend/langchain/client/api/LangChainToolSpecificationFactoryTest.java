@@ -21,21 +21,29 @@ import static org.junit.Assert.assertNotNull;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import java.util.Map;
 import org.junit.Test;
 
 public class LangChainToolSpecificationFactoryTest {
 
   @Test
-  public void shouldLoadGetContextToolSpecification() {
-    LangChainToolSpecificationFactory factory =
-        new LangChainToolSpecificationFactory("config/getContextTool.json");
+  public void shouldLoadOnDemandToolSpecifications() {
+    Map<String, String> toolResources =
+        Map.of(
+            "config/treeTool.json", "tree",
+            "config/getContentTool.json", "get_content",
+            "config/grepTool.json", "grep");
 
-    ToolSpecification specification = factory.loadToolSpecification();
+    for (Map.Entry<String, String> toolResource : toolResources.entrySet()) {
+      LangChainToolSpecificationFactory factory =
+          new LangChainToolSpecificationFactory(toolResource.getKey());
 
-    assertNotNull("Tool specification should be loaded", specification);
-    assertEquals("get_context", specification.name());
-    assertNotNull(specification.parameters());
-    assertEquals(JsonObjectSchema.class, specification.parameters().getClass());
+      ToolSpecification specification = factory.loadToolSpecification();
+
+      assertNotNull("Tool specification should be loaded", specification);
+      assertEquals(toolResource.getValue(), specification.name());
+      assertNotNull(specification.parameters());
+      assertEquals(JsonObjectSchema.class, specification.parameters().getClass());
+    }
   }
 }
-

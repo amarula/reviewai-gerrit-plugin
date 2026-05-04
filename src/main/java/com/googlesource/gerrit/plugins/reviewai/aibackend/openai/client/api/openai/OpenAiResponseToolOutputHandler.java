@@ -20,9 +20,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.A
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.CodeContextBuilder;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiToolCall;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.context.ondemand.GetContextContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseInputItem;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,19 +30,14 @@ import java.util.List;
 
 @Slf4j
 public class OpenAiResponseToolOutputHandler extends AiClientBase {
-  // OpenAI may occasionally return the fixed string "multi_tool_use" as the function name when
-  // multiple tools are utilized.
-  private static final List<String> ON_DEMAND_FUNCTION_NAMES =
-      List.of("get_context", "multi_tool_use");
-
-  private final CodeContextBuilder codeContextBuilder;
+  private final OnDemandCodeContextTools onDemandCodeContextTools;
 
   private List<AiToolCall> aiToolCalls;
 
   public OpenAiResponseToolOutputHandler(
       Configuration config, GerritChange change, GitRepoFiles gitRepoFiles) {
     super(config);
-    codeContextBuilder = new CodeContextBuilder(config, change, gitRepoFiles);
+    onDemandCodeContextTools = new OnDemandCodeContextTools(config, change, gitRepoFiles);
   }
 
   public List<OpenAiResponseInputItem> buildToolOutputs(List<AiToolCall> aiToolCalls) {
@@ -68,11 +62,9 @@ public class OpenAiResponseToolOutputHandler extends AiClientBase {
 
   private String getOutput(int i) {
     AiToolCall.Function function = getFunction(aiToolCalls, i);
-    if (ON_DEMAND_FUNCTION_NAMES.contains(function.getName())) {
-      GetContextContent getContextContent =
-          getArgumentAsType(aiToolCalls, i, GetContextContent.class);
-      log.debug("OpenAI `get_context` Response Content: {}", getContextContent);
-      return codeContextBuilder.buildCodeContext(getContextContent);
+    if (function != null && OnDemandCodeContextTools.FUNCTION_NAMES.contains(function.getName())) {
+      log.debug("OpenAI `{}` Response Content: {}", function.getName(), function.getArguments());
+      return onDemandCodeContextTools.execute(function.getName(), function.getArguments());
     }
     return "";
   }
