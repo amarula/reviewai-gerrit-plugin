@@ -89,6 +89,56 @@ public class GitRepoFiles {
     }
   }
 
+  public List<String> getFileTree(Configuration config, GerritChange change, String subdir) {
+    log.debug("Getting repository file tree from subdir: {}", subdir);
+    enabledFileExtensions = config.getEnabledFileExtensions();
+    String normalizedSubdir = normalizePath(subdir);
+    try (Repository repository = openRepository(change)) {
+      List<String> paths = new ArrayList<>();
+      try (TreeWalk treeWalk = new TreeWalk(repository)) {
+        treeWalk.addTree(getMasterRevTree(repository));
+        treeWalk.setRecursive(true);
+
+        while (treeWalk.next()) {
+          String path = treeWalk.getPathString();
+          if (!isUnderSubdir(path, normalizedSubdir)) continue;
+          if (!matchesExtensionList(path, enabledFileExtensions)) continue;
+          paths.add(path);
+        }
+      }
+      return paths;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to retrieve file tree from " + normalizedSubdir, e);
+    }
+  }
+
+  public List<String> grep(Configuration config, GerritChange change, String searchString) {
+    log.debug("Searching repository for string: {}", searchString);
+    enabledFileExtensions = config.getEnabledFileExtensions();
+    if (searchString == null || searchString.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (Repository repository = openRepository(change);
+        ObjectReader reader = repository.newObjectReader()) {
+      RevTree tree = getMasterRevTree(repository);
+      List<String> matches = new ArrayList<>();
+      try (TreeWalk treeWalk = new TreeWalk(repository)) {
+        treeWalk.addTree(tree);
+        treeWalk.setRecursive(true);
+
+        while (treeWalk.next()) {
+          String path = treeWalk.getPathString();
+          if (!matchesExtensionList(path, enabledFileExtensions)) continue;
+          String content = getContent(reader, treeWalk);
+          addGrepMatches(matches, path, content, searchString);
+        }
+      }
+      return matches;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to search repository", e);
+    }
+  }
+
   private List<Map<String, String>> listFilesWithContent(Repository repository)
       throws IOException, GitAPIException {
     Map<String, List<FileEntry>> dirFilesMap = getDirFilesMap(repository, TreeFilter.ANY_DIFF);
@@ -170,5 +220,29 @@ public class GitRepoFiles {
     fileSize = bytes.length;
 
     return new String(bytes, StandardCharsets.UTF_8);
+  }
+
+  private static String normalizePath(String path) {
+    if (path == null) {
+      return "";
+    }
+    return path.replaceAll("^/+", "").replaceAll("/+$", "");
+  }
+
+  private static boolean isUnderSubdir(String path, String subdir) {
+    return subdir == null
+        || subdir.isEmpty()
+        || path.equals(subdir)
+        || path.startsWith(subdir + "/");
+  }
+
+  private static void addGrepMatches(
+      List<String> matches, String path, String content, String searchString) {
+    String[] lines = content.split("\\R", -1);
+    for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      if (lines[lineIndex].contains(searchString)) {
+        matches.add(String.format("%s:%d: %s", path, lineIndex + 1, lines[lineIndex]));
+      }
+    }
   }
 }
