@@ -34,6 +34,24 @@
       "parentUuid": "d1dac2e8_8e2cebb3",
       "revId": "433702ee7ee564d1c5d295c5dff6ebf0d7da1423",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c1cb23c8_82e005f2",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/config/AiProviderConfiguration.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 165,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-05-04T10:12:09Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "34568913_8472208f",
+      "revId": "433702ee7ee564d1c5d295c5dff6ebf0d7da1423",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
