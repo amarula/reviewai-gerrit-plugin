@@ -275,9 +275,8 @@ directive = End each reply with \"Hope this helps!\"
   changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.
 - `codeContextPolicy`: Defines the code context policy to provide AI with the missing code context from the ChangeSet.
   The currently supported policies are:
-    - **ON_DEMAND**: Fetches just the minimal set of code artifacts requested by the Model. These artifacts can be
-      function signatures, type declarations, or similar entities that provide sufficient context for reasoning about
-      the change.
+    - **ON_DEMAND**: Lets the model request repository context during review through tool calls for listing the file
+      tree, searching references, and reading file content.
     - **NONE**: Skips file uploads entirely, relying solely on the formatted patch for reviews and interactions with AI.
 
 ### Optional Parameters Specific to OpenAI Backend
