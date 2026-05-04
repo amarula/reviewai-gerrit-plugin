@@ -35,7 +35,7 @@ public class OpenAiTool {
   @Data
   public static class Parameters {
     private String type;
-    private Properties properties;
+    private Object properties;
     private List<String> required;
 
     @Data

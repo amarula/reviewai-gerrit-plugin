@@ -1,0 +1,18 @@
+{
+  "type": "function",
+  "name": "grep",
+  "description": "Search the git project for a literal string and return matching file paths, line numbers, and lines.",
+  "strict": false,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "string": {
+        "type": "string",
+        "description": "Literal string to search for in the git project."
+      }
+    },
+    "required": [
+      "string"
+    ]
+  }
+}
