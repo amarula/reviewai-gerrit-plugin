@@ -94,6 +94,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_POLLING_INTERVAL = 1000;
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
+  private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
   private static final boolean DEFAULT_ENABLE_MESSAGE_DEBUGGING = false;
   private static final String DEFAULT_MOCK_AI_ADDRESS = DEFAULT_EMPTY_SETTING;
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
@@ -151,6 +152,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_POLLING_TIMEOUT = "aiPollingTimeout";
   private static final String KEY_AI_POLLING_INTERVAL = "aiPollingInterval";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
+  private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
   private static final String KEY_ENABLE_MESSAGE_DEBUGGING = "enableMessageDebugging";
 
   private final AiProviderConfiguration aiProviderConfiguration;
@@ -368,6 +370,11 @@ public class Configuration extends ConfigCore {
 
   public int getAiUploadedChunkSizeMb() {
     return getInt(KEY_AI_UPLOADED_CHUNK_SIZE_MB, DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB);
+  }
+
+  public int getAiMaxToolResponseRounds() {
+    return Math.max(
+        1, getInt(KEY_AI_MAX_TOOL_RESPONSE_ROUNDS, DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS));
   }
 
   public boolean getEnableMessageDebugging() {
