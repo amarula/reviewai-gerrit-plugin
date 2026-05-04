@@ -28,7 +28,9 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 @Slf4j
 public class OpenAiTools {
   public enum Functions {
-    getContext
+    getContent,
+    grep,
+    tree
   }
 
   private static final String FILENAME_TOOL_FORMAT = "config/%sTool.json";
