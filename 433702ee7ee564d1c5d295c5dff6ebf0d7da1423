@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d1dac2e8_8e2cebb3",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/config/AiProviderConfiguration.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 165,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-05-04T09:35:46Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com Please that index is in the range",
+      "revId": "433702ee7ee564d1c5d295c5dff6ebf0d7da1423",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
