@@ -144,6 +144,10 @@ public class ReviewTestBase extends TestBase {
   protected String promptTagComments;
   protected Localizer localizer;
   protected boolean includeEventAccountId = true;
+  protected Integer eventAccountId = GERRIT_USER_ACCOUNT_ID;
+  protected String eventAccountName = GERRIT_USER_ACCOUNT_NAME;
+  protected String eventAccountEmail = GERRIT_USER_ACCOUNT_EMAIL;
+  protected String eventAccountUsername = GERRIT_USER_USERNAME;
 
   @Before
   public void before() throws RestApiException {
@@ -385,11 +389,11 @@ public class ReviewTestBase extends TestBase {
 
   private AccountAttribute createTestAccountAttribute() {
     AccountAttribute accountAttribute = new AccountAttribute();
-    accountAttribute.name = GERRIT_USER_ACCOUNT_NAME;
-    accountAttribute.username = GERRIT_USER_USERNAME;
-    accountAttribute.email = GERRIT_USER_ACCOUNT_EMAIL;
+    accountAttribute.name = eventAccountName;
+    accountAttribute.username = eventAccountUsername;
+    accountAttribute.email = eventAccountEmail;
     if (includeEventAccountId) {
-      accountAttribute.accountId = GERRIT_USER_ACCOUNT_ID;
+      accountAttribute.accountId = eventAccountId;
     }
     return accountAttribute;
   }
