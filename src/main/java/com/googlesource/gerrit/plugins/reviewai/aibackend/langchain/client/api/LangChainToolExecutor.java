@@ -40,8 +40,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 class LangChainToolExecutor {
 
-  private static final int MAX_TOOL_EXECUTION_ROUNDS = 3;
-
   private final Configuration config;
   private final ResponseFormat structuredResponseFormat;
   private final List<ToolSpecification> onDemandTools;
@@ -52,11 +50,11 @@ class LangChainToolExecutor {
     ChatResponse response = model.chat(initialRequest);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
     logAiMessageToolRequests("initial", aiMessage);
-
+    int maxToolResponseRounds = config.getAiMaxToolResponseRounds();
     int iteration = 0;
     while (aiMessage != null
         && aiMessage.hasToolExecutionRequests()
-        && iteration < MAX_TOOL_EXECUTION_ROUNDS) {
+        && iteration < maxToolResponseRounds) {
       iteration++;
       memory.add(aiMessage);
       List<ToolExecutionRequest> requests = aiMessage.toolExecutionRequests();
@@ -75,7 +73,7 @@ class LangChainToolExecutor {
     if (aiMessage != null && aiMessage.hasToolExecutionRequests()) {
       log.warn(
           "LangChain on-demand tool execution stopped after {} rounds with pending tool requests: {}",
-          MAX_TOOL_EXECUTION_ROUNDS,
+          maxToolResponseRounds,
           aiMessage.toolExecutionRequests());
     }
 
