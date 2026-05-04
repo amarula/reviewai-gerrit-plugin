@@ -1,0 +1,16 @@
+{
+  "type": "function",
+  "name": "tree",
+  "description": "Return the repository file tree starting from the provided subdirectory, or from the git project root when no subdirectory is provided.",
+  "strict": false,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "subdir": {
+        "type": "string",
+        "description": "Optional subdirectory path relative to the git project root."
+      }
+    },
+    "required": []
+  }
+}
