@@ -1,0 +1,18 @@
+{
+  "type": "function",
+  "name": "get_content",
+  "description": "Return the content of a file by path relative to the git project root.",
+  "strict": false,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "file_path": {
+        "type": "string",
+        "description": "File path relative to the git project root."
+      }
+    },
+    "required": [
+      "file_path"
+    ]
+  }
+}

@@ -18,10 +18,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.CodeContextBuilder;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.context.ondemand.GetContextContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -35,7 +33,6 @@ import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,17 +40,18 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 class LangChainToolExecutor {
 
-  private static final Set<String> ON_DEMAND_FUNCTION_NAMES = Set.of("get_context");
-  private static final int MAX_TOOL_EXECUTION_ROUNDS = 1;
+  private static final int MAX_TOOL_EXECUTION_ROUNDS = 3;
 
   private final Configuration config;
   private final ResponseFormat structuredResponseFormat;
-  private final ToolSpecification getContextTool;
+  private final List<ToolSpecification> onDemandTools;
+  private final boolean requireInitialToolUse;
 
   AiMessage execute(ChatModel model, GerritChange change, ChatMemory memory) {
-    ChatRequest initialRequest = buildChatRequest(memory.messages());
+    ChatRequest initialRequest = buildChatRequest(memory.messages(), getInitialToolChoice());
     ChatResponse response = model.chat(initialRequest);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
+    logAiMessageToolRequests("initial", aiMessage);
 
     int iteration = 0;
     while (aiMessage != null
@@ -69,22 +67,35 @@ class LangChainToolExecutor {
         String output = executeToolRequest(request, change);
         memory.add(ToolExecutionResultMessage.from(request, output));
       }
-      response = model.chat(buildChatRequest(memory.messages()));
+      response = model.chat(buildChatRequest(memory.messages(), ToolChoice.AUTO));
       aiMessage = response != null ? response.aiMessage() : null;
+      logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);
+    }
+
+    if (aiMessage != null && aiMessage.hasToolExecutionRequests()) {
+      log.warn(
+          "LangChain on-demand tool execution stopped after {} rounds with pending tool requests: {}",
+          MAX_TOOL_EXECUTION_ROUNDS,
+          aiMessage.toolExecutionRequests());
     }
 
     return aiMessage;
   }
 
-  private ChatRequest buildChatRequest(List<ChatMessage> messages) {
+  private ChatRequest buildChatRequest(List<ChatMessage> messages, ToolChoice toolChoice) {
     ChatRequest.Builder requestBuilder = ChatRequest.builder().messages(messages);
 
     var parametersBuilder = ChatRequestParameters.builder();
     boolean parametersUsed = false;
 
-    if (getContextTool != null) {
-      parametersBuilder.toolSpecifications(getContextTool).toolChoice(ToolChoice.AUTO);
+    if (onDemandTools != null && !onDemandTools.isEmpty()) {
+      parametersBuilder.toolSpecifications(onDemandTools).toolChoice(toolChoice);
       parametersUsed = true;
+      log.debug(
+          "LangChain on-demand tools exposed: names={}, toolChoice={}, structuredResponse={}",
+          getToolNames(),
+          toolChoice,
+          structuredResponseFormat != null);
     }
 
     if (structuredResponseFormat != null) {
@@ -102,36 +113,46 @@ class LangChainToolExecutor {
     return requestBuilder.build();
   }
 
+  private ToolChoice getInitialToolChoice() {
+    return requireInitialToolUse ? ToolChoice.REQUIRED : ToolChoice.AUTO;
+  }
+
   private String executeToolRequest(ToolExecutionRequest request, GerritChange change) {
-    if (request == null || getContextTool == null) {
+    if (request == null || onDemandTools == null || onDemandTools.isEmpty()) {
       return "";
     }
 
     String toolName = request.name();
-    if (!ON_DEMAND_FUNCTION_NAMES.contains(toolName)) {
+    if (!OnDemandCodeContextTools.FUNCTION_NAMES.contains(toolName)) {
       log.debug("Ignoring unsupported tool request: {}", toolName);
       return "";
     }
 
     String arguments = request.arguments();
-    if (arguments == null || arguments.isBlank()) {
-      log.warn("Received empty arguments for tool request: {}", toolName);
-      return "";
-    }
+    OnDemandCodeContextTools codeContextTools =
+        new OnDemandCodeContextTools(config, change, new GitRepoFiles());
+    return codeContextTools.execute(toolName, arguments);
+  }
 
-    try {
-      GetContextContent getContextContent =
-          GsonUtils.jsonToClass(arguments, GetContextContent.class);
-      if (getContextContent == null) {
-        log.warn("Failed to deserialize arguments for tool {}", toolName);
-        return "";
-      }
-      CodeContextBuilder codeContextBuilder =
-          new CodeContextBuilder(config, change, new GitRepoFiles());
-      return codeContextBuilder.buildCodeContext(getContextContent);
-    } catch (Exception e) {
-      log.warn("Error executing tool request {}", toolName, e);
-      return "";
+  private List<String> getToolNames() {
+    if (onDemandTools == null) {
+      return List.of();
     }
+    return onDemandTools.stream().map(ToolSpecification::name).toList();
+  }
+
+  private void logAiMessageToolRequests(String stage, AiMessage aiMessage) {
+    if (aiMessage == null) {
+      log.debug("LangChain response at {} is null", stage);
+      return;
+    }
+    if (aiMessage.hasToolExecutionRequests()) {
+      log.info(
+          "LangChain response at {} requested on-demand tools: {}",
+          stage,
+          aiMessage.toolExecutionRequests());
+      return;
+    }
+    log.debug("LangChain response at {} did not request on-demand tools", stage);
   }
 }
