@@ -278,6 +278,8 @@ directive = End each reply with \"Hope this helps!\"
     - **ON_DEMAND**: Lets the model request repository context during review through tool calls for listing the file
       tree, searching references, and reading file content.
     - **NONE**: Skips file uploads entirely, relying solely on the formatted patch for reviews and interactions with AI.
+- `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
+  This applies when ON_DEMAND code context tools are enabled and defaults to 3.
 
 ### Optional Parameters Specific to OpenAI Backend
 
