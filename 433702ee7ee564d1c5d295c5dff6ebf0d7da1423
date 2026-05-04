@@ -16,6 +16,24 @@
       "message": "@patrizio.gelosi@amarulasolutions.com Please that index is in the range",
       "revId": "433702ee7ee564d1c5d295c5dff6ebf0d7da1423",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "34568913_8472208f",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/config/AiProviderConfiguration.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 165,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-05-04T10:05:29Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com The case aiModelsDefaultIndex\u003d0 is already handled: in that case zeroBasedIndex \u003d -1 and the first model is taken (see line below)",
+      "parentUuid": "d1dac2e8_8e2cebb3",
+      "revId": "433702ee7ee564d1c5d295c5dff6ebf0d7da1423",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
