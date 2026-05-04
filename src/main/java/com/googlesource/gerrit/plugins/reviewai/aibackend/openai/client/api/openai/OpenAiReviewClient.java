@@ -197,8 +197,27 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
   private OpenAiResponsesResponse continueResponseLoop(
       OpenAiResponses openAiResponses, OpenAiResponsesResponse response, String conversationId)
       throws AiConnectionFailException {
+    int maxToolResponseRounds = config.getAiMaxToolResponseRounds();
+    int toolRound = 0;
     while (hasToolCallsRequiringOutput(response)) {
+      if (toolRound >= maxToolResponseRounds) {
+        String message =
+            String.format(
+                "OpenAI tool response loop exceeded %d rounds for conversation %s after response %s",
+                maxToolResponseRounds, conversationId, response.getId());
+        log.warn(message);
+        throw new AiConnectionFailException(message);
+      }
+
+      toolRound++;
       List<OpenAiResponsesResponse.OutputItem> functionCalls = getFunctionCalls(response);
+      log.info(
+          "OpenAI tool response round {}/{} for conversation {} after response {}. Tool calls: {}",
+          toolRound,
+          maxToolResponseRounds,
+          conversationId,
+          response.getId(),
+          functionCalls.stream().map(OpenAiResponsesResponse.OutputItem::getName).toList());
       try {
         response =
             openAiResponses.createToolResponse(
