@@ -23,8 +23,11 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.mock.MockAiClient;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.lang.reflect.Method;
 import org.junit.Test;
 
@@ -58,5 +61,19 @@ public class GerritEventContextModuleTest {
     getAiClient.setAccessible(true);
 
     assertEquals(LangChainClient.class, getAiClient.invoke(module));
+  }
+
+  @Test
+  public void selectsMockAiClientForMockAiModel() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(new AiModelRoute(AiProviderTransport.MOCK, AiProviderType.MOCK, "debug"));
+
+    GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
+
+    Method getAiClient = GerritEventContextModule.class.getDeclaredMethod("getAiClient");
+    getAiClient.setAccessible(true);
+
+    assertEquals(MockAiClient.class, getAiClient.invoke(module));
   }
 }

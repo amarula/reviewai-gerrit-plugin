@@ -22,6 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.emptyIfNull;
+
 @Slf4j
 public final class LangChainMessageTextExtractor {
 
@@ -55,6 +57,6 @@ public final class LangChainMessageTextExtractor {
     }
 
     String fallback = message.toString();
-    return fallback == null ? "" : fallback;
+    return emptyIfNull(fallback);
   }
 }

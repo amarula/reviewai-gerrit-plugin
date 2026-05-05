@@ -56,6 +56,14 @@ public class StringUtils {
     return str.substring(0, 1).toUpperCase() + str.substring(1);
   }
 
+  public static String emptyIfNull(String str) {
+    return str == null ? "" : str;
+  }
+
+  public static String firstNonBlank(String first, String second) {
+    return first != null && !first.isBlank() ? first : second;
+  }
+
   public static String convertPascalCaseToWords(String pascalCase) {
     if (pascalCase == null || pascalCase.isEmpty()) {
       return pascalCase;

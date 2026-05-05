@@ -24,7 +24,8 @@ public enum AiProviderType {
   OPENAI("OpenAI"),
   GEMINI("Gemini"),
   MOONSHOT("MoonShot"),
-  OLLAMA("Ollama");
+  OLLAMA("Ollama"),
+  MOCK("MockAI");
 
   private static final Set<AiProviderType> DIRECT_CONNECTION_PROVIDERS = EnumSet.of(OPENAI);
 

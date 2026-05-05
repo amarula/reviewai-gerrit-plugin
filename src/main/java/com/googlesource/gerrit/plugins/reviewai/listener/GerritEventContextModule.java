@@ -20,6 +20,7 @@ import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.mock.MockAiClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
@@ -77,6 +78,9 @@ public class GerritEventContextModule extends FactoryModule {
   }
 
   private Class<? extends IAiClient> getAiClient() {
+    if (isMockAiModel()) {
+      return MockAiClient.class;
+    }
     if (config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN) {
       return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
           ? LangChainTaskSpecificReviewClient.class
@@ -92,6 +96,9 @@ public class GerritEventContextModule extends FactoryModule {
   }
 
   private Class<? extends ICodeContextPolicy> getCodeContextPolicy() {
+    if (isMockAiModel()) {
+      return CodeContextPolicyNone.class;
+    }
     return switch (config.getCodeContextPolicy()) {
       case NONE -> CodeContextPolicyNone.class;
       case ON_DEMAND ->
@@ -99,5 +106,9 @@ public class GerritEventContextModule extends FactoryModule {
               ? OpenAiCodeContextPolicyOnDemand.class
               : CodeContextPolicyOnDemand.class;
     };
+  }
+
+  private boolean isMockAiModel() {
+    return config.getSelectedAiModelRoute() != null && config.getSelectedAiModelRoute().isMock();
   }
 }

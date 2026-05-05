@@ -20,7 +20,8 @@ import java.util.Optional;
 
 public enum AiProviderTransport {
   OPENAI("OpenAI"),
-  LANGCHAIN("LangChain");
+  LANGCHAIN("LangChain"),
+  MOCK("MockAI");
 
   private final String configName;
 
