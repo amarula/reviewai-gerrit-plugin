@@ -94,6 +94,9 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final boolean DEFAULT_ENABLE_MESSAGE_DEBUGGING = false;
+  private static final boolean DEFAULT_ENABLE_MOCK_AI_MODEL = false;
+  private static final String DEFAULT_MOCK_AI_MODEL = "debug";
+  private static final String DEFAULT_MOCK_AI_MODEL_CONFIG_PATH = "mockAiModel.json";
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
 
   // Config setting keys
@@ -148,6 +151,9 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_POLLING_INTERVAL = "aiPollingInterval";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
   private static final String KEY_ENABLE_MESSAGE_DEBUGGING = "enableMessageDebugging";
+  public static final String KEY_ENABLE_MOCK_AI_MODEL = "enableMockAiModel";
+  public static final String KEY_MOCK_AI_MODEL = "mockAiModel";
+  public static final String KEY_MOCK_AI_MODEL_CONFIG_PATH = "mockAiModelConfigPath";
 
   private final AiProviderConfiguration aiProviderConfiguration;
 
@@ -361,6 +367,18 @@ public class Configuration extends ConfigCore {
 
   public boolean getEnableMessageDebugging() {
     return getBoolean(KEY_ENABLE_MESSAGE_DEBUGGING, DEFAULT_ENABLE_MESSAGE_DEBUGGING);
+  }
+
+  public boolean getEnableMockAiModel() {
+    return getBoolean(KEY_ENABLE_MOCK_AI_MODEL, DEFAULT_ENABLE_MOCK_AI_MODEL);
+  }
+
+  public String getMockAiModel() {
+    return getString(KEY_MOCK_AI_MODEL, DEFAULT_MOCK_AI_MODEL);
+  }
+
+  public String getMockAiModelConfigPath() {
+    return getString(KEY_MOCK_AI_MODEL_CONFIG_PATH, DEFAULT_MOCK_AI_MODEL_CONFIG_PATH);
   }
 
   public boolean getIgnoreOutdatedInlineComments() {

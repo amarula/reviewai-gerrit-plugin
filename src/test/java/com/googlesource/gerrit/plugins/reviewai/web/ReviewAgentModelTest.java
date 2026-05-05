@@ -80,6 +80,20 @@ public class ReviewAgentModelTest extends TestBase {
   }
 
   @Test
+  public void exposesMockAiModelRouteWhenConfigured() throws Exception {
+    when(config.getAiModels()).thenReturn(List.of("OpenAI/gpt-4.1", "MockAI/debug"));
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(new AiModelRoute(AiProviderTransport.MOCK, AiProviderType.MOCK, "debug"));
+
+    Response<ReviewAgentModel.Output> response = view.apply(changeResource);
+
+    assertEquals("MockAI/debug", response.value().defaultModelId);
+    assertEquals("MockAI/debug", response.value().models.get(1).modelId);
+    assertEquals("MockAI", response.value().models.get(1).provider);
+    assertEquals("debug", response.value().models.get(1).model);
+  }
+
+  @Test
   public void exposesCanAiReviewFalseWhenPermissionIsDenied() throws Exception {
     when(config.getAiModels()).thenReturn(List.of("OpenAI/gpt-4.1"));
     when(config.getSelectedAiModelRoute())

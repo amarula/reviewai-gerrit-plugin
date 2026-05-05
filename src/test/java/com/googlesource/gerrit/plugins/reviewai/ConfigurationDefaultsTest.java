@@ -223,6 +223,36 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldExposeMockAiModelOnlyWhenEnabled() {
+    Configuration disabledConfiguration = createConfiguration();
+    assertTrue(!disabledConfiguration.getAiModels().contains("MockAI/debug"));
+
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "enableMockAiModel", true);
+    cfg.setString("plugin", PLUGIN_NAME, "mockAiModel", "slow-debug");
+    Configuration enabledConfiguration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertTrue(enabledConfiguration.getEnableMockAiModel());
+    assertTrue(enabledConfiguration.getAiModels().contains("MockAI/slow-debug"));
+  }
+
+  @Test
+  public void shouldAllowSelectingMockAiModel() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "enableMockAiModel", true);
+    cfg.setString("plugin", PLUGIN_NAME, "mockAiModel", "slow-debug");
+    cfg.setString("plugin", PLUGIN_NAME, "selectedAiModel", "MockAI/slow-debug");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals("slow-debug", configuration.getAiModel());
+    assertEquals("MockAI/slow-debug", configuration.getSelectedAiModelRoute().modelRoute());
+  }
+
+  @Test
   public void shouldDefaultNeutralReviewScoreConversionToEnabled() {
     Configuration configuration = createConfiguration();
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());

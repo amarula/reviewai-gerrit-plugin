@@ -189,6 +189,11 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
 - `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
   value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
   when no model has been selected yet.
+- `enableMockAiModel`: Adds a `MockAI/{mockAiModel}` model to the Review Agent dropdown. The default value is `false`.
+- `mockAiModel`: Names the mocked model exposed when `enableMockAiModel` is true. The default value is `debug`.
+- `mockAiModelConfigPath`: JSON file used by the mocked model. The plugin first searches
+  `$GERRIT_SITE/etc/reviewai/{mockAiModelConfigPath}`, then falls back to the packaged `config/` resource directory.
+  The default value is `mockAiModel.json`.
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on. Ollama
   does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider, either direct or through LangChain. By default, it
@@ -222,6 +227,47 @@ directive = End each reply with \"Hope this helps!\"
 ```
 
 **NOTE**: Double quotes need to be escaped in directives content.
+
+#### Mock AI Model
+
+Enable the mocked Review Agent model for local debugging:
+
+```
+[plugin "reviewai-gerrit-plugin"]
+    enableMockAiModel = true
+    mockAiModel = debug
+    mockAiModelConfigPath = mockAiModel.json
+```
+
+Example behavior file:
+
+```json
+{
+  "delaySeconds": 2,
+  "responseText": "Mocked debug review response.",
+  "vote": -1,
+  "relevance": 1.0
+}
+```
+
+If `vote` or `score` is present, the response is returned as a scored patch-set reply so the existing voting logic can
+apply it when `enabledVoting` is true. Without a score, the response is posted as a patch-set message.
+
+For full control, define `jsonResponse` with the exact structured response the mock should return:
+
+```json
+{
+  "delayMs": 0,
+  "jsonResponse": {
+    "messageContent": "Direct structured mock response.",
+    "changeId": "direct-json-change"
+  }
+}
+```
+
+When `jsonResponse` is present, it takes precedence over `responseText`, `vote`, `score`, and `replies`.
+Place custom behavior files in `$GERRIT_SITE/etc/reviewai/` to change mocked responses without rebuilding the plugin.
+See `config/mockAiModelJsonResponse.json` for a packaged example with multiple replies.
 
 - `enabledFileExtensions`: This limits the reviewed files to the given types. Default file extensions are "py, java, js,
   ts, html, css, cs, cpp, c, h, php, rb, swift, kt, r, jl, go, scala, pl, pm, rs, dart, lua, sh, vb, bat".

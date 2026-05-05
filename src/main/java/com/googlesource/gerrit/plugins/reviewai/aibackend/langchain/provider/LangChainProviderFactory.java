@@ -38,6 +38,7 @@ public final class LangChainProviderFactory {
       case GEMINI -> GEMINI_PROVIDER;
       case MOONSHOT -> MOONSHOT_PROVIDER;
       case OLLAMA -> OLLAMA_PROVIDER;
+      case MOCK -> throw new IllegalArgumentException("MockAI is not a LangChain provider");
     };
   }
 }

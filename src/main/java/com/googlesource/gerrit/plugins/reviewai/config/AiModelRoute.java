@@ -23,6 +23,9 @@ import java.util.Optional;
 public record AiModelRoute(
     AiProviderTransport transport, AiProviderType provider, String model) {
   public String providerRoute() {
+    if (transport == AiProviderTransport.MOCK) {
+      return provider.getConfigName();
+    }
     if (transport == AiProviderTransport.OPENAI && provider.supportsDirectConnection()) {
       return provider.getConfigName();
     }
@@ -35,6 +38,10 @@ public record AiModelRoute(
 
   public boolean isLangChain() {
     return transport == AiProviderTransport.LANGCHAIN;
+  }
+
+  public boolean isMock() {
+    return transport == AiProviderTransport.MOCK || provider == AiProviderType.MOCK;
   }
 
   public static Optional<AiModelRoute> parse(String route) {
@@ -59,12 +66,18 @@ public record AiModelRoute(
   }
 
   private static AiProviderTransport defaultTransport(AiProviderType provider) {
+    if (provider == AiProviderType.MOCK) {
+      return AiProviderTransport.MOCK;
+    }
     return provider.supportsDirectConnection()
         ? AiProviderTransport.OPENAI
         : AiProviderTransport.LANGCHAIN;
   }
 
   private static boolean supportsTransport(AiProviderTransport transport, AiProviderType provider) {
+    if (transport == AiProviderTransport.MOCK) {
+      return provider == AiProviderType.MOCK;
+    }
     return transport != AiProviderTransport.OPENAI || provider.supportsDirectConnection();
   }
 }
