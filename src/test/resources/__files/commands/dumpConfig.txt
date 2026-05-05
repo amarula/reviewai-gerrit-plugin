@@ -27,6 +27,7 @@ convertNeutralReviewScoreToPositive: true
 directive: 
 disabledTopicFilter: 
 enableMessageDebugging: true
+enableMockAiModel: false
 enabledFileExtensions: 
     py
     java
@@ -65,6 +66,8 @@ ignoreOutdatedInlineComments: false
 ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewLines: 1000
+mockAiModel: debug
+mockAiModelConfigPath: config/mockAiModel.json
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 
 taskSpecificAssistants: false

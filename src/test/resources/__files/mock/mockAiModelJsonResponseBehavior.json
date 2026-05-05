@@ -1,0 +1,9 @@
+{
+  "delayMs": 0,
+  "responseText": "This fallback text must not be used.",
+  "vote": -1,
+  "jsonResponse": {
+    "messageContent": "Direct structured mock response.",
+    "changeId": "direct-json-change"
+  }
+}

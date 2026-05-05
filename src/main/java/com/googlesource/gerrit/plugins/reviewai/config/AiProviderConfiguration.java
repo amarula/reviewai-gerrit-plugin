@@ -35,6 +35,7 @@ final class AiProviderConfiguration {
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_AI_MODEL = "llama3.2";
+  static final String DEFAULT_MOCK_AI_MODEL = "debug";
   static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
@@ -46,6 +47,7 @@ final class AiProviderConfiguration {
   static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
       List.of("kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-thinking-turbo", "kimi-k2-turbo-preview", DEFAULT_MOONSHOT_AI_MODEL);
   static final List<String> DEFAULT_OLLAMA_AI_MODELS = List.of(DEFAULT_OLLAMA_AI_MODEL);
+  static final List<String> DEFAULT_MOCK_AI_MODELS = List.of(DEFAULT_MOCK_AI_MODEL);
 
   static final String KEY_AI_TOKENS = "aiTokens";
   static final String KEY_AI_MODELS = "aiModels";
@@ -134,6 +136,11 @@ final class AiProviderConfiguration {
         .map(AiModelRoute::modelRoute)
         .distinct()
         .toList();
+    if (config.getEnableMockAiModel()) {
+      List<String> modelsWithMock = new ArrayList<>(resolvedModels);
+      modelsWithMock.add(getMockAiModelRoute(config.getMockAiModel()).modelRoute());
+      resolvedModels = modelsWithMock.stream().distinct().toList();
+    }
     log.debug(
         "AI model routes resolved. configuredModels={}, resolvedProviders={}, tokenProviders={}, resolvedModels={}",
         configuredModels,
@@ -223,6 +230,9 @@ final class AiProviderConfiguration {
   }
 
   private AiProviderTransport getDefaultTransport(AiProviderType provider) {
+    if (provider == AiProviderType.MOCK) {
+      return AiProviderTransport.MOCK;
+    }
     if (provider.supportsDirectConnection()) {
       return AiProviderTransport.OPENAI;
     }
@@ -230,6 +240,9 @@ final class AiProviderConfiguration {
   }
 
   private boolean supportsTransport(AiProviderTransport transport, AiProviderType provider) {
+    if (transport == AiProviderTransport.MOCK) {
+      return provider == AiProviderType.MOCK;
+    }
     return transport != AiProviderTransport.OPENAI || provider.supportsDirectConnection();
   }
 
@@ -281,6 +294,7 @@ final class AiProviderConfiguration {
       case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODELS;
       case OLLAMA -> DEFAULT_OLLAMA_AI_MODELS;
       case OPENAI -> DEFAULT_OPENAI_AI_MODELS;
+      case MOCK -> DEFAULT_MOCK_AI_MODELS;
     };
   }
 
@@ -290,6 +304,7 @@ final class AiProviderConfiguration {
       case MOONSHOT -> MOONSHOT_DOMAIN;
       case OLLAMA -> OLLAMA_DOMAIN;
       case OPENAI -> OPENAI_DOMAIN;
+      case MOCK -> "";
     };
   }
 
@@ -452,6 +467,11 @@ final class AiProviderConfiguration {
     return getAiTokens().keySet().stream().toList();
   }
 
+  private AiModelRoute getMockAiModelRoute(String model) {
+    String resolvedModel = model == null || model.isBlank() ? DEFAULT_MOCK_AI_MODEL : model.trim();
+    return new AiModelRoute(AiProviderTransport.MOCK, AiProviderType.MOCK, resolvedModel);
+  }
+
   private String unwrapDumpQuotes(String value) {
     if (value == null) {
       return null;
@@ -461,6 +481,9 @@ final class AiProviderConfiguration {
 
   private record AiProviderRoute(AiProviderTransport transport, AiProviderType provider) {
     private String id() {
+      if (transport == AiProviderTransport.MOCK) {
+        return provider.getConfigName();
+      }
       if (transport == AiProviderTransport.OPENAI && provider.supportsDirectConnection()) {
         return provider.getConfigName();
       }

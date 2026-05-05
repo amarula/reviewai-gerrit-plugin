@@ -1,0 +1,19 @@
+{
+  "delayMs": 0,
+  "jsonResponse": {
+    "messageContent": "",
+    "changeId": "mock-json-response",
+    "replies": [
+      {
+        "reply": "Mocked direct JSON reply: please check the null handling in this change.",
+        "score": -1,
+        "relevance": 1.0
+      },
+      {
+        "reply": "Mocked direct JSON reply: consider adding a regression test for this path.",
+        "score": -0.5,
+        "relevance": 0.9
+      }
+    ]
+  }
+}
