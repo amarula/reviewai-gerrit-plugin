@@ -1,0 +1,11 @@
+{
+  "name": "reviewai-gerrit-plugin",
+  "version": "3.1.2",
+  "description": "ChatGPT Code Review Gerrit Plugin",
+  "scripts": {
+    "lint": "eslint src/main/resources/static/**/*.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
