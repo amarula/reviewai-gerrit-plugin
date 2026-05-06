@@ -35,6 +35,7 @@ final class AiProviderConfiguration {
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_AI_MODEL = "llama3.2";
+  static final String MOCK_AI_MODEL = "mock-ai";
   static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
@@ -78,6 +79,9 @@ final class AiProviderConfiguration {
   }
 
   String getAiDomain() {
+    if (isMockAiModelRoute(getSelectedAiModelRoute())) {
+      return getMockAiAddress();
+    }
     String aiDomain = config.getString(KEY_AI_DOMAIN);
     if (aiDomain != null && !aiDomain.isEmpty()) {
       return aiDomain;
@@ -134,6 +138,12 @@ final class AiProviderConfiguration {
         .map(AiModelRoute::modelRoute)
         .distinct()
         .toList();
+    if (hasMockAiAddress()) {
+      List<String> modelsWithMock = new ArrayList<>(resolvedModels);
+      modelsWithMock.addAll(
+          getMockAiModelRoutes(providerRoutes).stream().map(AiModelRoute::modelRoute).toList());
+      resolvedModels = modelsWithMock.stream().distinct().toList();
+    }
     log.debug(
         "AI model routes resolved. configuredModels={}, resolvedProviders={}, tokenProviders={}, resolvedModels={}",
         configuredModels,
@@ -450,6 +460,24 @@ final class AiProviderConfiguration {
 
   private List<String> getAiTokenProviders() {
     return getAiTokens().keySet().stream().toList();
+  }
+
+  private boolean hasMockAiAddress() {
+    return !getMockAiAddress().isBlank();
+  }
+
+  private String getMockAiAddress() {
+    return config.getMockAiAddress() == null ? "" : config.getMockAiAddress().trim();
+  }
+
+  private List<AiModelRoute> getMockAiModelRoutes(List<AiProviderRoute> providerRoutes) {
+    return providerRoutes.stream()
+        .map(route -> new AiModelRoute(route.transport(), route.provider(), MOCK_AI_MODEL))
+        .toList();
+  }
+
+  private boolean isMockAiModelRoute(AiModelRoute route) {
+    return hasMockAiAddress() && route != null && MOCK_AI_MODEL.equals(route.model());
   }
 
   private String unwrapDumpQuotes(String value) {
