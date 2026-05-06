@@ -46,6 +46,10 @@ pipeline {
         always {
           script {
             junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+
+	    recordCoverage(tools: [[parser: 'JACOCO', pattern: '**/target/site/jacoco/jacoco.xml']],
+                    id: 'jacoco', name: 'JaCoCo Coverage')
+
             recordIssues(
               enabledForFailure: true,
               aggregatingResults: false,
