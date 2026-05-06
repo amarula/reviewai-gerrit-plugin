@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "489b7e43_e8409945",
+        "filename": "pom.xml",
+        "patchSetId": 2
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-05-06T09:17:27Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com This line should be removed, since for maven-pmd-plugin:3.26.0, sourceEncoding is no longer listed among the accepted parameters for pmd:pmd. We already have the encoding in the standard Maven property `project.build.sourceEncoding`",
+      "range": {
+        "startLine": 75,
+        "startChar": 19,
+        "endLine": 75,
+        "endChar": 58
+      },
+      "revId": "2f0a00b715d5daf6ebf1c8551e1a85a78bdc0e77",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
