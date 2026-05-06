@@ -112,7 +112,7 @@
 
         this._setCanAiReview(changeNumber, !(modelInfo && modelInfo.can_ai_review === false));
         return this._canAiReview;
-      } catch (error) {
+      } catch {
         this._canAiReview = true;
         return true;
       }
