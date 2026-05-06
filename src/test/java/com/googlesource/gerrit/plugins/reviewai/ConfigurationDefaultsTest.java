@@ -223,6 +223,65 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldAppendMockAiModelWhenMockAddressIsConfigured() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI", "MoonShot", "Ollama"},
+            new String[] {"OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k", "Ollama/llama3.2"},
+            null,
+            new String[] {},
+            "http://localhost:9090");
+
+    List<String> models = configuration.getAiModels();
+    assertEquals(
+        List.of(
+            "OpenAI/gpt-4.1",
+            "LangChain/MoonShot/moonshot-v1-8k",
+            "LangChain/Ollama/llama3.2",
+            "OpenAI/mock-ai",
+            "LangChain/MoonShot/mock-ai",
+            "LangChain/Ollama/mock-ai"),
+        models);
+    assertTrue(models.contains("OpenAI/mock-ai"));
+    assertTrue(models.contains("LangChain/MoonShot/mock-ai"));
+    assertTrue(models.contains("LangChain/Ollama/mock-ai"));
+  }
+
+  @Test
+  public void shouldSelectMockAiModelByConfiguredDefaultIndex() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI"},
+            new String[] {"OpenAI/gpt-4.1"},
+            2,
+            new String[] {"OpenAI/test-token"},
+            "http://localhost:9090");
+
+    assertEquals("mock-ai", configuration.getAiModel());
+    assertEquals("OpenAI/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
+    assertEquals("http://localhost:9090", configuration.getAiDomain());
+    assertEquals("test-token", configuration.getAiToken());
+  }
+
+  @Test
+  public void shouldUseMockAiAddressWhenSelectedMoonShotModelIsMockAi() {
+    Config cfg = new Config();
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiProviders", List.of("MoonShot"));
+    cfg.setString("plugin", PLUGIN_NAME, "mockAiAddress", "http://localhost:9090");
+    cfg.setString("plugin", PLUGIN_NAME, "selectedAiModel", "MoonShot/mock-ai");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(
+        "LangChain/MoonShot/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
+    assertEquals("mock-ai", configuration.getAiModel());
+    assertEquals("LangChain", configuration.getAiProviderTransport().getConfigName());
+    assertEquals("MoonShot", configuration.getAiProviderType().getConfigName());
+    assertEquals("http://localhost:9090", configuration.getAiDomain());
+  }
+
+  @Test
   public void shouldDefaultNeutralReviewScoreConversionToEnabled() {
     Configuration configuration = createConfiguration();
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());
@@ -243,8 +302,17 @@ public class ConfigurationDefaultsTest {
 
   private Configuration createConfiguration(
       String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
+    return createConfiguration(providers, models, defaultIndex, tokens, null);
+  }
+
+  private Configuration createConfiguration(
+      String[] providers,
+      String[] models,
+      Integer defaultIndex,
+      String[] tokens,
+      String mockAiAddress) {
     PluginConfig projectConfig = emptyPluginConfig();
-    PluginConfig globalConfig = pluginConfig(providers, models, defaultIndex, tokens);
+    PluginConfig globalConfig = pluginConfig(providers, models, defaultIndex, tokens, mockAiAddress);
 
     return createConfiguration(globalConfig, projectConfig);
   }
@@ -268,12 +336,24 @@ public class ConfigurationDefaultsTest {
 
   private PluginConfig pluginConfig(
       String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
+    return pluginConfig(providers, models, defaultIndex, tokens, null);
+  }
+
+  private PluginConfig pluginConfig(
+      String[] providers,
+      String[] models,
+      Integer defaultIndex,
+      String[] tokens,
+      String mockAiAddress) {
     Config cfg = new Config();
     cfg.setStringList("plugin", PLUGIN_NAME, "aiProviders", List.of(providers));
     cfg.setStringList("plugin", PLUGIN_NAME, "aiModels", List.of(models));
     cfg.setStringList("plugin", PLUGIN_NAME, "aiTokens", List.of(tokens));
     if (defaultIndex != null) {
       cfg.setInt("plugin", PLUGIN_NAME, "aiModelsDefaultIndex", defaultIndex);
+    }
+    if (mockAiAddress != null) {
+      cfg.setString("plugin", PLUGIN_NAME, "mockAiAddress", mockAiAddress);
     }
     return PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg);
   }
