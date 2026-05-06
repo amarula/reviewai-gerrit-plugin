@@ -170,7 +170,8 @@ With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4`, `OpenAI/g
 
 ### OpenAI Route
 
-The direct OpenAI route uses the **Assistant** resource to maintain a richer interaction context. This route is designed to:
+The direct OpenAI route uses the **Assistant** resource to maintain a richer interaction context. This route is designed
+to:
 
 - Leverage OpenAI Conversations plus Responses to preserve the memory of interactions related to each Change Set.
 - Link these Threads with OpenAI Assistants that are specialized according to the response needed.
@@ -195,6 +196,11 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
   uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
   (Gemini), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a
   custom endpoint; leaving it unset lets the plugin pick the provider default automatically.
+- `mockAiAddress`: Configures a custom address for a mock AI server. When set, a `mock-ai` model for each configured
+  provider route, such as `OpenAI/mock-ai`, `LangChain/MoonShot/mock-ai`, or `LangChain/Ollama/mock-ai`. When one of
+  these models is selected, requests keep the same provider, transport, and token behavior as the live model route, but
+  use this address as the AI domain. Because mock models are appended to the regular model list, they can be selected by
+  `aiModelsDefaultIndex` like any other model.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
@@ -280,6 +286,7 @@ directive = End each reply with \"Hope this helps!\"
 
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
+
 ### Optional Parameters Specific to LangChain Routes
 
 - `aiMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
@@ -430,7 +437,8 @@ The index in the response to `/directives` query can be used to remove single dy
 ### Forgetting Conversation History
 
 For the OpenAI Responses backend, the plugin stores the OpenAI conversation ID for each Change Set so that forced or
-reiterated reviews continue on the same durable conversation object. This history can be removed with the `/forget_thread` command.
+reiterated reviews continue on the same durable conversation object. This history can be removed with the
+`/forget_thread` command.
 This functionality is crucial for preventing AI from merely recycling old responses, particularly following
 modifications to configuration parameters.
 
