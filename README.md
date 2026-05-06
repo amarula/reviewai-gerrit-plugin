@@ -195,6 +195,11 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
   uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
   (Gemini), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a
   custom endpoint; leaving it unset lets the plugin pick the provider default automatically.
+- `mockAiAddress`: Adds a `mock-ai` model for each configured provider route, such as `OpenAI/mock-ai`,
+  `LangChain/MoonShot/mock-ai`, or `LangChain/Ollama/mock-ai`. When one of these models is selected, requests keep the
+  same provider, transport, and token behavior as the live model route, but use this address as the AI domain. Because
+  mock models are appended to the regular model list, they can be selected by `aiModelsDefaultIndex` like any other
+  model.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
