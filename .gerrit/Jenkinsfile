@@ -1,12 +1,55 @@
-#!groovy
+def isGerritReview = false
 
-node {
-  checkout scm
-  try {
+pipeline {
+  agent {
+    label 'maratona'
+  }
+  stages {
     stage('Build') {
-      sh 'printenv'
+      steps {
+        script {
+          isGerritReview = (env.GERRIT_CHANGE_NUMBER || env.CHANGE_ID)
+          sh 'mkdir -p $HOME/.m2'
+
+          docker.withRegistry('', '') {
+            docker.image('maven:3.9.9-eclipse-temurin-21').inside('-v $HOME/.m2:/var/maven/.m2') {
+
+              if (isGerritReview) {
+                echo "Building Gerrit Change Review..."
+              } else {
+                echo "Building Main Branch Post-Merge..."
+              }
+
+              sh 'mvn -Dmaven.repo.local=/var/maven/.m2/repository -U clean package'
+            }
+          }
+        }
+      }
     }
-  } catch (e) {
-    throw e
+  }
+  post {
+    success {
+      script {
+        if (isGerritReview) {
+          gerritReview labels: [Verified: 1], notify: 'NONE'
+        } else {
+          echo "Main branch build successful. Skipping Gerrit vote."
+        }
+      }
+    }
+    unstable {
+      script {
+        if (isGerritReview) {
+          gerritReview labels: [Verified: 0], message: 'Build is unstable'
+        }
+      }
+    }
+    failure {
+      script {
+        if (isGerritReview) {
+          gerritReview labels: [Verified: -1]
+        }
+      }
+    }
   }
 }
