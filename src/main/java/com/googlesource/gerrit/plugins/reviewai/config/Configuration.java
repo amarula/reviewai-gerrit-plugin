@@ -94,6 +94,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final boolean DEFAULT_ENABLE_MESSAGE_DEBUGGING = false;
+  private static final String DEFAULT_MOCK_AI_ADDRESS = DEFAULT_EMPTY_SETTING;
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
 
   // Config setting keys
@@ -106,6 +107,7 @@ public class Configuration extends ConfigCore {
   public static final String KEY_VOTING_MAX_SCORE = "votingMaxScore";
   public static final String KEY_GERRIT_USERNAME = "gerritUserName";
   public static final String KEY_SELECTIVE_LOG_LEVEL_OVERRIDE = "selectiveLogLevelOverride";
+  public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -361,6 +363,10 @@ public class Configuration extends ConfigCore {
 
   public boolean getEnableMessageDebugging() {
     return getBoolean(KEY_ENABLE_MESSAGE_DEBUGGING, DEFAULT_ENABLE_MESSAGE_DEBUGGING);
+  }
+
+  public String getMockAiAddress() {
+    return getString(KEY_MOCK_AI_ADDRESS, DEFAULT_MOCK_AI_ADDRESS);
   }
 
   public boolean getIgnoreOutdatedInlineComments() {

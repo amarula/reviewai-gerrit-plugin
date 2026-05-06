@@ -65,6 +65,7 @@ ignoreOutdatedInlineComments: false
 ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewLines: 1000
+mockAiAddress: 
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 
 taskSpecificAssistants: false
