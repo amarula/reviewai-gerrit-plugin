@@ -75,7 +75,7 @@
           )
         );
         return this._mergeStoredTurnsWithHistory(storedTurns, historyTurns, includeNewTurns);
-      } catch (error) {
+      } catch {
         return storedTurns;
       }
     },

@@ -106,7 +106,7 @@
         let status = null;
         try {
           status = await this._fetchMessageStatus(change, requestId);
-        } catch (error) {
+        } catch {
           const historyResponse = await this._getNewAssistantHistoryResponse(
             change,
             baselineKeys,
