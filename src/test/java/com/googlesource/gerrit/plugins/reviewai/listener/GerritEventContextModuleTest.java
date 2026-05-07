@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import java.lang.reflect.Method;
@@ -31,26 +31,26 @@ import org.junit.Test;
 public class GerritEventContextModuleTest {
 
   @Test
-  public void selectsTaskSpecificLangChainClientWhenEnabled() throws Exception {
+  public void selectsMultiAgentLangChainClientWhenEnabled() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
-    when(config.getTaskSpecificAssistants()).thenReturn(true);
+    when(config.getMultiAgentMode()).thenReturn(true);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
 
     Method getAiClient = GerritEventContextModule.class.getDeclaredMethod("getAiClient");
     getAiClient.setAccessible(true);
 
-    assertEquals(LangChainTaskSpecificReviewClient.class, getAiClient.invoke(module));
+    assertEquals(LangChainMultiAgentReviewClient.class, getAiClient.invoke(module));
   }
 
   @Test
-  public void keepsUnifiedLangChainClientWhenTaskSpecificAssistantsDisabled() throws Exception {
+  public void keepsUnifiedLangChainClientWhenMultiAgentModeDisabled() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
-    when(config.getTaskSpecificAssistants()).thenReturn(false);
+    when(config.getMultiAgentMode()).thenReturn(false);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
 

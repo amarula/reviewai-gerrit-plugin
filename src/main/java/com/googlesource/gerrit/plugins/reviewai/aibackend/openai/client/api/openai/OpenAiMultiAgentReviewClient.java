@@ -39,13 +39,13 @@ import java.util.concurrent.ForkJoinPool;
 
 @Slf4j
 @Singleton
-public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implements IAiClient {
-  private static final List<ReviewAssistantStages> TASK_SPECIFIC_ASSISTANT_STAGES =
+public class OpenAiMultiAgentReviewClient extends OpenAiReviewClient implements IAiClient {
+  private static final List<ReviewAssistantStages> MULTI_AGENT_ASSISTANT_STAGES =
       List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
   private final Executor executor;
 
   @Inject
-  public OpenAiTaskSpecificReviewClient(
+  public OpenAiMultiAgentReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
@@ -53,20 +53,20 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
   }
 
   @VisibleForTesting
-  public OpenAiTaskSpecificReviewClient(
+  public OpenAiMultiAgentReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Executor executor) {
     super(config, codeContextPolicy, pluginDataHandlerProvider);
     this.executor = executor;
-    log.debug("Initialized OpenAiTaskSpecificReviewClient.");
+    log.debug("Initialized OpenAiMultiAgentReviewClient.");
   }
 
   public AiResponseContent ask(
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws AiConnectionFailException {
-    log.debug("Task-specific OpenAI ask method called with changeId: {}", change.getFullChangeId());
+    log.debug("Multi-agent OpenAI ask method called with changeId: {}", change.getFullChangeId());
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       return super.ask(changeSetData, change, patchSet);
     }
@@ -74,7 +74,7 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
       return askStages(
           changeSetData, change, patchSet, List.of(changeSetData.getReviewAssistantStage()));
     }
-    return askStages(changeSetData, change, patchSet, TASK_SPECIFIC_ASSISTANT_STAGES);
+    return askStages(changeSetData, change, patchSet, MULTI_AGENT_ASSISTANT_STAGES);
   }
 
   private AiResponseContent askStages(
@@ -131,7 +131,7 @@ public class OpenAiTaskSpecificReviewClient extends OpenAiReviewClient implement
         stageChangeSetData,
         change,
         patchSet,
-        OpenAiConversation.getTaskSpecificConversationKey(assistantStage));
+        OpenAiConversation.getMultiAgentConversationKey(assistantStage));
   }
 
 }
