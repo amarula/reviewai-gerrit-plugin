@@ -19,8 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -78,12 +78,12 @@ public class GerritEventContextModule extends FactoryModule {
 
   private Class<? extends IAiClient> getAiClient() {
     if (config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN) {
-      return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-          ? LangChainTaskSpecificReviewClient.class
+      return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+          ? LangChainMultiAgentReviewClient.class
           : LangChainClient.class;
     }
-    return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-        ? OpenAiTaskSpecificReviewClient.class
+    return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+        ? OpenAiMultiAgentReviewClient.class
         : OpenAiReviewClient.class;
   }
 
