@@ -78,8 +78,8 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
     aIPrompt =
         getAiPrompt(
             config, changeSetData, change, codeContextPolicy, ReviewAssistantStages.REVIEW_CODE);
-    if (openAiParameters.shouldSpecializeAssistants()) {
-      populateOpenAISpecializedCodeReviewParameters();
+    if (openAiParameters.isMultiAgentModeEnabled()) {
+      populateOpenAIMultiAgentCodeReviewParameters();
       aIPrompt =
           getAiPrompt(
               config,
@@ -87,7 +87,7 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
               change,
               codeContextPolicy,
               ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
-      populateOpenAISpecializedCommitMessageReviewParameters();
+      populateOpenAIMultiAgentCommitMessageReviewParameters();
     } else {
       populateOpenAIReviewParameters();
     }
@@ -115,9 +115,9 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
     return requestedScope == null || requestedScope == scope;
   }
 
-  protected void populateOpenAISpecializedCodeReviewParameters() {}
+  protected void populateOpenAIMultiAgentCodeReviewParameters() {}
 
-  protected void populateOpenAISpecializedCommitMessageReviewParameters() {}
+  protected void populateOpenAIMultiAgentCommitMessageReviewParameters() {}
 
   protected void populateOpenAIReviewParameters() {}
 }
