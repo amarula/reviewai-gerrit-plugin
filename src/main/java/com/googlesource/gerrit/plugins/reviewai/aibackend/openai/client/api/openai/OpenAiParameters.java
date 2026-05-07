@@ -41,8 +41,8 @@ public class OpenAiParameters extends ClientBase {
     }
   }
 
-  public boolean shouldSpecializeAssistants() {
-    return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants();
+  public boolean isMultiAgentModeEnabled() {
+    return config.getAiReviewCommitMessages() && config.getMultiAgentMode();
   }
 
   private Double retrieveTemperature(String temperatureKey, Double defaultTemperature) {
