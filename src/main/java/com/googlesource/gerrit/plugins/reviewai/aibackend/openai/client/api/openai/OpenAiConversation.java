@@ -59,7 +59,7 @@ public class OpenAiConversation {
     changeDataHandler = pluginDataHandlerProvider.getChangeScope();
   }
 
-  public static String getTaskSpecificConversationKey(ReviewAssistantStages assistantStage) {
+  public static String getMultiAgentConversationKey(ReviewAssistantStages assistantStage) {
     return KEY_CONVERSATION_ID + "." + assistantStage.name().toLowerCase(Locale.ROOT);
   }
 
@@ -108,7 +108,7 @@ public class OpenAiConversation {
   public void clear() {
     changeDataHandler.removeValue(KEY_CONVERSATION_ID);
     for (ReviewAssistantStages assistantStage : ReviewAssistantStages.values()) {
-      changeDataHandler.removeValue(getTaskSpecificConversationKey(assistantStage));
+      changeDataHandler.removeValue(getMultiAgentConversationKey(assistantStage));
     }
   }
 }

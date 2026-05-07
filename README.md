@@ -283,9 +283,9 @@ directive = End each reply with \"Hope this helps!\"
 
 ### Optional Parameters Specific to OpenAI Backend
 
-- `taskSpecificAssistants`: This option allows for dividing the Patch Set review between two specialized assistants: one
+- `multiAgentMode`: This option allows for dividing the Patch Set review between two specialized agents: one
   focused to the Patch's code and another to the commit message. When this option is set to false (default value), the
-  Patch Set review is unified into one single request processed by one assistant instructed for both tasks.
+  Patch Set review is unified into one single request processed by one agent instructed for both tasks.
 
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
@@ -598,10 +598,10 @@ ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewFileSize: 20000
 maxReviewLines: 1000
+multiAgentMode: false
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
-taskSpecificAssistants: false
 votingMaxScore: 1
 votingMinScore: -1
 ```
