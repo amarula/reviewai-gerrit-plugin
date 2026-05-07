@@ -30,11 +30,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
 
-public class LangChainTaskSpecificReviewClientTest {
+public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
-    RecordingLangChainTaskSpecificReviewClient client = new RecordingLangChainTaskSpecificReviewClient();
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(false);
@@ -52,7 +52,7 @@ public class LangChainTaskSpecificReviewClientTest {
 
   @Test
   public void forcedScopedReviewBypassesParallelSplit() throws Exception {
-    RecordingLangChainTaskSpecificReviewClient client = new RecordingLangChainTaskSpecificReviewClient();
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
@@ -68,11 +68,11 @@ public class LangChainTaskSpecificReviewClientTest {
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
   }
 
-  private static class RecordingLangChainTaskSpecificReviewClient
-      extends LangChainTaskSpecificReviewClient {
+  private static class RecordingLangChainMultiAgentReviewClient
+      extends LangChainMultiAgentReviewClient {
     private final List<ReviewAssistantStages> recordedStages = new ArrayList<>();
 
-    RecordingLangChainTaskSpecificReviewClient() {
+    RecordingLangChainMultiAgentReviewClient() {
       super(null, null, null, null, Runnable::run);
     }
 

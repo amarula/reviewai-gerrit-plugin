@@ -26,7 +26,7 @@ public final class AiResponseContentMerger {
   private AiResponseContentMerger() {}
 
   public static AiResponseContent merge(List<AiResponseContent> aiResponseContents) {
-    log.debug("Merging responses from different task-specific stages.");
+    log.debug("Merging responses from different multi-agent stages.");
     AiResponseContent mergedResponse = aiResponseContents.remove(0);
     for (AiResponseContent aiResponseContent : aiResponseContents) {
       List<AiReplyItem> replies = aiResponseContent.getReplies();
