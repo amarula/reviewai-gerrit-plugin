@@ -87,7 +87,7 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_PATCH_SET_COMMENTS_AS_RESOLVED = false;
   private static final boolean DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS = false;
   private static final boolean DEFAULT_IGNORE_RESOLVED_AI_COMMENTS = true;
-  private static final boolean DEFAULT_TASK_SPECIFIC_ASSISTANTS = false;
+  private static final boolean DEFAULT_MULTI_AGENT_MODE = false;
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
   private static final int DEFAULT_AI_POLLING_TIMEOUT = 180;
@@ -146,7 +146,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_PATCH_SET_COMMENTS_AS_RESOLVED = "patchSetCommentsAsResolved";
   private static final String KEY_IGNORE_OUTDATED_INLINE_COMMENTS = "ignoreOutdatedInlineComments";
   private static final String KEY_IGNORE_RESOLVED_AI_COMMENTS = "ignoreResolvedAiComments";
-  private static final String KEY_TASK_SPECIFIC_ASSISTANTS = "taskSpecificAssistants";
+  private static final String KEY_MULTI_AGENT_MODE = "multiAgentMode";
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
   private static final String KEY_AI_POLLING_TIMEOUT = "aiPollingTimeout";
@@ -344,8 +344,8 @@ public class Configuration extends ConfigCore {
     return getBoolean(KEY_IGNORE_RESOLVED_AI_COMMENTS, DEFAULT_IGNORE_RESOLVED_AI_COMMENTS);
   }
 
-  public boolean getTaskSpecificAssistants() {
-    return getBoolean(KEY_TASK_SPECIFIC_ASSISTANTS, DEFAULT_TASK_SPECIFIC_ASSISTANTS);
+  public boolean getMultiAgentMode() {
+    return getBoolean(KEY_MULTI_AGENT_MODE, DEFAULT_MULTI_AGENT_MODE);
   }
 
   public int getAiConnectionTimeout() {
