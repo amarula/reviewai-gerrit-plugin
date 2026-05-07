@@ -54,7 +54,7 @@ import static org.mockito.Mockito.when;
 
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
-public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
+public class OpenAiReviewMultiAgentModeTest extends OpenAiReviewTestBase {
   private static final String SECOND_CALL = "second-call";
   private static final String SECOND_CONVERSATION = "second-conversation";
   private static final String CONVERSATION_SCENARIO = "Create-Conversation Scenario";
@@ -62,7 +62,7 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   private static final String REVIEW_COMMIT_MESSAGE_CONVERSATION_ID =
       "conv_REVIEW_COMMIT_MESSAGE";
 
-  public OpenAiReviewTaskSpecificTest() {
+  public OpenAiReviewMultiAgentModeTest() {
     MockitoAnnotations.openMocks(this);
   }
 
@@ -70,7 +70,7 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   protected void initGlobalAndProjectConfig() {
     super.initGlobalAndProjectConfig();
 
-    when(globalConfig.getBoolean(Mockito.eq("taskSpecificAssistants"), Mockito.anyBoolean()))
+    when(globalConfig.getBoolean(Mockito.eq("multiAgentMode"), Mockito.anyBoolean()))
         .thenReturn(true);
   }
 
@@ -199,11 +199,11 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
     Assert.assertTrue(requestContent.contains(formattedPatchContent));
     Mockito.verify(pluginDataHandler)
         .setValue(
-            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE),
+            OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStages.REVIEW_CODE),
             REVIEW_CODE_CONVERSATION_ID);
     Mockito.verify(pluginDataHandler)
         .setValue(
-            OpenAiConversation.getTaskSpecificConversationKey(
+            OpenAiConversation.getMultiAgentConversationKey(
                 ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
             REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
     Mockito.verify(pluginDataHandler, Mockito.never())
@@ -214,9 +214,9 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   }
 
   @Test
-  public void commandReviewPatchsetScopeBypassesTaskSpecificCommitMessageStage() throws Exception {
+  public void commandReviewPatchsetScopeBypassesMultiAgentCommitMessageStage() throws Exception {
     when(pluginDataHandler.getValue(
-            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE)))
+            OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStages.REVIEW_CODE)))
         .thenReturn(REVIEW_CODE_CONVERSATION_ID);
     setupCommandComment("/review --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
 
@@ -241,7 +241,7 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   @Test
   public void commandReviewCommitMessageScopeUsesStoredCommitMessageConversation() throws Exception {
     when(pluginDataHandler.getValue(
-            OpenAiConversation.getTaskSpecificConversationKey(
+            OpenAiConversation.getMultiAgentConversationKey(
                 ReviewAssistantStages.REVIEW_COMMIT_MESSAGE)))
         .thenReturn(REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
     setupCommandComment("/review --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
@@ -263,12 +263,12 @@ public class OpenAiReviewTaskSpecificTest extends OpenAiReviewTestBase {
   }
 
   @Test
-  public void commandReviewUsesStoredTaskSpecificConversations() throws Exception {
+  public void commandReviewUsesStoredMultiAgentConversations() throws Exception {
     when(pluginDataHandler.getValue(
-            OpenAiConversation.getTaskSpecificConversationKey(ReviewAssistantStages.REVIEW_CODE)))
+            OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStages.REVIEW_CODE)))
         .thenReturn(REVIEW_CODE_CONVERSATION_ID);
     when(pluginDataHandler.getValue(
-            OpenAiConversation.getTaskSpecificConversationKey(
+            OpenAiConversation.getMultiAgentConversationKey(
                 ReviewAssistantStages.REVIEW_COMMIT_MESSAGE)))
         .thenReturn(REVIEW_COMMIT_MESSAGE_CONVERSATION_ID);
     setupCommandComment("/review");

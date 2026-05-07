@@ -39,14 +39,14 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Singleton
-public class LangChainTaskSpecificReviewClient extends LangChainClient implements IAiClient {
-  private static final List<ReviewAssistantStages> TASK_SPECIFIC_ASSISTANT_STAGES =
+public class LangChainMultiAgentReviewClient extends LangChainClient implements IAiClient {
+  private static final List<ReviewAssistantStages> MULTI_AGENT_ASSISTANT_STAGES =
       List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
 
   private final Executor executor;
 
   @Inject
-  public LangChainTaskSpecificReviewClient(
+  public LangChainMultiAgentReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
@@ -55,7 +55,7 @@ public class LangChainTaskSpecificReviewClient extends LangChainClient implement
   }
 
   @VisibleForTesting
-  public LangChainTaskSpecificReviewClient(
+  public LangChainMultiAgentReviewClient(
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
@@ -63,19 +63,19 @@ public class LangChainTaskSpecificReviewClient extends LangChainClient implement
       Executor executor) {
     super(config, codeContextPolicy, gerritClient, localizer);
     this.executor = executor;
-    log.debug("Initialized LangChainTaskSpecificReviewClient.");
+    log.debug("Initialized LangChainMultiAgentReviewClient.");
   }
 
   @Override
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
-    log.debug("Task-specific LangChain ask method called with changeId: {}", change.getFullChangeId());
+    log.debug("Multi-agent LangChain ask method called with changeId: {}", change.getFullChangeId());
     if (change.getIsCommentEvent() || changeSetData.getForcedStagedReview()) {
       return super.ask(changeSetData, change, patchSet);
     }
 
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
-    for (ReviewAssistantStages assistantStage : TASK_SPECIFIC_ASSISTANT_STAGES) {
+    for (ReviewAssistantStages assistantStage : MULTI_AGENT_ASSISTANT_STAGES) {
       reviewRequestFutures.add(
           CompletableFuture.supplyAsync(
               () -> {

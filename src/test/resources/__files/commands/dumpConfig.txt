@@ -67,10 +67,10 @@ ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiAddress: 
+multiAgentMode: false
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 
-taskSpecificAssistants: false
 votingMaxScore: 1
 votingMinScore: -1
 ```
