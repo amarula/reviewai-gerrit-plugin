@@ -42,8 +42,8 @@ import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainTaskSpecificReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiTaskSpecificReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -450,13 +450,13 @@ public class ReviewTestBase extends TestBase {
 
   private IAiClient getOpenAIClient() {
     if (config.getSelectedAiModelRoute().isLangChain()) {
-      return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-          ? new LangChainTaskSpecificReviewClient(
+      return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+          ? new LangChainMultiAgentReviewClient(
               config, getCodeContextPolicy(), gerritClient, localizer, Runnable::run)
           : new LangChainClient(config, getCodeContextPolicy(), gerritClient, localizer);
     }
-    return config.getAiReviewCommitMessages() && config.getTaskSpecificAssistants()
-        ? new OpenAiTaskSpecificReviewClient(
+    return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+        ? new OpenAiMultiAgentReviewClient(
             config, getCodeContextPolicy(), pluginDataHandlerProvider, Runnable::run)
         : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
   }

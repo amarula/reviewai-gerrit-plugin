@@ -42,7 +42,7 @@ public class AiPromptFactory {
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
       OpenAiParameters openAiParameters = new OpenAiParameters(config, false);
-      if (openAiParameters.shouldSpecializeAssistants() || changeSetData.getForcedStagedReview()) {
+      if (openAiParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
         return switch (changeSetData.getReviewAssistantStage()) {
           case REVIEW_CODE -> {
             log.info("AiPromptFactory: Return AiPromptReviewCode");
