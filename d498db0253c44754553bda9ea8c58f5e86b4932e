@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6e8c6833_25f8b52c",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/langchain/provider/ollama/OllamaLangChainProvider.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-05-08T04:59:51Z",
+      "side": 1,
+      "message": ".think(false)\n\nhttps://github.com/jenkinsci/explain-error-plugin/commit/62a622177afff1ba4b2ff1e5e54e9c1d074a19f3\n\nhttps://docs.ollama.com/capabilities/thinking",
+      "revId": "d498db0253c44754553bda9ea8c58f5e86b4932e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
