@@ -16,9 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ollama;
 
-import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.OLLAMA_DOMAIN;
-import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.OPENAI_DOMAIN;
-
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.FallbackTokenCountEstimator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -32,16 +29,16 @@ public class OllamaLangChainProvider implements ILangChainProvider {
 
   @Override
   public LangChainProvider buildChatModel(Configuration config, double temperature) {
-    String baseUrl = config.getAiDomain();
-    if (baseUrl == null || baseUrl.isBlank() || OPENAI_DOMAIN.equals(baseUrl)) {
-      baseUrl = OLLAMA_DOMAIN;
-    }
+    String baseUrl = config.getOllamaDomain();
 
     var model =
         OllamaChatModel.builder()
             .baseUrl(baseUrl)
             .modelName(config.getAiModel())
             .temperature(temperature)
+            .numCtx(config.getOllamaContextWindow())
+            .numPredict(config.getOllamaResponseLength())
+            .think(config.getOllamaThink())
             .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
             .maxRetries(LANGCHAIN_MAX_RETRIES)
             .build();
