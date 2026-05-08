@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -50,8 +51,15 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
-      Localizer localizer) {
-    this(config, codeContextPolicy, gerritClient, localizer, ForkJoinPool.commonPool());
+      Localizer localizer,
+      PluginDataHandlerProvider pluginDataHandlerProvider) {
+    this(
+        config,
+        codeContextPolicy,
+        gerritClient,
+        localizer,
+        pluginDataHandlerProvider,
+        ForkJoinPool.commonPool());
   }
 
   @VisibleForTesting
@@ -61,7 +69,18 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       GerritClient gerritClient,
       Localizer localizer,
       Executor executor) {
-    super(config, codeContextPolicy, gerritClient, localizer);
+    this(config, codeContextPolicy, gerritClient, localizer, null, executor);
+  }
+
+  @VisibleForTesting
+  public LangChainMultiAgentReviewClient(
+      Configuration config,
+      ICodeContextPolicy codeContextPolicy,
+      GerritClient gerritClient,
+      Localizer localizer,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Executor executor) {
+    super(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider);
     this.executor = executor;
     log.debug("Initialized LangChainMultiAgentReviewClient.");
   }
