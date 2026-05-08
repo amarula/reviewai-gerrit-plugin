@@ -26,5 +26,15 @@ public interface ILangChainProvider {
 
   LangChainProvider buildChatModel(Configuration config, double temperature);
 
+  default LangChainProvider buildChatModel(
+      Configuration config, double temperature, String conversationId) {
+    return buildChatModel(config, temperature);
+  }
+
+  default LangChainProvider buildChatModel(
+      Configuration config, double temperature, String conversationId, String instructions) {
+    return buildChatModel(config, temperature, conversationId);
+  }
+
   Optional<TokenCountEstimator> createTokenEstimator(Configuration config);
 }
