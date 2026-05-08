@@ -16,6 +16,24 @@
       "message": ".think(false)\n\nhttps://github.com/jenkinsci/explain-error-plugin/commit/62a622177afff1ba4b2ff1e5e54e9c1d074a19f3\n\nhttps://docs.ollama.com/capabilities/thinking",
       "revId": "d498db0253c44754553bda9ea8c58f5e86b4932e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "47b9adfa_b2d79822",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/langchain/provider/ollama/OllamaLangChainProvider.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-05-08T10:23:11Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com made configurable in I5f61873d0aab0454a2c3763a47566e60f4cf6c2e",
+      "parentUuid": "6e8c6833_25f8b52c",
+      "revId": "d498db0253c44754553bda9ea8c58f5e86b4932e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
