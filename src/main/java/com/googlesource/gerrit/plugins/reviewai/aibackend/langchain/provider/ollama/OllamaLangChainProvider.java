@@ -42,6 +42,9 @@ public class OllamaLangChainProvider implements ILangChainProvider {
             .baseUrl(baseUrl)
             .modelName(config.getAiModel())
             .temperature(temperature)
+            .numCtx(config.getOllamaContextWindow())
+            .numPredict(config.getOllamaResponseLength())
+            .think(config.getOllamaThink())
             .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
             .maxRetries(LANGCHAIN_MAX_RETRIES)
             .build();

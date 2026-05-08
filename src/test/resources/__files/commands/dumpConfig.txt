@@ -68,6 +68,9 @@ inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiAddress: 
 multiAgentMode: false
+ollamaContextWindow: 16384
+ollamaResponseLength: -1
+ollamaThink: false
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride: 

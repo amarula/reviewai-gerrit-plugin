@@ -292,6 +292,12 @@ directive = End each reply with \"Hope this helps!\"
 
 - `aiMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
 
+### Optional Parameters Specific to Ollama
+
+- `ollamaContextWindow`: Sets Ollama `num_ctx`, the model context window size. The default value is 16K.
+- `ollamaResponseLength`: Sets Ollama `num_predict`, the maximum generated response length. The default value is `-1`.
+- `ollamaThink`: Sets Ollama `think`, enabling thinking mode for supported models. The default value is `false`.
+
 ### Advanced Connection Parameters for OpenAI
 
 These parameters are specific to connecting with the OpenAI server and should only be modified by advanced users:

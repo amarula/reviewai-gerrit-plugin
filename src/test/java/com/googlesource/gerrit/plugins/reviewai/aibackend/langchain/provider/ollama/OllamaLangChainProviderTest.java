@@ -24,6 +24,9 @@ public class OllamaLangChainProviderTest {
     when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getAiModel()).thenReturn("llama3.2");
     when(config.getAiConnectionTimeout()).thenReturn(180);
+    when(config.getOllamaContextWindow()).thenReturn(16384);
+    when(config.getOllamaResponseLength()).thenReturn(-1);
+    when(config.getOllamaThink()).thenReturn(false);
 
     LangChainProvider langChainProvider = provider.buildChatModel(config, 0.2);
     OllamaChatModel model = (OllamaChatModel) langChainProvider.getModel();
@@ -31,7 +34,28 @@ public class OllamaLangChainProviderTest {
     assertEquals(Configuration.OLLAMA_DOMAIN, langChainProvider.getEndpoint());
     assertEquals("llama3.2", model.defaultRequestParameters().modelName());
     assertEquals(Double.valueOf(0.2), model.defaultRequestParameters().temperature());
+    assertEquals(Integer.valueOf(16384), model.defaultRequestParameters().numCtx());
+    assertEquals(Integer.valueOf(-1), model.defaultRequestParameters().maxOutputTokens());
+    assertEquals(Boolean.FALSE, model.defaultRequestParameters().think());
     verify(config, Mockito.never()).getAiToken();
+  }
+
+  @Test
+  public void buildsModelWithConfiguredOllamaContextWindowAndResponseLength() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn("http://localhost:11434");
+    when(config.getAiModel()).thenReturn("deepseek-r1:1.5b");
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+    when(config.getOllamaContextWindow()).thenReturn(32768);
+    when(config.getOllamaResponseLength()).thenReturn(4096);
+    when(config.getOllamaThink()).thenReturn(true);
+
+    LangChainProvider langChainProvider = provider.buildChatModel(config, 0.2);
+    OllamaChatModel model = (OllamaChatModel) langChainProvider.getModel();
+
+    assertEquals(Integer.valueOf(32768), model.defaultRequestParameters().numCtx());
+    assertEquals(Integer.valueOf(4096), model.defaultRequestParameters().maxOutputTokens());
+    assertEquals(Boolean.TRUE, model.defaultRequestParameters().think());
   }
 
   @Test
