@@ -308,6 +308,47 @@ public class ConfigurationDefaultsTest {
     assertEquals(0, configuration.getPatchContextLines());
   }
 
+  @Test
+  public void shouldDefaultOllamaContextWindowAndResponseLength() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(16384, configuration.getOllamaContextWindow());
+    assertEquals(Configuration.OLLAMA_DOMAIN, configuration.getOllamaDomain());
+    assertEquals(-1, configuration.getOllamaResponseLength());
+    assertEquals(false, configuration.getOllamaThink());
+  }
+
+  @Test
+  public void shouldReadConfiguredOllamaContextWindowDomainResponseLengthAndThink() {
+    Config cfg = new Config();
+    cfg.setInt("plugin", PLUGIN_NAME, "ollamaContextWindow", 32768);
+    cfg.setString("plugin", PLUGIN_NAME, "ollamaDomain", "http://ollama.example.com:11434");
+    cfg.setInt("plugin", PLUGIN_NAME, "ollamaResponseLength", 4096);
+    cfg.setBoolean("plugin", PLUGIN_NAME, "ollamaThink", true);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(32768, configuration.getOllamaContextWindow());
+    assertEquals("http://ollama.example.com:11434", configuration.getOllamaDomain());
+    assertEquals(4096, configuration.getOllamaResponseLength());
+    assertEquals(true, configuration.getOllamaThink());
+  }
+
+  @Test
+  public void shouldAllowProjectOllamaResponseLengthOverrideToZero() {
+    Config globalCfg = new Config();
+    globalCfg.setInt("plugin", PLUGIN_NAME, "ollamaResponseLength", 4096);
+    Config projectCfg = new Config();
+    projectCfg.setInt("plugin", PLUGIN_NAME, "ollamaResponseLength", 0);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, globalCfg),
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, projectCfg));
+
+    assertEquals(0, configuration.getOllamaResponseLength());
+  }
+
   private Configuration createConfiguration() {
     return createConfiguration(new String[] {}, new String[] {});
   }

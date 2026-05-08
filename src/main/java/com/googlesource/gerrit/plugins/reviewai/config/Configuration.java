@@ -95,6 +95,9 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
+  private static final int DEFAULT_OLLAMA_CONTEXT_WINDOW = 16384;
+  private static final int DEFAULT_OLLAMA_RESPONSE_LENGTH = -1;
+  private static final boolean DEFAULT_OLLAMA_THINK = false;
   private static final boolean DEFAULT_ENABLE_MESSAGE_DEBUGGING = false;
   private static final String DEFAULT_MOCK_AI_ADDRESS = DEFAULT_EMPTY_SETTING;
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
@@ -153,6 +156,10 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_POLLING_INTERVAL = "aiPollingInterval";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
   private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
+  private static final String KEY_OLLAMA_CONTEXT_WINDOW = "ollamaContextWindow";
+  private static final String KEY_OLLAMA_DOMAIN = "ollamaDomain";
+  private static final String KEY_OLLAMA_RESPONSE_LENGTH = "ollamaResponseLength";
+  private static final String KEY_OLLAMA_THINK = "ollamaThink";
   private static final String KEY_ENABLE_MESSAGE_DEBUGGING = "enableMessageDebugging";
 
   private final AiProviderConfiguration aiProviderConfiguration;
@@ -377,6 +384,28 @@ public class Configuration extends ConfigCore {
         1, getInt(KEY_AI_MAX_TOOL_RESPONSE_ROUNDS, DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS));
   }
 
+  public int getOllamaContextWindow() {
+    return Math.max(
+        1, getIntAllowingProjectZero(KEY_OLLAMA_CONTEXT_WINDOW, DEFAULT_OLLAMA_CONTEXT_WINDOW));
+  }
+
+  public int getOllamaResponseLength() {
+    return Math.max(
+        -1, getIntAllowingProjectZero(KEY_OLLAMA_RESPONSE_LENGTH, DEFAULT_OLLAMA_RESPONSE_LENGTH));
+  }
+
+  public String getOllamaDomain() {
+    String ollamaDomain = getString(KEY_OLLAMA_DOMAIN);
+    if (ollamaDomain != null && !ollamaDomain.isBlank()) {
+      return ollamaDomain;
+    }
+    return OLLAMA_DOMAIN;
+  }
+
+  public boolean getOllamaThink() {
+    return getBoolean(KEY_OLLAMA_THINK, DEFAULT_OLLAMA_THINK);
+  }
+
   public boolean getEnableMessageDebugging() {
     return getBoolean(KEY_ENABLE_MESSAGE_DEBUGGING, DEFAULT_ENABLE_MESSAGE_DEBUGGING);
   }
@@ -400,5 +429,12 @@ public class Configuration extends ConfigCore {
 
   public TreeMap<String, String> dumpConfigMap() {
     return dumpConfigMap(this.getClass());
+  }
+
+  private int getIntAllowingProjectZero(String key, int defaultValue) {
+    if (projectConfig.getString(key) != null) {
+      return projectConfig.getInt(key, defaultValue);
+    }
+    return globalConfig.getInt(key, defaultValue);
   }
 }
