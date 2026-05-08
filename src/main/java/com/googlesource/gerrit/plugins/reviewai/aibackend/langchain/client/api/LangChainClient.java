@@ -31,7 +31,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -64,6 +66,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainTokenEstimatorProvider tokenEstimatorProvider;
   private final GerritClient gerritClient;
   private final Localizer localizer;
+  private final PluginDataHandlerProvider pluginDataHandlerProvider;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
   private final LangChainToolExecutor toolExecutor;
@@ -86,12 +89,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
-      Localizer localizer) {
+      Localizer localizer,
+      PluginDataHandlerProvider pluginDataHandlerProvider) {
     super(config);
     this.codeContextPolicy = codeContextPolicy;
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
     this.gerritClient = gerritClient;
     this.localizer = localizer;
+    this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -113,6 +118,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         new LangChainToolExecutor(
             config, structuredResponseFormat, contextTools, requireInitialToolUse);
     log.debug("Initialized LangChainClient");
+  }
+
+  @VisibleForTesting
+  public LangChainClient(
+      Configuration config,
+      ICodeContextPolicy codeContextPolicy,
+      GerritClient gerritClient,
+      Localizer localizer) {
+    this(config, codeContextPolicy, gerritClient, localizer, null);
   }
 
   @Override
@@ -141,7 +155,10 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get())
               .build();
 
-      memory.add(LangChainChatMessages.systemMessage(systemInstructions));
+      AiProviderType providerType = config.getAiProviderType();
+      if (providerType != AiProviderType.OPENAI) {
+        memory.add(LangChainChatMessages.systemMessage(systemInstructions));
+      }
 
       GerritClientData gerritClientData = gerritClient.getClientData(change);
       AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
@@ -157,9 +174,10 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               ? Double.parseDouble(config.getAiCommentTemperature())
               : Double.parseDouble(config.getAiReviewTemperature());
 
-      AiProviderType providerType = config.getAiProviderType();
       ILangChainProvider provider = LangChainProviderFactory.get(providerType);
-      LangChainProvider providerModel = provider.buildChatModel(config, temperature);
+      String conversationId = resolveConversationId(providerType, changeSetData);
+      LangChainProvider providerModel =
+          provider.buildChatModel(config, temperature, conversationId, systemInstructions);
       ChatModel model = providerModel.getModel();
 
       log.info(
@@ -198,6 +216,28 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected void setRequestBody(String requestBody) {
     this.requestBody = requestBody;
+  }
+
+  private String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
+      throws AiConnectionFailException {
+    if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
+      return null;
+    }
+    String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
+    if (changeSetData.getReviewAssistantStage() != null) {
+      switch (changeSetData.getReviewAssistantStage()) {
+        case REVIEW_CODE:
+        case REVIEW_COMMIT_MESSAGE:
+          conversationKey =
+              OpenAiConversation.getMultiAgentConversationKey(
+                  changeSetData.getReviewAssistantStage());
+          break;
+        default:
+          break;
+      }
+    }
+    return new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey)
+        .resolveConversationId();
   }
 
   @Override
