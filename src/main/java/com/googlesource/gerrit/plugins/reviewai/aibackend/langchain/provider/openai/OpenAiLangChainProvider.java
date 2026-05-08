@@ -21,9 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.OpenAiMod
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
-import java.time.Duration;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,24 +30,35 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
 
   @Override
   public LangChainProvider buildChatModel(Configuration config, double temperature) {
+    return buildChatModel(config, temperature, null, null);
+  }
+
+  @Override
+  public LangChainProvider buildChatModel(
+      Configuration config, double temperature, String conversationId) {
+    return buildChatModel(config, temperature, conversationId, null);
+  }
+
+  @Override
+  public LangChainProvider buildChatModel(
+      Configuration config, double temperature, String conversationId, String instructions) {
     String baseUrl = config.getAiDomain();
     if (Configuration.OPENAI_DOMAIN.equals(baseUrl)) {
       baseUrl = baseUrl.endsWith("/v1") ? baseUrl : baseUrl + "/v1";
     }
     String modelName = config.getAiModel();
 
-    OpenAiChatModel.OpenAiChatModelBuilder builder =
-        OpenAiChatModel.builder()
+    // Timeout and retry settings are applied by OpenAiSdkClientFactory inside
+    // OpenAiResponsesChatModel, because this path uses the native OpenAI Responses API.
+    var model =
+        OpenAiResponsesChatModel.builder()
+            .config(config)
             .baseUrl(baseUrl)
-            .apiKey(config.getAiToken())
             .modelName(modelName)
-            .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
-            .maxRetries(LANGCHAIN_MAX_RETRIES);
-    if (OpenAiModelCompatibility.supportsTemperature(modelName)) {
-      builder.temperature(temperature);
-    }
-
-    var model = builder.build();
+            .temperature(OpenAiModelCompatibility.supportsTemperature(modelName) ? temperature : null)
+            .conversationId(conversationId)
+            .instructions(instructions)
+            .build();
 
     return new LangChainProvider(model, baseUrl);
   }
