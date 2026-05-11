@@ -20,6 +20,7 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
+import java.util.Properties;
 
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -45,7 +46,7 @@ public class PluginDataTest extends TestBase {
   @Test
   public void testValueSetAndGet() {
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler globalHandler = provider.getGlobalScope();
     PluginDataHandler projectHandler = provider.getProjectScope();
 
@@ -66,7 +67,7 @@ public class PluginDataTest extends TestBase {
   @Test
   public void testRemoveValue() {
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler handler = provider.getGlobalScope();
 
     String key = "testKey";
@@ -82,24 +83,27 @@ public class PluginDataTest extends TestBase {
   }
 
   @Test
-  public void testCreateFileOnNonexistent() throws Exception {
+  public void testCreateDbOnNonexistent() throws Exception {
     // Ensure the file doesn't exist before creating the handler
     Files.deleteIfExists(realPluginDataPath);
 
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     provider.getGlobalScope();
 
-    // The constructor should create the file if it doesn't exist
+    // The constructor should create the DB if it doesn't exist
     assertTrue(
-        "The config file should exist after initializing the handler.",
+        "The DB file should exist after initializing the handler.",
+        Files.exists(tempFolder.getRoot().toPath().resolve("reviewai.mv.db")));
+    assertFalse(
+        "The legacy config file should not be created for new data.",
         Files.exists(realPluginDataPath));
   }
 
   @Test
   public void testHandlersForSameScopeShareWrites() {
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler firstHandler = provider.getChangeScope();
     PluginDataHandler secondHandler = provider.getChangeScope();
 
@@ -113,11 +117,11 @@ public class PluginDataTest extends TestBase {
   }
 
   @Test
-  public void testHandlersFromDifferentProvidersMergeWritesToSameFile() throws Exception {
+  public void testHandlersFromDifferentProvidersMergeWritesToSameDb() {
     PluginDataHandlerProvider firstProvider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandlerProvider secondProvider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler firstHandler = firstProvider.getChangeScope();
     PluginDataHandler secondHandler = secondProvider.getChangeScope();
 
@@ -128,15 +132,33 @@ public class PluginDataTest extends TestBase {
     assertEquals(
         "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}",
         firstHandler.getValue("dynamicConfig"));
-    String dataFile = Files.readString(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"));
-    assertTrue(dataFile.contains("conversationId.review_code=review-code-conversation"));
-    assertTrue(dataFile.contains("dynamicConfig="));
+    assertFalse(
+        Files.exists(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data")));
+  }
+
+  @Test
+  public void testMigratesLegacyDataFileToDbExceptReviewAgentConversations() throws Exception {
+    Properties legacyProperties = new Properties();
+    legacyProperties.setProperty("dynamicConfig", "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}");
+    legacyProperties.setProperty("reviewAgentConversations", "{\"conversation-1\":{}}");
+    try (var output =
+        Files.newOutputStream(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"))) {
+      legacyProperties.store(output, null);
+    }
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
+    PluginDataHandler handler = provider.getChangeScope();
+
+    assertEquals(
+        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}",
+        handler.getValue("dynamicConfig"));
+    assertNull(handler.getValue("reviewAgentConversations"));
   }
 
   @Test
   public void testReviewAgentPendingRequestResolutionFollowsMovedRequest() {
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     ReviewAgentRequestStatusStore statusStore =
         new ReviewAgentRequestStatusStore(provider.getChangeScope());
 

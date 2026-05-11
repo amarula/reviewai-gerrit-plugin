@@ -16,52 +16,59 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.StoredMessage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.StoredMessageList;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainMessageTextExtractor;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
-import dev.langchain4j.data.message.AiMessage;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.ChatMessageDeserializer;
+import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
-
-import lombok.extern.slf4j.Slf4j;
-
-import java.lang.reflect.Method;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Singleton
 public class PluginChatMemoryStore implements ChatMemoryStore {
-  private static final String KEY_MESSAGES_PREFIX = "lc_chat_memory_messages";
+  private static final String DEFAULT_SCOPE = "default";
 
-  private final PluginDataHandler pluginDataHandler;
+  private final LangChainChatMemoryRepository repository;
 
-  public PluginChatMemoryStore(PluginDataHandler pluginDataHandler) {
-    this.pluginDataHandler = pluginDataHandler;
+  @Inject
+  public PluginChatMemoryStore(LangChainChatMemoryRepository repository) {
+    this.repository = repository;
+  }
+
+  public PluginChatMemoryStore(ReviewAiDb db) throws SQLException {
+    this(new LangChainChatMemoryRepository(db));
+  }
+
+  public PluginChatMemoryStore(Path pluginDataDir) throws SQLException, IOException {
+    this(new ReviewAiDb(pluginDataDir));
+  }
+
+  public PluginChatMemoryStore(String jdbcUrl) throws SQLException, IOException {
+    this(new ReviewAiDb(Path.of("."), jdbcUrl));
   }
 
   @Override
   public List<ChatMessage> getMessages(Object memoryId) {
-    String key = keyFor(memoryId);
+    MemoryKey key = MemoryKey.from(memoryId);
     try {
-      String json = pluginDataHandler.getValue(key);
-      if (json == null || json.isEmpty()) {
-        return new ArrayList<>();
-      }
-      StoredMessageList stored = getGson().fromJson(json, StoredMessageList.class);
-      if (stored == null || stored.getMessages() == null) {
-        return new ArrayList<>();
-      }
       List<ChatMessage> result = new ArrayList<>();
-      for (StoredMessage m : stored.getMessages()) {
-        result.add(toChatMessage(m));
+      for (String json : repository.getMessageJsons(key.changeId(), key.patchSet())) {
+        if (json != null && !json.isEmpty()) {
+          result.add(ChatMessageDeserializer.messageFromJson(json));
+        }
       }
       log.info(
-          "Loaded {} chat messages from LangChain memory store for {}", result.size(), memoryId);
+          "Loaded {} chat messages from LangChain memory store for {}",
+          result.size(),
+          memoryId);
       return result;
     } catch (Exception e) {
       log.warn("Failed to get chat memory messages for {}; returning empty list", memoryId, e);
@@ -71,17 +78,22 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
 
   @Override
   public void updateMessages(Object memoryId, List<ChatMessage> messages) {
-    String key = keyFor(memoryId);
+    MemoryKey key = MemoryKey.from(memoryId);
     try {
-      List<StoredMessage> stored = new ArrayList<>();
-      if (messages != null) {
-        for (ChatMessage m : messages) {
-          stored.add(fromChatMessage(m));
-        }
+      if (messages == null || messages.isEmpty()) {
+        deleteMessages(memoryId);
+        return;
       }
-      pluginDataHandler.setJsonValue(key, new StoredMessageList(stored));
+      int messagesAppended =
+          repository.updateMessages(
+              key.changeId(),
+              key.patchSet(),
+              key.scope(),
+              messages.stream().map(ChatMessageSerializer::messageToJson).toList());
       log.info(
-          "Persisted {} chat messages into LangChain memory store for {}", stored.size(), memoryId);
+          "Persisted {} new chat messages into LangChain memory store for {}",
+          messagesAppended,
+          memoryId);
     } catch (Exception e) {
       log.warn("Failed to persist chat memory messages for {}", memoryId, e);
     }
@@ -89,82 +101,35 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
 
   @Override
   public void deleteMessages(Object memoryId) {
+    MemoryKey key = MemoryKey.from(memoryId);
     log.info("Clearing LangChain memory store for {}", memoryId);
-    pluginDataHandler.removeValue(keyFor(memoryId));
-  }
-
-  private String keyFor(Object memoryId) {
-    return String.format("%s_%s", KEY_MESSAGES_PREFIX, memoryId);
-  }
-
-  private static ChatMessage toChatMessage(StoredMessage sm) {
-    StoredMessage.MessageType messageType = sm.getMessageType();
-    String text = sm.getText();
-    if (messageType == null) {
-      log.warn("Stored message messageType missing; defaulting to USER for text preview: {}", text);
-      messageType = StoredMessage.MessageType.USER;
-    }
     try {
-      return switch (messageType) {
-        case SYSTEM -> createSystemMessage(text);
-        case USER -> createUserMessage(text);
-        case AI -> createAiMessage(text);
-      };
+      repository.deleteMessages(key.changeId(), key.patchSet(), key.scope());
+    } catch (Exception e) {
+      log.warn("Failed to clear chat memory messages for {}", memoryId, e);
+    }
+  }
+
+  public void deleteMessagesForChangeSet(String changeId, int patchSet) {
+    log.info(
+        "Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
+    try {
+      repository.deleteMessagesForChangeSet(changeId, patchSet);
     } catch (Exception e) {
       log.warn(
-          "Falling back to UserMessage for messageType {} due to error: {}",
-          messageType,
-          e.getMessage());
-      return createUserMessage(text);
+          "Failed to clear chat memory messages for change {} patch set {}",
+          changeId,
+          patchSet,
+          e);
     }
   }
 
-  private static StoredMessage fromChatMessage(ChatMessage msg) {
-    String text = LangChainMessageTextExtractor.extractText(msg);
-    StoredMessage.MessageType messageType = resolveMessageType(msg);
-    return new StoredMessage(messageType, text);
-  }
-
-  private static StoredMessage.MessageType resolveMessageType(ChatMessage msg) {
-    if (msg == null) {
-      log.warn(
-          "Encountered null chat message while resolving StoredMessage type; defaulting to USER");
-      return StoredMessage.MessageType.USER;
+  private record MemoryKey(String changeId, int patchSet, String scope) {
+    private static MemoryKey from(Object memoryId) {
+      if (memoryId instanceof LangChainMemoryId id) {
+        return new MemoryKey(id.getChangeId(), id.getPatchSet(), id.getScope());
+      }
+      return new MemoryKey(String.valueOf(memoryId), 0, DEFAULT_SCOPE);
     }
-
-    return switch (msg) {
-      case SystemMessage ignored -> StoredMessage.MessageType.SYSTEM;
-      case AiMessage ignored -> StoredMessage.MessageType.AI;
-      case UserMessage ignored -> StoredMessage.MessageType.USER;
-      default -> StoredMessage.MessageType.USER;
-    };
-  }
-
-  private static SystemMessage createSystemMessage(String text) {
-    try {
-      // Prefer factory if available
-      Method from = SystemMessage.class.getMethod("from", String.class);
-      return (SystemMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
-    }
-    return new SystemMessage(text);
-  }
-
-  private static UserMessage createUserMessage(String text) {
-    try {
-      Method from = UserMessage.class.getMethod("from", String.class);
-      return (UserMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
-    }
-    return new UserMessage(text);
-  }
-
-  private static AiMessage createAiMessage(String text) {
-    try {
-      Method from = AiMessage.class.getMethod("from", String.class);
-      return (AiMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
-    }
-    return new AiMessage(text);
   }
 }

@@ -20,11 +20,12 @@ import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import java.io.IOException;
+import java.nio.file.Path;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mock;
-
-import java.nio.file.Path;
 
 import static org.mockito.Mockito.lenient;
 
@@ -39,6 +40,7 @@ public class TestBase {
   @Mock protected Path mockPluginDataPath;
 
   protected Path realPluginDataPath;
+  private ReviewAiDb testReviewAiDb;
 
   protected void setupPluginData() {
     realPluginDataPath = tempFolder.getRoot().toPath().resolve("global.data");
@@ -52,5 +54,23 @@ public class TestBase {
 
   protected GerritChange getGerritChange() {
     return new GerritChange(TestBase.PROJECT_NAME, TestBase.BRANCH_NAME, TestBase.CHANGE_ID);
+  }
+
+  protected ReviewAiDb getTestReviewAiDb() {
+    if (testReviewAiDb == null) {
+      Path pluginDataDir = tempFolder.getRoot().toPath();
+      try {
+        testReviewAiDb = new ReviewAiDb(pluginDataDir, buildEmbeddedTestJdbcUrl(pluginDataDir));
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to initialize test ReviewAI DB", e);
+      }
+    }
+    return testReviewAiDb;
+  }
+
+  protected static String buildEmbeddedTestJdbcUrl(Path pluginDataDir) {
+    return "jdbc:h2:"
+        + pluginDataDir.resolve("reviewai").toAbsolutePath().normalize()
+        + ";AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1";
   }
 }
