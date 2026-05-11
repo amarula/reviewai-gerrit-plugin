@@ -54,6 +54,7 @@ public class PatchSetReviewer {
   @Getter private final IAiClient openAiClient;
   private final Localizer localizer;
   private final DebugCodeBlocksReview debugCodeBlocksReview;
+  private final PatchSetReviewConversationRecorder conversationRecorder;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -67,13 +68,15 @@ public class PatchSetReviewer {
       ChangeSetData changeSetData,
       Provider<GerritClientReview> clientReviewProvider,
       IAiClient openAiClient,
-      Localizer localizer) {
+      Localizer localizer,
+      PatchSetReviewConversationRecorder conversationRecorder) {
     this.config = config;
     this.gerritClient = gerritClient;
     this.changeSetData = changeSetData;
     this.clientReviewProvider = clientReviewProvider;
     this.openAiClient = openAiClient;
     this.localizer = localizer;
+    this.conversationRecorder = conversationRecorder;
     debugCodeBlocksReview = new DebugCodeBlocksReview(localizer);
     log.debug("PatchSetReviewer initialized.");
   }
@@ -119,9 +122,9 @@ public class PatchSetReviewer {
     if (reviewReply != null) {
       retrieveReviewBatches(reviewReply, change);
     }
-    clientReviewProvider
-        .get()
-        .setReview(change, reviewBatches, changeSetData, getReviewScore(change));
+    Integer reviewScore = getReviewScore(change);
+    clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
+    conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
   private boolean shouldSkipAiReviewForEmptyPatchSet(GerritChange change) {

@@ -28,6 +28,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
@@ -67,6 +69,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final GerritClient gerritClient;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
+  private final PluginChatMemoryStore chatMemoryStore;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
   private final LangChainToolExecutor toolExecutor;
@@ -90,13 +93,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
       Localizer localizer,
-      PluginDataHandlerProvider pluginDataHandlerProvider) {
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      PluginChatMemoryStore chatMemoryStore) {
     super(config);
     this.codeContextPolicy = codeContextPolicy;
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
     this.gerritClient = gerritClient;
     this.localizer = localizer;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
+    this.chatMemoryStore = chatMemoryStore;
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -125,8 +130,18 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       Configuration config,
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
+      Localizer localizer,
+      PluginDataHandlerProvider pluginDataHandlerProvider) {
+    this(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, null);
+  }
+
+  @VisibleForTesting
+  public LangChainClient(
+      Configuration config,
+      ICodeContextPolicy codeContextPolicy,
+      GerritClient gerritClient,
       Localizer localizer) {
-    this(config, codeContextPolicy, gerritClient, localizer, null);
+    this(config, codeContextPolicy, gerritClient, localizer, null, null);
   }
 
   @Override
@@ -144,27 +159,26 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
       String systemInstructions = prompt.getDefaultAiAssistantInstructions();
       String userMessage = prompt.getDefaultAiThreadReviewMessage(patchSet);
-      Object memoryId = change.getFullChangeId();
+      Object memoryId = LangChainMemoryId.from(changeSetData, change);
 
       log.info("LangChain system instructions for {}: {}", memoryId, systemInstructions);
       log.info("LangChain user prompt for {}: {}", memoryId,userMessage);
 
-      ChatMemory memory =
-          TokenWindowChatMemory.builder()
-              .id(memoryId)
-              .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get())
-              .build();
+      ChatMemory memory = buildMemory(memoryId);
+      boolean hasStoredMemory = !memory.messages().isEmpty();
 
       AiProviderType providerType = config.getAiProviderType();
-      if (providerType != AiProviderType.OPENAI) {
+      if (!hasStoredMemory && providerType != AiProviderType.OPENAI) {
         memory.add(LangChainChatMessages.systemMessage(systemInstructions));
       }
 
-      GerritClientData gerritClientData = gerritClient.getClientData(change);
-      AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
-      List<ChatMessage> history = LangChainChatMessages.build(aiHistory, gerritClientData, change);
-      for (ChatMessage message : history) {
-        memory.add(message);
+      if (!hasStoredMemory) {
+        GerritClientData gerritClientData = gerritClient.getClientData(change);
+        AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+        List<ChatMessage> history = LangChainChatMessages.build(aiHistory, gerritClientData, change);
+        for (ChatMessage message : history) {
+          memory.add(message);
+        }
       }
 
       memory.add(LangChainChatMessages.userMessage(userMessage));
@@ -203,6 +217,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         return null;
       }
 
+      if (ai.hasToolExecutionRequests()) {
+        log.warn("Skipping final LangChain memory update because response still has tool requests");
+      } else {
+        memory.add(ai);
+      }
+
       if (isJsonObjectAsString(responseText)) {
         return new ReviewRequestResult(
             convertResponseContentFromJson(unwrapJsonCode(responseText)), userMessage);
@@ -238,6 +258,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     }
     return new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey)
         .resolveConversationId();
+  }
+
+  private ChatMemory buildMemory(Object memoryId) {
+    TokenWindowChatMemory.Builder builder =
+        TokenWindowChatMemory.builder()
+            .id(memoryId)
+            .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get());
+    if (chatMemoryStore != null) {
+      builder.chatMemoryStore(chatMemoryStore);
+    }
+    return builder.build();
   }
 
   @Override
