@@ -16,53 +16,100 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.StoredMessage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.StoredMessageList;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainMessageTextExtractor;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
-import dev.langchain4j.data.message.AiMessage;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.ChatMessageDeserializer;
+import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
-
-import lombok.extern.slf4j.Slf4j;
-
-import java.lang.reflect.Method;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import lombok.extern.slf4j.Slf4j;
+import org.h2.tools.Server;
 
 @Slf4j
+@Singleton
 public class PluginChatMemoryStore implements ChatMemoryStore {
-  private static final String KEY_MESSAGES_PREFIX = "lc_chat_memory_messages";
+  private static final String DB_FILE_NAME = "reviewai";
+  private static final String DEFAULT_SCOPE = "default";
+  private static final String TCP_HOST = "localhost";
+  private static final int TCP_PORT = 9092;
+  private static final String TCP_URL_PREFIX = "jdbc:h2:tcp://" + TCP_HOST + ":" + TCP_PORT + "/";
+  private static final Object TCP_SERVER_LOCK = new Object();
 
-  private final PluginDataHandler pluginDataHandler;
+  private static Server tcpServer;
 
-  public PluginChatMemoryStore(PluginDataHandler pluginDataHandler) {
-    this.pluginDataHandler = pluginDataHandler;
+  private final String jdbcUrl;
+
+  @Inject
+  public PluginChatMemoryStore(
+      @com.google.gerrit.extensions.annotations.PluginData Path pluginDataDir)
+      throws SQLException, IOException {
+    Files.createDirectories(pluginDataDir);
+    Path dbFile = pluginDataDir.resolve(DB_FILE_NAME);
+    this.jdbcUrl =
+        TCP_URL_PREFIX + dbFile.toAbsolutePath() + ";AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1";
+    ensureTcpServerStarted();
+    initSchema();
+  }
+
+  public PluginChatMemoryStore(String jdbcUrl) throws SQLException {
+    this.jdbcUrl = jdbcUrl;
+    ensureTcpServerStarted();
+    initSchema();
+  }
+
+  private void initSchema() throws SQLException {
+    try (Connection c = getConnection();
+        Statement s = c.createStatement()) {
+      s.executeUpdate(
+          """
+          CREATE TABLE IF NOT EXISTS langchain_chat_memory_messages (
+            id IDENTITY PRIMARY KEY,
+            change_id VARCHAR(512) NOT NULL,
+            patch_set INT NOT NULL,
+            scope VARCHAR(64) NOT NULL,
+            message_json CLOB NOT NULL,
+            updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )
+          """);
+      s.executeUpdate(
+          """
+          CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_lookup
+          ON langchain_chat_memory_messages(change_id, patch_set, updated_at, id)
+          """);
+    }
   }
 
   @Override
   public List<ChatMessage> getMessages(Object memoryId) {
-    String key = keyFor(memoryId);
+    MemoryKey key = MemoryKey.from(memoryId);
     try {
-      String json = pluginDataHandler.getValue(key);
-      if (json == null || json.isEmpty()) {
-        return new ArrayList<>();
+      try (Connection c = getConnection()) {
+        List<ChatMessage> result = new ArrayList<>();
+        for (StoredMessage message : getMessageRecords(c, key)) {
+          String json = message.messageJson();
+          if (json != null && !json.isEmpty()) {
+            result.add(ChatMessageDeserializer.messageFromJson(json));
+          }
+        }
+        log.info(
+            "Loaded {} chat messages from LangChain memory store for {}",
+            result.size(),
+            memoryId);
+        return result;
       }
-      StoredMessageList stored = getGson().fromJson(json, StoredMessageList.class);
-      if (stored == null || stored.getMessages() == null) {
-        return new ArrayList<>();
-      }
-      List<ChatMessage> result = new ArrayList<>();
-      for (StoredMessage m : stored.getMessages()) {
-        result.add(toChatMessage(m));
-      }
-      log.info(
-          "Loaded {} chat messages from LangChain memory store for {}", result.size(), memoryId);
-      return result;
     } catch (Exception e) {
       log.warn("Failed to get chat memory messages for {}; returning empty list", memoryId, e);
       return new ArrayList<>();
@@ -71,17 +118,33 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
 
   @Override
   public void updateMessages(Object memoryId, List<ChatMessage> messages) {
-    String key = keyFor(memoryId);
+    MemoryKey key = MemoryKey.from(memoryId);
     try {
-      List<StoredMessage> stored = new ArrayList<>();
-      if (messages != null) {
-        for (ChatMessage m : messages) {
-          stored.add(fromChatMessage(m));
-        }
+      if (messages == null || messages.isEmpty()) {
+        deleteMessages(memoryId);
+        return;
       }
-      pluginDataHandler.setJsonValue(key, new StoredMessageList(stored));
-      log.info(
-          "Persisted {} chat messages into LangChain memory store for {}", stored.size(), memoryId);
+      try (Connection c = getConnection();
+          PreparedStatement ps = prepareInsertMessage(c)) {
+        List<StoredMessage> existingRecords = getMessageRecords(c, key);
+        List<String> existingMessages =
+            existingRecords.stream().map(StoredMessage::messageJson).toList();
+        List<String> updatedMessages =
+            messages.stream().map(ChatMessageSerializer::messageToJson).toList();
+        int overlapSize = getExistingOverlapSize(existingMessages, updatedMessages);
+        deleteObsoleteMessages(c, existingRecords, existingMessages.size() - overlapSize);
+        List<String> messagesToAppend =
+            updatedMessages.subList(overlapSize, updatedMessages.size());
+        for (String messageJson : messagesToAppend) {
+          bindInsertMessage(ps, key, messageJson);
+          ps.addBatch();
+        }
+        ps.executeBatch();
+        log.info(
+            "Persisted {} new chat messages into LangChain memory store for {}",
+            messagesToAppend.size(),
+            memoryId);
+      }
     } catch (Exception e) {
       log.warn("Failed to persist chat memory messages for {}", memoryId, e);
     }
@@ -89,82 +152,176 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
 
   @Override
   public void deleteMessages(Object memoryId) {
+    MemoryKey key = MemoryKey.from(memoryId);
     log.info("Clearing LangChain memory store for {}", memoryId);
-    pluginDataHandler.removeValue(keyFor(memoryId));
-  }
-
-  private String keyFor(Object memoryId) {
-    return String.format("%s_%s", KEY_MESSAGES_PREFIX, memoryId);
-  }
-
-  private static ChatMessage toChatMessage(StoredMessage sm) {
-    StoredMessage.MessageType messageType = sm.getMessageType();
-    String text = sm.getText();
-    if (messageType == null) {
-      log.warn("Stored message messageType missing; defaulting to USER for text preview: {}", text);
-      messageType = StoredMessage.MessageType.USER;
-    }
     try {
-      return switch (messageType) {
-        case SYSTEM -> createSystemMessage(text);
-        case USER -> createUserMessage(text);
-        case AI -> createAiMessage(text);
-      };
+      try (Connection c = getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  DELETE FROM langchain_chat_memory_messages
+                  WHERE change_id = ? AND patch_set = ? AND scope = ?
+                  """)) {
+        bindMemoryKey(ps, key);
+        ps.executeUpdate();
+      }
+    } catch (Exception e) {
+      log.warn("Failed to clear chat memory messages for {}", memoryId, e);
+    }
+  }
+
+  public void deleteMessagesForChangeSet(String changeId, int patchSet) {
+    log.info(
+        "Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
+    try {
+      try (Connection c = getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  DELETE FROM langchain_chat_memory_messages
+                  WHERE change_id = ? AND patch_set = ?
+                  """)) {
+        ps.setString(1, changeId);
+        ps.setInt(2, patchSet);
+        ps.executeUpdate();
+      }
     } catch (Exception e) {
       log.warn(
-          "Falling back to UserMessage for messageType {} due to error: {}",
-          messageType,
-          e.getMessage());
-      return createUserMessage(text);
+          "Failed to clear chat memory messages for change {} patch set {}",
+          changeId,
+          patchSet,
+          e);
     }
   }
 
-  private static StoredMessage fromChatMessage(ChatMessage msg) {
-    String text = LangChainMessageTextExtractor.extractText(msg);
-    StoredMessage.MessageType messageType = resolveMessageType(msg);
-    return new StoredMessage(messageType, text);
+  private static void bindMemoryKey(PreparedStatement ps, MemoryKey key) throws SQLException {
+    ps.setString(1, key.changeId());
+    ps.setInt(2, key.patchSet());
+    ps.setString(3, key.scope());
   }
 
-  private static StoredMessage.MessageType resolveMessageType(ChatMessage msg) {
-    if (msg == null) {
-      log.warn(
-          "Encountered null chat message while resolving StoredMessage type; defaulting to USER");
-      return StoredMessage.MessageType.USER;
-    }
-
-    return switch (msg) {
-      case SystemMessage ignored -> StoredMessage.MessageType.SYSTEM;
-      case AiMessage ignored -> StoredMessage.MessageType.AI;
-      case UserMessage ignored -> StoredMessage.MessageType.USER;
-      default -> StoredMessage.MessageType.USER;
-    };
+  private Connection getConnection() throws SQLException {
+    ensureTcpServerStarted();
+    return DriverManager.getConnection(jdbcUrl);
   }
 
-  private static SystemMessage createSystemMessage(String text) {
-    try {
-      // Prefer factory if available
-      Method from = SystemMessage.class.getMethod("from", String.class);
-      return (SystemMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
+  private void ensureTcpServerStarted() {
+    if (!usesManagedTcpServer()) {
+      return;
     }
-    return new SystemMessage(text);
+    synchronized (TCP_SERVER_LOCK) {
+      if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
+        return;
+      }
+      try {
+        tcpServer =
+            Server.createTcpServer(
+                    "-tcpPort", Integer.toString(TCP_PORT), "-tcpDaemon", "-ifNotExists")
+                .start();
+      } catch (SQLException e) {
+        throw new RuntimeException("Failed to start H2 TCP server for ReviewAI chat memory", e);
+      }
+    }
   }
 
-  private static UserMessage createUserMessage(String text) {
-    try {
-      Method from = UserMessage.class.getMethod("from", String.class);
-      return (UserMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
-    }
-    return new UserMessage(text);
+  private boolean usesManagedTcpServer() {
+    return jdbcUrl.startsWith(TCP_URL_PREFIX);
   }
 
-  private static AiMessage createAiMessage(String text) {
-    try {
-      Method from = AiMessage.class.getMethod("from", String.class);
-      return (AiMessage) from.invoke(null, text);
-    } catch (Exception ignore) {
+  private static boolean isTcpServerAvailable() {
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress(TCP_HOST, TCP_PORT), 200);
+      return true;
+    } catch (IOException e) {
+      return false;
     }
-    return new AiMessage(text);
+  }
+
+  private static PreparedStatement prepareInsertMessage(Connection c) throws SQLException {
+    return c.prepareStatement(
+        """
+        INSERT INTO langchain_chat_memory_messages
+          (change_id, patch_set, scope, message_json, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """);
+  }
+
+  private static void bindInsertMessage(PreparedStatement ps, MemoryKey key, String messageJson)
+      throws SQLException {
+    bindMemoryKey(ps, key);
+    ps.setString(4, messageJson);
+  }
+
+  private List<StoredMessage> getMessageRecords(Connection c, MemoryKey key) throws SQLException {
+    try (PreparedStatement ps =
+        c.prepareStatement(
+            """
+            SELECT id, message_json
+            FROM langchain_chat_memory_messages
+            WHERE change_id = ? AND patch_set = ?
+            ORDER BY updated_at, id
+            """)) {
+      ps.setString(1, key.changeId());
+      ps.setInt(2, key.patchSet());
+      try (ResultSet rs = ps.executeQuery()) {
+        List<StoredMessage> result = new ArrayList<>();
+        while (rs.next()) {
+          result.add(new StoredMessage(rs.getLong(1), rs.getString(2)));
+        }
+        return result;
+      }
+    }
+  }
+
+  private static void deleteObsoleteMessages(
+      Connection c, List<StoredMessage> existingRecords, int obsoleteCount) throws SQLException {
+    if (obsoleteCount <= 0) {
+      return;
+    }
+    try (PreparedStatement ps =
+        c.prepareStatement(
+            """
+            DELETE FROM langchain_chat_memory_messages
+            WHERE id = ?
+            """)) {
+      for (StoredMessage message : existingRecords.subList(0, obsoleteCount)) {
+        ps.setLong(1, message.id());
+        ps.addBatch();
+      }
+      ps.executeBatch();
+    }
+  }
+
+  private static int getExistingOverlapSize(
+      List<String> existingMessages, List<String> updatedMessages) {
+    int maxOverlap = Math.min(existingMessages.size(), updatedMessages.size());
+    for (int overlap = maxOverlap; overlap >= 0; overlap--) {
+      if (matchesOverlap(existingMessages, updatedMessages, overlap)) {
+        return overlap;
+      }
+    }
+    return 0;
+  }
+
+  private static boolean matchesOverlap(
+      List<String> existingMessages, List<String> updatedMessages, int overlap) {
+    int existingStart = existingMessages.size() - overlap;
+    for (int i = 0; i < overlap; i++) {
+      if (!existingMessages.get(existingStart + i).equals(updatedMessages.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private record StoredMessage(long id, String messageJson) {}
+
+  private record MemoryKey(String changeId, int patchSet, String scope) {
+    private static MemoryKey from(Object memoryId) {
+      if (memoryId instanceof LangChainMemoryId id) {
+        return new MemoryKey(id.getChangeId(), id.getPatchSet(), id.getScope());
+      }
+      return new MemoryKey(String.valueOf(memoryId), 0, DEFAULT_SCOPE);
+    }
   }
 }

@@ -29,6 +29,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -48,6 +50,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private final GitRepoFiles gitRepoFiles;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
+  private final PluginChatMemoryStore chatMemoryStore;
   private final IPatchSetProvider IPatchSetProvider;
 
   private CommandSet command;
@@ -64,6 +67,28 @@ public class ClientCommandExecutor extends ClientCommandBase {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        gitRepoFiles,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        null);
+  }
+
+  public ClientCommandExecutor(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      GitRepoFiles gitRepoFiles,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
@@ -71,6 +96,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.codeContextPolicy = codeContextPolicy;
     this.gitRepoFiles = gitRepoFiles;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
+    this.chatMemoryStore = chatMemoryStore;
     this.IPatchSetProvider = IPatchSetProvider;
     log.debug("ClientCommandExecutor initialized.");
   }
@@ -256,7 +282,16 @@ public class ClientCommandExecutor extends ClientCommandBase {
         "Removing conversation ID '{}' for Change Set",
         changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID));
     new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider).clear();
+    clearLangChainMemory();
     changeSetData.setReviewSystemMessage(localizer.getText("message.command.thread.forget"));
+  }
+
+  private void clearLangChainMemory() {
+    if (chatMemoryStore == null) {
+      return;
+    }
+    chatMemoryStore.deleteMessagesForChangeSet(
+        change.getFullChangeId(), LangChainMemoryId.getPatchSetNumber(change));
   }
 
   private void commandDynamicallyConfigure() {
