@@ -71,7 +71,7 @@ public class OpenAiReviewTestBase extends ReviewTestBase {
 
     setupPluginData();
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     projectHandler = provider.getProjectScope();
     Mockito.lenient().when(pluginDataHandlerProvider.getProjectScope()).thenReturn(projectHandler);
     Mockito.lenient()

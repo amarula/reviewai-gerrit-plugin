@@ -32,20 +32,28 @@ public class PluginDataHandlerBaseProvider implements Provider<PluginDataHandler
   private static final String PATH_GLOBAL = "global";
 
   private final Path defaultPluginDataPath;
+  private final ReviewAiDb db;
   private final Map<Path, PluginDataHandler> handlers = new ConcurrentHashMap<>();
 
   @Inject
   public PluginDataHandlerBaseProvider(
-      @com.google.gerrit.extensions.annotations.PluginData Path defaultPluginDataPath) {
+      @com.google.gerrit.extensions.annotations.PluginData Path defaultPluginDataPath,
+      ReviewAiDb db) {
     this.defaultPluginDataPath = defaultPluginDataPath;
+    this.db = db;
     log.debug(
         "PluginDataHandlerBaseProvider initialized with default plugin data path: {}",
         defaultPluginDataPath);
   }
 
+  public PluginDataHandlerBaseProvider(Path defaultPluginDataPath) {
+    this(defaultPluginDataPath, null);
+  }
+
   public PluginDataHandler get(String path) {
     Path dataFile = defaultPluginDataPath.resolve(path + PATH_SUFFIX);
-    return handlers.computeIfAbsent(dataFile, PluginDataHandler::new);
+    return handlers.computeIfAbsent(
+        dataFile, key -> db != null ? new PluginDataHandler(key, db) : new PluginDataHandler(key));
   }
 
   @Override

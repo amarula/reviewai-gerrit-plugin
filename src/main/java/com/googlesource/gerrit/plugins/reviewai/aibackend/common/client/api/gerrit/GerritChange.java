@@ -22,13 +22,12 @@ import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetEvent;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Getter
@@ -41,6 +40,7 @@ public class GerritChange {
   private BranchNameKey branchNameKey;
   private Change.Key changeKey;
   private String fullChangeId;
+  @Setter private Integer patchSetNumber;
   // "Boolean" is used instead of "boolean" to have "getIsCommentEvent" instead of "isCommentEvent"
   // as getter method
   // (due to Lombok's magic naming convention)
@@ -75,6 +75,19 @@ public class GerritChange {
   public Optional<PatchSetAttribute> getPatchSetAttribute() {
     try {
       return Optional.ofNullable(patchSetEvent.patchSet.get());
+    } catch (NullPointerException e) {
+      if (patchSetNumber == null) {
+        return Optional.empty();
+      }
+      PatchSetAttribute patchSetAttribute = new PatchSetAttribute();
+      patchSetAttribute.number = patchSetNumber;
+      return Optional.of(patchSetAttribute);
+    }
+  }
+
+  public Optional<Integer> getChangeNumber() {
+    try {
+      return Optional.ofNullable(patchSetEvent.change.get()).map(change -> change.number);
     } catch (NullPointerException e) {
       return Optional.empty();
     }
