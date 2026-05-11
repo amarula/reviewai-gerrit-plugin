@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -51,12 +52,22 @@ class ReviewAgentResponseService {
   private final AccountCache accountCache;
   private final GitRepositoryManager repositoryManager;
   private final Path pluginDataPath;
+  private final PluginChatMemoryStore chatMemoryStore;
 
   ReviewAgentResponseService(
       AccountCache accountCache, GitRepositoryManager repositoryManager, Path pluginDataPath) {
+    this(accountCache, repositoryManager, pluginDataPath, null);
+  }
+
+  ReviewAgentResponseService(
+      AccountCache accountCache,
+      GitRepositoryManager repositoryManager,
+      Path pluginDataPath,
+      PluginChatMemoryStore chatMemoryStore) {
     this.accountCache = accountCache;
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
+    this.chatMemoryStore = chatMemoryStore;
   }
 
   Optional<AiReviewMessage.Output> getDirectResponse(
@@ -201,7 +212,8 @@ class ReviewAgentResponseService {
             new GitRepoFiles(),
             pluginDataHandlerProvider,
             localizer,
-            () -> gerritClientPatchSet.getPatchSet(changeSetData, change))
+            () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
+            chatMemoryStore)
         .parseCommands(message, executeCommands);
     return new ReviewAgentCommandContext(changeSetData, pluginDataHandlerProvider, localizer);
   }
