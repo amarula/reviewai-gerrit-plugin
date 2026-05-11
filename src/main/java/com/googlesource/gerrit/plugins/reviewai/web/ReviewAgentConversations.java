@@ -22,13 +22,10 @@ import com.google.gerrit.extensions.restapi.RestModifyView;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
-import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -38,22 +35,21 @@ import java.util.Optional;
 
 public class ReviewAgentConversations
     implements RestModifyView<ChangeResource, ReviewAgentConversations.Input> {
-  private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
   private static final String ACTION_LIST = "list";
   private static final String ACTION_GET = "get";
   private static final String ACTION_UPSERT = "upsert";
   private static final String ACTION_APPEND = "append";
-  private static final Type CONVERSATION_MAP_TYPE =
-      new TypeToken<Map<String, ReviewAgentConversationInfo>>() {}.getType();
+  private static final String PATCH_SET_EVENT_TRIGGER_MESSAGE =
+      "Patch set commit event triggered this ReviewAI request.";
 
-  private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
+  private final ReviewAgentConversationStore conversationStore;
   private final AiReviewPermission aiReviewPermission;
 
   @Inject
   ReviewAgentConversations(
-      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      ReviewAgentConversationStore conversationStore,
       AiReviewPermission aiReviewPermission) {
-    this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+    this.conversationStore = conversationStore;
     this.aiReviewPermission = aiReviewPermission;
   }
 
@@ -64,28 +60,27 @@ public class ReviewAgentConversations
       throw new BadRequestException("action is required");
     }
 
-    PluginDataHandler changeDataHandler =
-        pluginDataHandlerBaseProvider.get(resource.getChange().getKey().toString());
-    Map<String, ReviewAgentConversationInfo> conversations = getConversations(changeDataHandler);
+    String changeId = getFullChangeId(resource);
+    Map<String, ReviewAgentConversationInfo> conversations =
+        conversationStore.getConversations(changeId);
 
     return switch (input.action) {
       case ACTION_LIST -> Response.ok(Output.list(toSortedList(conversations)));
       case ACTION_GET -> Response.ok(Output.conversation(getConversation(conversations, input)));
       case ACTION_APPEND ->
-          Response.ok(Output.conversation(append(changeDataHandler, conversations, input)));
-      case ACTION_UPSERT -> Response.ok(Output.conversation(upsert(changeDataHandler, conversations, input)));
+          Response.ok(Output.conversation(append(changeId, conversations, input)));
+      case ACTION_UPSERT ->
+          Response.ok(Output.conversation(upsert(changeId, conversations, input)));
       default -> throw new BadRequestException("unsupported action: " + input.action);
     };
   }
 
-  private Map<String, ReviewAgentConversationInfo> getConversations(
-      PluginDataHandler changeDataHandler) {
-    Map<String, ReviewAgentConversationInfo> conversations =
-        changeDataHandler.getJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, CONVERSATION_MAP_TYPE);
-    if (conversations == null) {
-      return new LinkedHashMap<>();
-    }
-    return new LinkedHashMap<>(conversations);
+  private String getFullChangeId(ChangeResource resource) {
+    return new GerritChange(
+            resource.getChange().getProject(),
+            resource.getChange().getDest(),
+            resource.getChange().getKey())
+        .getFullChangeId();
   }
 
   private List<ReviewAgentConversationInfo> toSortedList(
@@ -109,19 +104,21 @@ public class ReviewAgentConversations
     if (conversationId == null || conversationId.isBlank()) {
       return null;
     }
-    ReviewAgentConversationInfo conversation = conversations.get(conversationId);
+    String canonicalConversationId =
+        ReviewAgentConversationStore.canonicalConversationId(conversationId);
+    ReviewAgentConversationInfo conversation = conversations.get(canonicalConversationId);
     if (conversation != null) {
       return conversation;
     }
     return conversations.entrySet().stream()
-        .filter(entry -> entry.getKey().equalsIgnoreCase(conversationId))
+        .filter(entry -> entry.getKey().equalsIgnoreCase(canonicalConversationId))
         .map(Map.Entry::getValue)
         .findFirst()
         .orElse(null);
   }
 
   private ReviewAgentConversationInfo upsert(
-      PluginDataHandler changeDataHandler,
+      String changeId,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -132,17 +129,19 @@ public class ReviewAgentConversations
     if (incomingConversation.id == null || incomingConversation.id.isBlank()) {
       throw new BadRequestException("conversation.id is required");
     }
+    incomingConversation.id =
+        ReviewAgentConversationStore.canonicalConversationId(incomingConversation.id);
     ReviewAgentConversationInfo conversation =
         mergeConversation(
             getConversationById(conversations, incomingConversation.id), incomingConversation);
     conversations.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase(conversation.id));
     conversations.put(conversation.id, conversation);
-    changeDataHandler.setJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, conversations);
+    conversationStore.upsertConversation(changeId, conversation);
     return conversation;
   }
 
   private ReviewAgentConversationInfo append(
-      PluginDataHandler changeDataHandler,
+      String changeId,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -152,6 +151,8 @@ public class ReviewAgentConversations
     if (input.turn == null) {
       throw new BadRequestException("turn is required");
     }
+    input.conversationId =
+        ReviewAgentConversationStore.canonicalConversationId(input.conversationId);
 
     ReviewAgentConversationInfo conversation =
         Optional.ofNullable(getConversationById(conversations, input.conversationId))
@@ -173,9 +174,15 @@ public class ReviewAgentConversations
     }
 
     int turnIndex = getTurnIndex(conversation, input);
-    if (turnIndex < conversation.turns.size()
-        && isSameConversationTurn(conversation.turns.get(turnIndex), input.turn)) {
-      conversation.turns.set(turnIndex, input.turn);
+    boolean replaceTurn = false;
+    if (turnIndex < conversation.turns.size()) {
+      JsonObject existingTurn = conversation.turns.get(turnIndex);
+      if (shouldReplaceConversationTurn(existingTurn, input.turn)) {
+        conversation.turns.set(turnIndex, input.turn);
+        replaceTurn = true;
+      } else {
+        conversation.turns.add(input.turn);
+      }
     } else {
       conversation.turns.add(input.turn);
     }
@@ -184,7 +191,18 @@ public class ReviewAgentConversations
 
     conversations.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase(conversation.id));
     conversations.put(conversation.id, conversation);
-    changeDataHandler.setJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, conversations);
+    if (replaceTurn) {
+      conversationStore.replaceTurn(
+          changeId,
+          conversation.id,
+          conversation.title,
+          input.turn,
+          conversation.timestampMillis,
+          turnIndex);
+    } else {
+      conversationStore.appendTurn(
+          changeId, conversation.id, conversation.title, input.turn, conversation.timestampMillis);
+    }
     return conversation;
   }
 
@@ -197,6 +215,20 @@ public class ReviewAgentConversations
 
   private boolean isSameConversationTurn(JsonObject existingTurn, JsonObject newTurn) {
     return getUserQuestion(existingTurn).equals(getUserQuestion(newTurn));
+  }
+
+  private boolean shouldReplaceConversationTurn(JsonObject existingTurn, JsonObject newTurn) {
+    return isSameConversationTurn(existingTurn, newTurn)
+        || (isPatchSetEventTriggerTurn(existingTurn) && isReviewCommandTurn(newTurn));
+  }
+
+  private boolean isPatchSetEventTriggerTurn(JsonObject turn) {
+    return PATCH_SET_EVENT_TRIGGER_MESSAGE.equals(getUserQuestion(turn));
+  }
+
+  private boolean isReviewCommandTurn(JsonObject turn) {
+    String normalizedQuestion = getUserQuestion(turn).stripLeading();
+    return normalizedQuestion.equals("/review") || normalizedQuestion.startsWith("/review ");
   }
 
   private String getUserQuestion(JsonObject turn) {
@@ -241,7 +273,7 @@ public class ReviewAgentConversations
 
   private void mergeTurn(List<JsonObject> storedTurns, JsonObject incomingTurn) {
     for (int i = 0; i < storedTurns.size(); i++) {
-      if (isSameConversationTurn(storedTurns.get(i), incomingTurn)) {
+      if (shouldReplaceConversationTurn(storedTurns.get(i), incomingTurn)) {
         storedTurns.set(i, incomingTurn);
         return;
       }

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 public class HashUtils {
@@ -37,6 +38,28 @@ public class HashUtils {
     return hash;
   }
 
+  public static String stableUuid(String value) {
+    String input = String.valueOf(value).toLowerCase(Locale.ROOT);
+    long[] parts = {
+      hash32(input, 0x811c9dc5L),
+      hash32(input, 0x01000193L),
+      hash32(input, 0x85ebca6bL),
+      hash32(input, 0xc2b2ae35L)
+    };
+    StringBuilder hex = new StringBuilder();
+    for (long part : parts) {
+      hex.append(String.format("%08x", part));
+    }
+    int variant = (Integer.parseInt(hex.substring(16, 17), 16) & 0x3) | 0x8;
+    return String.join(
+        "-",
+        hex.substring(0, 8),
+        hex.substring(8, 12),
+        "4" + hex.substring(13, 16),
+        Integer.toString(variant, 16) + hex.substring(17, 20),
+        hex.substring(20, 32));
+  }
+
   private static String sha1(String data) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-1");
@@ -48,6 +71,20 @@ public class HashUtils {
       log.error("Failed to find SHA-1 hashing algorithm", e);
       throw new RuntimeException("SHA-1 algorithm not found", e);
     }
+  }
+
+  private static long hash32(String input, long seed) {
+    long hash = seed & 0xffffffffL;
+    for (int i = 0; i < input.length(); i++) {
+      hash ^= input.charAt(i);
+      hash = (hash * 0x01000193L) & 0xffffffffL;
+    }
+    hash ^= hash >>> 16;
+    hash = (hash * 0x7feb352dL) & 0xffffffffL;
+    hash ^= hash >>> 15;
+    hash = (hash * 0x846ca68bL) & 0xffffffffL;
+    hash ^= hash >>> 16;
+    return hash & 0xffffffffL;
   }
 
   private static String bytesToHex(byte[] hashBytes) {

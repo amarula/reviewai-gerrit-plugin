@@ -89,7 +89,7 @@ public class CommandTest extends OpenAiReviewTestBase {
     Path realChangeDataPath = tempFolder.getRoot().toPath().resolve(TestBase.CHANGE_ID + ".data");
     when(mockPluginDataPath.resolve(TestBase.CHANGE_ID + ".data")).thenReturn(realChangeDataPath);
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler changeHandler = provider.getChangeScope();
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeHandler);
 
@@ -124,6 +124,23 @@ public class CommandTest extends OpenAiReviewTestBase {
 
     Gson gson = OutputFormat.JSON_COMPACT.newGson();
     Assert.assertEquals(reviewMessage, gson.toJson(captor.getAllValues().get(0)));
+  }
+
+  @Test
+  public void commandReviewDoesNotStoreAutomaticPatchSetConversationTurn()
+      throws RestApiException {
+    setupCommandComment("/review");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(reviewAgentConversationStore, Mockito.never())
+        .appendTurn(
+            Mockito.anyString(),
+            Mockito.anyString(),
+            Mockito.anyString(),
+            Mockito.any(),
+            Mockito.any());
   }
 
   @Test
@@ -438,7 +455,7 @@ public class CommandTest extends OpenAiReviewTestBase {
     enableMessageDebugging();
 
     PluginDataHandlerProvider provider =
-        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange());
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
     PluginDataHandler globalHandler = provider.getGlobalScope();
     when(pluginDataHandlerProvider.getGlobalScope()).thenReturn(globalHandler);
     PluginDataHandler projectHandler = provider.getProjectScope();

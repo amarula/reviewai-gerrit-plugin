@@ -19,14 +19,20 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
@@ -34,23 +40,33 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 @Slf4j
 public class PluginDataHandler {
   private static final Map<Path, Object> FILE_LOCKS = new ConcurrentHashMap<>();
+  private static final String PATH_SUFFIX = ".data";
+  private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
 
   private final Path configFile;
   private final Object fileLock;
-  private final Properties configProperties = new Properties();
+  private final String scope;
+  private final ReviewAiDb db;
 
   @Inject
   public PluginDataHandler(Path configFilePath) {
+    this(configFilePath, null);
+  }
+
+  public PluginDataHandler(Path configFilePath, ReviewAiDb db) {
     this.configFile = configFilePath;
     this.fileLock =
         FILE_LOCKS.computeIfAbsent(configFile.toAbsolutePath().normalize(), path -> new Object());
+    this.scope = scopeFrom(configFilePath);
+    Path pluginDataDir = configFilePath.toAbsolutePath().getParent();
     try {
-      log.debug("Loading or creating properties file at: {}", configFilePath);
+      this.db = db != null ? db : new ReviewAiDb(pluginDataDir);
       synchronized (fileLock) {
-        loadOrCreateProperties();
+        initSchema();
+        migrateLegacyProperties();
       }
-    } catch (IOException e) {
-      log.error("Failed to load or create properties", e);
+    } catch (IOException | SQLException e) {
+      log.error("Failed to initialize plugin data store", e);
       throw new RuntimeException(e);
     }
   }
@@ -58,9 +74,22 @@ public class PluginDataHandler {
   public synchronized void setValue(String key, String value) {
     log.debug("Setting value for key: {} with value: {}", key, value);
     synchronized (fileLock) {
-      loadOrCreatePropertiesUnchecked();
-      configProperties.setProperty(key, value);
-      storeProperties();
+      try (Connection c = db.getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  MERGE INTO plugin_data
+                  KEY(scope, data_key)
+                  VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                  """)) {
+        ps.setString(1, scope);
+        ps.setString(2, key);
+        ps.setString(3, value);
+        ps.executeUpdate();
+      } catch (SQLException e) {
+        log.error("Failed to store plugin data value for key {}", key, e);
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -72,8 +101,23 @@ public class PluginDataHandler {
   public String getValue(String key) {
     log.debug("Getting value for key: {}", key);
     synchronized (fileLock) {
-      loadOrCreatePropertiesUnchecked();
-      return configProperties.getProperty(key);
+      try (Connection c = db.getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  SELECT data_value
+                  FROM plugin_data
+                  WHERE scope = ? AND data_key = ?
+                  """)) {
+        ps.setString(1, scope);
+        ps.setString(2, key);
+        try (ResultSet rs = ps.executeQuery()) {
+          return rs.next() ? rs.getString(1) : null;
+        }
+      } catch (SQLException e) {
+        log.error("Failed to read plugin data value for key {}", key, e);
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -100,21 +144,34 @@ public class PluginDataHandler {
   public Map<String, String> getAllValues() {
     log.debug("Getting all properties");
     synchronized (fileLock) {
-      loadOrCreatePropertiesUnchecked();
-      Map<String, String> allProperties = new HashMap<>();
-      for (String key : configProperties.stringPropertyNames()) {
-        allProperties.put(key, configProperties.getProperty(key));
+      try (Connection c = db.getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  SELECT data_key, data_value
+                  FROM plugin_data
+                  WHERE scope = ?
+                  """)) {
+        ps.setString(1, scope);
+        try (ResultSet rs = ps.executeQuery()) {
+          Map<String, String> allProperties = new HashMap<>();
+          while (rs.next()) {
+            allProperties.put(rs.getString(1), rs.getString(2));
+          }
+          return allProperties;
+        }
+      } catch (SQLException e) {
+        log.error("Failed to read plugin data values", e);
+        throw new RuntimeException(e);
       }
-      return allProperties;
     }
   }
 
   public synchronized <T> void appendJsonValue(String key, T value, Class<T> clazz) {
     log.debug("Updating JSON value for key: {}", key);
     synchronized (fileLock) {
-      loadOrCreatePropertiesUnchecked();
       Type typeOfArray = TypeToken.getParameterized(List.class, clazz).getType();
-      String jsonValue = configProperties.getProperty(key);
+      String jsonValue = getValue(key);
       List<T> jsonProperty =
           jsonValue == null || jsonValue.isEmpty()
               ? null
@@ -123,18 +180,26 @@ public class PluginDataHandler {
         jsonProperty = new ArrayList<>();
       }
       jsonProperty.add(value);
-      configProperties.setProperty(key, getGson().toJson(jsonProperty));
-      storeProperties();
+      setValue(key, getGson().toJson(jsonProperty));
     }
   }
 
   public synchronized void removeValue(String key) {
     log.debug("Removing value for key: {}", key);
     synchronized (fileLock) {
-      loadOrCreatePropertiesUnchecked();
-      if (configProperties.containsKey(key)) {
-        configProperties.remove(key);
-        storeProperties();
+      try (Connection c = db.getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  DELETE FROM plugin_data
+                  WHERE scope = ? AND data_key = ?
+                  """)) {
+        ps.setString(1, scope);
+        ps.setString(2, key);
+        ps.executeUpdate();
+      } catch (SQLException e) {
+        log.error("Failed to remove plugin data value for key {}", key, e);
+        throw new RuntimeException(e);
       }
     }
   }
@@ -142,46 +207,80 @@ public class PluginDataHandler {
   public synchronized void destroy() {
     log.debug("Destroying configuration file at: {}", configFile);
     synchronized (fileLock) {
-      try {
+      try (Connection c = db.getConnection();
+          PreparedStatement ps =
+              c.prepareStatement(
+                  """
+                  DELETE FROM plugin_data
+                  WHERE scope = ?
+                  """)) {
+        ps.setString(1, scope);
+        ps.executeUpdate();
         Files.deleteIfExists(configFile);
-        configProperties.clear();
-      } catch (IOException e) {
+      } catch (IOException | SQLException e) {
         log.error("Failed to delete the config file: " + configFile, e);
         throw new RuntimeException("Failed to delete the config file: " + configFile, e);
       }
     }
   }
 
-  private void storeProperties() {
-    log.debug("Storing properties to file: {}", configFile);
-    try (var output = Files.newOutputStream(configFile)) {
-      configProperties.store(output, null);
-    } catch (IOException e) {
-      log.error("Failed to store properties", e);
-      throw new RuntimeException(e);
+  private void initSchema() throws SQLException {
+    db.initPluginDataSchema();
+  }
+
+  private void migrateLegacyProperties() throws IOException, SQLException {
+    if (Files.notExists(configFile)) {
+      return;
+    }
+    java.util.Properties legacyProperties = new java.util.Properties();
+    try (var input = Files.newInputStream(configFile)) {
+      legacyProperties.load(input);
+    }
+    if (legacyProperties.isEmpty()) {
+      return;
+    }
+    try (Connection c = db.getConnection();
+        PreparedStatement ps =
+            c.prepareStatement(
+                """
+                MERGE INTO plugin_data
+                KEY(scope, data_key)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """)) {
+      for (String key : legacyProperties.stringPropertyNames()) {
+        if (KEY_REVIEW_AGENT_CONVERSATIONS.equals(key) || hasValue(c, key)) {
+          continue;
+        }
+        ps.setString(1, scope);
+        ps.setString(2, key);
+        ps.setString(3, legacyProperties.getProperty(key));
+        ps.addBatch();
+      }
+      ps.executeBatch();
     }
   }
 
-  private void loadOrCreateProperties() throws IOException {
-    log.debug("Checking existence of the configuration file: {}", configFile);
-    configProperties.clear();
-    if (Files.notExists(configFile)) {
-      log.debug("Configuration file not found, creating new one at: {}", configFile);
-      Files.createFile(configFile);
-    } else {
-      log.debug("Loading properties from file: {}", configFile);
-      try (var input = Files.newInputStream(configFile)) {
-        configProperties.load(input);
+  private boolean hasValue(Connection c, String key) throws SQLException {
+    try (PreparedStatement ps =
+        c.prepareStatement(
+            """
+            SELECT 1
+            FROM plugin_data
+            WHERE scope = ? AND data_key = ?
+            LIMIT 1
+            """)) {
+      ps.setString(1, scope);
+      ps.setString(2, key);
+      try (ResultSet rs = ps.executeQuery()) {
+        return rs.next();
       }
     }
   }
 
-  private void loadOrCreatePropertiesUnchecked() {
-    try {
-      loadOrCreateProperties();
-    } catch (IOException e) {
-      log.error("Failed to load or create properties", e);
-      throw new RuntimeException(e);
-    }
+  private static String scopeFrom(Path configFilePath) {
+    String fileName = configFilePath.getFileName().toString();
+    return fileName.endsWith(PATH_SUFFIX)
+        ? fileName.substring(0, fileName.length() - PATH_SUFFIX.length())
+        : fileName;
   }
 }

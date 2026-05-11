@@ -38,6 +38,10 @@ public class TimeUtils {
     return System.currentTimeMillis();
   }
 
+  public static long epochSecondsToMillisOrNow(long epochSeconds) {
+    return epochSeconds > 0 ? epochSeconds * 1000 : getCurrentMillis();
+  }
+
   private static DateTimeFormatter getFormatter() {
     return DateTimeFormatter.ofPattern(DATE_TIME_PATTERN);
   }

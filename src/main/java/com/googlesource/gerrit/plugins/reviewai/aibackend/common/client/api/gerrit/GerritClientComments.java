@@ -22,6 +22,7 @@ import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
@@ -57,12 +58,12 @@ public class GerritClientComments extends GerritClientAccount {
   private final HashMap<String, GerritComment> patchSetCommentMap;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
+  private final PluginChatMemoryStore chatMemoryStore;
 
   private String authorUsername;
   @Getter private List<GerritComment> commentProperties;
 
   @VisibleForTesting
-  @Inject
   public GerritClientComments(
       Configuration config,
       AccountCache accountCache,
@@ -72,6 +73,29 @@ public class GerritClientComments extends GerritClientAccount {
       IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
+    this(
+        config,
+        accountCache,
+        changeSetData,
+        codeContextPolicy,
+        gitRepoFiles,
+        gerritClientPatchSet,
+        pluginDataHandlerProvider,
+        localizer,
+        null);
+  }
+
+  @Inject
+  public GerritClientComments(
+      Configuration config,
+      AccountCache accountCache,
+      ChangeSetData changeSetData,
+      ICodeContextPolicy codeContextPolicy,
+      GitRepoFiles gitRepoFiles,
+      IGerritClientPatchSet gerritClientPatchSet,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      PluginChatMemoryStore chatMemoryStore) {
     super(config, accountCache);
     this.changeSetData = changeSetData;
     this.codeContextPolicy = codeContextPolicy;
@@ -79,6 +103,7 @@ public class GerritClientComments extends GerritClientAccount {
     this.gerritClientPatchSet = gerritClientPatchSet;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
+    this.chatMemoryStore = chatMemoryStore;
     commentProperties = new ArrayList<>();
     commentMap = new HashMap<>();
     patchSetCommentMap = new HashMap<>();
@@ -184,7 +209,8 @@ public class GerritClientComments extends GerritClientAccount {
             gitRepoFiles,
             pluginDataHandlerProvider,
             localizer,
-            () -> gerritClientPatchSet.getPatchSet(changeSetData, change));
+            () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
+            chatMemoryStore);
     try {
       List<GerritComment> latestComments = retrieveComments(change);
       if (latestComments == null) {

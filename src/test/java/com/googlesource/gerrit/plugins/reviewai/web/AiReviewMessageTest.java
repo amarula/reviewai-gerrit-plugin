@@ -119,7 +119,9 @@ public class AiReviewMessageTest extends TestBase {
             pluginDataHandlerBaseProvider,
             accountCache,
             repositoryManager,
-            mockPluginDataPath);
+            mockPluginDataPath,
+            null,
+            getTestReviewAiDb());
   }
 
   @Test(expected = AuthException.class)
@@ -179,7 +181,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentShowCommandReturnsDirectResponseWithoutPostingGerritMessage()
       throws Exception {
-    new PluginDataHandler(realChangeDataPath)
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/show --config";
@@ -231,7 +233,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentReviewCommandReturnsDynamicConfigPreambleAndPostsGerritMessage()
       throws Exception {
-    new PluginDataHandler(realChangeDataPath)
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/forget_thread /review";
@@ -314,7 +316,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentConfigureCommandBlockedByDebuggingReturnsDirectSystemMessage()
       throws Exception {
-    new PluginDataHandler(realChangeDataPath)
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/configure";
@@ -335,7 +337,7 @@ public class AiReviewMessageTest extends TestBase {
   public void reviewAgentConfigureCommandWithDebuggingWaitsForPostedCommandResponse()
       throws Exception {
     when(config.getEnableMessageDebugging()).thenReturn(true);
-    new PluginDataHandler(realChangeDataPath)
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/configure";
