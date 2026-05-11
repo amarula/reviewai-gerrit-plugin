@@ -152,6 +152,39 @@
     return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
   }
 
+  function stableUuid(value) {
+    const input = String(value || '').toLowerCase();
+    const parts = [
+      hash32(input, 0x811c9dc5),
+      hash32(input, 0x01000193),
+      hash32(input, 0x85ebca6b),
+      hash32(input, 0xc2b2ae35),
+    ];
+    const hex = parts.map(part => part.toString(16).padStart(8, '0')).join('');
+    const variant = ((parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      `4${hex.slice(13, 16)}`,
+      `${variant}${hex.slice(17, 20)}`,
+      hex.slice(20, 32),
+    ].join('-');
+  }
+
+  function hash32(input, seed) {
+    let hash = seed >>> 0;
+    for (let i = 0; i < input.length; i++) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    hash ^= hash >>> 16;
+    hash = Math.imul(hash, 0x7feb352d) >>> 0;
+    hash ^= hash >>> 15;
+    hash = Math.imul(hash, 0x846ca68b) >>> 0;
+    hash ^= hash >>> 16;
+    return hash >>> 0;
+  }
+
   function isSameConversationId(left, right) {
     return String(left || '').toLowerCase() === String(right || '').toLowerCase();
   }
@@ -235,6 +268,7 @@
     formatAgentEntries,
     buildClientData,
     getConversationTitle,
+    stableUuid,
     isSameConversationId,
     toProviderDisplayName,
     emptyModelsResponse,

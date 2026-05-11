@@ -28,6 +28,7 @@ import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewReiterated;
+import com.googlesource.gerrit.plugins.reviewai.utils.HashUtils;
 import com.googlesource.gerrit.plugins.reviewai.utils.ThreadUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.entity.ContentType;
@@ -181,6 +182,29 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
     Assert.assertEquals(reviewMessageCode, getCapturedMessage(captor, "test_file_1.py"));
     Assert.assertEquals(
         reviewMessageCommitMessage, getCapturedMessage(captor, GERRIT_PATCH_SET_FILENAME));
+
+    ArgumentCaptor<JsonObject> turnCaptor = ArgumentCaptor.forClass(JsonObject.class);
+    Mockito.verify(reviewAgentConversationStore)
+        .appendTurn(
+            Mockito.eq(getGerritChange().getFullChangeId()),
+            Mockito.eq(HashUtils.stableUuid("reviewai-1")),
+            Mockito.eq("ReviewAI comments"),
+            turnCaptor.capture(),
+            Mockito.eq(TEST_TIMESTAMP * 1000));
+    JsonObject turn = turnCaptor.getValue();
+    Assert.assertEquals(
+        "Patch set commit event triggered this ReviewAI request.",
+        turn.getAsJsonObject("user_input").get("user_question").getAsString());
+    Assert.assertFalse(turn.getAsJsonObject("user_input").has("client_data"));
+    String responseText =
+        turn.getAsJsonObject("response")
+            .getAsJsonArray("response_parts")
+            .get(0)
+            .getAsJsonObject()
+            .get("text")
+            .getAsString();
+    Assert.assertTrue(responseText.contains(reviewMessageCode));
+    Assert.assertTrue(responseText.contains(reviewMessageCommitMessage));
   }
 
   @Test
@@ -458,6 +482,24 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
     Assert.assertEquals(1, captor.getValue().labels.get("Code-Review").intValue());
+    ArgumentCaptor<JsonObject> turnCaptor = ArgumentCaptor.forClass(JsonObject.class);
+    Mockito.verify(reviewAgentConversationStore)
+        .appendTurn(
+            Mockito.eq(getGerritChange().getFullChangeId()),
+            Mockito.eq(HashUtils.stableUuid("reviewai-1")),
+            Mockito.eq("ReviewAI comments"),
+            turnCaptor.capture(),
+            Mockito.eq(TEST_TIMESTAMP * 1000));
+    String responseText =
+        turnCaptor
+            .getValue()
+            .getAsJsonObject("response")
+            .getAsJsonArray("response_parts")
+            .get(0)
+            .getAsJsonObject()
+            .get("text")
+            .getAsString();
+    Assert.assertTrue(responseText.contains("**Code-Review +1**"));
   }
 
   @Test

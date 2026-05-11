@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -52,24 +53,16 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
       Localizer localizer,
-      PluginDataHandlerProvider pluginDataHandlerProvider) {
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      PluginChatMemoryStore chatMemoryStore) {
     this(
         config,
         codeContextPolicy,
         gerritClient,
         localizer,
         pluginDataHandlerProvider,
+        chatMemoryStore,
         ForkJoinPool.commonPool());
-  }
-
-  @VisibleForTesting
-  public LangChainMultiAgentReviewClient(
-      Configuration config,
-      ICodeContextPolicy codeContextPolicy,
-      GerritClient gerritClient,
-      Localizer localizer,
-      Executor executor) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, executor);
   }
 
   @VisibleForTesting
@@ -80,7 +73,29 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Executor executor) {
-    super(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider);
+    this(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, null, executor);
+  }
+
+  @VisibleForTesting
+  public LangChainMultiAgentReviewClient(
+      Configuration config,
+      ICodeContextPolicy codeContextPolicy,
+      GerritClient gerritClient,
+      Localizer localizer,
+      Executor executor) {
+    this(config, codeContextPolicy, gerritClient, localizer, null, null, executor);
+  }
+
+  @VisibleForTesting
+  public LangChainMultiAgentReviewClient(
+      Configuration config,
+      ICodeContextPolicy codeContextPolicy,
+      GerritClient gerritClient,
+      Localizer localizer,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      Executor executor) {
+    super(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, chatMemoryStore);
     this.executor = executor;
     log.debug("Initialized LangChainMultiAgentReviewClient.");
   }

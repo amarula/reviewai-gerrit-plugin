@@ -8,38 +8,6 @@
       return (userInput && userInput.user_question) || '';
     },
 
-    _mergeStoredTurnsWithHistory(storedTurns, historyTurns, includeNewTurns) {
-      if (!historyTurns.length) {
-        return storedTurns;
-      }
-
-      const mergedTurns = storedTurns.slice();
-      historyTurns.forEach(historyTurn => {
-        const storedTurnIndex = mergedTurns.findIndex(
-          storedTurn => this._turnUserQuestion(storedTurn) === this._turnUserQuestion(historyTurn)
-        );
-        if (storedTurnIndex !== -1) {
-          mergedTurns[storedTurnIndex] = this._mergeTurnWithHistory(
-            mergedTurns[storedTurnIndex],
-            historyTurn
-          );
-        } else if (includeNewTurns) {
-          mergedTurns.push(historyTurn);
-        }
-      });
-      return mergedTurns;
-    },
-
-    _mergeTurnWithHistory(storedTurn, historyTurn) {
-      const refreshedResponse = historyTurn.response || historyTurn.chat_response;
-      return {
-        ...storedTurn,
-        response: refreshedResponse || storedTurn.response,
-        chat_response: refreshedResponse || storedTurn.chat_response,
-        timestamp_millis: historyTurn.timestamp_millis || storedTurn.timestamp_millis,
-      };
-    },
-
     _applyReviewScoreToTurn(turn, reviewScore) {
       if (!reviewScore || !turn || !turn.response) {
         return;
@@ -143,7 +111,7 @@
     },
 
     _conversationId(change) {
-      return `reviewai-${agentUtils.getChangeNumber(change) || 'change'}`;
+      return agentUtils.stableUuid(`reviewai-${agentUtils.getChangeNumber(change) || 'change'}`);
     },
   };
 })(window);

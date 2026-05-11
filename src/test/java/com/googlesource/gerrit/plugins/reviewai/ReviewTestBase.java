@@ -31,6 +31,7 @@ import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.data.AccountAttribute;
+import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.*;
 import com.google.gerrit.server.git.GitRepositoryManager;
@@ -65,6 +66,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
+import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 
 import lombok.NonNull;
 import org.junit.After;
@@ -130,6 +132,7 @@ public class ReviewTestBase extends TestBase {
   @Mock protected GitRepositoryManager repositoryManager;
   @Mock protected ChangeSetDataProvider changeSetDataProvider;
   @Mock protected AiReviewPermission aiReviewPermission;
+  @Mock protected ReviewAgentConversationStore reviewAgentConversationStore;
   @Mock protected IdentifiedUser.GenericFactory identifiedUserFactory;
   @Mock protected IdentifiedUser eventUser;
 
@@ -376,7 +379,8 @@ public class ReviewTestBase extends TestBase {
                 new GerritClientReview(
                     config, accountCacheMock, pluginDataHandlerProvider, localizer)),
             getOpenAIClient(),
-            localizer);
+            localizer,
+            new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore));
     mockConfigCreator = mock(ConfigCreator.class);
   }
 
@@ -405,6 +409,12 @@ public class ReviewTestBase extends TestBase {
     return patchSetAttribute;
   }
 
+  private ChangeAttribute createChangeAttribute() {
+    ChangeAttribute changeAttribute = new ChangeAttribute();
+    changeAttribute.number = 1;
+    return changeAttribute;
+  }
+
   @NonNull
   private Consumer<Event> getTypeSpecificSetup(EventHandlerTask.SupportedEvents triggeredEvent) {
     return switch (triggeredEvent) {
@@ -421,6 +431,7 @@ public class ReviewTestBase extends TestBase {
             PatchSetCreatedEvent patchEvent = (PatchSetCreatedEvent) event;
             patchEvent.uploader = this::createTestAccountAttribute;
             patchEvent.patchSet = this::createPatchSetAttribute;
+            patchEvent.eventCreatedOn = TEST_TIMESTAMP;
             when(patchEvent.getType()).thenReturn("patchset-created");
           };
     };
@@ -434,6 +445,7 @@ public class ReviewTestBase extends TestBase {
     when(event.getProjectNameKey()).thenReturn(PROJECT_NAME);
     when(event.getBranchNameKey()).thenReturn(BRANCH_NAME);
     when(event.getChangeKey()).thenReturn(CHANGE_ID);
+    event.change = this::createChangeAttribute;
   }
 
   private AccountCache mockAccountCache() {
