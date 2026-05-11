@@ -29,6 +29,7 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -51,7 +52,6 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   private final ReviewAgentResponseService reviewAgentResponseService;
   private final ReviewAgentGerritMessageIdFinder gerritMessageIdFinder;
 
-  @Inject
   AiReviewMessage(
       ConfigCreator configCreator,
       GerritApi gerritApi,
@@ -60,12 +60,34 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath) {
+    this(
+        configCreator,
+        gerritApi,
+        aiReviewPermission,
+        pluginDataHandlerBaseProvider,
+        accountCache,
+        repositoryManager,
+        pluginDataPath,
+        null);
+  }
+
+  @Inject
+  AiReviewMessage(
+      ConfigCreator configCreator,
+      GerritApi gerritApi,
+      AiReviewPermission aiReviewPermission,
+      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      AccountCache accountCache,
+      GitRepositoryManager repositoryManager,
+      @PluginData Path pluginDataPath,
+      PluginChatMemoryStore chatMemoryStore) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     reviewAgentResponseService =
-        new ReviewAgentResponseService(accountCache, repositoryManager, pluginDataPath);
+        new ReviewAgentResponseService(
+            accountCache, repositoryManager, pluginDataPath, chatMemoryStore);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 
