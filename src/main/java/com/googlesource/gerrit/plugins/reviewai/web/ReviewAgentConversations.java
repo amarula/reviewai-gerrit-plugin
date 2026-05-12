@@ -22,13 +22,10 @@ import com.google.gerrit.extensions.restapi.RestModifyView;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
-import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -38,22 +35,19 @@ import java.util.Optional;
 
 public class ReviewAgentConversations
     implements RestModifyView<ChangeResource, ReviewAgentConversations.Input> {
-  private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
   private static final String ACTION_LIST = "list";
   private static final String ACTION_GET = "get";
   private static final String ACTION_UPSERT = "upsert";
   private static final String ACTION_APPEND = "append";
-  private static final Type CONVERSATION_MAP_TYPE =
-      new TypeToken<Map<String, ReviewAgentConversationInfo>>() {}.getType();
 
-  private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
+  private final ReviewAgentConversationStore conversationStore;
   private final AiReviewPermission aiReviewPermission;
 
   @Inject
   ReviewAgentConversations(
-      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      ReviewAgentConversationStore conversationStore,
       AiReviewPermission aiReviewPermission) {
-    this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+    this.conversationStore = conversationStore;
     this.aiReviewPermission = aiReviewPermission;
   }
 
@@ -64,28 +58,35 @@ public class ReviewAgentConversations
       throw new BadRequestException("action is required");
     }
 
-    PluginDataHandler changeDataHandler =
-        pluginDataHandlerBaseProvider.get(resource.getChange().getKey().toString());
-    Map<String, ReviewAgentConversationInfo> conversations = getConversations(changeDataHandler);
+    String changeId = getFullChangeId(resource);
+    int patchSet = getPatchSet(resource);
+    Map<String, ReviewAgentConversationInfo> conversations =
+        conversationStore.getConversations(changeId);
 
     return switch (input.action) {
       case ACTION_LIST -> Response.ok(Output.list(toSortedList(conversations)));
       case ACTION_GET -> Response.ok(Output.conversation(getConversation(conversations, input)));
       case ACTION_APPEND ->
-          Response.ok(Output.conversation(append(changeDataHandler, conversations, input)));
-      case ACTION_UPSERT -> Response.ok(Output.conversation(upsert(changeDataHandler, conversations, input)));
+          Response.ok(Output.conversation(append(changeId, patchSet, conversations, input)));
+      case ACTION_UPSERT ->
+          Response.ok(Output.conversation(upsert(changeId, patchSet, conversations, input)));
       default -> throw new BadRequestException("unsupported action: " + input.action);
     };
   }
 
-  private Map<String, ReviewAgentConversationInfo> getConversations(
-      PluginDataHandler changeDataHandler) {
-    Map<String, ReviewAgentConversationInfo> conversations =
-        changeDataHandler.getJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, CONVERSATION_MAP_TYPE);
-    if (conversations == null) {
-      return new LinkedHashMap<>();
+  private String getFullChangeId(ChangeResource resource) {
+    return new GerritChange(
+            resource.getChange().getProject(),
+            resource.getChange().getDest(),
+            resource.getChange().getKey())
+        .getFullChangeId();
+  }
+
+  private int getPatchSet(ChangeResource resource) {
+    if (resource.getChange().currentPatchSetId() == null) {
+      return 0;
     }
-    return new LinkedHashMap<>(conversations);
+    return resource.getChange().currentPatchSetId().get();
   }
 
   private List<ReviewAgentConversationInfo> toSortedList(
@@ -109,19 +110,22 @@ public class ReviewAgentConversations
     if (conversationId == null || conversationId.isBlank()) {
       return null;
     }
-    ReviewAgentConversationInfo conversation = conversations.get(conversationId);
+    String canonicalConversationId =
+        ReviewAgentConversationStore.canonicalConversationId(conversationId);
+    ReviewAgentConversationInfo conversation = conversations.get(canonicalConversationId);
     if (conversation != null) {
       return conversation;
     }
     return conversations.entrySet().stream()
-        .filter(entry -> entry.getKey().equalsIgnoreCase(conversationId))
+        .filter(entry -> entry.getKey().equalsIgnoreCase(canonicalConversationId))
         .map(Map.Entry::getValue)
         .findFirst()
         .orElse(null);
   }
 
   private ReviewAgentConversationInfo upsert(
-      PluginDataHandler changeDataHandler,
+      String changeId,
+      int patchSet,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -132,17 +136,20 @@ public class ReviewAgentConversations
     if (incomingConversation.id == null || incomingConversation.id.isBlank()) {
       throw new BadRequestException("conversation.id is required");
     }
+    incomingConversation.id =
+        ReviewAgentConversationStore.canonicalConversationId(incomingConversation.id);
     ReviewAgentConversationInfo conversation =
         mergeConversation(
             getConversationById(conversations, incomingConversation.id), incomingConversation);
     conversations.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase(conversation.id));
     conversations.put(conversation.id, conversation);
-    changeDataHandler.setJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, conversations);
+    conversationStore.upsertConversation(changeId, patchSet, conversation);
     return conversation;
   }
 
   private ReviewAgentConversationInfo append(
-      PluginDataHandler changeDataHandler,
+      String changeId,
+      int patchSet,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -152,6 +159,8 @@ public class ReviewAgentConversations
     if (input.turn == null) {
       throw new BadRequestException("turn is required");
     }
+    input.conversationId =
+        ReviewAgentConversationStore.canonicalConversationId(input.conversationId);
 
     ReviewAgentConversationInfo conversation =
         Optional.ofNullable(getConversationById(conversations, input.conversationId))
@@ -184,7 +193,7 @@ public class ReviewAgentConversations
 
     conversations.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase(conversation.id));
     conversations.put(conversation.id, conversation);
-    changeDataHandler.setJsonValue(KEY_REVIEW_AGENT_CONVERSATIONS, conversations);
+    conversationStore.upsertConversation(changeId, patchSet, conversation);
     return conversation;
   }
 

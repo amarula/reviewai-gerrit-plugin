@@ -20,6 +20,7 @@ import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mock;
@@ -34,6 +35,7 @@ public class TestBase {
   protected static final BranchNameKey BRANCH_NAME =
       BranchNameKey.create(PROJECT_NAME, "myBranchName");
 
+  @ClassRule public static final H2TcpServerRule h2TcpServer = new H2TcpServerRule();
   @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
 
   @Mock protected Path mockPluginDataPath;

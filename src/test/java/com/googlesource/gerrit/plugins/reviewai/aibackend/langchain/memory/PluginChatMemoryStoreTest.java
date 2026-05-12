@@ -20,26 +20,22 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.googlesource.gerrit.plugins.reviewai.H2TcpServerRule;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
-import org.h2.tools.Server;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
 
 public class PluginChatMemoryStoreTest {
-  private static final int H2_TCP_PORT = 9092;
   private static final String USER_MESSAGE_RESOURCE = "__files/langchain/chatMemoryUserMessage.txt";
   private static final String AI_MESSAGE_RESOURCE = "__files/langchain/chatMemoryAiMessage.txt";
 
@@ -144,36 +140,5 @@ public class PluginChatMemoryStoreTest {
   private String readResource(String resourceName) throws Exception {
     URL resource = getClass().getClassLoader().getResource(resourceName);
     return Files.readString(Paths.get(resource.toURI())).trim();
-  }
-
-  private static class H2TcpServerRule extends ExternalResource {
-    private Server server;
-
-    @Override
-    protected void before() throws Throwable {
-      if (isPortOpen()) {
-        return;
-      }
-      server =
-          Server.createTcpServer(
-                  "-tcpPort", Integer.toString(H2_TCP_PORT), "-tcpDaemon", "-ifNotExists")
-              .start();
-    }
-
-    @Override
-    protected void after() {
-      if (server != null) {
-        server.stop();
-      }
-    }
-
-    private boolean isPortOpen() {
-      try (Socket socket = new Socket()) {
-        socket.connect(new InetSocketAddress("localhost", H2_TCP_PORT), 200);
-        return true;
-      } catch (Exception e) {
-        return false;
-      }
-    }
   }
 }

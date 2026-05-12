@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.gerrit.server.data.PatchSetAttribute;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -50,7 +51,9 @@ public class ClientCommandExecutorTest {
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
     when(changeDataHandler.getValue("conversationId")).thenReturn("conv-1");
     when(change.getFullChangeId()).thenReturn("change~1");
-    when(change.getPatchSetAttribute()).thenReturn(Optional.empty());
+    PatchSetAttribute patchSetAttribute = new PatchSetAttribute();
+    patchSetAttribute.number = 1;
+    when(change.getPatchSetAttribute()).thenReturn(Optional.of(patchSetAttribute));
     when(localizer.getText("message.command.thread.forget")).thenReturn("forgot");
 
     ClientCommandExecutor executor =
@@ -68,7 +71,7 @@ public class ClientCommandExecutorTest {
     executor.executeCommand(
         ClientCommandBase.CommandSet.FORGET_THREAD, Map.of(), Map.of(), "");
 
-    verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 0);
+    verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 1);
     assertEquals("forgot", changeSetData.getReviewSystemMessage());
   }
 }
