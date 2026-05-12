@@ -79,7 +79,7 @@ pipeline {
     unstable {
       script {
         if (isGerritReview) {
-          gerritReview labels: [Verified: 0], message: 'Build is unstable'
+          gerritReview labels: [Verified: 0], message: "Build is unstable ${env.BUILD_URL}"
         }
       }
     }
@@ -87,7 +87,7 @@ pipeline {
       script {
         explainError()
         if (isGerritReview) {
-          gerritReview labels: [Verified: -1]
+           gerritReview labels: [Verified: -1], message: "${env.BUILD_URL}"
         }
       }
     }
