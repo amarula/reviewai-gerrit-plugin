@@ -15,9 +15,13 @@
 
       const mergedTurns = storedTurns.slice();
       historyTurns.forEach(historyTurn => {
-        const storedTurnIndex = mergedTurns.findIndex(
-          storedTurn => this._turnUserQuestion(storedTurn) === this._turnUserQuestion(historyTurn)
-        );
+        const historyQuestion = this._turnUserQuestion(historyTurn);
+        const storedTurnIndex =
+          historyQuestion && !this._isAutomaticReviewQuestion(historyQuestion)
+          ? mergedTurns.findIndex(
+              storedTurn => this._turnUserQuestion(storedTurn) === historyQuestion
+            )
+          : -1;
         if (storedTurnIndex !== -1) {
           mergedTurns[storedTurnIndex] = this._mergeTurnWithHistory(
             mergedTurns[storedTurnIndex],
@@ -27,7 +31,7 @@
           mergedTurns.push(historyTurn);
         }
       });
-      return mergedTurns;
+      return includeNewTurns ? this._sortTurnsByTimestamp(mergedTurns) : mergedTurns;
     },
 
     _mergeTurnWithHistory(storedTurn, historyTurn) {
@@ -37,6 +41,56 @@
         response: refreshedResponse || storedTurn.response,
         chat_response: refreshedResponse || storedTurn.chat_response,
         timestamp_millis: historyTurn.timestamp_millis || storedTurn.timestamp_millis,
+      };
+    },
+
+    _sortTurnsByTimestamp(turns) {
+      return turns
+        .map((turn, index) => ({turn, index}))
+        .sort((left, right) => {
+          const leftTimestamp = Number(left.turn && left.turn.timestamp_millis) || 0;
+          const rightTimestamp = Number(right.turn && right.turn.timestamp_millis) || 0;
+          return leftTimestamp - rightTimestamp || left.index - right.index;
+        })
+        .map(item => item.turn);
+    },
+
+    _automaticReviewPrompt(entry) {
+      const patchSet = entry && entry.patchSet;
+      return patchSet ? `Automatic review for Patch Set ${patchSet}` : 'Automatic review';
+    },
+
+    _isAutomaticReviewQuestion(question) {
+      return /^Automatic review(?:\b| for Patch Set \d+$)/.test(question || '');
+    },
+
+    _entryTimestampMillis(entry) {
+      return agentUtils.parseTimestampMillis(entry && entry.updated);
+    },
+
+    _isNextAssistantEntryForCurrentTurn(currentTurn, entry) {
+      if (!currentTurn || !currentTurn.response) {
+        return false;
+      }
+      const currentPatchSet = currentTurn.patch_set || currentTurn.patchSet;
+      if (currentPatchSet && entry.patchSet && currentPatchSet !== entry.patchSet) {
+        return false;
+      }
+      const responseTimestamp =
+        Number(currentTurn.response.timestamp_millis || currentTurn.timestamp_millis) || 0;
+      const entryTimestamp = this._entryTimestampMillis(entry);
+      return Math.abs(entryTimestamp - responseTimestamp) <= 60000;
+    },
+
+    _newTurn(entry, userQuestion, hasClientDataOverride) {
+      return {
+        user_input: {
+          user_question: userQuestion,
+          client_data: agentUtils.buildClientData(!hasClientDataOverride),
+        },
+        regeneration_index: 0,
+        timestamp_millis: this._entryTimestampMillis(entry),
+        patch_set: entry.patchSet,
       };
     },
 
@@ -67,14 +121,7 @@
 
       agentUtils.orderAssistantEntriesWithinTurns(entries).forEach(entry => {
         if (entry.role === 'user' && !entry.systemMessage) {
-          currentTurn = {
-            user_input: {
-              user_question: entry.message || '',
-              client_data: agentUtils.buildClientData(!hasClientDataOverride),
-            },
-            regeneration_index: 0,
-            timestamp_millis: agentUtils.parseTimestampMillis(entry.updated),
-          };
+          currentTurn = this._newTurn(entry, entry.message || '', hasClientDataOverride);
           turns.push(currentTurn);
           hasClientDataOverride = true;
           return;
@@ -84,15 +131,18 @@
           return;
         }
 
-        if (!currentTurn) {
-          currentTurn = {
-            user_input: {
-              user_question: '',
-              client_data: agentUtils.buildClientData(!hasClientDataOverride),
-            },
-            regeneration_index: 0,
-            timestamp_millis: agentUtils.parseTimestampMillis(entry.updated),
-          };
+        if (
+          !currentTurn ||
+          !this._turnUserQuestion(currentTurn) ||
+          (this._turnUserQuestion(currentTurn) &&
+            currentTurn.response &&
+            !this._isNextAssistantEntryForCurrentTurn(currentTurn, entry))
+        ) {
+          currentTurn = this._newTurn(
+            entry,
+            this._automaticReviewPrompt(entry),
+            hasClientDataOverride
+          );
           turns.push(currentTurn);
           hasClientDataOverride = true;
         }
