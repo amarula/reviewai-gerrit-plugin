@@ -36,6 +36,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +69,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         accountCache,
         repositoryManager,
         pluginDataPath,
+        null,
         null);
   }
 
@@ -80,14 +82,15 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
-      PluginChatMemoryStore chatMemoryStore) {
+      PluginChatMemoryStore chatMemoryStore,
+      ReviewAiDb db) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     reviewAgentResponseService =
         new ReviewAgentResponseService(
-            accountCache, repositoryManager, pluginDataPath, chatMemoryStore);
+            accountCache, repositoryManager, pluginDataPath, chatMemoryStore, db);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 

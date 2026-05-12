@@ -18,13 +18,13 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.PatchSet;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
 import org.junit.Before;
 import org.junit.Test;
@@ -32,9 +32,14 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.sql.DriverManager;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -47,16 +52,19 @@ public class ReviewAgentConversationsTest extends TestBase {
   @Mock private AiReviewPermission aiReviewPermission;
 
   private ReviewAgentConversations view;
+  private String jdbcUrl;
 
   @Before
-  public void setUp() {
-    Path realChangeDataPath = tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data");
-    when(mockPluginDataPath.resolve(CHANGE_ID + ".data")).thenReturn(realChangeDataPath);
+  public void setUp() throws Exception {
     Change change = new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
+    change.setCurrentPatchSet(PatchSet.id(change.getId(), 1), "", "");
     when(changeResource.getChange()).thenReturn(change);
+    jdbcUrl = "jdbc:h2:mem:" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+    ReviewAgentConversationStore conversationStore =
+        new ReviewAgentConversationStore(jdbcUrl, tempFolder.getRoot().toPath());
     view =
         new ReviewAgentConversations(
-            new PluginDataHandlerBaseProvider(mockPluginDataPath), aiReviewPermission);
+            conversationStore, aiReviewPermission);
   }
 
   @Test
@@ -74,7 +82,7 @@ public class ReviewAgentConversationsTest extends TestBase {
     Response<ReviewAgentConversations.Output> getResponse = view.apply(changeResource, getInput);
 
     assertNotNull(getResponse.value().conversation);
-    assertEquals("conversation-1", getResponse.value().conversation.id);
+    assertEquals(uuidFor("conversation-1"), getResponse.value().conversation.id);
     assertEquals("First conversation", getResponse.value().conversation.title);
     assertEquals("Hello", getResponse.value().conversation.turns.get(0).get("message").getAsString());
   }
@@ -89,8 +97,8 @@ public class ReviewAgentConversationsTest extends TestBase {
     List<ReviewAgentConversationInfo> conversations =
         view.apply(changeResource, listInput).value().conversations;
 
-    assertEquals("newer", conversations.get(0).id);
-    assertEquals("older", conversations.get(1).id);
+    assertEquals(uuidFor("newer"), conversations.get(0).id);
+    assertEquals(uuidFor("older"), conversations.get(1).id);
   }
 
   @Test
@@ -241,6 +249,87 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   @Test
+  public void storesConversationIdAsUuid() throws Exception {
+    append("reviewai-15038", 0, turn("First", "First response"), 1000L);
+
+    try (var c = DriverManager.getConnection(jdbcUrl);
+        var rs =
+            c.createStatement()
+                .executeQuery("SELECT conversation_id FROM review_agent_conversations")) {
+      rs.next();
+      String conversationId = rs.getString(1);
+      UUID.fromString(conversationId);
+      assertEquals(uuidFor("reviewai-15038"), conversationId);
+    }
+  }
+
+  @Test
+  public void storesTurnTextOnlyInLangChainMessageRows() throws Exception {
+    append("conversation-1", 0, turn("First", "First response"), 1000L);
+
+    try (var c = DriverManager.getConnection(jdbcUrl);
+        var turnMetadata =
+            c.createStatement()
+                .executeQuery("SELECT turn_metadata_json FROM review_agent_conversation_turns");
+        var partMetadata =
+            c.createStatement()
+                .executeQuery(
+                    "SELECT response_part_metadata_json "
+                        + "FROM review_agent_conversation_response_parts");
+        var messages =
+            c.createStatement()
+                .executeQuery(
+                    "SELECT change_id, patch_set, scope, message_json "
+                        + "FROM langchain_chat_memory_messages")) {
+      turnMetadata.next();
+      assertEquals(false, turnMetadata.getString(1).contains("First"));
+      partMetadata.next();
+      assertEquals(false, partMetadata.getString(1).contains("First response"));
+      int messageRowsWithText = 0;
+      while (messages.next()) {
+        assertEquals(getGerritChange().getFullChangeId(), messages.getString(1));
+        assertEquals(1, messages.getInt(2));
+        assertEquals("review_agent_conversations", messages.getString(3));
+        if (messages.getString(4).contains("First")) {
+          messageRowsWithText++;
+        }
+      }
+      assertEquals(2, messageRowsWithText);
+    }
+  }
+
+  @Test
+  public void doesNotStoreEmptyOrForgetThreadTurnsInLangChainMessageRows() throws Exception {
+    append("conversation-1", 0, turn("", "Empty prompt response"), 1000L);
+    append("conversation-1", 1, turn("/forget_thread", "Forget response"), 2000L);
+
+    try (var c = DriverManager.getConnection(jdbcUrl);
+        var rs =
+            c.createStatement()
+                .executeQuery("SELECT message_json FROM langchain_chat_memory_messages")) {
+      assertEquals(false, rs.next());
+    }
+  }
+
+  @Test
+  public void migratesLegacyConversationDataFileToDb() throws Exception {
+    ReviewAgentConversationInfo conversation = conversation("legacy-conversation", 1000L);
+    Properties legacyProperties = new Properties();
+    legacyProperties.setProperty(
+        "reviewAgentConversations", getGson().toJson(Map.of(conversation.id, conversation)));
+    try (var output =
+        Files.newOutputStream(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data"))) {
+      legacyProperties.store(output, null);
+    }
+
+    ReviewAgentConversationInfo restored = get("legacy-conversation");
+
+    assertNotNull(restored);
+    assertEquals(uuidFor("legacy-conversation"), restored.id);
+    assertEquals("Hello", restored.turns.get(0).get("message").getAsString());
+  }
+
+  @Test
   public void getWithoutConversationIdReturnsEmptyConversation() throws Exception {
     ReviewAgentConversations.Input getInput = new ReviewAgentConversations.Input();
     getInput.action = "get";
@@ -327,5 +416,11 @@ public class ReviewAgentConversationsTest extends TestBase {
         .getAsJsonObject()
         .get("text")
         .getAsString();
+  }
+
+  private String uuidFor(String conversationId) {
+    return UUID.nameUUIDFromBytes(
+            conversationId.toLowerCase().getBytes(StandardCharsets.UTF_8))
+        .toString();
   }
 }
