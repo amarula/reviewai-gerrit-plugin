@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.Plugi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
@@ -67,6 +68,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainTokenEstimatorProvider tokenEstimatorProvider;
   private final GerritClient gerritClient;
   private final Localizer localizer;
+  private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
@@ -98,6 +100,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
     this.gerritClient = gerritClient;
     this.localizer = localizer;
+    this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
@@ -186,8 +189,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               : Double.parseDouble(config.getAiReviewTemperature());
 
       ILangChainProvider provider = LangChainProviderFactory.get(providerType);
+      String conversationId = resolveConversationId(providerType, changeSetData);
       LangChainProvider providerModel =
-          provider.buildChatModel(config, temperature, null, systemInstructions);
+          provider.buildChatModel(config, temperature, conversationId, systemInstructions);
       ChatModel model = providerModel.getModel();
 
       log.info(
@@ -232,6 +236,28 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected void setRequestBody(String requestBody) {
     this.requestBody = requestBody;
+  }
+
+  private String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
+      throws AiConnectionFailException {
+    if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
+      return null;
+    }
+    String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
+    if (changeSetData.getReviewAssistantStage() != null) {
+      switch (changeSetData.getReviewAssistantStage()) {
+        case REVIEW_CODE:
+        case REVIEW_COMMIT_MESSAGE:
+          conversationKey =
+              OpenAiConversation.getMultiAgentConversationKey(
+                  changeSetData.getReviewAssistantStage());
+          break;
+        default:
+          break;
+      }
+    }
+    return new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey)
+        .resolveConversationId();
   }
 
   private ChatMemory buildMemory(Object memoryId) {
