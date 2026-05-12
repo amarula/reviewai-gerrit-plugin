@@ -33,13 +33,6 @@
       });
     },
 
-    _hasReviewAiCommentsConversation(change, conversations) {
-      const conversationId = this._conversationId(change);
-      return conversations.some(conversation =>
-        agentUtils.isSameConversationId(conversation && conversation.id, conversationId)
-      );
-    },
-
     _filterStoredConversationEntries(change, entries, conversations, ignoredConversationId) {
       const conversationId = this._conversationId(change);
       const userMessages = new Map();
