@@ -9,10 +9,6 @@
       }
 
       const storedConversations = await this._listStoredConversations(change);
-      if (this._hasReviewAiCommentsConversation(change, storedConversations)) {
-        return storedConversations;
-      }
-
       const entries = await this._fetchEntries(change);
       const reviewAiCommentsEntries = this._filterStoredConversationEntries(
         change,
@@ -23,13 +19,11 @@
         return storedConversations;
       }
       const lastEntry = reviewAiCommentsEntries[reviewAiCommentsEntries.length - 1];
-      return storedConversations.concat([
-        {
-          id: this._conversationId(change),
-          title: 'ReviewAI comments',
-          timestamp_millis: agentUtils.parseTimestampMillis(lastEntry.updated),
-        },
-      ]);
+      return this._upsertReviewAiCommentsConversation(
+        change,
+        storedConversations,
+        agentUtils.parseTimestampMillis(lastEntry.updated)
+      );
     },
 
     async getChatConversation(change, conversationId) {
@@ -78,6 +72,32 @@
       } catch {
         return storedTurns;
       }
+    },
+
+    _upsertReviewAiCommentsConversation(change, storedConversations, timestampMillis) {
+      const conversationId = this._conversationId(change);
+      const conversationIndex = storedConversations.findIndex(conversation =>
+        agentUtils.isSameConversationId(conversation && conversation.id, conversationId)
+      );
+      const historyConversation = {
+        id: conversationId,
+        title: 'ReviewAI comments',
+        timestamp_millis: timestampMillis,
+      };
+      if (conversationIndex === -1) {
+        return storedConversations.concat([historyConversation]);
+      }
+
+      const conversations = storedConversations.slice();
+      const storedConversation = conversations[conversationIndex] || {};
+      const storedTimestamp =
+        Number(storedConversation.timestamp_millis || storedConversation.timestampMillis) || 0;
+      conversations[conversationIndex] = {
+        ...storedConversation,
+        title: storedConversation.title || historyConversation.title,
+        timestamp_millis: Math.max(storedTimestamp, timestampMillis),
+      };
+      return conversations;
     },
   };
 })(window);
