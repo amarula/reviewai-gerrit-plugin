@@ -38,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.nio.file.Path;
@@ -53,21 +54,24 @@ class ReviewAgentResponseService {
   private final GitRepositoryManager repositoryManager;
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
+  private final ReviewAiDb db;
 
   ReviewAgentResponseService(
       AccountCache accountCache, GitRepositoryManager repositoryManager, Path pluginDataPath) {
-    this(accountCache, repositoryManager, pluginDataPath, null);
+    this(accountCache, repositoryManager, pluginDataPath, null, null);
   }
 
   ReviewAgentResponseService(
       AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       Path pluginDataPath,
-      PluginChatMemoryStore chatMemoryStore) {
+      PluginChatMemoryStore chatMemoryStore,
+      ReviewAiDb db) {
     this.accountCache = accountCache;
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
+    this.db = db;
   }
 
   Optional<AiReviewMessage.Output> getDirectResponse(
@@ -196,12 +200,15 @@ class ReviewAgentResponseService {
     GerritChange change =
         new GerritChange(
             resource.getProject(), resource.getChange().getDest(), resource.getChange().getKey());
+    if (resource.getChange().currentPatchSetId() != null) {
+      change.setPatchSetNumber(resource.getChange().currentPatchSetId().get());
+    }
     ChangeSetData changeSetData =
         new ChangeSetData(
             getAiAccountId(config), config.getVotingMinScore(), config.getVotingMaxScore());
     Localizer localizer = new Localizer(config);
     PluginDataHandlerProvider pluginDataHandlerProvider =
-        new PluginDataHandlerProvider(pluginDataPath, change);
+        new PluginDataHandlerProvider(pluginDataPath, change, db);
     GerritClientPatchSetOpenAi gerritClientPatchSet =
         new GerritClientPatchSetOpenAi(config, accountCache, repositoryManager);
     new ClientCommandParser(
