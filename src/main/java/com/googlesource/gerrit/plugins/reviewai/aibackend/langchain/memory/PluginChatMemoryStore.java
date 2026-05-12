@@ -18,85 +18,51 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.h2.tools.Server;
 
 @Slf4j
 @Singleton
 public class PluginChatMemoryStore implements ChatMemoryStore {
-  private static final String DB_FILE_NAME = "reviewai";
   private static final String DEFAULT_SCOPE = "default";
-  private static final String TCP_HOST = "localhost";
-  private static final int TCP_PORT = 9092;
-  private static final String TCP_URL_PREFIX = "jdbc:h2:tcp://" + TCP_HOST + ":" + TCP_PORT + "/";
-  private static final Object TCP_SERVER_LOCK = new Object();
 
-  private static Server tcpServer;
-
-  private final String jdbcUrl;
+  private final ReviewAiDb db;
 
   @Inject
-  public PluginChatMemoryStore(
-      @com.google.gerrit.extensions.annotations.PluginData Path pluginDataDir)
-      throws SQLException, IOException {
-    Files.createDirectories(pluginDataDir);
-    Path dbFile = pluginDataDir.resolve(DB_FILE_NAME);
-    this.jdbcUrl =
-        TCP_URL_PREFIX + dbFile.toAbsolutePath() + ";AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1";
-    ensureTcpServerStarted();
+  public PluginChatMemoryStore(ReviewAiDb db) throws SQLException {
+    this.db = db;
     initSchema();
   }
 
-  public PluginChatMemoryStore(String jdbcUrl) throws SQLException {
-    this.jdbcUrl = jdbcUrl;
-    ensureTcpServerStarted();
-    initSchema();
+  public PluginChatMemoryStore(Path pluginDataDir) throws SQLException, IOException {
+    this(new ReviewAiDb(pluginDataDir));
+  }
+
+  public PluginChatMemoryStore(String jdbcUrl) throws SQLException, IOException {
+    this(new ReviewAiDb(Path.of("."), jdbcUrl));
   }
 
   private void initSchema() throws SQLException {
-    try (Connection c = getConnection();
-        Statement s = c.createStatement()) {
-      s.executeUpdate(
-          """
-          CREATE TABLE IF NOT EXISTS langchain_chat_memory_messages (
-            id IDENTITY PRIMARY KEY,
-            change_id VARCHAR(512) NOT NULL,
-            patch_set INT NOT NULL,
-            scope VARCHAR(64) NOT NULL,
-            message_json CLOB NOT NULL,
-            updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
-          )
-          """);
-      s.executeUpdate(
-          """
-          CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_lookup
-          ON langchain_chat_memory_messages(change_id, patch_set, updated_at, id)
-          """);
-    }
+    db.initLangChainChatMemorySchema();
   }
 
   @Override
   public List<ChatMessage> getMessages(Object memoryId) {
     MemoryKey key = MemoryKey.from(memoryId);
     try {
-      try (Connection c = getConnection()) {
+      try (Connection c = db.getConnection()) {
         List<ChatMessage> result = new ArrayList<>();
         for (StoredMessage message : getMessageRecords(c, key)) {
           String json = message.messageJson();
@@ -124,7 +90,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
         deleteMessages(memoryId);
         return;
       }
-      try (Connection c = getConnection();
+      try (Connection c = db.getConnection();
           PreparedStatement ps = prepareInsertMessage(c)) {
         List<StoredMessage> existingRecords = getMessageRecords(c, key);
         List<String> existingMessages =
@@ -155,7 +121,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
     MemoryKey key = MemoryKey.from(memoryId);
     log.info("Clearing LangChain memory store for {}", memoryId);
     try {
-      try (Connection c = getConnection();
+      try (Connection c = db.getConnection();
           PreparedStatement ps =
               c.prepareStatement(
                   """
@@ -174,7 +140,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
     log.info(
         "Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
     try {
-      try (Connection c = getConnection();
+      try (Connection c = db.getConnection();
           PreparedStatement ps =
               c.prepareStatement(
                   """
@@ -198,43 +164,6 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
     ps.setString(1, key.changeId());
     ps.setInt(2, key.patchSet());
     ps.setString(3, key.scope());
-  }
-
-  private Connection getConnection() throws SQLException {
-    ensureTcpServerStarted();
-    return DriverManager.getConnection(jdbcUrl);
-  }
-
-  private void ensureTcpServerStarted() {
-    if (!usesManagedTcpServer()) {
-      return;
-    }
-    synchronized (TCP_SERVER_LOCK) {
-      if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
-        return;
-      }
-      try {
-        tcpServer =
-            Server.createTcpServer(
-                    "-tcpPort", Integer.toString(TCP_PORT), "-tcpDaemon", "-ifNotExists")
-                .start();
-      } catch (SQLException e) {
-        throw new RuntimeException("Failed to start H2 TCP server for ReviewAI chat memory", e);
-      }
-    }
-  }
-
-  private boolean usesManagedTcpServer() {
-    return jdbcUrl.startsWith(TCP_URL_PREFIX);
-  }
-
-  private static boolean isTcpServerAvailable() {
-    try (Socket socket = new Socket()) {
-      socket.connect(new InetSocketAddress(TCP_HOST, TCP_PORT), 200);
-      return true;
-    } catch (IOException e) {
-      return false;
-    }
   }
 
   private static PreparedStatement prepareInsertMessage(Connection c) throws SQLException {

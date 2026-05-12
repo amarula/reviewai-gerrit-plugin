@@ -143,7 +143,7 @@
     },
 
     _conversationId(change) {
-      return `reviewai-${agentUtils.getChangeNumber(change) || 'change'}`;
+      return agentUtils.stableUuid(`reviewai-${agentUtils.getChangeNumber(change) || 'change'}`);
     },
   };
 })(window);

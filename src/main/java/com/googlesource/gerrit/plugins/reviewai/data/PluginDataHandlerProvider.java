@@ -39,8 +39,9 @@ public class PluginDataHandlerProvider extends PluginDataHandlerBaseProvider
   @Inject
   public PluginDataHandlerProvider(
       @com.google.gerrit.extensions.annotations.PluginData Path defaultPluginDataPath,
-      GerritChange change) {
-    super(defaultPluginDataPath);
+      GerritChange change,
+      ReviewAiDb db) {
+    super(defaultPluginDataPath, db);
     projectName = sanitizeFilename(change.getProjectName());
     changeKey = change.getChangeKey().toString();
     assistantsWorkspace = projectName + PATH_ASSISTANTS;
@@ -49,6 +50,10 @@ public class PluginDataHandlerProvider extends PluginDataHandlerBaseProvider
         projectName,
         changeKey,
         assistantsWorkspace);
+  }
+
+  public PluginDataHandlerProvider(Path defaultPluginDataPath, GerritChange change) {
+    this(defaultPluginDataPath, change, null);
   }
 
   public PluginDataHandler getGlobalScope() {
