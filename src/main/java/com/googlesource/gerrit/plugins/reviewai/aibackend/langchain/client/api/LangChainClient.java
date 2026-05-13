@@ -162,7 +162,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
 
       log.info("LangChain system instructions for {}: {}", memoryId, systemInstructions);
-      log.info("LangChain user prompt for {}: {}", memoryId,userMessage);
+      log.info("LangChain user prompt for {}: {}", memoryId, userMessage);
 
       ChatMemory memory = buildMemory(memoryId);
       boolean hasStoredMemory = !memory.messages().isEmpty();
@@ -175,7 +175,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       if (!hasStoredMemory) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
         AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
-        List<ChatMessage> history = LangChainChatMessages.build(aiHistory, gerritClientData, change);
+        List<ChatMessage> history =
+            LangChainChatMessages.build(aiHistory, gerritClientData, change);
         for (ChatMessage message : history) {
           memory.add(message);
         }
@@ -238,7 +239,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.requestBody = requestBody;
   }
 
-  private String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
+  protected String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
       throws AiConnectionFailException {
     if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
       return null;
@@ -260,7 +261,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         .resolveConversationId();
   }
 
-  private ChatMemory buildMemory(Object memoryId) {
+  protected ChatMemory buildMemory(Object memoryId) {
     TokenWindowChatMemory.Builder builder =
         TokenWindowChatMemory.builder()
             .id(memoryId)
