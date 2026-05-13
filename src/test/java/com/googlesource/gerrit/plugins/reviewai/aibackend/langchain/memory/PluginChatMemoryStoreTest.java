@@ -74,23 +74,24 @@ public class PluginChatMemoryStoreTest {
   }
 
   @Test
-  public void returnsMessagesFromAllScopesForSameChangePatchSet() throws Exception {
+  public void returnsMessagesOnlyFromRequestedScope() throws Exception {
     String jdbcUrl = "jdbc:h2:mem:" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
     PluginChatMemoryStore store = new PluginChatMemoryStore(jdbcUrl);
     LangChainMemoryId reviewCode = new LangChainMemoryId("change-1", 3, "review_code");
-    LangChainMemoryId requests = new LangChainMemoryId("change-1", 3, "requests");
+    LangChainMemoryId reviewCommitMessage =
+        new LangChainMemoryId("change-1", 3, "review_commit_message");
     String userMessage = readResource(USER_MESSAGE_RESOURCE);
     String aiMessage = readResource(AI_MESSAGE_RESOURCE);
 
     store.updateMessages(reviewCode, List.of(UserMessage.from(userMessage)));
     store.updateMessages(
-        requests, List.of(UserMessage.from(userMessage), AiMessage.from(aiMessage)));
+        reviewCommitMessage,
+        List.of(UserMessage.from("Commit message review"), AiMessage.from(aiMessage)));
 
     List<ChatMessage> restored = store.getMessages(reviewCode);
 
-    assertEquals(2, restored.size());
+    assertEquals(1, restored.size());
     assertEquals(userMessage, ((UserMessage) restored.get(0)).singleText());
-    assertEquals(aiMessage, ((AiMessage) restored.get(1)).text());
   }
 
   @Test
