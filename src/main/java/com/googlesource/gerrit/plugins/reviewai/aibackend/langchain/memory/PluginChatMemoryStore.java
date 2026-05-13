@@ -187,11 +187,10 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
             """
             SELECT id, message_json
             FROM langchain_chat_memory_messages
-            WHERE change_id = ? AND patch_set = ?
+            WHERE change_id = ? AND patch_set = ? AND scope = ?
             ORDER BY updated_at, id
             """)) {
-      ps.setString(1, key.changeId());
-      ps.setInt(2, key.patchSet());
+      bindMemoryKey(ps, key);
       try (ResultSet rs = ps.executeQuery()) {
         List<StoredMessage> result = new ArrayList<>();
         while (rs.next()) {
