@@ -20,6 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.logging.LogArg;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -46,7 +47,16 @@ class LangChainToolExecutor {
   private final boolean requireInitialToolUse;
 
   AiMessage execute(ChatModel model, GerritChange change, ChatMemory memory) {
+    log.debug(
+        "Starting LangChain execution with {} memory messages, initialToolChoice={}, tools={}, " +
+            "structuredResponse={}",
+        memory.messages().size(),
+        getInitialToolChoice(),
+        getToolNames(),
+        structuredResponseFormat != null);
     ChatRequest initialRequest = buildChatRequest(memory.messages(), getInitialToolChoice());
+    log.debug("Sending initial LangChain chat request: {}",
+        LogArg.truncated(initialRequest));
     ChatResponse response = model.chat(initialRequest);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
     logAiMessageToolRequests("initial", aiMessage);
@@ -61,22 +71,42 @@ class LangChainToolExecutor {
       if (requests == null || requests.isEmpty()) {
         break;
       }
+      log.debug(
+          "Processing LangChain tool response round {} of {} with {} tool requests",
+          iteration,
+          maxToolResponseRounds,
+          requests.size());
       for (ToolExecutionRequest request : requests) {
         String output = executeToolRequest(request, change);
+        log.debug(
+            "Adding LangChain tool result for request id={}, name={}, outputLength={}",
+            request.id(),
+            request.name(),
+            output != null ? output.length() : 0);
         memory.add(ToolExecutionResultMessage.from(request, output));
       }
+      log.debug(
+          "Sending LangChain continuation request after tool round {} with {} memory messages",
+          iteration,
+          memory.messages().size());
       response = model.chat(buildChatRequest(memory.messages(), ToolChoice.AUTO));
       aiMessage = response != null ? response.aiMessage() : null;
       logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);
     }
+    log.debug("Received LangChain response message: {}", aiMessage);
 
     if (aiMessage != null && aiMessage.hasToolExecutionRequests()) {
       log.warn(
-          "LangChain on-demand tool execution stopped after {} rounds with pending tool requests: {}",
+          "LangChain tool execution stopped after {} rounds with pending tool requests: {}",
           maxToolResponseRounds,
           aiMessage.toolExecutionRequests());
     }
 
+    log.debug(
+        "Finished LangChain execution after {} rounds; responsePresent={}, pendingToolRequests={}",
+        iteration,
+        aiMessage != null,
+        aiMessage != null && aiMessage.hasToolExecutionRequests());
     return aiMessage;
   }
 
@@ -117,6 +147,8 @@ class LangChainToolExecutor {
 
   private String executeToolRequest(ToolExecutionRequest request, GerritChange change) {
     if (request == null || onDemandTools == null || onDemandTools.isEmpty()) {
+      log.debug(
+          "Skipping LangChain tool request execution because request or configured tools are missing");
       return "";
     }
 
@@ -127,9 +159,20 @@ class LangChainToolExecutor {
     }
 
     String arguments = request.arguments();
+    log.debug(
+        "Executing LangChain request id={}, name={}, arguments={}",
+        request.id(),
+        toolName,
+        arguments);
     OnDemandCodeContextTools codeContextTools =
         new OnDemandCodeContextTools(config, change, new GitRepoFiles());
-    return codeContextTools.execute(toolName, arguments);
+    String output = codeContextTools.execute(toolName, arguments);
+    log.debug(
+        "Executed LangChain request id={}, name={}, outputLength={}",
+        request.id(),
+        toolName,
+        output != null ? output.length() : 0);
+    return output;
   }
 
   private List<String> getToolNames() {
