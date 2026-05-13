@@ -1,0 +1,14 @@
+{
+  "replies": [
+    {
+      "reply": "Trailing whitespace should not prevent parsing.",
+      "score": 1.0,
+      "relevance": 0.9,
+      "repeated": false,
+      "conflicting": false
+    }
+  ],
+  "changeId": "myChangeId"
+}
+
+

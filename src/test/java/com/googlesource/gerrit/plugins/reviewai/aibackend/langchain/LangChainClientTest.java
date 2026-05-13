@@ -22,6 +22,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
@@ -36,10 +37,15 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 public class LangChainClientTest {
+  private static final String AI_RESPONSE_CONTENT_TRAILING_WHITESPACE_RESOURCE =
+      "__files/langchain/aiResponseContentWithTrailingWhitespace.json";
 
   @Test
   public void shouldLoadStructuredResponseFormatFromSchemaResource() throws Exception {
@@ -66,6 +72,21 @@ public class LangChainClientTest {
     assertTrue(repliesSchema.items() instanceof JsonObjectSchema);
     JsonObjectSchema replyItemSchema = (JsonObjectSchema) repliesSchema.items();
     assertTrue(replyItemSchema.properties().containsKey("reply"));
+  }
+
+  @Test
+  public void parsesJsonResponseWithTrailingWhitespace() throws Exception {
+    String responseText = readTestResource(AI_RESPONSE_CONTENT_TRAILING_WHITESPACE_RESOURCE);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    AiResponseContent responseContent = client.parseResponseContent(responseText);
+
+    assertEquals("myChangeId", responseContent.getChangeId());
+    assertNotNull(responseContent.getReplies());
+    assertEquals(1, responseContent.getReplies().size());
+    assertEquals(
+        "Trailing whitespace should not prevent parsing.",
+        responseContent.getReplies().get(0).getReply());
   }
 
   @Test
@@ -132,5 +153,21 @@ public class LangChainClientTest {
             "resolveConversationId", AiProviderType.class, ChangeSetData.class);
     method.setAccessible(true);
     return (String) method.invoke(client, providerType, changeSetData);
+  }
+
+  private String readTestResource(String resourceName) throws Exception {
+    URL resource = getClass().getClassLoader().getResource(resourceName);
+    assertNotNull("Test resource should exist: " + resourceName, resource);
+    return Files.readString(Paths.get(resource.toURI()));
+  }
+
+  private static class TestableLangChainClient extends LangChainClient {
+    private TestableLangChainClient() {
+      super(null, null, null, null);
+    }
+
+    private AiResponseContent parseResponseContent(String responseText) {
+      return toResponseContent(responseText);
+    }
   }
 }
