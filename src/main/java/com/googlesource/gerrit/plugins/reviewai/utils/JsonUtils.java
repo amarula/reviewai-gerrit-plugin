@@ -45,7 +45,7 @@ public class JsonUtils extends TextUtils {
       Pattern.compile(patternJoinAlternation(JSON_ARRAY, JSON_OBJECT), Pattern.DOTALL);
 
   public static String unwrapJsonCode(String text) {
-    return JSON_DELIMITED.matcher(text).replaceAll("$1");
+    return JSON_DELIMITED.matcher(normalizeJsonText(text)).replaceAll("$1").strip();
   }
 
   public static List<String> jsonArrayToList(String input) {
@@ -65,7 +65,13 @@ public class JsonUtils extends TextUtils {
   }
 
   public static boolean isJsonObjectAsString(String text) {
-    return JSON_OBJECT.matcher(text).matches() || JSON_DELIMITED.matcher(text).matches();
+    String normalizedText = normalizeJsonText(text);
+    return JSON_OBJECT.matcher(normalizedText).matches()
+        || JSON_DELIMITED.matcher(normalizedText).matches();
+  }
+
+  private static String normalizeJsonText(String text) {
+    return text == null ? "" : text.strip();
   }
 
   public static String prettyStringifyMap(Map<String, String> map) {
