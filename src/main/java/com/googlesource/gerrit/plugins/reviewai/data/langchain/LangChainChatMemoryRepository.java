@@ -36,9 +36,10 @@ public class LangChainChatMemoryRepository {
     db.initLangChainChatMemorySchema();
   }
 
-  public List<String> getMessageJsons(String changeId, int patchSet) throws SQLException {
+  public List<String> getMessageJsons(String changeId, int patchSet, String scope)
+      throws SQLException {
     try (Connection c = db.getConnection()) {
-      return getMessageRecords(c, changeId, patchSet).stream()
+      return getMessageRecords(c, changeId, patchSet, scope).stream()
           .map(StoredMessage::messageJson)
           .toList();
     }
@@ -53,7 +54,7 @@ public class LangChainChatMemoryRepository {
     }
     try (Connection c = db.getConnection();
         PreparedStatement ps = prepareInsertMessage(c)) {
-      List<StoredMessage> existingRecords = getMessageRecords(c, changeId, patchSet);
+      List<StoredMessage> existingRecords = getMessageRecords(c, changeId, patchSet, scope);
       List<String> existingMessages =
           existingRecords.stream().map(StoredMessage::messageJson).toList();
       int overlapSize = getExistingOverlapSize(existingMessages, updatedMessages);
@@ -116,18 +117,20 @@ public class LangChainChatMemoryRepository {
     ps.setString(4, messageJson);
   }
 
-  private List<StoredMessage> getMessageRecords(Connection c, String changeId, int patchSet)
+  private List<StoredMessage> getMessageRecords(
+      Connection c, String changeId, int patchSet, String scope)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """
             SELECT id, message_json
             FROM langchain_chat_memory_messages
-            WHERE change_id = ? AND patch_set = ?
+            WHERE change_id = ? AND patch_set = ? AND scope = ?
             ORDER BY updated_at, id
             """)) {
       ps.setString(1, changeId);
       ps.setInt(2, patchSet);
+      ps.setString(3, scope);
       try (ResultSet rs = ps.executeQuery()) {
         List<StoredMessage> result = new ArrayList<>();
         while (rs.next()) {
