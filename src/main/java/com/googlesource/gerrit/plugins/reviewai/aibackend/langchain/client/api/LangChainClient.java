@@ -224,11 +224,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(ai);
       }
 
-      if (isJsonObjectAsString(responseText)) {
-        return new ReviewRequestResult(
-            convertResponseContentFromJson(unwrapJsonCode(responseText)), userMessage);
-      }
-      return new ReviewRequestResult(new AiResponseContent(responseText), userMessage);
+      return new ReviewRequestResult(toResponseContent(responseText), userMessage);
     } catch (Exception e) {
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
@@ -237,6 +233,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected void setRequestBody(String requestBody) {
     this.requestBody = requestBody;
+  }
+
+  @VisibleForTesting
+  protected AiResponseContent toResponseContent(String responseText) {
+    if (isJsonObjectAsString(responseText)) {
+      return convertResponseContentFromJson(unwrapJsonCode(responseText));
+    }
+    return new AiResponseContent(responseText);
   }
 
   protected String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
