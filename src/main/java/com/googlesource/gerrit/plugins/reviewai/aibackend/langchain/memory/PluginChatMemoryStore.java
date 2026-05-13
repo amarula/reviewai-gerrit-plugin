@@ -60,7 +60,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
     MemoryKey key = MemoryKey.from(memoryId);
     try {
       List<ChatMessage> result = new ArrayList<>();
-      for (String json : repository.getMessageJsons(key.changeId(), key.patchSet())) {
+      for (String json : repository.getMessageJsons(key.changeId(), key.patchSet(), key.scope())) {
         if (json != null && !json.isEmpty()) {
           result.add(ChatMessageDeserializer.messageFromJson(json));
         }

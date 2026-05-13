@@ -90,8 +90,8 @@ public class ReviewAiDb {
         )
         """,
         """
-        CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_lookup
-        ON langchain_chat_memory_messages(change_id, patch_set, updated_at, id)
+        CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_scope_lookup
+        ON langchain_chat_memory_messages(change_id, patch_set, scope, updated_at, id)
         """);
   }
 
