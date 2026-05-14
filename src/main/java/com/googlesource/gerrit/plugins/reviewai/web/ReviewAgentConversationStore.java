@@ -19,10 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasTable;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.setLongOrNull;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getLong;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getOrCreateObject;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getLong;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
@@ -41,7 +42,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -99,6 +102,21 @@ public class ReviewAgentConversationStore {
       log.warn("Failed to read review-agent conversations for change {}", changeId, e);
       return new LinkedHashMap<>();
     }
+  }
+
+  public List<String> getAutomaticReviewResponseTexts(String changeId) {
+    List<String> responseTexts = new ArrayList<>();
+    for (ReviewAgentConversationInfo conversation : getConversations(changeId).values()) {
+      if (conversation.turns == null) {
+        continue;
+      }
+      for (JsonObject turn : conversation.turns) {
+        if (isAutomaticReviewTurn(turn)) {
+          responseTexts.addAll(getResponseTexts(turn));
+        }
+      }
+    }
+    return responseTexts;
   }
 
   void upsertConversation(String changeId, ReviewAgentConversationInfo conversation) {
@@ -417,6 +435,35 @@ public class ReviewAgentConversationStore {
     }
     userInput.remove("client_data");
     return true;
+  }
+
+  private boolean isAutomaticReviewTurn(JsonObject turn) {
+    if (turn == null || !turn.has("user_input") || !turn.get("user_input").isJsonObject()) {
+      return false;
+    }
+    JsonObject userInput = turn.getAsJsonObject("user_input");
+    return PATCH_SET_EVENT_TRIGGER_MESSAGE.equals(getString(userInput, "user_question"));
+  }
+
+  private List<String> getResponseTexts(JsonObject turn) {
+    List<String> responseTexts = new ArrayList<>();
+    if (turn == null || !turn.has("response") || !turn.get("response").isJsonObject()) {
+      return responseTexts;
+    }
+    JsonObject response = turn.getAsJsonObject("response");
+    if (!response.has("response_parts") || !response.get("response_parts").isJsonArray()) {
+      return responseTexts;
+    }
+    for (JsonElement responsePartElement : response.getAsJsonArray("response_parts")) {
+      if (!responsePartElement.isJsonObject()) {
+        continue;
+      }
+      String responseText = getString(responsePartElement.getAsJsonObject(), "text");
+      if (responseText != null && !responseText.isBlank()) {
+        responseTexts.add(responseText);
+      }
+    }
+    return responseTexts;
   }
 
   private void restoreLegacyUserQuestion(Connection c, Long userMessageId, JsonObject turn)

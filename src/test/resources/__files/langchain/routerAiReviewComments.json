@@ -1,0 +1,26 @@
+[
+  {
+    "author": {
+      "_account_id": 7,
+      "name": "ReviewAI",
+      "username": "reviewai"
+    },
+    "patch_set": 1,
+    "id": "ai-review-1",
+    "date": "2026-04-09 09:59:00.000000",
+    "message": "Patch Set 1: Code-Review-1\n\nPrevious AI review: the commit message is too vague.",
+    "filename": "/PATCHSET_LEVEL"
+  },
+  {
+    "author": {
+      "_account_id": 1001,
+      "name": "Alice",
+      "username": "alice"
+    },
+    "patch_set": 1,
+    "id": "user-comment-1",
+    "date": "2026-04-09 10:00:00.000000",
+    "message": "@reviewai please check the patch set.",
+    "filename": "/PATCHSET_LEVEL"
+  }
+]
