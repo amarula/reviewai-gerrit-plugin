@@ -37,7 +37,12 @@ public class AiPromptFactory {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    if (change.getIsCommentEvent()) {
+    if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
+      if (changeSetData.getForcedStagedReview()) {
+        log.info("AiPromptFactory: Return AiPromptRoutedReviewAgentRequest");
+        return new AiPromptRoutedReviewAgentRequest(
+            config, changeSetData, change, codeContextPolicy);
+      }
       log.info("AiPromptFactory: Return AiPromptRequests");
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
