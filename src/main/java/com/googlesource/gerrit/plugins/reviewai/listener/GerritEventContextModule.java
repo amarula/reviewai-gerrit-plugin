@@ -78,7 +78,7 @@ public class GerritEventContextModule extends FactoryModule {
 
   private Class<? extends IAiClient> getAiClient() {
     if (config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN) {
-      return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+      return config.getMultiAgentMode()
           ? LangChainMultiAgentReviewClient.class
           : LangChainClient.class;
     }

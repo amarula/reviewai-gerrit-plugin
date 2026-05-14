@@ -21,6 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -49,6 +50,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
 
   private final ICodeContextPolicy codeContextPolicy;
 
@@ -61,6 +64,14 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     this.codeContextPolicy = codeContextPolicy;
     loadDefaultPrompts("promptsOpenAiReview");
     log.debug("AiPromptReview initialized for change ID: {}", change.getFullChangeId());
+  }
+
+  public static String getRoutedReviewAgentInstructions(ReviewAssistantStages stage) {
+    return switch (stage) {
+      case REVIEW_COMMIT_MESSAGE -> DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
+      case REVIEW_CODE, REVIEW_REITERATED ->
+          DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
+    };
   }
 
   @Override
