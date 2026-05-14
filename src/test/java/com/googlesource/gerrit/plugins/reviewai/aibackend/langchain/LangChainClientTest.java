@@ -18,11 +18,13 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
@@ -90,6 +92,28 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void omitsStructuredResponseFormatForGeminiOnDemandTools() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.GEMINI);
+
+    LangChainClient client = new LangChainClient(config, null, null, null);
+
+    assertNull(getToolExecutorStructuredResponseFormat(client));
+  }
+
+  @Test
+  public void keepsStructuredResponseFormatForOpenAiOnDemandTools() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+
+    LangChainClient client = new LangChainClient(config, null, null, null);
+
+    assertNotNull(getToolExecutorStructuredResponseFormat(client));
+  }
+
+  @Test
   public void resolvesOpenAiConversationForLangChainOpenAiProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
@@ -153,6 +177,16 @@ public class LangChainClientTest {
             "resolveConversationId", AiProviderType.class, ChangeSetData.class);
     method.setAccessible(true);
     return (String) method.invoke(client, providerType, changeSetData);
+  }
+
+  private ResponseFormat getToolExecutorStructuredResponseFormat(LangChainClient client)
+      throws Exception {
+    Field executorField = LangChainClient.class.getDeclaredField("toolExecutor");
+    executorField.setAccessible(true);
+    Object executor = executorField.get(client);
+    Field responseFormatField = executor.getClass().getDeclaredField("structuredResponseFormat");
+    responseFormatField.setAccessible(true);
+    return (ResponseFormat) responseFormatField.get(executor);
   }
 
   private String readTestResource(String resourceName) throws Exception {

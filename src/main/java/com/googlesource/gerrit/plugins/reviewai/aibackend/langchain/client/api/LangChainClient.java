@@ -119,9 +119,13 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         config != null
             && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
             && config.getAiProviderType() == AiProviderType.OPENAI;
+    ResponseFormat toolExecutorResponseFormat =
+        supportsStructuredResponseWithTools(config, contextTools)
+            ? structuredResponseFormat
+            : null;
     this.toolExecutor =
         new LangChainToolExecutor(
-            config, structuredResponseFormat, contextTools, requireInitialToolUse);
+            config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
     log.debug("Initialized LangChainClient");
   }
 
@@ -274,6 +278,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       builder.chatMemoryStore(chatMemoryStore);
     }
     return builder.build();
+  }
+
+  private boolean supportsStructuredResponseWithTools(
+      Configuration config, List<ToolSpecification> contextTools) {
+    return config == null
+        || config.getAiProviderType() != AiProviderType.GEMINI
+        || contextTools == null
+        || contextTools.isEmpty();
   }
 
   @Override
