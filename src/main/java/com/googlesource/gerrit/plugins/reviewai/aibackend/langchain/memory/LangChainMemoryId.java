@@ -50,7 +50,9 @@ public final class LangChainMemoryId {
 
   public static LangChainMemoryId from(ChangeSetData changeSetData, GerritChange change) {
     return new LangChainMemoryId(
-        change.getFullChangeId(), getPatchSetNumber(change), getMemoryScope(changeSetData, change));
+        change.getFullChangeId(),
+        getPatchSetNumber(change),
+        getMemoryScope(changeSetData, change));
   }
 
   public static int getPatchSetNumber(GerritChange change) {
@@ -58,7 +60,8 @@ public final class LangChainMemoryId {
   }
 
   private static String getMemoryScope(ChangeSetData changeSetData, GerritChange change) {
-    if (Boolean.TRUE.equals(change.getIsCommentEvent())) {
+    if (Boolean.TRUE.equals(change.getIsCommentEvent())
+        && !Boolean.TRUE.equals(changeSetData.getForcedStagedReview())) {
       return REQUESTS_SCOPE;
     }
     ReviewAssistantStages assistantStage = changeSetData.getReviewAssistantStage();
