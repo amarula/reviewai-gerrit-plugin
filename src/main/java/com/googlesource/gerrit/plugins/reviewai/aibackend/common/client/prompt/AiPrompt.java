@@ -105,11 +105,14 @@ public class AiPrompt {
   }
 
   protected void loadDefaultPrompts(String promptFilename) {
-    Class<? extends AiPrompt> me = this.getClass();
+    loadDefaultPrompts(this.getClass(), promptFilename);
+  }
+
+  protected void loadDefaultPrompts(Class<?> promptClass, String promptFilename) {
     Map<String, Object> values = getJsonPromptValues(promptFilename);
     for (Map.Entry<String, Object> entry : values.entrySet()) {
       try {
-        Field field = me.getField(entry.getKey());
+        Field field = promptClass.getField(entry.getKey());
         field.setAccessible(true);
         field.set(null, entry.getValue());
         log.debug("Loaded prompt attribute: {} with value: {}", entry.getKey(), entry.getValue());
