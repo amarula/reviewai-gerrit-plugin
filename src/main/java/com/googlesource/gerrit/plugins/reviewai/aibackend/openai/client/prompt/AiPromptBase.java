@@ -78,10 +78,14 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
       List<String> instructions, boolean includeSystemPromptInstructions) {
     if (includeSystemPromptInstructions) {
       instructions.add(
-          config.getAiSystemPromptInstructions(DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS) + DOT);
+          config.getAiSystemPromptInstructions(getDefaultAiSystemPromptInstructions()) + DOT);
     }
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
     this.projectInstructions.addProjectInstructions(instructions);
+  }
+
+  protected String getDefaultAiSystemPromptInstructions() {
+    return DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS;
   }
 
   public String getDefaultAiAssistantInstructions() {
