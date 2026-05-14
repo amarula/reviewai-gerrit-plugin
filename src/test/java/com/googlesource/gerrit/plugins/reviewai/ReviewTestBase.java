@@ -462,9 +462,14 @@ public class ReviewTestBase extends TestBase {
 
   private IAiClient getOpenAIClient() {
     if (config.getSelectedAiModelRoute().isLangChain()) {
-      return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
+      return config.getMultiAgentMode()
           ? new LangChainMultiAgentReviewClient(
-              config, getCodeContextPolicy(), gerritClient, localizer, pluginDataHandlerProvider, Runnable::run)
+              config,
+              getCodeContextPolicy(),
+              gerritClient,
+              localizer,
+              pluginDataHandlerProvider,
+              Runnable::run)
           : new LangChainClient(
               config, getCodeContextPolicy(), gerritClient, localizer, pluginDataHandlerProvider);
     }

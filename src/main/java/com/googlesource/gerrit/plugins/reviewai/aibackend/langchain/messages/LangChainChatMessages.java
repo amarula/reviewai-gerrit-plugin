@@ -50,6 +50,12 @@ public final class LangChainChatMessages {
     return createMessage(AiMessage.class, text);
   }
 
+  public static List<ChatMessage> fromRequestMessages(List<AiRequestMessage> source) {
+    List<ChatMessage> messages = new ArrayList<>();
+    appendMessages(messages, source);
+    return messages;
+  }
+
   public static List<ChatMessage> build(
       AiHistory aiHistory, GerritClientData gerritClientData, GerritChange change) {
     // Combine patch set history with inline threads.

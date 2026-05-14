@@ -26,11 +26,24 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
 
 public class LangChainMultiAgentReviewClientTest {
+  private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
+  private static final String ROUTER_HISTORY_PROMPT_RESOURCE =
+      "__files/langchain/routerAiDataPromptWithHistory.json";
+  private static final String ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE =
+      "__files/langchain/routerAiDataPromptWithHistoryExpectedMessages.txt";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -47,6 +60,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(
         List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
         client.recordedStages);
+    assertEquals(List.of(true, true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
   }
 
@@ -65,12 +79,98 @@ public class LangChainMultiAgentReviewClientTest {
     assertNotNull(response.getReplies());
     assertEquals(1, response.getReplies().size());
     assertEquals(List.of(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE), client.recordedStages);
+    assertEquals(List.of(true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
+  }
+
+  @Test
+  public void forcedReviewCommentUsesPatchsetAndCommitMessageAgents() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedReview(true);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response = client.ask(changeSetData, change, "patch");
+
+    assertNotNull(response.getReplies());
+    assertEquals(2, response.getReplies().size());
+    assertEquals(
+        List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
+        client.recordedStages);
+    assertEquals(List.of(true, true), client.recordedForcedStagedReview);
+  }
+
+  @Test
+  public void messageUsesRoutingAgentToSelectCommitMessageAgent() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    client.routedStage = ReviewAssistantStages.REVIEW_COMMIT_MESSAGE;
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response = client.ask(changeSetData, change, "patch");
+
+    assertNotNull(response.getReplies());
+    assertEquals(1, response.getReplies().size());
+    assertEquals(1, client.routeCalls);
+    assertEquals(List.of(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE), client.recordedStages);
+    assertEquals(List.of(true), client.recordedForcedStagedReview);
+    assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
+  }
+
+  @Test
+  public void routingHistoryIncludesUserAndAiMessagesFromRequestData() throws Exception {
+    TestableLangChainMultiAgentReviewClient client = new TestableLangChainMultiAgentReviewClient();
+    String requestData = readTestResource(ROUTER_HISTORY_PROMPT_RESOURCE);
+
+    List<String> messages = summarizeMessages(client.buildRoutingHistoryMessages(requestData));
+
+    assertEquals(readTestResourceLines(ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE), messages);
+  }
+
+  private static List<String> summarizeMessages(List<ChatMessage> messages) {
+    return messages.stream()
+        .map(message -> message.type() + ":" + messageText(message))
+        .toList();
+  }
+
+  private static String messageText(ChatMessage message) {
+    if (message instanceof UserMessage userMessage) {
+      return userMessage.singleText();
+    }
+    if (message instanceof AiMessage aiMessage) {
+      return aiMessage.text();
+    }
+    if (message instanceof SystemMessage systemMessage) {
+      return systemMessage.text();
+    }
+    return message.toString();
+  }
+
+  private static String readTestResource(String resourceName) throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  private static List<String> readTestResourceLines(String resourceName) throws Exception {
+    return Files.readAllLines(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  private static class TestableLangChainMultiAgentReviewClient
+      extends LangChainMultiAgentReviewClient {
+    TestableLangChainMultiAgentReviewClient() {
+      super(null, null, null, null, Runnable::run);
+    }
   }
 
   private static class RecordingLangChainMultiAgentReviewClient
       extends LangChainMultiAgentReviewClient {
     private final List<ReviewAssistantStages> recordedStages = new ArrayList<>();
+    private final List<Boolean> recordedForcedStagedReview = new ArrayList<>();
+    private ReviewAssistantStages routedStage = ReviewAssistantStages.REVIEW_CODE;
+    private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
       super(null, null, null, null, Runnable::run);
@@ -81,12 +181,20 @@ public class LangChainMultiAgentReviewClientTest {
         ChangeSetData changeSetData, GerritChange change, String patchSet) {
       ReviewAssistantStages stage = changeSetData.getReviewAssistantStage();
       recordedStages.add(stage);
+      recordedForcedStagedReview.add(changeSetData.getForcedStagedReview());
 
       AiReplyItem reply = AiReplyItem.builder().reply(stage.name()).build();
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(new ArrayList<>(List.of(reply)));
 
       return new ReviewRequestResult(response, "body-" + stage.name());
+    }
+
+    @Override
+    protected ReviewAssistantStages routeMessage(ChangeSetData changeSetData, GerritChange change)
+        throws AiConnectionFailException {
+      routeCalls++;
+      return routedStage;
     }
   }
 }
