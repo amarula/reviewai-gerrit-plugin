@@ -19,6 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageCleaner;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
@@ -26,10 +28,14 @@ import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -69,10 +75,73 @@ public class GerritAiReviewHistoryCollector {
     }
 
     entries.sort(
-        Comparator.comparing(AiReviewHistoryInfo.Entry::getUpdated, Comparator.nullsLast(String::compareTo))
+        Comparator.comparing(
+                AiReviewHistoryInfo.Entry::getUpdated, Comparator.nullsLast(String::compareTo))
             .thenComparing(AiReviewHistoryInfo.Entry::getId, Comparator.nullsLast(String::compareTo)));
 
     return new AiReviewHistoryInfo(entries);
+  }
+
+  public AiReviewHistoryInfo collect(
+      Configuration config,
+      Localizer localizer,
+      int aiAccountId,
+      GerritClientData gerritClientData) {
+    return collect(config, localizer, aiAccountId, toCommentsByFile(gerritClientData));
+  }
+
+  private Map<String, List<GerritComment>> toCommentsByFile(GerritClientData gerritClientData) {
+    Map<String, List<GerritComment>> commentsByFile = new HashMap<>();
+    if (gerritClientData == null) {
+      return commentsByFile;
+    }
+
+    Set<String> seenComments = new HashSet<>();
+    addCommentsByFile(commentsByFile, seenComments, gerritClientData.getDetailComments());
+
+    CommentData commentData = gerritClientData.getCommentData();
+    if (commentData == null) {
+      return commentsByFile;
+    }
+    if (commentData.getPatchSetCommentMap() != null) {
+      addCommentsByFile(
+          commentsByFile, seenComments, commentData.getPatchSetCommentMap().values());
+    }
+    if (commentData.getCommentMap() != null) {
+      addCommentsByFile(commentsByFile, seenComments, commentData.getCommentMap().values());
+    }
+    addCommentsByFile(commentsByFile, seenComments, commentData.getCommentProperties());
+    return commentsByFile;
+  }
+
+  private void addCommentsByFile(
+      Map<String, List<GerritComment>> commentsByFile,
+      Set<String> seenComments,
+      Collection<GerritComment> comments) {
+    if (comments == null) {
+      return;
+    }
+    for (GerritComment comment : comments) {
+      if (comment == null || !seenComments.add(commentKey(comment))) {
+        continue;
+      }
+      String filename =
+          Optional.ofNullable(comment.getFilename()).orElse(Settings.GERRIT_PATCH_SET_FILENAME);
+      commentsByFile.computeIfAbsent(filename, key -> new ArrayList<>()).add(comment);
+    }
+  }
+
+  private String commentKey(GerritComment comment) {
+    return Stream.of(comment.getChangeMessageId(), comment.getId())
+        .filter(value -> value != null && !value.isBlank())
+        .findFirst()
+        .orElseGet(
+            () ->
+                String.join(
+                    ":",
+                    Optional.ofNullable(comment.getFilename()).orElse(""),
+                    Optional.ofNullable(comment.getUpdated()).orElse(comment.getDate()),
+                    Optional.ofNullable(comment.getMessage()).orElse("")));
   }
 
   private List<GerritComment> flattenComments(Map<String, List<GerritComment>> inlineComments) {

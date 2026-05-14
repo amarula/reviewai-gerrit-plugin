@@ -50,6 +50,35 @@ public final class LangChainChatMessages {
     return createMessage(AiMessage.class, text);
   }
 
+  public static List<ChatMessage> fromRequestMessages(List<AiRequestMessage> source) {
+    List<ChatMessage> messages = new ArrayList<>();
+    appendMessages(messages, source);
+    return messages;
+  }
+
+  public static void appendUnique(
+      List<ChatMessage> target, Set<String> seenMessages, List<ChatMessage> source) {
+    for (ChatMessage message : source) {
+      String messageKey = message.type() + ":" + content(message);
+      if (seenMessages.add(messageKey)) {
+        target.add(message);
+      }
+    }
+  }
+
+  public static String content(ChatMessage message) {
+    if (message instanceof UserMessage userMessage) {
+      return userMessage.hasSingleText() ? userMessage.singleText() : userMessage.toString();
+    }
+    if (message instanceof AiMessage aiMessage) {
+      return aiMessage.text() == null ? "" : aiMessage.text();
+    }
+    if (message instanceof SystemMessage systemMessage) {
+      return systemMessage.text() == null ? "" : systemMessage.text();
+    }
+    return message.toString();
+  }
+
   public static List<ChatMessage> build(
       AiHistory aiHistory, GerritClientData gerritClientData, GerritChange change) {
     // Combine patch set history with inline threads.

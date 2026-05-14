@@ -1,0 +1,20 @@
+[
+  {
+    "request": "Should this update the commit message instead?",
+    "id": 0,
+    "history": [
+      {
+        "role": "user",
+        "content": "Can you improve the commit title?"
+      },
+      {
+        "role": "assistant",
+        "content": "A clearer title would be: Fix null handling"
+      },
+      {
+        "role": "user",
+        "content": "What about the body?"
+      }
+    ]
+  }
+]
