@@ -1,0 +1,6 @@
+AI:Patchset-triggered review: commit message should mention null handling.
+AI:Previous AI review: the commit message is too vague.
+USER:Can you improve the commit title?
+AI:A clearer title would be: Fix null handling
+USER:What about the body?
+USER:Should this update the commit message instead?

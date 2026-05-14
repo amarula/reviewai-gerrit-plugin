@@ -34,6 +34,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.DriverManager;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -56,6 +57,7 @@ public class ReviewAgentConversationsTest extends TestBase {
   @Mock private AiReviewPermission aiReviewPermission;
 
   private ReviewAgentConversations view;
+  private ReviewAgentConversationStore conversationStore;
   private String jdbcUrl;
 
   @Before
@@ -64,8 +66,7 @@ public class ReviewAgentConversationsTest extends TestBase {
     change.setCurrentPatchSet(PatchSet.id(change.getId(), 1), "", "");
     when(changeResource.getChange()).thenReturn(change);
     jdbcUrl = "jdbc:h2:mem:" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
-    ReviewAgentConversationStore conversationStore =
-        new ReviewAgentConversationStore(jdbcUrl, tempFolder.getRoot().toPath());
+    conversationStore = new ReviewAgentConversationStore(jdbcUrl, tempFolder.getRoot().toPath());
     view =
         new ReviewAgentConversations(
             conversationStore, aiReviewPermission);
@@ -409,6 +410,21 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   @Test
+  public void getsAutomaticReviewResponseTexts() throws Exception {
+    String responseText = readTestResource("__files/review-agent/automaticReviewResponse.txt");
+    append(
+        "conversation-1",
+        0,
+        turn("Patch set commit event triggered this ReviewAI request.", responseText),
+        1000L);
+    append("conversation-1", 1, turn("/review", "Manual review response"), 2000L);
+
+    assertEquals(
+        List.of(responseText),
+        conversationStore.getAutomaticReviewResponseTexts(getGerritChange().getFullChangeId()));
+  }
+
+  @Test
   public void getWithoutConversationIdReturnsEmptyConversation() throws Exception {
     ReviewAgentConversations.Input getInput = new ReviewAgentConversations.Input();
     getInput.action = "get";
@@ -495,6 +511,10 @@ public class ReviewAgentConversationsTest extends TestBase {
         .getAsJsonObject()
         .get("text")
         .getAsString();
+  }
+
+  private String readTestResource(String resourceName) throws Exception {
+    return Files.readString(Paths.get("src/test/resources").resolve(resourceName)).trim();
   }
 
   private boolean hasResponsePartsTable(java.sql.Connection c) throws Exception {
