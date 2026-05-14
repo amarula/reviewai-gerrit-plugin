@@ -34,7 +34,21 @@ public class GerritEventContextModuleTest {
   public void selectsMultiAgentLangChainClientWhenEnabled() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
-    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getMultiAgentMode()).thenReturn(true);
+
+    GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
+
+    Method getAiClient = GerritEventContextModule.class.getDeclaredMethod("getAiClient");
+    getAiClient.setAccessible(true);
+
+    assertEquals(LangChainMultiAgentReviewClient.class, getAiClient.invoke(module));
+  }
+
+  @Test
+  public void selectsMultiAgentLangChainClientBasedOnlyOnMultiAgentMode() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
+    when(config.getAiReviewCommitMessages()).thenReturn(false);
     when(config.getMultiAgentMode()).thenReturn(true);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));

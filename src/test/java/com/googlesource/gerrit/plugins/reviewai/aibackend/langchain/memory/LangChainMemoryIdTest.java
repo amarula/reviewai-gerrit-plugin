@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import org.junit.Test;
 
 public class LangChainMemoryIdTest {
@@ -33,6 +34,19 @@ public class LangChainMemoryIdTest {
     LangChainMemoryId memoryId = LangChainMemoryId.from(changeSetData, change);
 
     assertEquals("requests", memoryId.getScope());
+  }
+
+  @Test
+  public void routedCommentEventsUseReviewStageScope() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+    GerritChange change = new GerritChange("change~1");
+    change.setIsCommentEvent(true);
+
+    LangChainMemoryId memoryId = LangChainMemoryId.from(changeSetData, change);
+
+    assertEquals("review_commit_message", memoryId.getScope());
   }
 
   @Test
