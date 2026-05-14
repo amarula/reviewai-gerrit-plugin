@@ -18,8 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
@@ -189,7 +187,7 @@ class ReviewAgentConversationStore {
       setLongOrNull(ps, 4, conversation.timestampMillis);
       ps.executeUpdate();
     }
-    deleteConversationMessages(c, changeId, conversation.id);
+    deleteConversationUserMessages(c, changeId, conversation.id);
     deleteConversationTurns(c, changeId, conversation.id);
     for (int i = 0; i < conversation.turns.size(); i++) {
       insertTurn(c, changeId, patchSet, conversation.id, i, conversation.turns.get(i));
@@ -221,7 +219,6 @@ class ReviewAgentConversationStore {
       setLongOrNull(ps, 6, getTimestampMillis(turn));
       ps.executeUpdate();
     }
-    insertResponseParts(c, changeId, patchSet, conversationId, turnIndex, turnMessages);
   }
 
   private TurnMessages extractTurnMessages(
@@ -235,52 +232,7 @@ class ReviewAgentConversationStore {
       userMessageId = insertMessage(c, changeId, patchSet, UserMessage.from(userQuestion));
       metadata.getAsJsonObject("user_input").remove("user_question");
     }
-    JsonArray responseParts = storeInLangChainMemory ? extractResponseParts(metadata) : null;
-    if (responseParts != null) {
-      metadata.getAsJsonObject("response").remove("response_parts");
-    }
-    return new TurnMessages(metadata, userMessageId, responseParts);
-  }
-
-  private void insertResponseParts(
-      Connection c,
-      String changeId,
-      int patchSet,
-      String conversationId,
-      int turnIndex,
-      TurnMessages messages)
-      throws SQLException {
-    JsonArray responseParts = messages.responseParts();
-    if (responseParts == null) {
-      return;
-    }
-    try (PreparedStatement ps =
-        c.prepareStatement(
-            """
-            INSERT INTO review_agent_conversation_response_parts
-              (change_id, conversation_id, turn_index, part_index, response_part_id,
-               ai_message_id, response_part_metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """)) {
-      for (int i = 0; i < responseParts.size(); i++) {
-        JsonObject partMetadata = responseParts.get(i).getAsJsonObject().deepCopy();
-        Long aiMessageId = null;
-        String text = getString(partMetadata, "text");
-        if (text != null) {
-          aiMessageId = insertMessage(c, changeId, patchSet, AiMessage.from(text));
-          partMetadata.remove("text");
-        }
-        ps.setString(1, changeId);
-        ps.setString(2, conversationId);
-        ps.setInt(3, turnIndex);
-        ps.setInt(4, i);
-        setIntegerOrNull(ps, 5, getInteger(partMetadata, "id"));
-        setLongOrNull(ps, 6, aiMessageId);
-        ps.setString(7, getGson().toJson(partMetadata));
-        ps.addBatch();
-      }
-      ps.executeBatch();
-    }
+    return new TurnMessages(metadata, userMessageId);
   }
 
   private long insertMessage(Connection c, String changeId, int patchSet, ChatMessage message)
@@ -326,7 +278,6 @@ class ReviewAgentConversationStore {
           int turnIndex = rs.getInt(1);
           JsonObject turn = getGson().fromJson(rs.getString(3), JsonObject.class);
           restoreUserQuestion(c, rs.getObject(2, Long.class), turn);
-          restoreResponseParts(c, changeId, canonicalConversationId, turnIndex, turn);
           turns.add(turn);
         }
         return turns;
@@ -341,42 +292,6 @@ class ReviewAgentConversationStore {
     }
     JsonObject userInput = getOrCreateObject(turn, "user_input");
     userInput.addProperty("user_question", readMessageText(c, userMessageId));
-  }
-
-  private void restoreResponseParts(
-      Connection c, String changeId, String conversationId, int turnIndex, JsonObject turn)
-      throws SQLException {
-    String canonicalConversationId = canonicalConversationId(conversationId);
-    try (PreparedStatement ps =
-        c.prepareStatement(
-            """
-            SELECT response_part_id, ai_message_id, response_part_metadata_json
-            FROM review_agent_conversation_response_parts
-            WHERE change_id = ? AND conversation_id = ? AND turn_index = ?
-            ORDER BY part_index
-            """)) {
-      ps.setString(1, changeId);
-      ps.setString(2, canonicalConversationId);
-      ps.setInt(3, turnIndex);
-      try (ResultSet rs = ps.executeQuery()) {
-        JsonArray responseParts = new JsonArray();
-        while (rs.next()) {
-          JsonObject part = getGson().fromJson(rs.getString(3), JsonObject.class);
-          Integer partId = rs.getObject(1, Integer.class);
-          if (partId != null) {
-            part.addProperty("id", partId);
-          }
-          Long aiMessageId = rs.getObject(2, Long.class);
-          if (aiMessageId != null) {
-            part.addProperty("text", readMessageText(c, aiMessageId));
-          }
-          responseParts.add(part);
-        }
-        if (!responseParts.isEmpty()) {
-          getOrCreateObject(turn, "response").add("response_parts", responseParts);
-        }
-      }
-    }
   }
 
   private String readMessageText(Connection c, long messageId) throws SQLException {
@@ -404,7 +319,7 @@ class ReviewAgentConversationStore {
     }
   }
 
-  private void deleteConversationMessages(Connection c, String changeId, String conversationId)
+  private void deleteConversationUserMessages(Connection c, String changeId, String conversationId)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
@@ -414,37 +329,22 @@ class ReviewAgentConversationStore {
               SELECT user_message_id
               FROM review_agent_conversation_turns
               WHERE change_id = ? AND conversation_id = ? AND user_message_id IS NOT NULL
-              UNION ALL
-              SELECT ai_message_id
-              FROM review_agent_conversation_response_parts
-              WHERE change_id = ? AND conversation_id = ? AND ai_message_id IS NOT NULL
             )
             """)) {
       ps.setString(1, changeId);
       ps.setString(2, conversationId);
-      ps.setString(3, changeId);
-      ps.setString(4, conversationId);
       ps.executeUpdate();
     }
   }
 
   private void deleteConversationTurns(Connection c, String changeId, String conversationId)
       throws SQLException {
-    try (PreparedStatement parts =
-            c.prepareStatement(
-                """
-                DELETE FROM review_agent_conversation_response_parts
-                WHERE change_id = ? AND conversation_id = ?
-                """);
-        PreparedStatement turns =
+    try (PreparedStatement turns =
             c.prepareStatement(
                 """
                 DELETE FROM review_agent_conversation_turns
                 WHERE change_id = ? AND conversation_id = ?
                 """)) {
-      parts.setString(1, changeId);
-      parts.setString(2, conversationId);
-      parts.executeUpdate();
       turns.setString(1, changeId);
       turns.setString(2, conversationId);
       turns.executeUpdate();
@@ -476,32 +376,11 @@ class ReviewAgentConversationStore {
         && !normalizedQuestion.startsWith("/forget_thread ");
   }
 
-  private static JsonArray extractResponseParts(JsonObject turn) {
-    if (!turn.has("response") || !turn.get("response").isJsonObject()) {
-      return null;
-    }
-    JsonObject response = turn.getAsJsonObject("response");
-    if (!response.has("response_parts") || !response.get("response_parts").isJsonArray()) {
-      return null;
-    }
-    return response.getAsJsonArray("response_parts").deepCopy();
-  }
-
   private static String getString(JsonObject object, String key) {
     if (!object.has(key) || object.get(key).isJsonNull()) {
       return null;
     }
     return object.get(key).getAsString();
-  }
-
-  private static Integer getInteger(JsonObject object, String key) {
-    if (!object.has(key) || object.get(key).isJsonNull()) {
-      return null;
-    }
-    JsonElement value = object.get(key);
-    return value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()
-        ? value.getAsInt()
-        : null;
   }
 
   private static Long getTimestampMillis(JsonObject turn) {
@@ -520,15 +399,6 @@ class ReviewAgentConversationStore {
     }
   }
 
-  private static void setIntegerOrNull(PreparedStatement ps, int index, Integer value)
-      throws SQLException {
-    if (value == null) {
-      ps.setNull(index, java.sql.Types.INTEGER);
-    } else {
-      ps.setInt(index, value);
-    }
-  }
-
   static String canonicalConversationId(String conversationId) {
     String normalizedConversationId = conversationId.toLowerCase(Locale.ROOT);
     try {
@@ -539,6 +409,5 @@ class ReviewAgentConversationStore {
     }
   }
 
-  private record TurnMessages(
-      JsonObject turnMetadata, Long userMessageId, JsonArray responseParts) {}
+  private record TurnMessages(JsonObject turnMetadata, Long userMessageId) {}
 }

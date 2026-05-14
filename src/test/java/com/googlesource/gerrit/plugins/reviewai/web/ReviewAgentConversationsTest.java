@@ -42,6 +42,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.when;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
@@ -264,37 +265,37 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   @Test
-  public void storesTurnTextOnlyInLangChainMessageRows() throws Exception {
+  public void storesUserTextOnlyInLangChainMessageRows() throws Exception {
     append("conversation-1", 0, turn("First", "First response"), 1000L);
 
     try (var c = DriverManager.getConnection(jdbcUrl);
         var turnMetadata =
             c.createStatement()
                 .executeQuery("SELECT turn_metadata_json FROM review_agent_conversation_turns");
-        var partMetadata =
-            c.createStatement()
-                .executeQuery(
-                    "SELECT response_part_metadata_json "
-                        + "FROM review_agent_conversation_response_parts");
         var messages =
             c.createStatement()
                 .executeQuery(
                     "SELECT change_id, patch_set, scope, message_json "
                         + "FROM langchain_chat_memory_messages")) {
       turnMetadata.next();
-      assertEquals(false, turnMetadata.getString(1).contains("First"));
-      partMetadata.next();
-      assertEquals(false, partMetadata.getString(1).contains("First response"));
-      int messageRowsWithText = 0;
+      assertFalse(turnMetadata.getString(1).contains("\"user_question\":\"First\""));
+      assertEquals(true, turnMetadata.getString(1).contains("First response"));
+      int userMessageRows = 0;
+      int responseMessageRows = 0;
       while (messages.next()) {
         assertEquals(getGerritChange().getFullChangeId(), messages.getString(1));
         assertEquals(1, messages.getInt(2));
         assertEquals("review_agent_conversations", messages.getString(3));
-        if (messages.getString(4).contains("First")) {
-          messageRowsWithText++;
+        if (messages.getString(4).contains("First\"")) {
+          userMessageRows++;
+        }
+        if (messages.getString(4).contains("First response")) {
+          responseMessageRows++;
         }
       }
-      assertEquals(2, messageRowsWithText);
+      assertEquals(1, userMessageRows);
+      assertEquals(0, responseMessageRows);
+      assertFalse(hasResponsePartsTable(c));
     }
   }
 
@@ -416,6 +417,14 @@ public class ReviewAgentConversationsTest extends TestBase {
         .getAsJsonObject()
         .get("text")
         .getAsString();
+  }
+
+  private boolean hasResponsePartsTable(java.sql.Connection c) throws Exception {
+    try (var rs =
+        c.getMetaData()
+            .getTables(null, null, "REVIEW_AGENT_CONVERSATION_RESPONSE_PARTS", null)) {
+      return rs.next();
+    }
   }
 
   private String uuidFor(String conversationId) {

@@ -130,18 +130,6 @@ public class ReviewAiDb {
           updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           PRIMARY KEY(change_id, conversation_id, turn_index)
         )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS review_agent_conversation_response_parts (
-          change_id VARCHAR(512) NOT NULL,
-          conversation_id VARCHAR(255) NOT NULL,
-          turn_index INT NOT NULL,
-          part_index INT NOT NULL,
-          response_part_id INT,
-          ai_message_id BIGINT,
-          response_part_metadata_json CLOB NOT NULL,
-          PRIMARY KEY(change_id, conversation_id, turn_index, part_index)
-        )
         """);
   }
 
