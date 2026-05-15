@@ -107,10 +107,10 @@ public class PatchSetReviewer {
     AiResponseContent reviewReply = null;
     try {
       reviewReply = getReviewReply(change, patchSet);
-      log.debug("OpenAI final response: {}", reviewReply);
+      log.debug("AI final response: {}", reviewReply);
     } catch (AiConnectionFailException e) {
       log.error(
-          "OpenAI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
+          "AI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
           change.getFullChangeId(),
           config.getAiDomain(),
           config.getAiModel(),
