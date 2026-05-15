@@ -22,7 +22,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patc
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -33,6 +32,8 @@ public class CodeFinder {
   private static final String PUNCTUATION_REGEX = "([()\\[\\]{}<>:;,?&+\\-*/%|=])";
   private static final String BEGINNING_DIFF_REGEX = "(?:^|\n)[+\\-]";
   private static final String ENDING_ELLIPSIS_REGEX = "\\.\\.\\.\\W*$";
+  private static final List<String> NEW_SIDE_FIELDS = List.of("b", "ab");
+  private static final List<String> OLD_SIDE_FIELDS = List.of("a", "ab");
 
   private final String NON_PRINTING_REPLACEMENT;
   private final String PUNCTUATION_REPLACEMENT;
@@ -57,24 +58,52 @@ public class CodeFinder {
     updateCodePattern(replyItem);
     currentCodeRange = null;
     closestCodeRange = null;
-    for (CodeFinderDiff codeFinderDiff : codeFinderDiffs) {
-      for (Field diffField : DiffContent.class.getDeclaredFields()) {
-        String diffCode = getDiffItem(diffField, codeFinderDiff.getContent());
-        if (diffCode != null) {
-          TreeMap<Integer, Integer> charToLineMapItem = codeFinderDiff.getCharToLineMap();
-          try {
-            findCodeLines(diffCode, charToLineMapItem);
-          } catch (IllegalArgumentException e) {
-            log.warn(
-                "Could not retrieve line number from charToLineMap for diff code: {}", diffCode, e);
-          }
-        } else {
-          log.debug("Diff code is null for field: {}", diffField.getName());
-        }
-      }
+    if (!findCodeLinesIfMapped(buildSideDiff(NEW_SIDE_FIELDS))) {
+      findCodeLinesIfMapped(buildSideDiff(OLD_SIDE_FIELDS));
     }
     log.debug("Returning closest code range found.");
     return closestCodeRange;
+  }
+
+  private boolean findCodeLinesIfMapped(SearchableDiff searchableDiff) {
+    try {
+      return findCodeLines(searchableDiff);
+    } catch (IllegalArgumentException e) {
+      log.warn(
+          "Could not retrieve line number from charToLineMap for diff code: {}",
+          searchableDiff.diffCode(),
+          e);
+      return false;
+    }
+  }
+
+  private SearchableDiff buildSideDiff(List<String> sideFields) {
+    StringBuilder diffCode = new StringBuilder();
+    TreeMap<Integer, Integer> charToLineMap = new TreeMap<>();
+    for (CodeFinderDiff codeFinderDiff : codeFinderDiffs) {
+      for (String fieldName : sideFields) {
+        String diffItem = getDiffItem(fieldName, codeFinderDiff.getContent());
+        if (diffItem == null || diffItem.isEmpty()) {
+          continue;
+        }
+        if (!diffCode.isEmpty()) {
+          diffCode.append('\n');
+        }
+        int offset = diffCode.length();
+        for (Integer position : codeFinderDiff.getCharToLineMap().keySet()) {
+          if (position <= diffItem.length()) {
+            charToLineMap.put(offset + position, codeFinderDiff.getCharToLineMap().get(position));
+          }
+        }
+        diffCode.append(diffItem);
+      }
+    }
+    if (!diffCode.isEmpty()
+        && !charToLineMap.isEmpty()
+        && !charToLineMap.containsKey(diffCode.length())) {
+      charToLineMap.put(diffCode.length(), charToLineMap.lastEntry().getValue());
+    }
+    return new SearchableDiff(diffCode.toString(), charToLineMap);
   }
 
   private void updateCodePattern(AiReplyItem replyItem) {
@@ -109,13 +138,13 @@ public class CodeFinder {
     return Math.abs((range.endLine + range.startLine) / 2 - fromLine);
   }
 
-  private String getDiffItem(Field diffField, DiffContent diffItem) {
-    try {
-      return (String) diffField.get(diffItem);
-    } catch (IllegalAccessException e) {
-      log.error("Error accessing field '{}' during diff processing", diffField.getName(), e);
-      return null;
-    }
+  private String getDiffItem(String fieldName, DiffContent diffItem) {
+    return switch (fieldName) {
+      case "a" -> diffItem.a;
+      case "b" -> diffItem.b;
+      case "ab" -> diffItem.ab;
+      default -> null;
+    };
   }
 
   private int getLineNumber(TreeMap<Integer, Integer> charToLineMapItem, int position) {
@@ -132,9 +161,15 @@ public class CodeFinder {
     return position - diffCode.substring(0, position).lastIndexOf("\n") - 1;
   }
 
-  private void findCodeLines(String diffCode, TreeMap<Integer, Integer> charToLineMapItem)
-      throws IllegalArgumentException {
+  private boolean findCodeLines(SearchableDiff searchableDiff) throws IllegalArgumentException {
+    String diffCode = searchableDiff.diffCode();
+    TreeMap<Integer, Integer> charToLineMapItem = searchableDiff.charToLineMap();
+    if (diffCode.isEmpty()) {
+      return false;
+    }
+    log.debug("Current diffCode to match: {}", diffCode);
     Matcher codeMatcher = commentedCodePattern.matcher(diffCode);
+    boolean found = false;
     while (codeMatcher.find()) {
       int startPosition = codeMatcher.start();
       int endPosition = codeMatcher.end();
@@ -170,6 +205,7 @@ public class CodeFinder {
               .startCharacter(startCharacter)
               .endCharacter(endCharacter)
               .build();
+      found = true;
       log.debug("Evaluated current code range: {}", currentCodeRange);
       // If multiple commented code portions are found and currentCommentRange is closer to the line
       // number suggested by AI than closestCommentRange, it becomes the new
@@ -181,5 +217,8 @@ public class CodeFinder {
         log.debug("New closest code range set: {}", closestCodeRange);
       }
     }
+    return found;
   }
+
+  private record SearchableDiff(String diffCode, TreeMap<Integer, Integer> charToLineMap) {}
 }
