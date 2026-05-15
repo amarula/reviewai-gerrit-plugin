@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor
-class LangChainToolExecutor {
+class LangChainExecutor {
 
   private final Configuration config;
   private final ResponseFormat structuredResponseFormat;
