@@ -46,14 +46,14 @@ public class AiDataPrompt {
   }
 
   public String buildPrompt() {
-    log.debug("Building data prompt for OpenAI.");
+    log.debug("Building data prompt for AI.");
     for (int i = 0; i < openAiDataPromptHandler.getCommentProperties().size(); i++) {
       openAiDataPromptHandler.addMessageItem(i);
       log.debug("Added message item to prompt for comment index: {}", i);
     }
     List<AiMessageItem> messageItems = openAiDataPromptHandler.getMessageItems();
     String promptJson = messageItems.isEmpty() ? "" : getGson().toJson(messageItems);
-    log.debug("Final OpenAI prompt JSON: {}", promptJson);
+    log.debug("Final AI prompt JSON: {}", promptJson);
     return promptJson;
   }
 }

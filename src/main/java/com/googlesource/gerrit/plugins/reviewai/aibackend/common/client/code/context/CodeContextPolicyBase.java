@@ -46,7 +46,7 @@ public abstract class CodeContextPolicyBase extends ClientBase implements ICodeC
   }
 
   public void updateOpenAiTools(OpenAiAssistantTools openAiAssistantTools) {
-    log.debug("OpenAI tools updating skipped with the current code context policy");
+    log.debug("AI tools updating skipped with the current code context policy");
   }
 
   public void addCodeContextPolicyAwareAssistantInstructions(List<String> instructions) {
