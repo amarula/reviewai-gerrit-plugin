@@ -72,7 +72,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final PluginChatMemoryStore chatMemoryStore;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
-  private final LangChainToolExecutor toolExecutor;
+  private final LangChainExecutor toolExecutor;
 
   private String requestBody;
 
@@ -124,7 +124,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             ? structuredResponseFormat
             : null;
     this.toolExecutor =
-        new LangChainToolExecutor(
+        new LangChainExecutor(
             config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
     log.debug("Initialized LangChainClient");
   }
