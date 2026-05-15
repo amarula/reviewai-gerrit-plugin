@@ -92,7 +92,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       throws AiConnectionFailException {
     boolean isCommentEvent = change.getIsCommentEvent();
     log.debug(
-        "Processing OPENAI OpenAI Request with changeId: {}, Patch Set: {}",
+        "Processing OPENAI AI Request with changeId: {}, Patch Set: {}",
         change.getFullChangeId(),
         patchSet);
 
@@ -119,7 +119,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       throws AiConnectionFailException {
     boolean isCommentEvent = change.getIsCommentEvent();
     log.debug(
-        "Processing OPENAI OpenAI Request with changeId: {}, Patch Set: {}",
+        "Processing OPENAI AI Request with changeId: {}, Patch Set: {}",
         change.getFullChangeId(),
         patchSet);
 
@@ -167,7 +167,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       boolean isCommentEvent,
       String conversationKey)
       throws AiConnectionFailException {
-    log.debug("Processing Single OpenAI Request");
+    log.debug("Processing Single AI Request");
     OpenAiConversation openAiConversation =
         new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey);
     OpenAiResponses openAiResponses =
@@ -181,7 +181,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
               getPrompt(changeSetData, change, patchSet),
               conversationId);
       response = continueResponseLoop(openAiResponses, response, conversationId);
-      log.debug("OpenAI response: {}", response);
+      log.debug("AI response: {}", response);
       AiResponseContent aiResponseContent = getResponseContentOpenAI(response);
       if (!isCommentEvent && aiResponseContent.getReplies() == null) {
         throw new ResponseEmptyRepliesException();
@@ -203,7 +203,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       if (toolRound >= maxToolResponseRounds) {
         String message =
             String.format(
-                "OpenAI tool response loop exceeded %d rounds for conversation %s after response %s",
+                "AI tool response loop exceeded %d rounds for conversation %s after response %s",
                 maxToolResponseRounds, conversationId, response.getId());
         log.warn(message);
         throw new AiConnectionFailException(message);
@@ -212,7 +212,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       toolRound++;
       List<OpenAiResponsesResponse.OutputItem> functionCalls = getFunctionCalls(response);
       log.info(
-          "OpenAI tool response round {}/{} for conversation {} after response {}. Tool calls: {}",
+          "AI tool response round {}/{} for conversation {} after response {}. Tool calls: {}",
           toolRound,
           maxToolResponseRounds,
           conversationId,
@@ -239,7 +239,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
   private AiResponseContent getResponseContentOpenAI(OpenAiResponsesResponse response) {
     List<OpenAiResponsesResponse.OutputItem> functionCalls = getFormatRepliesCalls(response);
     if (!functionCalls.isEmpty()) {
-      log.debug("Processing tool calls from OpenAI response.");
+      log.debug("Processing tool calls from AI response.");
       return getResponseContent(toAiToolCalls(functionCalls));
     }
 
@@ -250,7 +250,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
 
     String responseText = extractResponseText(response);
     if (responseText == null) {
-      throw new RuntimeException("OpenAI response content is null");
+      throw new RuntimeException("AI response content is null");
     }
     log.debug("Response text received: {}", responseText);
     if (isJsonObjectAsString(responseText)) {
@@ -356,7 +356,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
         throw e;
       }
       log.warn(
-          "OpenAI conversation {} has unresolved tool calls. Resetting it and retrying once.",
+          "AI conversation {} has unresolved tool calls. Resetting it and retrying once.",
           conversationId);
       openAiConversation.clear();
       return openAiResponses.createPromptResponse(prompt, openAiConversation.resolveConversationId());

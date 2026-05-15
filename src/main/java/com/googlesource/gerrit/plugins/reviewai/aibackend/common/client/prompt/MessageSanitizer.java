@@ -31,7 +31,7 @@ public class MessageSanitizer {
       Pattern.compile("^(\\s*)(#+)(?=\\s)", Pattern.MULTILINE);
 
   public static String sanitizeAiMessage(String message) {
-    log.debug("Sanitizing OpenAI message.");
+    log.debug("Sanitizing AI message.");
     // Sanitize code blocks (delimited by CODE_DELIMITER) by stripping out the language for syntax
     // highlighting and
     // ensuring that is preceded by two "\n" chars. Additionally, sanitize the content outside these
@@ -43,7 +43,7 @@ public class MessageSanitizer {
             MessageSanitizer::sanitizeOutsideInlineCodeBlocks,
             CODE_DELIMITER_BEGIN,
             CODE_DELIMITER_END);
-    log.debug("Sanitized OpenAI message: {}", sanitizedMessage);
+    log.debug("Sanitized AI message: {}", sanitizedMessage);
     return sanitizedMessage;
   }
 
