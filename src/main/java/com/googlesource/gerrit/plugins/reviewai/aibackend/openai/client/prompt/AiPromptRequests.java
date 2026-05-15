@@ -83,7 +83,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
 
   private String getCommentRequestPrompt(int commentPropertiesSize) {
     log.debug(
-        "Constructing OpenAI comment request prompt for {} comment properties.",
+        "Constructing AI comment request prompt for {} comment properties.",
         commentPropertiesSize);
     return joinWithSpace(
         new ArrayList<>(

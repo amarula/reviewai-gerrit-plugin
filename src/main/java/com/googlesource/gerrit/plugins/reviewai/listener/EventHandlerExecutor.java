@@ -43,7 +43,7 @@ public class EventHandlerExecutor {
     this.injector = injector;
     int maximumPoolSize =
         pluginConfigFactory.getFromGerritConfig(pluginName).getInt("maximumPoolSize", 2);
-    this.executor = workQueue.createQueue(maximumPoolSize, "OpenAI request executor");
+    this.executor = workQueue.createQueue(maximumPoolSize, "AI request executor");
     log.debug("EventHandlerExecutor initialized with maximum pool size: {}", maximumPoolSize);
   }
 

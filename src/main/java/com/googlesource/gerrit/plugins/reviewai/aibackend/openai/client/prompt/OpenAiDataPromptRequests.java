@@ -43,7 +43,7 @@ public class OpenAiDataPromptRequests extends AiDataPromptRequests implements IA
 
   @Override
   protected AiMessageItem getMessageItem(int i) {
-    log.debug("Getting OpenAI Message Item");
+    log.debug("Getting AI Message Item");
     AiMessageItem messageItem = super.getMessageItem(i);
     String inReplyToMessage = getReferenceToLastMessage(i);
     if (inReplyToMessage != null) {
