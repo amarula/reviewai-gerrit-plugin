@@ -181,6 +181,9 @@ public class ReviewAgentConversations
       conversation.turns = new ArrayList<>();
     }
 
+    if (!shouldPersistTurn(input.turn)) {
+      return conversation;
+    }
     int turnIndex = getTurnIndex(conversation, input);
     if (turnIndex < conversation.turns.size()
         && isSameConversationTurn(conversation.turns.get(turnIndex), input.turn)) {
@@ -249,6 +252,9 @@ public class ReviewAgentConversations
   }
 
   private void mergeTurn(List<JsonObject> storedTurns, JsonObject incomingTurn) {
+    if (!shouldPersistTurn(incomingTurn)) {
+      return;
+    }
     for (int i = 0; i < storedTurns.size(); i++) {
       if (isSameConversationTurn(storedTurns.get(i), incomingTurn)) {
         storedTurns.set(i, incomingTurn);
@@ -256,6 +262,21 @@ public class ReviewAgentConversations
       }
     }
     storedTurns.add(incomingTurn);
+  }
+
+  private boolean shouldPersistTurn(JsonObject turn) {
+    String userQuestion = getUserQuestion(turn);
+    if (!userQuestion.isBlank()) {
+      return true;
+    }
+    return getTopLevelMessage(turn) != null && !getTopLevelMessage(turn).isBlank();
+  }
+
+  private String getTopLevelMessage(JsonObject turn) {
+    if (turn == null || !turn.has("message") || turn.get("message").isJsonNull()) {
+      return null;
+    }
+    return turn.get("message").getAsString();
   }
 
   public static class Input {

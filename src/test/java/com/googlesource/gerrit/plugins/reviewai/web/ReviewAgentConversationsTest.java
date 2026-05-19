@@ -44,6 +44,7 @@ import java.util.UUID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
@@ -313,6 +314,58 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   @Test
+  public void appendDoesNotStoreEmptyQuestionTurn() throws Exception {
+    append("conversation-1", 0, turn("", "System-only response"), 1000L);
+    append("conversation-1", 1, turn("/review", "Review response"), 2000L);
+
+    ReviewAgentConversationInfo conversation = get("conversation-1");
+
+    assertEquals(1, conversation.turns.size());
+    assertEquals("/review", userQuestion(conversation.turns.get(0)));
+  }
+
+  @Test
+  public void upsertDropsEmptyQuestionTurns() throws Exception {
+    ReviewAgentConversationInfo conversation = conversation("conversation-1", 2000L);
+    conversation.turns.clear();
+    conversation.turns.add(turn("", "System-only response"));
+    conversation.turns.add(turn("/review", "Review response"));
+
+    upsert(conversation);
+
+    ReviewAgentConversationInfo storedConversation = get("conversation-1");
+    assertEquals(1, storedConversation.turns.size());
+    assertEquals("/review", userQuestion(storedConversation.turns.get(0)));
+  }
+
+  @Test
+  public void readRemovesDuplicateSystemMessagePrefixFromStoredResponse() throws Exception {
+    append(
+        "conversation-1",
+        0,
+        turn(
+            "/configure --reset",
+            """
+            SYSTEM MESSAGE: Dynamic configuration modified
+
+            ```
+            DYNAMIC CONFIGURATION SETTINGS
+
+            codeContextPolicy: ON_DEMAND
+            ```
+
+            SYSTEM MESSAGE: Dynamic configuration modified
+            """),
+        1000L);
+
+    ReviewAgentConversationInfo conversation = get("conversation-1");
+
+    String responseText = responseText(conversation.turns.get(0));
+    assertTrue(responseText.startsWith("```\nDYNAMIC CONFIGURATION SETTINGS"));
+    assertEquals(1, countOccurrences(responseText, "SYSTEM MESSAGE: Dynamic configuration modified"));
+  }
+
+  @Test
   public void migratesLegacyConversationDataFileToDb() throws Exception {
     ReviewAgentConversationInfo conversation = conversation("legacy-conversation", 1000L);
     Properties legacyProperties = new Properties();
@@ -425,6 +478,16 @@ public class ReviewAgentConversationsTest extends TestBase {
             .getTables(null, null, "REVIEW_AGENT_CONVERSATION_RESPONSE_PARTS", null)) {
       return rs.next();
     }
+  }
+
+  private int countOccurrences(String text, String value) {
+    int count = 0;
+    int index = 0;
+    while ((index = text.indexOf(value, index)) != -1) {
+      count++;
+      index += value.length();
+    }
+    return count;
   }
 
   private String uuidFor(String conversationId) {

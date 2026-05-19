@@ -133,7 +133,7 @@
           config
         );
         if (historyResponse) {
-          return agentUtils.joinAgentResponses(statusResponse, historyResponse);
+          return agentUtils.joinDistinctAgentResponses(statusResponse, historyResponse);
         }
         return statusResponse || 'ReviewAI completed the request without a visible update.';
       }

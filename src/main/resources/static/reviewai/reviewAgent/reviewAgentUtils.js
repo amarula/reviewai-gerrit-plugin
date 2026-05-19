@@ -7,6 +7,7 @@
     responseSettleMs: 500,
   };
   const defaultActionId = 'review-change';
+  const markdownEntrySeparator = '\n\n---\n\n';
 
   function buildChatResponse(text) {
     return {
@@ -96,6 +97,63 @@
       .join('\n\n');
   }
 
+  function joinDistinctAgentResponses() {
+    const responseEntries = [];
+    Array.from(arguments)
+      .map(text => (text || '').trim())
+      .filter(Boolean)
+      .forEach(response => {
+        splitAgentResponseEntries(response).forEach(responseEntry => {
+          const duplicateIndex = responseEntries.findIndex(existing =>
+            isDuplicateAgentResponseEntry(existing, responseEntry)
+          );
+          if (duplicateIndex === -1) {
+            responseEntries.push(responseEntry);
+            return;
+          }
+          if (
+            normalizeAgentResponse(responseEntry).length >
+            normalizeAgentResponse(responseEntries[duplicateIndex]).length
+          ) {
+            responseEntries[duplicateIndex] = responseEntry;
+          }
+        });
+      });
+    return responseEntries.join(markdownEntrySeparator);
+  }
+
+  function splitAgentResponseEntries(response) {
+    return String(response || '')
+      .split(/\n\s*---\s*\n/)
+      .map(entry => entry.trim())
+      .filter(Boolean);
+  }
+
+  function isDuplicateAgentResponseEntry(left, right) {
+    const normalizedLeft = normalizeAgentResponse(left);
+    const normalizedRight = normalizeAgentResponse(right);
+    if (normalizedLeft === normalizedRight) {
+      return true;
+    }
+    return (
+      isSystemMessageOnly(normalizedLeft) &&
+      normalizedRight.includes(normalizedLeft)
+    ) || (
+      isSystemMessageOnly(normalizedRight) &&
+      normalizedLeft.includes(normalizedRight)
+    );
+  }
+
+  function isSystemMessageOnly(response) {
+    return /^SYSTEM MESSAGE:[^`]*$/.test(response);
+  }
+
+  function normalizeAgentResponse(response) {
+    return String(response || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function parseTimestampMillis(value) {
     const timestamp = reviewAi.entries.parseTimestamp(value);
     return timestamp ? timestamp.getTime() : Date.now();
@@ -129,7 +187,10 @@
         })
       )
       .filter(Boolean);
-    return (reviewScore ? [`**${reviewScore}**`].concat(messages) : messages).join('\n\n');
+    const responseText = messages.join(markdownEntrySeparator);
+    return (reviewScore ? [`**${reviewScore}**`, responseText] : [responseText])
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   function buildClientData(overridesPreviousTurn) {
@@ -253,6 +314,7 @@
   reviewAi.agentUtils = {
     agentConfig,
     defaultActionId,
+    markdownEntrySeparator,
     buildChatResponse,
     sleep,
     getChangeNumber,
@@ -264,6 +326,7 @@
     isCommandPrompt,
     isDirectResponsePrompt,
     joinAgentResponses,
+    joinDistinctAgentResponses,
     parseTimestampMillis,
     formatAgentEntry,
     formatAgentEntries,

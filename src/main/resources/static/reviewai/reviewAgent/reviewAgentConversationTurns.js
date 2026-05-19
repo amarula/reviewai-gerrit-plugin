@@ -14,24 +14,50 @@
       }
 
       const mergedTurns = storedTurns.slice();
+      const matchedStoredTurnIndexes = new Set();
       historyTurns.forEach(historyTurn => {
-        const historyQuestion = this._turnUserQuestion(historyTurn);
-        const storedTurnIndex =
-          historyQuestion && !this._isAutomaticReviewQuestion(historyQuestion)
-          ? mergedTurns.findIndex(
-              storedTurn => this._turnUserQuestion(storedTurn) === historyQuestion
-            )
-          : -1;
+        const storedTurnIndex = this._findStoredTurnIndexForHistory(
+          mergedTurns,
+          historyTurn,
+          matchedStoredTurnIndexes
+        );
         if (storedTurnIndex !== -1) {
           mergedTurns[storedTurnIndex] = this._mergeTurnWithHistory(
             mergedTurns[storedTurnIndex],
             historyTurn
           );
-        } else if (includeNewTurns) {
+          matchedStoredTurnIndexes.add(storedTurnIndex);
+        } else if (
+          includeNewTurns &&
+          !this._hasEquivalentStoredAssistantResponse(mergedTurns, historyTurn)
+        ) {
           mergedTurns.push(historyTurn);
         }
       });
       return includeNewTurns ? this._sortTurnsByTimestamp(mergedTurns) : mergedTurns;
+    },
+
+    _findStoredTurnIndexForHistory(storedTurns, historyTurn, matchedStoredTurnIndexes) {
+      const historyQuestion = this._turnUserQuestion(historyTurn);
+      if (!historyQuestion || this._isAutomaticReviewQuestion(historyQuestion)) {
+        return -1;
+      }
+
+      return storedTurns.findIndex((storedTurn, index) => {
+        if (matchedStoredTurnIndexes.has(index)) {
+          return false;
+        }
+        if (this._turnUserQuestion(storedTurn) !== historyQuestion) {
+          return false;
+        }
+        return this._isSamePatchSetTurn(storedTurn, historyTurn);
+      });
+    },
+
+    _isSamePatchSetTurn(leftTurn, rightTurn) {
+      const leftPatchSet = leftTurn && (leftTurn.patch_set || leftTurn.patchSet);
+      const rightPatchSet = rightTurn && (rightTurn.patch_set || rightTurn.patchSet);
+      return !leftPatchSet || !rightPatchSet || leftPatchSet === rightPatchSet;
     },
 
     _mergeTurnWithHistory(storedTurn, historyTurn) {
@@ -62,6 +88,35 @@
 
     _isAutomaticReviewQuestion(question) {
       return /^Automatic review(?:\b| for Patch Set \d+$)/.test(question || '');
+    },
+
+    _hasEquivalentStoredAssistantResponse(storedTurns, historyTurn) {
+      if (!this._isAutomaticReviewQuestion(this._turnUserQuestion(historyTurn))) {
+        return false;
+      }
+
+      const historyResponseText = this._normalizeTurnResponseText(historyTurn);
+      if (!historyResponseText) {
+        return false;
+      }
+      return storedTurns.some(
+        storedTurn =>
+          this._isSamePatchSetTurn(storedTurn, historyTurn) &&
+          this._normalizeTurnResponseText(storedTurn) === historyResponseText
+      );
+    },
+
+    _normalizeTurnResponseText(turn) {
+      const response = turn && (turn.response || turn.chat_response);
+      const responseParts = response && response.response_parts;
+      if (!Array.isArray(responseParts)) {
+        return '';
+      }
+      return responseParts
+        .map(part => (part && part.text) || '')
+        .join('\n\n')
+        .replace(/\s+/g, ' ')
+        .trim();
     },
 
     _entryTimestampMillis(entry) {
@@ -187,6 +242,9 @@
     },
 
     async _storeConversationTurn(change, req, conversationId, prompt, responseText) {
+      if (!prompt || !String(prompt).trim()) {
+        return;
+      }
       const now = Date.now();
       const turn = {
         user_input: {
