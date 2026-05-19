@@ -7,6 +7,7 @@
     responseSettleMs: 500,
   };
   const defaultActionId = 'review-change';
+  const responseEntrySeparator = '\n\n---\n\n';
 
   function buildChatResponse(text) {
     return {
@@ -96,6 +97,17 @@
       .join('\n\n');
   }
 
+  function normalizeResponseEntrySeparators(text) {
+    return String(text || '')
+      .replace(/\n\n(\*\*[^*\n]+(?:\/[^*\n]+)+(?::\d+)?\*\*\n)/g, (match, header, offset, value) => {
+        const textBeforeHeader = value.slice(0, offset);
+        return /(?:^|\n)---$/.test(textBeforeHeader)
+          ? match
+          : `${responseEntrySeparator}${header}`;
+      })
+      .replace(/(\n\n---\n\n)(?:---\n\n)+/g, responseEntrySeparator);
+  }
+
   function parseTimestampMillis(value) {
     const timestamp = reviewAi.entries.parseTimestamp(value);
     return timestamp ? timestamp.getTime() : Date.now();
@@ -129,7 +141,12 @@
         })
       )
       .filter(Boolean);
-    return (reviewScore ? [`**${reviewScore}**`].concat(messages) : messages).join('\n\n');
+    if (reviewScore && messages.length) {
+      messages[0] = `**${reviewScore}**\n\n${messages[0]}`;
+    } else if (reviewScore) {
+      messages.push(`**${reviewScore}**`);
+    }
+    return messages.join(responseEntrySeparator);
   }
 
   function buildClientData(overridesPreviousTurn) {
@@ -263,6 +280,7 @@
     isCommandPrompt,
     isDirectResponsePrompt,
     joinAgentResponses,
+    normalizeResponseEntrySeparators,
     parseTimestampMillis,
     formatAgentEntry,
     formatAgentEntries,
