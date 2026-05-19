@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
@@ -189,8 +190,12 @@ class ReviewAgentConversationStore {
     }
     deleteConversationUserMessages(c, changeId, conversation.id);
     deleteConversationTurns(c, changeId, conversation.id);
-    for (int i = 0; i < conversation.turns.size(); i++) {
-      insertTurn(c, changeId, patchSet, conversation.id, i, conversation.turns.get(i));
+    int persistedTurnIndex = 0;
+    for (JsonObject turn : conversation.turns) {
+      if (!shouldPersistTurn(turn)) {
+        continue;
+      }
+      insertTurn(c, changeId, patchSet, conversation.id, persistedTurnIndex++, turn);
     }
   }
 
@@ -278,6 +283,10 @@ class ReviewAgentConversationStore {
           int turnIndex = rs.getInt(1);
           JsonObject turn = getGson().fromJson(rs.getString(3), JsonObject.class);
           restoreUserQuestion(c, rs.getObject(2, Long.class), turn);
+          sanitizeTurn(turn);
+          if (!shouldPersistTurn(turn)) {
+            continue;
+          }
           turns.add(turn);
         }
         return turns;
@@ -365,6 +374,55 @@ class ReviewAgentConversationStore {
       return null;
     }
     return getString(turn.getAsJsonObject("user_input"), "user_question");
+  }
+
+  private static boolean shouldPersistTurn(JsonObject turn) {
+    if (turn == null) {
+      return false;
+    }
+    String userQuestion = getUserQuestion(turn);
+    if (userQuestion != null && !userQuestion.isBlank()) {
+      return true;
+    }
+    return getString(turn, "message") != null && !getString(turn, "message").isBlank();
+  }
+
+  private static void sanitizeTurn(JsonObject turn) {
+    if (turn == null || !turn.has("response") || !turn.get("response").isJsonObject()) {
+      return;
+    }
+    JsonObject response = turn.getAsJsonObject("response");
+    if (!response.has("response_parts") || !response.get("response_parts").isJsonArray()) {
+      return;
+    }
+    JsonArray responseParts = response.getAsJsonArray("response_parts");
+    responseParts.forEach(
+        part -> {
+          if (!part.isJsonObject()) {
+            return;
+          }
+          JsonObject responsePart = part.getAsJsonObject();
+          String text = getString(responsePart, "text");
+          if (text != null) {
+            responsePart.addProperty("text", removeDuplicateSystemMessagePrefix(text));
+          }
+        });
+  }
+
+  private static String removeDuplicateSystemMessagePrefix(String text) {
+    String prefix = "SYSTEM MESSAGE:";
+    String leadingWhitespace = text.substring(0, text.length() - text.stripLeading().length());
+    String strippedText = text.stripLeading();
+    if (!strippedText.startsWith(prefix)) {
+      return text;
+    }
+    int firstLineEnd = strippedText.indexOf('\n');
+    String firstLine = firstLineEnd < 0 ? strippedText : strippedText.substring(0, firstLineEnd);
+    String remainder = firstLineEnd < 0 ? "" : strippedText.substring(firstLineEnd).stripLeading();
+    if (!remainder.contains(firstLine)) {
+      return text;
+    }
+    return leadingWhitespace + remainder;
   }
 
   private static boolean shouldStoreInLangChainMemory(String userQuestion) {
