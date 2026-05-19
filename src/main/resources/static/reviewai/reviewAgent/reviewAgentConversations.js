@@ -36,13 +36,18 @@
         return this._getHistoryBackedStoredTurns(change, storedConversation);
       }
 
-      if (!agentUtils.isSameConversationId(conversationId, this._conversationId(change))) {
+      if (
+        !agentUtils.isSameConversationId(
+          conversationId,
+          this.conversationTurns.conversationId(change)
+        )
+      ) {
         return [];
       }
 
       const storedConversations = await this._listStoredConversations(change);
       const entries = await this._fetchEntries(change);
-      return this._entriesToConversationTurns(
+      return this.conversationTurns.entriesToConversationTurns(
         this._filterStoredConversationEntries(change, entries, storedConversations)
       );
     },
@@ -54,13 +59,13 @@
       const storedConversationId = storedConversation && storedConversation.id;
       const includeNewTurns = agentUtils.isSameConversationId(
         storedConversationId,
-        this._conversationId(change)
+        this.conversationTurns.conversationId(change)
       );
 
       try {
         const storedConversations = await this._listStoredConversations(change);
         const entries = await this._fetchEntries(change);
-        const historyTurns = this._entriesToConversationTurns(
+        const historyTurns = this.conversationTurns.entriesToConversationTurns(
           this._filterStoredConversationEntries(
             change,
             entries,
@@ -68,14 +73,18 @@
             storedConversationId
           )
         );
-        return this._mergeStoredTurnsWithHistory(storedTurns, historyTurns, includeNewTurns);
+        return this.conversationTurns.mergeStoredTurnsWithHistory(
+          storedTurns,
+          historyTurns,
+          includeNewTurns
+        );
       } catch {
         return storedTurns;
       }
     },
 
     _upsertReviewAiCommentsConversation(change, storedConversations, timestampMillis) {
-      const conversationId = this._conversationId(change);
+      const conversationId = this.conversationTurns.conversationId(change);
       const conversationIndex = storedConversations.findIndex(conversation =>
         agentUtils.isSameConversationId(conversation && conversation.id, conversationId)
       );
