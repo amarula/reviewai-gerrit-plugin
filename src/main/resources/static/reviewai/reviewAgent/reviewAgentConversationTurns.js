@@ -67,18 +67,20 @@
         currentTurn.response.timestamp_millis = agentUtils.parseTimestampMillis(entry.updated);
       });
 
+      this._appendEntrySeparators(turns);
       return turns;
     }
 
     async storeConversationTurn(change, req, conversationId, prompt, responseText) {
       const now = Date.now();
+      const normalizedResponseText = agentUtils.normalizeResponseEntrySeparators(responseText);
       const turn = {
         user_input: {
           user_question: prompt,
           client_data:
             (req && req.client_data) || agentUtils.buildClientData(!req || req.turn_index === 0),
         },
-        response: agentUtils.buildChatResponse(responseText),
+        response: agentUtils.buildChatResponse(normalizedResponseText),
         regeneration_index: (req && req.regeneration_index) || 0,
         timestamp_millis: now,
       };
@@ -116,6 +118,26 @@
         return;
       }
       firstPart.text = firstText ? `${scoreHeader}\n\n${firstText}` : scoreHeader;
+    }
+
+    _appendEntrySeparators(turns) {
+      turns.forEach(turn => {
+        const response = turn && turn.response;
+        const responseParts = response && response.response_parts;
+        if (!Array.isArray(responseParts) || responseParts.length < 2) {
+          return;
+        }
+
+        responseParts.slice(0, -1).forEach(part => {
+          if (!part || !part.text) {
+            return;
+          }
+          if (/(?:^|\n\n)---\n\n$/.test(part.text)) {
+            return;
+          }
+          part.text = `${part.text}\n\n---\n\n`;
+        });
+      });
     }
   }
 
