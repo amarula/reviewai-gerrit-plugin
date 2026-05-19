@@ -114,6 +114,23 @@
       firstPart.text = firstText ? `${scoreHeader}\n\n${firstText}` : scoreHeader;
     },
 
+    _appendEntrySeparators(turns) {
+      turns.forEach(turn => {
+        const response = turn && turn.response;
+        const responseParts = response && response.response_parts;
+        if (!Array.isArray(responseParts) || responseParts.length < 2) {
+          return;
+        }
+
+        responseParts.slice(0, -1).forEach(part => {
+          if (!part || !part.text) {
+            return;
+          }
+          part.text = `${part.text}\n\n---\n\n`;
+        });
+      });
+    },
+
     _entriesToConversationTurns(entries) {
       const turns = [];
       let currentTurn = null;
@@ -165,6 +182,7 @@
         currentTurn.response.timestamp_millis = agentUtils.parseTimestampMillis(entry.updated);
       });
 
+      this._appendEntrySeparators(turns);
       return turns;
     },
 
