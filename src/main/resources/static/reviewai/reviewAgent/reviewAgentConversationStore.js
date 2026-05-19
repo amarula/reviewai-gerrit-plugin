@@ -34,7 +34,7 @@
     },
 
     _filterStoredConversationEntries(change, entries, conversations, ignoredConversationId) {
-      const conversationId = this._conversationId(change);
+      const conversationId = this.conversationTurns.conversationId(change);
       const userMessages = new Map();
       const assistantMessages = new Map();
 
@@ -50,7 +50,7 @@
         turns.forEach(turn => {
           this._incrementMessageCount(
             userMessages,
-            turn && turn.user_input && turn.user_input.user_question
+            this.conversationTurns.turnUserQuestion(turn)
           );
           this._incrementMessageCount(assistantMessages, this._turnResponseText(turn));
         });
