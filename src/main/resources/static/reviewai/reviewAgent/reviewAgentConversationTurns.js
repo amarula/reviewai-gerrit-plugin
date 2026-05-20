@@ -2,33 +2,17 @@
   const reviewAi = global.ReviewAi;
   const agentUtils = reviewAi.agentUtils;
 
-  reviewAi.agentConversationTurnMethods = {
-    _turnUserQuestion(turn) {
+  class ReviewAgentConversationTurns {
+    constructor(provider) {
+      this.provider = provider;
+    }
+
+    turnUserQuestion(turn) {
       const userInput = turn && turn.user_input;
       return (userInput && userInput.user_question) || '';
-    },
+    }
 
-    _applyReviewScoreToTurn(turn, reviewScore) {
-      if (!reviewScore || !turn || !turn.response) {
-        return;
-      }
-
-      const scoreHeader = `**${reviewScore}**`;
-      const responseParts = turn.response.response_parts;
-      if (!Array.isArray(responseParts) || !responseParts.length) {
-        turn.response.response_parts = [{id: 0, text: scoreHeader}];
-        return;
-      }
-
-      const firstPart = responseParts[0];
-      const firstText = (firstPart && firstPart.text) || '';
-      if (firstText.startsWith(scoreHeader)) {
-        return;
-      }
-      firstPart.text = firstText ? `${scoreHeader}\n\n${firstText}` : scoreHeader;
-    },
-
-    _entriesToConversationTurns(entries) {
+    entriesToConversationTurns(entries) {
       const turns = [];
       let currentTurn = null;
       let hasClientDataOverride = false;
@@ -84,9 +68,9 @@
       });
 
       return turns;
-    },
+    }
 
-    async _storeConversationTurn(change, req, conversationId, prompt, responseText) {
+    async storeConversationTurn(change, req, conversationId, prompt, responseText) {
       const now = Date.now();
       const turn = {
         user_input: {
@@ -98,7 +82,7 @@
         regeneration_index: (req && req.regeneration_index) || 0,
         timestamp_millis: now,
       };
-      await this._appendStoredConversationTurn(change, {
+      await this.provider._appendStoredConversationTurn(change, {
         conversationId,
         conversation_id: conversationId,
         title: agentUtils.getConversationTitle(prompt),
@@ -108,10 +92,32 @@
         turn_index: req && Number.isInteger(req.turn_index) ? req.turn_index : undefined,
         turn,
       });
-    },
+    }
 
-    _conversationId(change) {
+    conversationId(change) {
       return agentUtils.stableUuid(`reviewai-${agentUtils.getChangeNumber(change) || 'change'}`);
-    },
-  };
+    }
+
+    _applyReviewScoreToTurn(turn, reviewScore) {
+      if (!reviewScore || !turn || !turn.response) {
+        return;
+      }
+
+      const scoreHeader = `**${reviewScore}**`;
+      const responseParts = turn.response.response_parts;
+      if (!Array.isArray(responseParts) || !responseParts.length) {
+        turn.response.response_parts = [{id: 0, text: scoreHeader}];
+        return;
+      }
+
+      const firstPart = responseParts[0];
+      const firstText = (firstPart && firstPart.text) || '';
+      if (firstText.startsWith(scoreHeader)) {
+        return;
+      }
+      firstPart.text = firstText ? `${scoreHeader}\n\n${firstText}` : scoreHeader;
+    }
+  }
+
+  reviewAi.ReviewAgentConversationTurns = ReviewAgentConversationTurns;
 })(window);
