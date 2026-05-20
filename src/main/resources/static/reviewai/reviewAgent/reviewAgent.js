@@ -6,6 +6,7 @@
     constructor(plugin, pluginName) {
       this.plugin = plugin;
       this.pluginName = pluginName;
+      this.conversationTurns = new reviewAi.ReviewAgentConversationTurns(this);
       this.supports_add_context = false;
       this.supports_history = true;
       this.supports_more_menu = false;
@@ -63,7 +64,13 @@
                 excludeDynamicConfiguration: Boolean(directResponse),
               })
             );
-        await this._storeConversationTurn(change, req, conversationId, prompt, responseText);
+        await this.conversationTurns.storeConversationTurn(
+          change,
+          req,
+          conversationId,
+          prompt,
+          responseText
+        );
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
       } catch (error) {
@@ -91,7 +98,7 @@
     _getRequestConversationId(req, change) {
       return (
         (req && (req.conversation_id || req.conversationId)) ||
-        this._conversationId(change)
+        this.conversationTurns.conversationId(change)
       );
     }
 
@@ -203,7 +210,6 @@
     ReviewAiCodeReviewProvider.prototype,
     reviewAi.agentModelMethods,
     reviewAi.agentConversationStoreMethods,
-    reviewAi.agentConversationTurnMethods,
     reviewAi.agentConversationMethods
   );
 
