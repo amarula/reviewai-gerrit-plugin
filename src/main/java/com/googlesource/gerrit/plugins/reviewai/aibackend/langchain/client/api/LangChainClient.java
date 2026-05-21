@@ -53,8 +53,8 @@ import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.isJsonObjectAsString;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwrapJsonCode;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.isJsonObjectAsString;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
 
 @Slf4j
 @Singleton

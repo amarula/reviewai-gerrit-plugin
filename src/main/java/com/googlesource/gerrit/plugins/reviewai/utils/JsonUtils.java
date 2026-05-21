@@ -34,7 +34,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.RegexUtils.patternJoinAlternation;
 
 @Slf4j
-public class JsonTextUtils extends TextUtils {
+public class JsonUtils extends TextUtils {
   private static final String INDENT = "    ";
   private static final Pattern JSON_DELIMITED =
       Pattern.compile(
@@ -71,11 +71,60 @@ public class JsonTextUtils extends TextUtils {
   public static String prettyStringifyMap(Map<String, String> map) {
     log.info("Starting to pretty stringify map: {}", map);
     return joinWithNewLine(
-        map.entrySet().stream().map(JsonTextUtils::formatEntry).collect(Collectors.toList()));
+        map.entrySet().stream().map(JsonUtils::formatEntry).collect(Collectors.toList()));
   }
 
   public static String prettyFormatList(List<String> list) {
     return formatJsonArray(getGson().toJsonTree(list).getAsJsonArray(), "    ");
+  }
+
+  public static JsonObject getOrCreateObject(JsonObject parent, String key) {
+    if (parent.has(key) && parent.get(key).isJsonObject()) {
+      return parent.getAsJsonObject(key);
+    }
+    JsonObject child = new JsonObject();
+    parent.add(key, child);
+    return child;
+  }
+
+  public static Long getLong(JsonObject object, String memberName) {
+    JsonElement element = getElement(object, memberName);
+    if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
+      return null;
+    }
+    return element.getAsLong();
+  }
+
+  public static String getString(JsonObject object, String memberName) {
+    JsonElement element = getElement(object, memberName);
+    if (element == null || !element.isJsonPrimitive()) {
+      return null;
+    }
+    return element.getAsJsonPrimitive().getAsString();
+  }
+
+  public static JsonObject getObject(JsonObject object, String memberName) {
+    JsonElement element = getElement(object, memberName);
+    if (element == null || !element.isJsonObject()) {
+      return null;
+    }
+    return element.getAsJsonObject();
+  }
+
+  public static JsonArray getArray(JsonObject object, String memberName) {
+    JsonElement element = getElement(object, memberName);
+    if (element == null || !element.isJsonArray()) {
+      return null;
+    }
+    return element.getAsJsonArray();
+  }
+
+  private static JsonElement getElement(JsonObject object, String memberName) {
+    if (object == null || !object.has(memberName)) {
+      return null;
+    }
+    JsonElement element = object.get(memberName);
+    return element == null || element.isJsonNull() ? null : element;
   }
 
   private static String formatEntry(Map.Entry<String, String> entry) {

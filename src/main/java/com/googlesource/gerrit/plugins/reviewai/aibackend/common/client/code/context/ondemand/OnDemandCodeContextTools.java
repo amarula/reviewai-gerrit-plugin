@@ -16,6 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.cutString;
+
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
@@ -26,8 +29,6 @@ import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.cutString;
 
 @Slf4j
 public class OnDemandCodeContextTools extends ClientBase {
@@ -113,13 +114,6 @@ public class OnDemandCodeContextTools extends ClientBase {
       return new JsonObject();
     }
     return JsonParser.parseString(arguments).getAsJsonObject();
-  }
-
-  private static String getString(JsonObject object, String memberName) {
-    if (object == null || !object.has(memberName) || object.get(memberName).isJsonNull()) {
-      return null;
-    }
-    return object.get(memberName).getAsString();
   }
 
   private String getChangeId() {

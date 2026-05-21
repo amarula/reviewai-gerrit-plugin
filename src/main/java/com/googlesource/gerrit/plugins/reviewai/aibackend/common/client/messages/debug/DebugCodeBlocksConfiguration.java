@@ -22,7 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
 import java.util.TreeMap;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.prettyStringifyMap;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.prettyStringifyMap;
 
 public class DebugCodeBlocksConfiguration extends DebugCodeBlocksComposer {
   public DebugCodeBlocksConfiguration(Localizer localizer) {
