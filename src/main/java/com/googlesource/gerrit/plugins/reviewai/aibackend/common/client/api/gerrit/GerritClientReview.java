@@ -163,11 +163,11 @@ public class GerritClientReview extends GerritClientAccount {
   }
 
   private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
-    if (reviewScore == null || reviewScore != 1 || changeSetData.getReviewSystemMessage() != null) {
+    if (reviewScore == null || changeSetData.getReviewSystemMessage() != null) {
       return false;
     }
     Integer existingReviewScore = getCurrentCodeReviewValue(changeSetData);
-    return existingReviewScore == null || existingReviewScore != 1;
+    return existingReviewScore == null || !existingReviewScore.equals(reviewScore);
   }
 
   private Integer getCurrentCodeReviewValue(ChangeSetData changeSetData) {

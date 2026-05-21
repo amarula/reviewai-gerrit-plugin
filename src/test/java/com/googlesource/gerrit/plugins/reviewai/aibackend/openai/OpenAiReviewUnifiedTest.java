@@ -527,6 +527,28 @@ public class OpenAiReviewUnifiedTest extends OpenAiReviewTestBase {
   }
 
   @Test
+  public void patchSetCreatedSuppressesSystemMessageWhenNegativeReviewReplacesPositiveVote()
+      throws Exception {
+    when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean())).thenReturn(true);
+    ChangeInfo changeInfo = readTestFileToClass("__files/gerritPatchSetDetail.json", ChangeInfo.class);
+    changeInfo.labels.get("Code-Review").all.get(0)._accountId = GERRIT_AI_ACCOUNT_ID;
+    changeInfo.labels.get("Code-Review").all.get(0).value = 1;
+    when(changeApiMock.get()).thenReturn(changeInfo);
+    setupMockRequestCreateResponseFromBody(
+        readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
+            .replace("\\\"repeated\\\": false", "\\\"repeated\\\": true"),
+        null,
+        null);
+
+    handleEventBasedOnType(SupportedEvents.PATCH_SET_CREATED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(-1, captor.getValue().labels.get("Code-Review").intValue());
+    Assert.assertNull(captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+  }
+
+  @Test
   public void patchSetCreatedAcceptsDecimalNegativeReviewScoreForVoting() throws Exception {
     when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean())).thenReturn(true);
     setupMockRequestCreateResponseFromBody(
