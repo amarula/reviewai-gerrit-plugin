@@ -45,7 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.unwrapJsonCode;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;

@@ -19,7 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.logging;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.prettyFormatList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.prettyFormatList;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 public class LoggerFilterDecider {

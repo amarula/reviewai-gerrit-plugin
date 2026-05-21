@@ -21,7 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
 import java.util.Map;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.prettyStringifyMap;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.prettyStringifyMap;
 
 public class DebugCodeBlocksDynamicConfiguration extends DebugCodeBlocksComposer {
   public DebugCodeBlocksDynamicConfiguration(Localizer localizer) {
