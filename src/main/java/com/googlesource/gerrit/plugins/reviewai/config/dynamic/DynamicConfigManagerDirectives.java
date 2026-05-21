@@ -24,7 +24,7 @@ import lombok.Getter;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.jsonArrayToList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.jsonArrayToList;
 
 public class DynamicConfigManagerDirectives extends DynamicConfigManager {
   @Getter private final List<String> directives;

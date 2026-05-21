@@ -16,6 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getArray;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getObject;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -152,29 +156,6 @@ final class LangChainJsonSchemaParser {
     if (description != null) {
       descriptionConsumer.accept(description);
     }
-  }
-
-  private static String getString(JsonObject object, String memberName) {
-    JsonElement element = object.get(memberName);
-    if (element == null || element.isJsonNull()) {
-      return null;
-    }
-    if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
-      return element.getAsString();
-    }
-    return null;
-  }
-
-  private static JsonObject getObject(JsonObject object, String memberName) {
-    return asObject(object.get(memberName));
-  }
-
-  private static JsonArray getArray(JsonObject object, String memberName) {
-    JsonElement element = object.get(memberName);
-    if (element != null && element.isJsonArray()) {
-      return element.getAsJsonArray();
-    }
-    return null;
   }
 
   private static JsonObject asObject(JsonElement element) {

@@ -16,53 +16,48 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
-import com.google.gson.JsonElement;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getObject;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+
 import com.google.gson.JsonObject;
 
 final class LangChainToolSchemaUtils {
   private LangChainToolSchemaUtils() {}
 
   static JsonObject getFunctionDefinition(JsonObject root) {
-    JsonObject nestedFunction = root.getAsJsonObject("function");
+    JsonObject nestedFunction = getObject(root, "function");
     if (nestedFunction != null) {
       return nestedFunction;
     }
-    JsonElement typeElement = root.get("type");
-    if (typeElement != null
-        && typeElement.isJsonPrimitive()
-        && "function".equals(typeElement.getAsString())) {
+    if ("function".equals(getString(root, "type"))) {
       return root;
     }
     return null;
   }
 
   static JsonObject getStructuredOutputDefinition(JsonObject root) {
-    JsonObject directSchema = root.getAsJsonObject("schema");
+    JsonObject directSchema = getObject(root, "schema");
     if (directSchema != null) {
       return directSchema;
     }
 
     JsonObject functionDefinition = getFunctionDefinition(root);
     if (functionDefinition != null) {
-      return functionDefinition.getAsJsonObject("parameters");
+      return getObject(functionDefinition, "parameters");
     }
     return null;
   }
 
   static String getStructuredOutputName(JsonObject root) {
-    JsonElement directName = root.get("name");
-    if (directName != null && directName.isJsonPrimitive()) {
-      return directName.getAsString();
+    String directName = getString(root, "name");
+    if (directName != null) {
+      return directName;
     }
 
     JsonObject functionDefinition = getFunctionDefinition(root);
     if (functionDefinition == null) {
       return null;
     }
-    JsonElement functionName = functionDefinition.get("name");
-    if (functionName != null && functionName.isJsonPrimitive()) {
-      return functionName.getAsString();
-    }
-    return null;
+    return getString(functionDefinition, "name");
   }
 }

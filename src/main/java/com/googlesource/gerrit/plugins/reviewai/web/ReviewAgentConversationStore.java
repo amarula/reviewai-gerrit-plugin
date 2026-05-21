@@ -19,6 +19,9 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasTable;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.setLongOrNull;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getOrCreateObject;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getLong;
 
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
@@ -453,27 +456,8 @@ public class ReviewAgentConversationStore {
     }
   }
 
-  private static JsonObject getOrCreateObject(JsonObject parent, String key) {
-    if (parent.has(key) && parent.get(key).isJsonObject()) {
-      return parent.getAsJsonObject(key);
-    }
-    JsonObject child = new JsonObject();
-    parent.add(key, child);
-    return child;
-  }
-
-  private static Long getTimestampMillis(JsonObject turn) {
-    if (!turn.has("timestamp_millis") || turn.get("timestamp_millis").isJsonNull()) {
-      return null;
-    }
-    return turn.get("timestamp_millis").getAsLong();
-  }
-
-  private static String getString(JsonObject object, String key) {
-    if (!object.has(key) || object.get(key).isJsonNull()) {
-      return null;
-    }
-    return object.get(key).getAsString();
+  private static Long getTimestampMillis(JsonObject object) {
+    return getLong(object, "timestamp_millis");
   }
 
   public static String canonicalConversationId(String conversationId) {

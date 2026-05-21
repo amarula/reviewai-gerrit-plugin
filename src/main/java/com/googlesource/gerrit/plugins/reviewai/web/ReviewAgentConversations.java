@@ -16,6 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getObject;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
@@ -232,14 +235,9 @@ public class ReviewAgentConversations
   }
 
   private String getUserQuestion(JsonObject turn) {
-    if (turn == null || !turn.has("user_input") || !turn.get("user_input").isJsonObject()) {
-      return "";
-    }
-    JsonObject userInput = turn.getAsJsonObject("user_input");
-    if (!userInput.has("user_question") || userInput.get("user_question").isJsonNull()) {
-      return "";
-    }
-    return userInput.get("user_question").getAsString();
+    JsonObject userInput = getObject(turn, "user_input");
+    String userQuestion = getString(userInput, "user_question");
+    return userQuestion == null ? "" : userQuestion;
   }
 
   private ReviewAgentConversationInfo mergeConversation(
