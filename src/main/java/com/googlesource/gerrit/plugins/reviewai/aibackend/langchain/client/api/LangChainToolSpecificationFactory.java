@@ -16,7 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
-import com.google.gson.JsonElement;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
+
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -98,14 +99,4 @@ class LangChainToolSpecificationFactory {
     }
   }
 
-  private static String getString(JsonObject object, String memberName) {
-    JsonElement element = object.get(memberName);
-    if (element == null || element.isJsonNull()) {
-      return null;
-    }
-    if (element.isJsonPrimitive()) {
-      return element.getAsJsonPrimitive().getAsString();
-    }
-    return null;
-  }
 }

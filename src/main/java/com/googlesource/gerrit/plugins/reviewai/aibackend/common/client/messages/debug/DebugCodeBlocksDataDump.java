@@ -25,7 +25,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonTextUtils.prettyStringifyMap;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.prettyStringifyMap;
 
 @Slf4j
 public class DebugCodeBlocksDataDump extends DebugCodeBlocksComposer {
