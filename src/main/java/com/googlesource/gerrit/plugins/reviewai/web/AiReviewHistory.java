@@ -29,6 +29,7 @@ import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCodeReviewScoreParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -47,17 +48,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TimeZone;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class AiReviewHistory implements RestReadView<ChangeResource> {
   private static final SimpleDateFormat DATE_FORMAT = newFormat();
-  private static final Pattern CODE_REVIEW_SCORE_PATTERN =
-      Pattern.compile(
-          "^"
-              + Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET
-              + " \\d+:[^\\n]*\\bCode-Review([+-]\\d+)\\b");
 
   private final ConfigCreator configCreator;
   private final GerritAiReviewHistoryCollector collector;
@@ -190,11 +185,7 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
   }
 
   private static String getCodeReviewScore(String message) {
-    return Optional.ofNullable(message)
-        .map(CODE_REVIEW_SCORE_PATTERN::matcher)
-        .filter(matcher -> matcher.find())
-        .map(matcher -> matcher.group(1))
-        .orElse(null);
+    return GerritCodeReviewScoreParser.getCodeReviewScore(message);
   }
 
   private static GerritComment.Author toAuthor(AccountInfo authorInfo) {
