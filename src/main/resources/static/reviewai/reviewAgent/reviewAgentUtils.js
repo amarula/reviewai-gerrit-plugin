@@ -81,9 +81,7 @@
   }
 
   function isCommandPrompt(prompt) {
-    return /^\s*\/(?:help|message|review|directives|forget_thread|configure|show)\b/.test(
-      prompt
-    );
+    return /^\s*\/\w+\b/.test(prompt || '');
   }
 
   function isDirectResponsePrompt(prompt) {
