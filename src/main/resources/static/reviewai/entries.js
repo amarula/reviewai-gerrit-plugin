@@ -6,33 +6,6 @@
       return Array.isArray(result && result.entries) ? result.entries : [];
     },
 
-    buildDisplayedEntries(entries, awaitingResponse, pendingPrompt) {
-      const displayedEntries = entries.slice();
-      if (!awaitingResponse || !pendingPrompt) {
-        return displayedEntries;
-      }
-
-      const hasPromptInEntries = entries.some(
-        entry => entry.role === 'user' && entry.message === pendingPrompt
-      );
-      if (!hasPromptInEntries) {
-        displayedEntries.push({
-          role: 'user',
-          author: 'You',
-          message: pendingPrompt,
-          pending: true,
-        });
-      }
-
-      displayedEntries.push({
-        role: 'assistant',
-        author: 'ReviewAI',
-        message: 'Thinking...',
-        pending: true,
-      });
-      return displayedEntries;
-    },
-
     formatLocation(entry) {
       if (entry.filename) {
         return entry.line ? `${entry.filename}:${entry.line}` : entry.filename;
@@ -87,38 +60,5 @@
       return Number.isNaN(timestamp) ? null : new Date(timestamp);
     },
 
-    formatTimestamp(value) {
-      if (!value) {
-        return '';
-      }
-
-      const timestamp = this.parseTimestamp(value);
-      if (!timestamp) {
-        return value.replace(/\.0+$/, '');
-      }
-
-      return timestamp.toLocaleString();
-    },
-
-    hasAssistantReplyForPendingPrompt(entries, pendingPrompt) {
-      if (!pendingPrompt) {
-        return false;
-      }
-
-      let promptIndex = -1;
-      entries.forEach((entry, index) => {
-        if (entry.role === 'user' && entry.message === pendingPrompt) {
-          promptIndex = index;
-        }
-      });
-
-      if (promptIndex === -1) {
-        return false;
-      }
-
-      return entries
-        .slice(promptIndex + 1)
-        .some(entry => entry.role === 'assistant' || entry.systemMessage);
-    },
   };
 })(window);
