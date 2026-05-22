@@ -19,6 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.InlineCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
@@ -37,6 +39,7 @@ import java.util.List;
 @Slf4j
 public abstract class AiDataPromptBase implements IAiDataPrompt {
   protected final GerritClientData gerritClientData;
+  protected final Configuration config;
   protected final HashMap<String, FileDiffProcessed> fileDiffsProcessed;
   protected final CommentData commentData;
   @Getter protected final List<AiMessageItem> messageItems;
@@ -49,6 +52,7 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
       ChangeSetData changeSetData,
       GerritClientData gerritClientData,
       Localizer localizer) {
+    this.config = config;
     this.gerritClientData = gerritClientData;
     fileDiffsProcessed = gerritClientData.getGerritClientPatchSet().getFileDiffsProcessed();
     commentData = gerritClientData.getCommentData();
@@ -91,5 +95,11 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
     } else {
       log.debug("No message history to set for message item.");
     }
+  }
+
+  protected boolean shouldUseNonAiConversationHistory() {
+    return config != null
+        && config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN
+        && config.getAiProviderType() == AiProviderType.OPENAI;
   }
 }

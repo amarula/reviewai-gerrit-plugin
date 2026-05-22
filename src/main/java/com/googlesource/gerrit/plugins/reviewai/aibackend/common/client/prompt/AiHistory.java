@@ -47,6 +47,7 @@ public class AiHistory extends AiComment {
   private final String forgetThreadCutoff;
 
   private boolean filterActive;
+  private boolean excludeAiConversationMessages;
 
   public AiHistory(
       Configuration config,
@@ -81,6 +82,21 @@ public class AiHistory extends AiComment {
 
   public List<AiRequestMessage> retrieveHistory(GerritComment commentProperty) {
     return retrieveHistory(commentProperty, false);
+  }
+
+  public List<AiRequestMessage> retrieveNonAiConversationHistory(
+      GerritComment commentProperty, boolean filterActive) {
+    boolean previousExcludeAiConversationMessages = excludeAiConversationMessages;
+    excludeAiConversationMessages = true;
+    try {
+      return retrieveHistory(commentProperty, filterActive);
+    } finally {
+      excludeAiConversationMessages = previousExcludeAiConversationMessages;
+    }
+  }
+
+  public List<AiRequestMessage> retrieveNonAiConversationHistory(GerritComment commentProperty) {
+    return retrieveNonAiConversationHistory(commentProperty, false);
   }
 
   private List<GerritComment> retrievePatchSetComments(GerritClientData gerritClientData) {
@@ -212,6 +228,10 @@ public class AiHistory extends AiComment {
   private void addMessageToHistory(
       List<AiRequestMessage> messageHistory, GerritComment comment) {
     log.debug("Adding message to history - comment: {}", comment);
+    if (excludeAiConversationMessages && isAiConversationMessage(comment)) {
+      log.debug("Message not added to history because it is part of the AI conversation.");
+      return;
+    }
     String messageContent = getCleanedMessage(comment);
     log.debug("Cleaned message content: {}", messageContent);
     boolean shouldNotProcessComment =
@@ -240,5 +260,27 @@ public class AiHistory extends AiComment {
             .build();
     log.debug("Message added to history: {}", message);
     messageHistory.add(message);
+  }
+
+  private boolean isAiConversationMessage(GerritComment comment) {
+    return isFromAssistant(comment) || isAddressedToAssistant(comment) || isReplyToAssistant(comment);
+  }
+
+  private boolean isAddressedToAssistant(GerritComment comment) {
+    if (comment == null || comment.getMessage() == null) {
+      return false;
+    }
+    ClientMessageCleaner cleaner = new ClientMessageCleaner(config, comment.getMessage(), localizer);
+    boolean hasMention =
+        !cleaner.removeMentions().getMessage().trim().equals(comment.getMessage().trim());
+    return hasMention || ClientCommandBase.COMMAND_PATTERN.matcher(comment.getMessage()).find();
+  }
+
+  private boolean isReplyToAssistant(GerritComment comment) {
+    if (comment == null || comment.getInReplyTo() == null) {
+      return false;
+    }
+    GerritComment parent = commentMap.get(comment.getInReplyTo());
+    return parent != null && isFromAssistant(parent);
   }
 }

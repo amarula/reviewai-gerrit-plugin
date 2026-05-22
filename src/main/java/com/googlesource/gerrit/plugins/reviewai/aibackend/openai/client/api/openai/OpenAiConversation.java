@@ -64,14 +64,26 @@ public class OpenAiConversation {
   }
 
   public String resolveConversationId() throws AiConnectionFailException {
-    String conversationId = changeDataHandler.getValue(conversationKey);
-    if (conversationId == null
-        || !changeSetData.getForcedReview() && !changeSetData.getForcedStagedReview()) {
+    String conversationId = getExistingConversationId();
+    if (conversationId == null) {
       return createConversation();
     }
     log.info(
         "Existing OpenAI conversation found for the Change Set. Conversation ID: {}",
         conversationId);
+    return conversationId;
+  }
+
+  public boolean hasExistingConversation() {
+    return getExistingConversationId() != null;
+  }
+
+  private String getExistingConversationId() {
+    String conversationId = changeDataHandler.getValue(conversationKey);
+    if (conversationId == null
+        || !changeSetData.getForcedReview() && !changeSetData.getForcedStagedReview()) {
+      return null;
+    }
     return conversationId;
   }
 
