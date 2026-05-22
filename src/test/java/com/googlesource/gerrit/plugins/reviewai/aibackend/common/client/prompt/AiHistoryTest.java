@@ -30,7 +30,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -93,6 +96,61 @@ public class AiHistoryTest {
         List.of(
             "user:new question", "assistant:new answer", "user:final follow-up"),
         historySummary(aiHistory.retrieveHistory(currentComment)));
+  }
+
+  @Test
+  public void nonAiDiscussionHistoryExcludesAiConversationMessages() throws Exception {
+    AiHistoryFixture fixture =
+        readFixture("nonAiDiscussionHistoryExcludesAiConversationMessages.json");
+    HashMap<String, GerritComment> commentMap = mapById(fixture.inlineComments);
+    GerritComment currentComment = commentMap.get(fixture.currentCommentId);
+    assertNotNull(currentComment);
+
+    AiHistory aiHistory =
+        new AiHistory(
+            config(),
+            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new GerritClientData(
+                null,
+                List.of(),
+                new CommentData(List.of(), commentMap, new HashMap<>()),
+                0),
+            localizer());
+
+    assertEquals(
+        List.of("user:This method needs tests."),
+        historySummary(aiHistory.retrieveNonAiConversationHistory(currentComment)));
+  }
+
+  @Test
+  public void langChainOpenAiRequestPromptRetrievesFilteredHistoryOnlyOnce() throws Exception {
+    AiHistoryFixture fixture =
+        readFixture("nonAiDiscussionHistoryExcludesAiConversationMessages.json");
+    HashMap<String, GerritComment> commentMap = mapById(fixture.inlineComments);
+    GerritComment currentComment = commentMap.get(fixture.currentCommentId);
+    assertNotNull(currentComment);
+    Configuration config = config();
+    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
+    when(patchSet.getFileDiffsProcessed()).thenReturn(new HashMap<>());
+    AiDataPromptRequests dataPrompt =
+        new AiDataPromptRequests(
+            config,
+            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new GerritClientData(
+                patchSet,
+                List.of(),
+                new CommentData(List.of(currentComment), commentMap, new HashMap<>()),
+                0),
+            localizer());
+
+    dataPrompt.addMessageItem(0);
+
+    assertEquals("final request", dataPrompt.getMessageItems().get(0).getRequest());
+    assertEquals(
+        List.of("user:This method needs tests."),
+        historySummary(dataPrompt.getMessageItems().get(0).getHistory()));
   }
 
   private static List<String> historySummary(List<AiRequestMessage> history) {

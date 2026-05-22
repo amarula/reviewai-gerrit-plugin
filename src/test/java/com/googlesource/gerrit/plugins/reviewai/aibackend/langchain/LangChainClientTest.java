@@ -21,7 +21,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -31,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.open
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
@@ -48,6 +52,10 @@ import org.mockito.Mockito;
 public class LangChainClientTest {
   private static final String AI_RESPONSE_CONTENT_TRAILING_WHITESPACE_RESOURCE =
       "__files/langchain/aiResponseContentWithTrailingWhitespace.json";
+  private static final String OPENAI_PROMPT_TAG_REQUESTS_RESOURCE =
+      "__files/openai/openAiPromptTagRequests.json";
+  private static final String GERRIT_FORMATTED_PATCH_RESOURCE =
+      "__files/openai/gerritFormattedPatch.txt";
 
   @Test
   public void shouldLoadStructuredResponseFormatFromSchemaResource() throws Exception {
@@ -169,6 +177,92 @@ public class LangChainClientTest {
     assertEquals(null, conversationId);
   }
 
+  @Test
+  public void contextlessExistingOpenAiConversationUsesOnlyRequestData() throws Exception {
+    String requestData = readTestResource(OPENAI_PROMPT_TAG_REQUESTS_RESOURCE);
+    String patchSet = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
+    IAiPrompt prompt = Mockito.mock(IAiPrompt.class);
+    when(prompt.getAiRequestDataPrompt()).thenReturn(requestData);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    String userMessage = client.userMessageForRequest(prompt, patchSet, true);
+
+    assertEquals(requestData, userMessage);
+    verify(prompt, never()).getDefaultAiThreadReviewMessage(patchSet);
+  }
+
+  @Test
+  public void contextlessExistingOpenAiConversationDropsPatchWhenRequestDataIsAbsent()
+      throws Exception {
+    String requestData = readTestResource(OPENAI_PROMPT_TAG_REQUESTS_RESOURCE);
+    String patchSet = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
+    IAiPrompt prompt = Mockito.mock(IAiPrompt.class);
+    when(prompt.getAiRequestDataPrompt()).thenReturn(null);
+    when(prompt.getDefaultAiThreadReviewMessage("")).thenReturn(requestData);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    String userMessage = client.userMessageForRequest(prompt, patchSet, true);
+
+    assertEquals(requestData, userMessage);
+    verify(prompt).getDefaultAiThreadReviewMessage("");
+    verify(prompt, never()).getDefaultAiThreadReviewMessage(patchSet);
+  }
+
+  @Test
+  public void fullLangChainRequestKeepsPatchWhenOpenAiConversationIsNew() throws Exception {
+    String requestData = readTestResource(OPENAI_PROMPT_TAG_REQUESTS_RESOURCE);
+    String patchSet = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
+    IAiPrompt prompt = Mockito.mock(IAiPrompt.class);
+    when(prompt.getDefaultAiThreadReviewMessage(patchSet)).thenReturn(requestData);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    String userMessage = client.userMessageForRequest(prompt, patchSet, false);
+
+    assertEquals(requestData, userMessage);
+    verify(prompt).getDefaultAiThreadReviewMessage(patchSet);
+    verify(prompt, never()).getDefaultAiThreadReviewMessage("");
+  }
+
+  @Test
+  public void omitsRequestContextOnlyForNormalCommentFollowUps() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    assertEquals(
+        true,
+        client.omitRequestContext(
+            AiProviderType.OPENAI, true, changeSetData, change));
+  }
+
+  @Test
+  public void forcedReviewKeepsPatchEvenWhenOpenAiConversationExists() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedReview(true);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    assertEquals(
+        false,
+        client.omitRequestContext(
+            AiProviderType.OPENAI, true, changeSetData, change));
+  }
+
+  @Test
+  public void automaticReviewKeepsPatchEvenWhenOpenAiConversationExists() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    assertEquals(
+        false,
+        client.omitRequestContext(
+            AiProviderType.OPENAI, true, changeSetData, change));
+  }
+
   private String resolveConversationId(
       LangChainClient client, AiProviderType providerType, ChangeSetData changeSetData)
       throws Exception {
@@ -202,6 +296,23 @@ public class LangChainClientTest {
 
     private AiResponseContent parseResponseContent(String responseText) {
       return toResponseContent(responseText);
+    }
+
+    private String userMessageForRequest(
+        IAiPrompt prompt, String patchSet, boolean omitContext) {
+      return getUserMessageForRequest(prompt, patchSet, omitContext);
+    }
+
+    private boolean omitRequestContext(
+        AiProviderType providerType,
+        boolean existingConversation,
+        ChangeSetData changeSetData,
+        GerritChange change) {
+      return shouldOmitRequestContext(
+          providerType,
+          existingConversation,
+          changeSetData,
+          change);
     }
   }
 }
