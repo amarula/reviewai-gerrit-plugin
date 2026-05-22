@@ -58,10 +58,25 @@ public final class LangChainChatMessages {
 
   public static List<ChatMessage> build(
       AiHistory aiHistory, GerritClientData gerritClientData, GerritChange change) {
+    return build(aiHistory, gerritClientData, change, true);
+  }
+
+  public static List<ChatMessage> buildNonAiDiscussion(
+      AiHistory aiHistory, GerritClientData gerritClientData, GerritChange change) {
+    return build(aiHistory, gerritClientData, change, false);
+  }
+
+  private static List<ChatMessage> build(
+      AiHistory aiHistory,
+      GerritClientData gerritClientData,
+      GerritChange change,
+      boolean includeAiConversationMessages) {
     // Combine patch set history with inline threads.
     List<ChatMessage> historyMessages = new ArrayList<>();
 
-    appendMessages(historyMessages, aiHistory.retrieveHistory(patchSetMarker(), true));
+    appendMessages(
+        historyMessages,
+        retrieveHistory(aiHistory, patchSetMarker(), true, includeAiConversationMessages));
 
     boolean filterInactive = !change.getIsCommentEvent();
     Set<String> processedCommentIds = new LinkedHashSet<>();
@@ -69,12 +84,24 @@ public final class LangChainChatMessages {
     CommentData commentData = gerritClientData.getCommentData();
     if (commentData != null && commentData.getCommentProperties() != null) {
       for (GerritComment comment : commentData.getCommentProperties()) {
-        addCommentThread(historyMessages, aiHistory, comment, filterInactive, processedCommentIds);
+        addCommentThread(
+            historyMessages,
+            aiHistory,
+            comment,
+            filterInactive,
+            processedCommentIds,
+            includeAiConversationMessages);
       }
     }
 
     for (GerritComment comment : aiHistory.getCommentMap().values()) {
-      addCommentThread(historyMessages, aiHistory, comment, filterInactive, processedCommentIds);
+      addCommentThread(
+          historyMessages,
+          aiHistory,
+          comment,
+          filterInactive,
+          processedCommentIds,
+          includeAiConversationMessages);
     }
 
     return historyMessages;
@@ -85,7 +112,8 @@ public final class LangChainChatMessages {
       AiHistory aiHistory,
       GerritComment comment,
       boolean filterInactive,
-      Set<String> processedCommentIds) {
+      Set<String> processedCommentIds,
+      boolean includeAiConversationMessages) {
     if (comment == null) {
       return;
     }
@@ -93,7 +121,19 @@ public final class LangChainChatMessages {
     if (id != null && !processedCommentIds.add(id)) {
       return;
     }
-    appendMessages(historyMessages, aiHistory.retrieveHistory(comment, filterInactive));
+    appendMessages(
+        historyMessages,
+        retrieveHistory(aiHistory, comment, filterInactive, includeAiConversationMessages));
+  }
+
+  private static List<AiRequestMessage> retrieveHistory(
+      AiHistory aiHistory,
+      GerritComment comment,
+      boolean filterInactive,
+      boolean includeAiConversationMessages) {
+    return includeAiConversationMessages
+        ? aiHistory.retrieveHistory(comment, filterInactive)
+        : aiHistory.retrieveNonAiConversationHistory(comment, filterInactive);
   }
 
   private static void appendMessages(List<ChatMessage> messages, List<AiRequestMessage> source) {

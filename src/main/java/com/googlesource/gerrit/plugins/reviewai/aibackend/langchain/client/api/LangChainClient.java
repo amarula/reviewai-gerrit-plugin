@@ -40,6 +40,7 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFa
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -86,6 +87,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       this.requestBody = requestBody;
     }
   }
+
+  protected record ConversationResolution(String conversationId, boolean existingConversation) {}
 
   @Inject
   public LangChainClient(
@@ -160,18 +163,25 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected ReviewRequestResult askSingleRequest(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     try {
+      AiProviderType providerType = config.getAiProviderType();
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
       String systemInstructions = prompt.getDefaultAiAssistantInstructions();
-      String userMessage = prompt.getDefaultAiThreadReviewMessage(patchSet);
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
+      ConversationResolution conversationResolution =
+          resolveConversation(providerType, changeSetData);
+      boolean omitRequestContext =
+          shouldOmitRequestContext(
+              providerType, conversationResolution.existingConversation(), changeSetData, change);
+      String userMessage =
+          getUserMessageForRequest(prompt, patchSet, omitRequestContext);
 
       log.info("LangChain system instructions for {}: {}", memoryId, systemInstructions);
       log.info("LangChain user prompt for {}: {}", memoryId, userMessage);
 
-      ChatMemory memory = buildMemory(memoryId);
+      ChatMemory memory =
+          providerType == AiProviderType.OPENAI ? buildTransientMemory(memoryId) : buildMemory(memoryId);
       boolean hasStoredMemory = !memory.messages().isEmpty();
 
-      AiProviderType providerType = config.getAiProviderType();
       if (!hasStoredMemory && providerType != AiProviderType.OPENAI) {
         memory.add(LangChainChatMessages.systemMessage(systemInstructions));
       }
@@ -180,7 +190,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
         AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
         List<ChatMessage> history =
-            LangChainChatMessages.build(aiHistory, gerritClientData, change);
+            providerType == AiProviderType.OPENAI
+                ? LangChainChatMessages.buildNonAiDiscussion(aiHistory, gerritClientData, change)
+                : LangChainChatMessages.build(aiHistory, gerritClientData, change);
         for (ChatMessage message : history) {
           memory.add(message);
         }
@@ -194,9 +206,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               : Double.parseDouble(config.getAiReviewTemperature());
 
       ILangChainProvider provider = LangChainProviderFactory.get(providerType);
-      String conversationId = resolveConversationId(providerType, changeSetData);
       LangChainProvider providerModel =
-          provider.buildChatModel(config, temperature, conversationId, systemInstructions);
+          provider.buildChatModel(
+              config, temperature, conversationResolution.conversationId(), systemInstructions);
       ChatModel model = providerModel.getModel();
 
       log.info(
@@ -235,6 +247,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     }
   }
 
+  protected boolean shouldOmitRequestContext(
+      AiProviderType providerType,
+      boolean existingConversation,
+      ChangeSetData changeSetData,
+      GerritChange change) {
+    return providerType == AiProviderType.OPENAI
+        && existingConversation
+        && change.getIsCommentEvent()
+        && !changeSetData.getForcedReview();
+  }
+
   protected void setRequestBody(String requestBody) {
     this.requestBody = requestBody;
   }
@@ -249,8 +272,13 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected String resolveConversationId(AiProviderType providerType, ChangeSetData changeSetData)
       throws AiConnectionFailException {
+    return resolveConversation(providerType, changeSetData).conversationId();
+  }
+
+  protected ConversationResolution resolveConversation(
+      AiProviderType providerType, ChangeSetData changeSetData) throws AiConnectionFailException {
     if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
-      return null;
+      return new ConversationResolution(null, false);
     }
     String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
     if (changeSetData.getReviewAssistantStage() != null) {
@@ -265,8 +293,25 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           break;
       }
     }
-    return new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey)
-        .resolveConversationId();
+    OpenAiConversation conversation =
+        new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey);
+    boolean existingConversation = conversation.hasExistingConversation();
+    return new ConversationResolution(
+        conversation.resolveConversationId(), existingConversation);
+  }
+
+  @VisibleForTesting
+  protected String getUserMessageForRequest(
+      IAiPrompt prompt, String patchSet, boolean omitContext) {
+    if (!omitContext) {
+      return prompt.getDefaultAiThreadReviewMessage(patchSet);
+    }
+
+    String requestDataPrompt = prompt.getAiRequestDataPrompt();
+    if (requestDataPrompt != null && !requestDataPrompt.isEmpty()) {
+      return requestDataPrompt;
+    }
+    return prompt.getDefaultAiThreadReviewMessage("");
   }
 
   protected ChatMemory buildMemory(Object memoryId) {
@@ -278,6 +323,13 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       builder.chatMemoryStore(chatMemoryStore);
     }
     return builder.build();
+  }
+
+  protected ChatMemory buildTransientMemory(Object memoryId) {
+    return TokenWindowChatMemory.builder()
+        .id(memoryId)
+        .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get())
+        .build();
   }
 
   private boolean supportsStructuredResponseWithTools(
