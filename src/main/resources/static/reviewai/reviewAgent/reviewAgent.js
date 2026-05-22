@@ -147,7 +147,7 @@
 
       return (
         'ReviewAI accepted the request. The answer is still being generated and will appear ' +
-        'in Gerrit comments and in the AI Assistant tab.'
+        'in Gerrit comments.'
       );
     }
 
