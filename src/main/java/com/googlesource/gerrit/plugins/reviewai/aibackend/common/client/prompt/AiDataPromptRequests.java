@@ -57,6 +57,14 @@ public class AiDataPromptRequests extends AiDataPromptBase {
     messageItem = super.getMessageItem(i);
     log.debug("Retrieving extended message item for index: {}", i);
     GerritComment commentProperty = commentProperties.get(i);
+    if (shouldUseNonAiConversationHistory()) {
+      setRequestFromCommentProperty(messageItem, i);
+      setHistory(
+          messageItem, aiMessageHistory.retrieveNonAiConversationHistory(commentProperty));
+      log.debug("Message item after setting request content: {}", messageItem);
+      return messageItem;
+    }
+
     messageHistory = aiMessageHistory.retrieveHistory(commentProperty);
     if (commentProperty.isPatchSetComment()) {
       setRequestFromCommentProperty(messageItem, i);
