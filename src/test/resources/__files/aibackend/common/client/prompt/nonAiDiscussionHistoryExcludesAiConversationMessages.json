@@ -1,0 +1,65 @@
+{
+  "patchSetComments": [],
+  "inlineComments": [
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "c-1",
+      "line": 42,
+      "updated": "2026-04-09 10:00:00.000000",
+      "message": "This method needs tests.",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "c-2",
+      "line": 42,
+      "in_reply_to": "c-1",
+      "updated": "2026-04-09 10:01:00.000000",
+      "message": "@gpt please check this thread.",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 7
+      },
+      "patch_set": 1,
+      "id": "c-3",
+      "line": 42,
+      "in_reply_to": "c-2",
+      "updated": "2026-04-09 10:02:00.000000",
+      "message": "AI answer",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "c-4",
+      "line": 42,
+      "in_reply_to": "c-3",
+      "updated": "2026-04-09 10:03:00.000000",
+      "message": "Can you expand on that?",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "c-5",
+      "line": 42,
+      "in_reply_to": "c-4",
+      "updated": "2026-04-09 10:04:00.000000",
+      "message": "@gpt final request",
+      "filename": "src/main/java/Foo.java"
+    }
+  ],
+  "currentCommentId": "c-5"
+}
