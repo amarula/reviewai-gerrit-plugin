@@ -250,9 +250,11 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     LangChainMemoryId routerMemoryId =
         new LangChainMemoryId(
             change.getFullChangeId(), LangChainMemoryId.getPatchSetNumber(change), ROUTER_SCOPE);
-    ChatMemory memory = buildMemory(routerMemoryId);
-    memory.clear();
     AiProviderType providerType = config.getAiProviderType();
+    ChatMemory memory =
+        providerType == AiProviderType.OPENAI
+            ? buildTransientMemory(routerMemoryId)
+            : buildMemory(routerMemoryId);
     AiPromptReviewAgentRouter routerPrompt = new AiPromptReviewAgentRouter(config);
     String routerInstructions = routerPrompt.getDefaultAiAssistantInstructions();
     if (providerType != AiProviderType.OPENAI) {
