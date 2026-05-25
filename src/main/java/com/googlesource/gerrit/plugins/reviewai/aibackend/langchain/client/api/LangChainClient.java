@@ -294,7 +294,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       }
     }
     OpenAiConversation conversation =
-        new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey);
+        new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
     boolean existingConversation = conversation.hasExistingConversation();
     return new ConversationResolution(
         conversation.resolveConversationId(), existingConversation);

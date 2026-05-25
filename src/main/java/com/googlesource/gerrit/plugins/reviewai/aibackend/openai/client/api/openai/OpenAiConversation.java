@@ -19,7 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.ope
 import com.openai.client.OpenAIClient;
 import com.openai.core.http.HttpResponseFor;
 import com.openai.models.conversations.Conversation;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponse;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -37,24 +36,20 @@ public class OpenAiConversation {
   public static final String KEY_CONVERSATION_ID = "conversationId";
 
   private final Configuration config;
-  private final ChangeSetData changeSetData;
   private final PluginDataHandler changeDataHandler;
   private final String conversationKey;
 
   public OpenAiConversation(
       Configuration config,
-      ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
-    this(config, changeSetData, pluginDataHandlerProvider, KEY_CONVERSATION_ID);
+    this(config, pluginDataHandlerProvider, KEY_CONVERSATION_ID);
   }
 
   public OpenAiConversation(
       Configuration config,
-      ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       String conversationKey) {
     this.config = config;
-    this.changeSetData = changeSetData;
     this.conversationKey = conversationKey;
     changeDataHandler = pluginDataHandlerProvider.getChangeScope();
   }
@@ -79,12 +74,7 @@ public class OpenAiConversation {
   }
 
   private String getExistingConversationId() {
-    String conversationId = changeDataHandler.getValue(conversationKey);
-    if (conversationId == null
-        || !changeSetData.getForcedReview() && !changeSetData.getForcedStagedReview()) {
-      return null;
-    }
-    return conversationId;
+    return changeDataHandler.getValue(conversationKey);
   }
 
   private String createConversation() throws AiConnectionFailException {
