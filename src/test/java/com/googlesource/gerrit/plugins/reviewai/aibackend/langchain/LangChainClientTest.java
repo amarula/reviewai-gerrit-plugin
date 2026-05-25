@@ -143,6 +143,26 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void resolvesOpenAiConversationForNormalFollowUpMessage() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
+        .thenReturn("conv_follow_up");
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setReviewAssistantStage(null);
+
+    String conversationId =
+        resolveConversationId(
+            new LangChainClient(
+                Mockito.mock(Configuration.class), null, null, null, pluginDataHandlerProvider),
+            AiProviderType.OPENAI,
+            changeSetData);
+
+    assertEquals("conv_follow_up", conversationId);
+  }
+
+  @Test
   public void resolvesStageConversationForLangChainOpenAiMultiAgentProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =

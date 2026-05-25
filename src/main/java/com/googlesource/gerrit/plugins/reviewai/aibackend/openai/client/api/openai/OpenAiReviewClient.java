@@ -169,7 +169,7 @@ public class OpenAiReviewClient extends OpenAiReviewClientBase implements IAiCli
       throws AiConnectionFailException {
     log.debug("Processing Single AI Request");
     OpenAiConversation openAiConversation =
-        new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider, conversationKey);
+        new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
     OpenAiResponses openAiResponses =
         new OpenAiResponses(config, changeSetData, change, codeContextPolicy);
     try {
