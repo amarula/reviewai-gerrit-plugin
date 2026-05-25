@@ -281,7 +281,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     log.info(
         "Removing conversation ID '{}' for Change Set",
         changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID));
-    new OpenAiConversation(config, changeSetData, pluginDataHandlerProvider).clear();
+    new OpenAiConversation(config, pluginDataHandlerProvider).clear();
     clearLangChainMemory();
     changeSetData.setReviewSystemMessage(localizer.getText("message.command.thread.forget"));
   }
