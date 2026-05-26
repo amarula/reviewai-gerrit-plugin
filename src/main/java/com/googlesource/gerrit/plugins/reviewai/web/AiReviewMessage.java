@@ -44,6 +44,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_SELECTED_AI_MODEL;
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.isDefaultSelectedAiModel;
 
 public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewMessage.Input> {
   private final ConfigCreator configCreator;
@@ -252,8 +254,16 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         changeDataHandler.getJsonObjectValue(KEY_DYNAMIC_CONFIG, String.class);
     if (dynamicConfig == null) {
       dynamicConfig = new HashMap<>();
+    } else {
+      dynamicConfig = new HashMap<>(dynamicConfig);
     }
-    dynamicConfig.put("selectedAiModel", modelId);
+    if (isDefaultSelectedAiModel(config, modelId)
+        && (dynamicConfig.isEmpty()
+            || (dynamicConfig.size() == 1 && dynamicConfig.containsKey(KEY_SELECTED_AI_MODEL)))) {
+      changeDataHandler.removeValue(KEY_DYNAMIC_CONFIG);
+      return;
+    }
+    dynamicConfig.put(KEY_SELECTED_AI_MODEL, modelId);
     changeDataHandler.setJsonValue(KEY_DYNAMIC_CONFIG, dynamicConfig);
   }
 
