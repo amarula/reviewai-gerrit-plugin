@@ -29,7 +29,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -73,7 +73,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertNotNull(response.getReplies());
     assertEquals(2, response.getReplies().size());
     assertEquals(
-        List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_COMMIT_MESSAGE),
         client.recordedStages);
     assertEquals(List.of(true, true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
@@ -84,7 +84,7 @@ public class LangChainMultiAgentReviewClientTest {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setForcedStagedReview(true);
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(false);
     when(change.getFullChangeId()).thenReturn("change~1");
@@ -93,7 +93,7 @@ public class LangChainMultiAgentReviewClientTest {
 
     assertNotNull(response.getReplies());
     assertEquals(1, response.getReplies().size());
-    assertEquals(List.of(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE), client.recordedStages);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE), client.recordedStages);
     assertEquals(List.of(true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
   }
@@ -112,7 +112,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertNotNull(response.getReplies());
     assertEquals(2, response.getReplies().size());
     assertEquals(
-        List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE),
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_COMMIT_MESSAGE),
         client.recordedStages);
     assertEquals(List.of(true, true), client.recordedForcedStagedReview);
   }
@@ -120,7 +120,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void messageUsesRoutingAgentToSelectCommitMessageAgent() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    client.routedStage = ReviewAssistantStages.REVIEW_COMMIT_MESSAGE;
+    client.routedStage = ReviewAssistantStage.REVIEW_COMMIT_MESSAGE;
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
@@ -131,7 +131,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertNotNull(response.getReplies());
     assertEquals(1, response.getReplies().size());
     assertEquals(1, client.routeCalls);
-    assertEquals(List.of(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE), client.recordedStages);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE), client.recordedStages);
     assertEquals(List.of(true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
   }
@@ -275,9 +275,9 @@ public class LangChainMultiAgentReviewClientTest {
 
   private static class RecordingLangChainMultiAgentReviewClient
       extends LangChainMultiAgentReviewClient {
-    private final List<ReviewAssistantStages> recordedStages = new ArrayList<>();
+    private final List<ReviewAssistantStage> recordedStages = new ArrayList<>();
     private final List<Boolean> recordedForcedStagedReview = new ArrayList<>();
-    private ReviewAssistantStages routedStage = ReviewAssistantStages.REVIEW_CODE;
+    private ReviewAssistantStage routedStage = ReviewAssistantStage.REVIEW_CODE;
     private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
@@ -287,7 +287,7 @@ public class LangChainMultiAgentReviewClientTest {
     @Override
     protected ReviewRequestResult askSingleRequest(
         ChangeSetData changeSetData, GerritChange change, String patchSet) {
-      ReviewAssistantStages stage = changeSetData.getReviewAssistantStage();
+      ReviewAssistantStage stage = changeSetData.getReviewAssistantStage();
       recordedStages.add(stage);
       recordedForcedStagedReview.add(changeSetData.getForcedStagedReview());
 
@@ -299,7 +299,7 @@ public class LangChainMultiAgentReviewClientTest {
     }
 
     @Override
-    protected ReviewAssistantStages routeMessage(ChangeSetData changeSetData, GerritChange change)
+    protected ReviewAssistantStage routeMessage(ChangeSetData changeSetData, GerritChange change)
         throws AiConnectionFailException {
       routeCalls++;
       return routedStage;

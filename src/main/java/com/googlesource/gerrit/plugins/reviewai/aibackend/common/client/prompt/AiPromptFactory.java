@@ -19,14 +19,14 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiParameters;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptParameters;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.*;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.*;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -46,8 +46,8 @@ public class AiPromptFactory {
       log.info("AiPromptFactory: Return AiPromptRequests");
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
-      OpenAiParameters openAiParameters = new OpenAiParameters(config, false);
-      if (openAiParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
+      AiPromptParameters aiPromptParameters = new AiPromptParameters(config, false);
+      if (aiPromptParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
         return switch (changeSetData.getReviewAssistantStage()) {
           case REVIEW_CODE -> {
             log.info("AiPromptFactory: Return AiPromptReviewCode");
@@ -76,7 +76,7 @@ public class AiPromptFactory {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
-      ReviewAssistantStages reviewAssistantStage) {
+      ReviewAssistantStage reviewAssistantStage) {
     changeSetData.setReviewAssistantStage(reviewAssistantStage);
     return getAiPrompt(config, changeSetData, change, codeContextPolicy);
   }
@@ -88,8 +88,8 @@ public class AiPromptFactory {
       GerritClientData gerritClientData,
       Localizer localizer) {
     if (change.getIsCommentEvent()) {
-      log.info("AiPromptFactory: Return OpenAiDataPromptRequests");
-      return new OpenAiDataPromptRequests(config, changeSetData, gerritClientData, localizer);
+      log.info("AiPromptFactory: Return ReferencedAiDataPromptRequests");
+      return new ReferencedAiDataPromptRequests(config, changeSetData, gerritClientData, localizer);
     } else {
       log.info("AiPromptFactory: Return AiDataPromptReview");
       return new AiDataPromptReview(config, changeSetData, gerritClientData, localizer);

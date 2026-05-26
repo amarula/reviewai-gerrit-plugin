@@ -35,7 +35,7 @@ import com.openai.models.responses.ResponseStatus;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.ResponseUsage;
 import com.openai.models.responses.ToolChoiceOptions;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiSdkClientFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiSdkClientFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -358,7 +358,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
     return ChatResponse.builder()
         .aiMessage(aiMessage)
         .id(response.id())
-        .modelName(response.model().toString())
+        .modelName(response.model() == null ? modelName : response.model().toString())
         .tokenUsage(tokenUsage)
         .finishReason(finishReason)
         .build();

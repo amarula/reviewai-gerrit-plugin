@@ -21,7 +21,7 @@ import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.OPEN
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.FallbackTokenCountEstimator;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.OpenAiModelCompatibility;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ModelCompatibility;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
@@ -52,7 +52,7 @@ public class MoonshotLangChainProvider implements ILangChainProvider {
             .modelName(modelName)
             .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
             .maxRetries(LANGCHAIN_MAX_RETRIES);
-    if (OpenAiModelCompatibility.supportsTemperature(modelName)) {
+    if (ModelCompatibility.supportsTemperature(modelName)) {
       builder.temperature(temperature);
     }
 

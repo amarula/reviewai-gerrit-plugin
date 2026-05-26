@@ -20,6 +20,7 @@ import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestReadView;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.util.List;
@@ -69,15 +70,9 @@ public class ReviewAgentModel implements RestReadView<ChangeResource> {
     }
 
     private static Model fromRoute(String route) {
-      int separator = route.lastIndexOf("/");
-      if (separator <= 0 || separator == route.length() - 1) {
-        return new Model(route, route, "");
-      }
-      String providerRoute = route.substring(0, separator);
-      int providerSeparator = providerRoute.lastIndexOf("/");
-      String provider =
-          providerSeparator < 0 ? providerRoute : providerRoute.substring(providerSeparator + 1);
-      return new Model(route, provider, route.substring(separator + 1));
+      return AiModelRoute.parse(route)
+          .map(modelRoute -> new Model(route, modelRoute.providerRoute(), modelRoute.model()))
+          .orElseGet(() -> new Model(route, route, ""));
     }
   }
 }

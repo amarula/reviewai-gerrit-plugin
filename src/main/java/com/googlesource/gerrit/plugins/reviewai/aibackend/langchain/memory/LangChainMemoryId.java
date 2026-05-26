@@ -18,7 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -64,7 +64,7 @@ public final class LangChainMemoryId {
         && !Boolean.TRUE.equals(changeSetData.getForcedStagedReview())) {
       return REQUESTS_SCOPE;
     }
-    ReviewAssistantStages assistantStage = changeSetData.getReviewAssistantStage();
+    ReviewAssistantStage assistantStage = changeSetData.getReviewAssistantStage();
     if (assistantStage == null) {
       return DEFAULT_SCOPE;
     }

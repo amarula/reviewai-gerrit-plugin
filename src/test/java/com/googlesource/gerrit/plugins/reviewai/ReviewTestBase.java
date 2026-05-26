@@ -44,8 +44,6 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiMultiAgentReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
@@ -63,7 +61,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
@@ -342,8 +340,11 @@ public class ReviewTestBase extends TestBase {
   protected ArgumentCaptor<ReviewInput> testRequestSent() throws RestApiException {
     ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
     verify(revisionApiMock).review(reviewInputCaptor.capture());
+    String requestBody = patchSetReviewer.getOpenAiClient().getRequestBody();
     aiRequestBody =
-        jsonToClass(patchSetReviewer.getOpenAiClient().getRequestBody(), JsonObject.class);
+        requestBody != null && requestBody.trim().startsWith("{")
+            ? jsonToClass(requestBody, JsonObject.class)
+            : null;
     return reviewInputCaptor;
   }
 
@@ -461,25 +462,19 @@ public class ReviewTestBase extends TestBase {
   }
 
   private IAiClient getOpenAIClient() {
-    if (config.getSelectedAiModelRoute().isLangChain()) {
-      return config.getMultiAgentMode()
-          ? new LangChainMultiAgentReviewClient(
-              config,
-              getCodeContextPolicy(),
-              gerritClient,
-              localizer,
-              pluginDataHandlerProvider,
-              Runnable::run)
-          : new LangChainClient(
-              config, getCodeContextPolicy(), gerritClient, localizer, pluginDataHandlerProvider);
-    }
-    return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
-        ? new OpenAiMultiAgentReviewClient(
-            config, getCodeContextPolicy(), pluginDataHandlerProvider, Runnable::run)
-        : new OpenAiReviewClient(config, getCodeContextPolicy(), pluginDataHandlerProvider);
+    return config.getMultiAgentMode()
+        ? new LangChainMultiAgentReviewClient(
+            config,
+            getCodeContextPolicy(),
+            gerritClient,
+            localizer,
+            pluginDataHandlerProvider,
+            Runnable::run)
+        : new LangChainClient(
+            config, getCodeContextPolicy(), gerritClient, localizer, pluginDataHandlerProvider);
   }
 
   private IGerritClientPatchSet getGerritClientPatchSet() {
-    return new GerritClientPatchSetOpenAi(config, accountCacheMock);
+    return new GerritClientPatchSetReviewAi(config, accountCacheMock);
   }
 }

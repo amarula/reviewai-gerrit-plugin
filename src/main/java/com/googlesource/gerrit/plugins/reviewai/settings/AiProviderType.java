@@ -16,17 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.settings;
 
-import java.util.EnumSet;
 import java.util.Optional;
-import java.util.Set;
 
 public enum AiProviderType {
   OPENAI("OpenAI"),
   GEMINI("Gemini"),
   MOONSHOT("MoonShot"),
   OLLAMA("Ollama");
-
-  private static final Set<AiProviderType> DIRECT_CONNECTION_PROVIDERS = EnumSet.of(OPENAI);
 
   private final String configName;
 
@@ -36,10 +32,6 @@ public enum AiProviderType {
 
   public String getConfigName() {
     return configName;
-  }
-
-  public boolean supportsDirectConnection() {
-    return DIRECT_CONNECTION_PROVIDERS.contains(this);
   }
 
   public static Optional<AiProviderType> fromConfigName(String value) {

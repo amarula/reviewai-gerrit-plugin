@@ -32,7 +32,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -123,14 +122,13 @@ public class AiHistoryTest {
   }
 
   @Test
-  public void langChainOpenAiRequestPromptRetrievesFilteredHistoryOnlyOnce() throws Exception {
+  public void openAiRequestPromptRetrievesFilteredHistoryOnlyOnce() throws Exception {
     AiHistoryFixture fixture =
         readFixture("nonAiDiscussionHistoryExcludesAiConversationMessages.json");
     HashMap<String, GerritComment> commentMap = mapById(fixture.inlineComments);
     GerritComment currentComment = commentMap.get(fixture.currentCommentId);
     assertNotNull(currentComment);
     Configuration config = config();
-    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
     IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
     when(patchSet.getFileDiffsProcessed()).thenReturn(new HashMap<>());

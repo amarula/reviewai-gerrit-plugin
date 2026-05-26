@@ -29,7 +29,6 @@ import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.time.Instant;
 import java.util.List;
@@ -62,10 +61,9 @@ public class ReviewAgentModelTest extends TestBase {
   @Test
   public void exposesConfiguredProviderModelRoutes() throws Exception {
     when(config.getAiModels())
-        .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
+        .thenReturn(List.of("OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"));
     when(config.getSelectedAiModelRoute())
-        .thenReturn(
-            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, "gpt-4.1"));
+        .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1"));
 
     Response<ReviewAgentModel.Output> response = view.apply(changeResource);
 
@@ -83,8 +81,7 @@ public class ReviewAgentModelTest extends TestBase {
   public void exposesCanAiReviewFalseWhenPermissionIsDenied() throws Exception {
     when(config.getAiModels()).thenReturn(List.of("OpenAI/gpt-4.1"));
     when(config.getSelectedAiModelRoute())
-        .thenReturn(
-            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, "gpt-4.1"));
+        .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1"));
     when(aiReviewPermission.canAiReview(changeResource)).thenReturn(false);
 
     Response<ReviewAgentModel.Output> response = view.apply(changeResource);
