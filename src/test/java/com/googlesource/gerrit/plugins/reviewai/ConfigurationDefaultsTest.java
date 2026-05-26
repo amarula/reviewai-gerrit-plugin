@@ -52,16 +52,14 @@ public class ConfigurationDefaultsTest {
   public void shouldExposeModelsForConfiguredProviderRoutes() {
     Configuration configuration =
         createConfiguration(
-            new String[] {"OpenAI", "LangChain/OpenAI", "LangChain/MoonShot"},
+            new String[] {"OpenAI", "MoonShot"},
             new String[] {"OpenAI/gpt-4.1", "OpenAI/gpt-5.4", "MoonShot/moonshot-v1-8k"});
 
     assertEquals(
         List.of(
             "OpenAI/gpt-4.1",
             "OpenAI/gpt-5.4",
-            "LangChain/OpenAI/gpt-4.1",
-            "LangChain/OpenAI/gpt-5.4",
-            "LangChain/MoonShot/moonshot-v1-8k"),
+            "MoonShot/moonshot-v1-8k"),
         configuration.getAiModels());
   }
 
@@ -96,7 +94,7 @@ public class ConfigurationDefaultsTest {
         createConfiguration(new String[] {"MoonShot"}, new String[] {});
 
     assertEquals(
-        "LangChain/MoonShot/" + Configuration.DEFAULT_MOONSHOT_AI_MODEL,
+        "MoonShot/" + Configuration.DEFAULT_MOONSHOT_AI_MODEL,
         configuration.getAiModels().getLast());
   }
 
@@ -106,7 +104,7 @@ public class ConfigurationDefaultsTest {
         createConfiguration(new String[] {"Gemini"}, new String[] {});
 
     assertEquals(
-        "LangChain/Gemini/" + Configuration.DEFAULT_GEMINI_AI_MODEL,
+        "Gemini/" + Configuration.DEFAULT_GEMINI_AI_MODEL,
         configuration.getAiModels().getLast());
   }
 
@@ -116,19 +114,19 @@ public class ConfigurationDefaultsTest {
         createConfiguration(new String[] {"Ollama"}, new String[] {});
 
     assertEquals(
-        "LangChain/Ollama/" + Configuration.DEFAULT_OLLAMA_AI_MODEL,
+        "Ollama/" + Configuration.DEFAULT_OLLAMA_AI_MODEL,
         configuration.getAiModels().getLast());
   }
 
   @Test
-  public void shouldExposeOllamaModelFromFullLangChainRoute() {
+  public void shouldExposeOllamaModelFromProviderRoute() {
     Configuration configuration =
         createConfiguration(
-            new String[] {"LangChain/Ollama"},
-            new String[] {"LangChain/Ollama/llama3.2"});
+            new String[] {"Ollama"},
+            new String[] {"Ollama/llama3.2"});
 
-    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
-    assertEquals(List.of("LangChain/Ollama/llama3.2"), configuration.getAiModels());
+    assertEquals(List.of("Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("Ollama/llama3.2"), configuration.getAiModels());
     assertEquals("llama3.2", configuration.getAiModel());
     assertEquals(Configuration.OLLAMA_DOMAIN, configuration.getAiDomain());
   }
@@ -138,8 +136,8 @@ public class ConfigurationDefaultsTest {
     Configuration configuration =
         createConfiguration(new String[] {}, new String[] {"llama3.2"});
 
-    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
-    assertEquals(List.of("LangChain/Ollama/llama3.2"), configuration.getAiModels());
+    assertEquals(List.of("Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("Ollama/llama3.2"), configuration.getAiModels());
     assertEquals("llama3.2", configuration.getAiModel());
     assertEquals(Configuration.OLLAMA_DOMAIN, configuration.getAiDomain());
   }
@@ -149,8 +147,8 @@ public class ConfigurationDefaultsTest {
     Configuration configuration =
         createConfiguration(new String[] {}, new String[] {"custom-local-model"});
 
-    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
-    assertEquals(List.of("LangChain/Ollama/custom-local-model"), configuration.getAiModels());
+    assertEquals(List.of("Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("Ollama/custom-local-model"), configuration.getAiModels());
   }
 
   @Test
@@ -158,12 +156,12 @@ public class ConfigurationDefaultsTest {
     Configuration configuration =
         createConfigurationFromResource("src/test/resources/__files/config/ollamaBareModels.config");
 
-    assertEquals(List.of("LangChain/Ollama"), configuration.getAiProviders());
+    assertEquals(List.of("Ollama"), configuration.getAiProviders());
     assertEquals(
         List.of(
-            "LangChain/Ollama/llama3.2",
-            "LangChain/Ollama/deepseek-r1:1.5b",
-            "LangChain/Ollama/gemini-3-flash-preview"),
+            "Ollama/llama3.2",
+            "Ollama/deepseek-r1:1.5b",
+            "Ollama/gemini-3-flash-preview"),
         configuration.getAiModels());
   }
 
@@ -197,16 +195,15 @@ public class ConfigurationDefaultsTest {
   public void shouldGuessOllamaForBareModelNotInTokenBackedProviderModels() {
     Configuration configuration =
         createConfiguration(
-            new String[] {"OpenAI", "LangChain/OpenAI", "LangChain/MoonShot", "LangChain/Ollama"},
+            new String[] {"OpenAI", "MoonShot", "Ollama"},
             new String[] {"deepseek-r1:1.5b"},
             null,
             new String[] {"OpenAI/test-token", "MoonShot/test-token"});
 
     List<String> models = configuration.getAiModels();
-    assertTrue(models.contains("LangChain/Ollama/deepseek-r1:1.5b"));
+    assertTrue(models.contains("Ollama/deepseek-r1:1.5b"));
     assertTrue(!models.contains("OpenAI/deepseek-r1:1.5b"));
-    assertTrue(!models.contains("LangChain/OpenAI/deepseek-r1:1.5b"));
-    assertTrue(!models.contains("LangChain/MoonShot/deepseek-r1:1.5b"));
+    assertTrue(!models.contains("MoonShot/deepseek-r1:1.5b"));
   }
 
   @Test
@@ -216,9 +213,9 @@ public class ConfigurationDefaultsTest {
             new String[] {"OpenAI", "MoonShot"},
             new String[] {"OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"});
 
-    assertEquals(List.of("OpenAI", "LangChain/MoonShot"), configuration.getAiProviders());
+    assertEquals(List.of("OpenAI", "MoonShot"), configuration.getAiProviders());
     assertEquals(
-        List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"),
+        List.of("OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"),
         configuration.getAiModels());
   }
 
@@ -236,15 +233,15 @@ public class ConfigurationDefaultsTest {
     assertEquals(
         List.of(
             "OpenAI/gpt-4.1",
-            "LangChain/MoonShot/moonshot-v1-8k",
-            "LangChain/Ollama/llama3.2",
+            "MoonShot/moonshot-v1-8k",
+            "Ollama/llama3.2",
             "OpenAI/mock-ai",
-            "LangChain/MoonShot/mock-ai",
-            "LangChain/Ollama/mock-ai"),
+            "MoonShot/mock-ai",
+            "Ollama/mock-ai"),
         models);
     assertTrue(models.contains("OpenAI/mock-ai"));
-    assertTrue(models.contains("LangChain/MoonShot/mock-ai"));
-    assertTrue(models.contains("LangChain/Ollama/mock-ai"));
+    assertTrue(models.contains("MoonShot/mock-ai"));
+    assertTrue(models.contains("Ollama/mock-ai"));
   }
 
   @Test
@@ -274,9 +271,8 @@ public class ConfigurationDefaultsTest {
             PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
 
     assertEquals(
-        "LangChain/MoonShot/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
+        "MoonShot/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
     assertEquals("mock-ai", configuration.getAiModel());
-    assertEquals("LangChain", configuration.getAiProviderTransport().getConfigName());
     assertEquals("MoonShot", configuration.getAiProviderType().getConfigName());
     assertEquals("http://localhost:9090", configuration.getAiDomain());
   }

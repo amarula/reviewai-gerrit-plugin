@@ -20,9 +20,7 @@ import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -34,9 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.google.inject.Scopes.SINGLETON;
@@ -57,7 +53,7 @@ public class GerritEventContextModule extends FactoryModule {
     log.debug("Configuring bindings for GerritEventContextModule");
 
     bind(IAiClient.class).to(getAiClient());
-    log.debug("Bound IOpenAIClient to: {}", getAiClient().getSimpleName());
+    log.debug("Bound IAiClient to: {}", getAiClient().getSimpleName());
 
     bind(IGerritClientPatchSet.class).to(getClientPatchSet());
     log.debug("Bound IGerritClientPatchSet to: {}", getClientPatchSet().getSimpleName());
@@ -77,27 +73,19 @@ public class GerritEventContextModule extends FactoryModule {
   }
 
   private Class<? extends IAiClient> getAiClient() {
-    if (config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN) {
-      return config.getMultiAgentMode()
-          ? LangChainMultiAgentReviewClient.class
-          : LangChainClient.class;
-    }
-    return config.getAiReviewCommitMessages() && config.getMultiAgentMode()
-        ? OpenAiMultiAgentReviewClient.class
-        : OpenAiReviewClient.class;
+    return config.getMultiAgentMode()
+        ? LangChainMultiAgentReviewClient.class
+        : LangChainClient.class;
   }
 
   private Class<? extends IGerritClientPatchSet> getClientPatchSet() {
-    return GerritClientPatchSetOpenAi.class;
+    return GerritClientPatchSetReviewAi.class;
   }
 
   private Class<? extends ICodeContextPolicy> getCodeContextPolicy() {
     return switch (config.getCodeContextPolicy()) {
       case NONE -> CodeContextPolicyNone.class;
-      case ON_DEMAND ->
-          !config.getSelectedAiModelRoute().isLangChain()
-              ? OpenAiCodeContextPolicyOnDemand.class
-              : CodeContextPolicyOnDemand.class;
+      case ON_DEMAND -> CodeContextPolicyOnDemand.class;
     };
   }
 }

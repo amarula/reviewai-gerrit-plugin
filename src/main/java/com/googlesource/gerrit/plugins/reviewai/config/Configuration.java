@@ -20,7 +20,6 @@ import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 import java.util.ArrayList;
@@ -89,8 +88,6 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_MULTI_AGENT_MODE = false;
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
-  private static final int DEFAULT_AI_POLLING_TIMEOUT = 180;
-  private static final int DEFAULT_AI_POLLING_INTERVAL = 1000;
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
@@ -150,8 +147,6 @@ public class Configuration extends ConfigCore {
   private static final String KEY_MULTI_AGENT_MODE = "multiAgentMode";
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
-  private static final String KEY_AI_POLLING_TIMEOUT = "aiPollingTimeout";
-  private static final String KEY_AI_POLLING_INTERVAL = "aiPollingInterval";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
   private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
   private static final String KEY_OLLAMA_CONTEXT_WINDOW = "ollamaContextWindow";
@@ -215,10 +210,6 @@ public class Configuration extends ConfigCore {
 
   public AiProviderType getAiProviderType() {
     return aiProviderConfiguration.getAiProviderType();
-  }
-
-  public AiProviderTransport getAiProviderTransport() {
-    return aiProviderConfiguration.getAiProviderTransport();
   }
 
   // The default system prompt/instructions are specified in the prompt files and are passed as a
@@ -358,14 +349,6 @@ public class Configuration extends ConfigCore {
 
   public int getAiConnectionMaxRetryAttempts() {
     return getInt(KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS, DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS);
-  }
-
-  public int getAiPollingTimeout() {
-    return getInt(KEY_AI_POLLING_TIMEOUT, DEFAULT_AI_POLLING_TIMEOUT);
-  }
-
-  public int getAiPollingInterval() {
-    return getInt(KEY_AI_POLLING_INTERVAL, DEFAULT_AI_POLLING_INTERVAL);
   }
 
   public int getAiUploadedChunkSizeMb() {

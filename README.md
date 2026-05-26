@@ -133,23 +133,22 @@ Please ensure **strict control over the access permissions of `refs/meta/config`
 
 ## AI Provider Routes
 
-The plugin supports multiple provider routes, giving flexibility in selecting a direct provider or a framework-backed
-provider. The Review Agent AI exposes each configured route/model combination using `/` syntax.
+The plugin supports multiple AI providers. The Review Agent AI exposes each configured provider/model combination using
+`/` syntax. All configured providers use LangChain internally.
 
-Supported provider routes are:
+Supported providers are:
 
-- `OpenAI`: direct OpenAI connection.
-- `LangChain/OpenAI`: OpenAI through LangChain.
-- `LangChain/MoonShot` or simply `MoonShot`: MoonShot through LangChain.
-- `LangChain/Ollama` or simply `Ollama`: Ollama through LangChain.
+- OpenAI
+- MoonShot
+- Gemini
+- Ollama
 
 Model and token settings are grouped by the provider part of the route:
 
 ```
 [plugin "reviewai-gerrit-plugin"]
     aiProviders = OpenAI
-    aiProviders = LangChain/OpenAI
-    aiProviders = LangChain/MoonShot
+    aiProviders = MoonShot
     aiProviders = Ollama
 
     aiModels = OpenAI/gpt-5.4
@@ -162,25 +161,11 @@ Model and token settings are grouped by the provider part of the route:
     aiTokens = MoonShot/{moonShotToken}
 ```
 
-With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`,
-`LangChain/OpenAI/gpt-5.4`, `LangChain/OpenAI/gpt-4.1`, `LangChain/MoonShot/moonshot-v1-8k`, and
-`LangChain/Ollama/llama3.2`. Ollama does not require an `aiTokens` entry. A bare model can also be configured as
+With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`, `MoonShot/moonshot-v1-8k`, and
+`Ollama/llama3.2`.
+Ollama does not require an `aiTokens` entry. A bare model can also be configured as
 `aiModels = llama3.2`; when no configured provider token identifies the model route, the plugin guesses
-`LangChain/Ollama/llama3.2`.
-
-### OpenAI Route
-
-The direct OpenAI route uses the **Assistant** resource to maintain a richer interaction context. This route is designed
-to:
-
-- Leverage OpenAI Conversations plus Responses to preserve the memory of interactions related to each Change Set.
-- Link these Threads with OpenAI Assistants that are specialized according to the response needed.
-- Associate the Assistants with the complete Codebase of the Git project related to the Change, which is updated
-  each time commits are merged in Gerrit.
-
-### LangChain Routes
-
-LangChain routes rely on the LangChain framework to connect with an AI provider.
+`Ollama/llama3.2`.
 
 ## Optional Parameters
 
@@ -192,15 +177,15 @@ LangChain routes rely on the LangChain framework to connect with an AI provider.
   when no model has been selected yet.
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on. Ollama
   does not require a token.
-- `aiDomain`: Defines the base endpoint for the selected provider, either direct or through LangChain. By default, it
-  uses the provider’s standard domain: `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com`
-  (Gemini), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a
-  custom endpoint; leaving it unset lets the plugin pick the provider default automatically.
+- `aiDomain`: Defines the base endpoint for the selected provider. By default, it uses the provider’s standard domain:
+  `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com` (Gemini), `https://api.moonshot.ai`
+  (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a custom endpoint; leaving it unset lets
+  the plugin pick the provider default automatically.
 - `mockAiAddress`: Configures a custom address for a mock AI server. When set, a `mock-ai` model is added for each
-  configured provider route, such as `OpenAI/mock-ai`, `LangChain/MoonShot/mock-ai`, or `LangChain/Ollama/mock-ai`.
-  Selecting one of these models keeps the same provider, transport, and token behavior as the corresponding live model
-  route, but sends AI requests to the configured mock server address instead. Because mock models are appended to the
-  regular model list, they can be selected through `aiModelsDefaultIndex` like any other model.
+  configured provider route, such as `OpenAI/mock-ai`, `MoonShot/mock-ai`, or `Ollama/mock-ai`. Selecting one of these
+  models keeps the same provider and token behavior as the corresponding live model route, but sends AI requests to the
+  configured mock server address instead. Because mock models are appended to the regular model list, they can be
+  selected through `aiModelsDefaultIndex` like any other model.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
@@ -281,7 +266,7 @@ directive = End each reply with \"Hope this helps!\"
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
   This applies when ON_DEMAND code context tools are enabled and defaults to 3.
 
-### Optional Parameters Specific to OpenAI Backend
+### Optional Parameters Specific to Review Processing
 
 - `multiAgentMode`: This option allows for dividing the Patch Set review between two specialized agents: one
   focused to the Patch's code and another to the commit message. When this option is set to false (default value), the
@@ -290,7 +275,7 @@ directive = End each reply with \"Hope this helps!\"
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
 
-### Optional Parameters Specific to LangChain Routes
+### Optional Parameters Specific to Provider Routes
 
 - `aiMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
 
@@ -306,8 +291,6 @@ directive = End each reply with \"Hope this helps!\"
 These parameters are specific to connecting with the OpenAI server and should only be modified by advanced users:
 
 - `aiConnectionTimeout`: Defines the timeout for connections to the OpenAI server, with a default of 30 seconds.
-- `aiPollingTimeout`: Sets the timeout for terminating OpenAI polling on requests, defaulting to 180 seconds.
-- `getPollingInterval`: Sets the interval for OpenAI polling on requests, defaulting to 1 second.
 - `aiConnectionMaxRetryAttempts`: Determines the maximum number of retry attempts, defaulting to 2.
 - `aiUploadedChunkSizeMb`: When uploading project repositories to OpenAI, the repositories are packaged and split into
   chunk files. This setting specifies the maximum size of each chunk file, with a default of 5 MB.

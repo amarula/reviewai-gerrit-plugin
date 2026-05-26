@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026. The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
+
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewCode;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewCommitMessage;
+
+import java.util.List;
+
+public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPromptingParamBase {
+  private static final String TITLE_FULL_REVIEW = "PROMPT FOR FULL REVIEW";
+  private static final String TITLE_PATCH_SET_ONLY = "PROMPT FOR PATCH SET ONLY";
+  private static final String TITLE_COMMIT_MESSAGE_ONLY = "PROMPT FOR COMMIT MESSAGE ONLY";
+  private static final List<ScopedPromptingParameter> SCOPED_PARAMETERS =
+      List.of(
+          new ScopedPromptingParameter(ReviewScope.FULL, TITLE_FULL_REVIEW),
+          new ScopedPromptingParameter(ReviewScope.PATCHSET, TITLE_PATCH_SET_ONLY),
+          new ScopedPromptingParameter(ReviewScope.COMMIT_MESSAGE, TITLE_COMMIT_MESSAGE_ONLY));
+
+  private final String patchSet;
+  private final ReviewScope reviewScope;
+
+  public DebugCodeBlocksPromptingParamPrompts(
+      Localizer localizer,
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      String patchSet,
+      ReviewScope reviewScope) {
+    super(
+        localizer, "message.dump.prompts.title", config, changeSetData, change, codeContextPolicy);
+    this.patchSet = patchSet;
+    this.reviewScope = reviewScope;
+  }
+
+  @Override
+  public String getDebugCodeBlock() {
+    return getScopedDebugCodeBlock(reviewScope, SCOPED_PARAMETERS);
+  }
+
+  @Override
+  protected void populateAiPromptParameters() {
+    promptingParameters.put(
+        TITLE_FULL_REVIEW,
+        new AiPromptReview(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+    promptingParameters.put(
+        TITLE_PATCH_SET_ONLY,
+        new AiPromptReviewCode(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+    promptingParameters.put(
+        TITLE_COMMIT_MESSAGE_ONLY,
+        new AiPromptReviewCommitMessage(config, changeSetData.copy(), change, codeContextPolicy)
+            .getDefaultAiThreadReviewMessage(patchSet));
+  }
+}

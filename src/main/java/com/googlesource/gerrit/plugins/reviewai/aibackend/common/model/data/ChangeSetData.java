@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +33,7 @@ public class ChangeSetData {
   @NonNull private Integer aiAccountId;
   private String aiDataPrompt;
   private Integer commentPropertiesSize;
-  private ReviewAssistantStages reviewAssistantStage = ReviewAssistantStages.REVIEW_CODE;
+  private ReviewAssistantStage reviewAssistantStage = ReviewAssistantStage.REVIEW_CODE;
   private Boolean forcedStagedReview = false;
   private ReviewScope reviewScope;
   @NonNull private Integer votingMinScore;
@@ -44,7 +43,7 @@ public class ChangeSetData {
   private Boolean forcedReview = false;
   private Boolean replyFilterEnabled = true;
   private Boolean debugReviewMode = false;
-  private Boolean hideOpenAiReview = false;
+  private Boolean hideAiReview = false;
   private Boolean hideDynamicConfigMessage = false;
   private Boolean showDynamicConfigMessage = false;
   private String reviewSystemMessage;
@@ -74,12 +73,12 @@ public class ChangeSetData {
     return value.equals(parsedCommandOptions.getOrDefault(command, Map.of()).get(option));
   }
 
-  public Boolean shouldHideOpenAiReview() {
-    return hideOpenAiReview && !forcedReview;
+  public Boolean shouldHideAiReview() {
+    return hideAiReview && !forcedReview;
   }
 
   public Boolean shouldRequestAiReview() {
-    return reviewSystemMessage == null && !shouldHideOpenAiReview();
+    return reviewSystemMessage == null && !shouldHideAiReview();
   }
 
   public ChangeSetData copy() {
@@ -92,7 +91,7 @@ public class ChangeSetData {
     copy.setForcedReview(forcedReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);
-    copy.setHideOpenAiReview(hideOpenAiReview);
+    copy.setHideAiReview(hideAiReview);
     copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
     copy.setShowDynamicConfigMessage(showDynamicConfigMessage);
     copy.setReviewSystemMessage(reviewSystemMessage);

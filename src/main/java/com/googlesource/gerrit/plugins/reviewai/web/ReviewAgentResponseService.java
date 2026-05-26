@@ -33,8 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.gerrit.GerritClientPatchSetOpenAi;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.code.context.OpenAiCodeContextPolicyOnDemand;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -213,8 +212,8 @@ class ReviewAgentResponseService {
     Localizer localizer = new Localizer(config);
     PluginDataHandlerProvider pluginDataHandlerProvider =
         new PluginDataHandlerProvider(pluginDataPath, change, db);
-    GerritClientPatchSetOpenAi gerritClientPatchSet =
-        new GerritClientPatchSetOpenAi(config, accountCache, repositoryManager);
+    GerritClientPatchSetReviewAi gerritClientPatchSet =
+        new GerritClientPatchSetReviewAi(config, accountCache, repositoryManager);
     new ClientCommandParser(
             config,
             changeSetData,
@@ -251,11 +250,6 @@ class ReviewAgentResponseService {
   private ICodeContextPolicy getCodeContextPolicy(Configuration config, GerritChange change) {
     if (config.getCodeContextPolicy() != CodeContextPolicies.ON_DEMAND) {
       return new CodeContextPolicyNone(config);
-    }
-    GitRepoFiles gitRepoFiles = new GitRepoFiles();
-    if (config.getSelectedAiModelRoute() != null
-        && !config.getSelectedAiModelRoute().isLangChain()) {
-      return new OpenAiCodeContextPolicyOnDemand(config, change, gitRepoFiles);
     }
     return new CodeContextPolicyOnDemand(config);
   }
