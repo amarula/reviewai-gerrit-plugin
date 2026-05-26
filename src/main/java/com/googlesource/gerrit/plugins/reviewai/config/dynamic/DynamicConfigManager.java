@@ -16,21 +16,23 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config.dynamic;
 
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
 public class DynamicConfigManager {
   public static final String KEY_DYNAMIC_CONFIG = "dynamicConfig";
+  public static final String KEY_SELECTED_AI_MODEL = "selectedAiModel";
 
   private final PluginDataHandler pluginDataHandler;
-  @Getter private final Map<String, String> dynamicConfig;
+  private final Map<String, String> dynamicConfig;
 
   public DynamicConfigManager(PluginDataHandlerProvider pluginDataHandlerProvider) {
     this.pluginDataHandler = pluginDataHandlerProvider.getChangeScope();
@@ -43,6 +45,17 @@ public class DynamicConfigManager {
   public String getConfig(String key) {
     log.debug("Retrieving config key: {}", key);
     return dynamicConfig.get(key);
+  }
+
+  public Map<String, String> getDynamicConfigForDisplay(Configuration config) {
+    if (dynamicConfig == null || dynamicConfig.isEmpty()) {
+      return Map.of();
+    }
+    if (dynamicConfig.size() == 1
+        && isDefaultSelectedAiModel(config, dynamicConfig.get(KEY_SELECTED_AI_MODEL))) {
+      return Map.of();
+    }
+    return dynamicConfig;
   }
 
   public void setConfig(String key, String value) {
@@ -66,6 +79,28 @@ public class DynamicConfigManager {
       log.info("Updating dynamic configuration with {}", dynamicConfig);
       pluginDataHandler.setJsonValue(KEY_DYNAMIC_CONFIG, dynamicConfig);
     }
+  }
+
+  public static boolean isDefaultSelectedAiModel(Configuration config, String selectedAiModel) {
+    if (selectedAiModel == null || selectedAiModel.isBlank()) {
+      return false;
+    }
+    return selectedAiModel.trim().equals(getDefaultAiModel(config));
+  }
+
+  private static String getDefaultAiModel(Configuration config) {
+    if (config == null) {
+      return "";
+    }
+    List<String> aiModels = config.getAiModels();
+    if (aiModels == null || aiModels.isEmpty()) {
+      return "";
+    }
+    int zeroBasedIndex = config.getAiModelsDefaultIndex() - 1;
+    if (zeroBasedIndex >= 0 && zeroBasedIndex < aiModels.size()) {
+      return aiModels.get(zeroBasedIndex);
+    }
+    return aiModels.get(0);
   }
 
   private void resetDynamicConfig() {

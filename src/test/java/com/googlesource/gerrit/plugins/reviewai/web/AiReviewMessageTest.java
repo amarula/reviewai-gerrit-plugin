@@ -151,7 +151,36 @@ public class AiReviewMessageTest extends TestBase {
 
   @Test
   @SuppressWarnings("unchecked")
-  public void storesSelectedModelIdAlias() throws Exception {
+  public void storesNonDefaultSelectedModelIdAlias() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.modelId = "LangChain/MoonShot/moonshot-v1-8k";
+
+    view.apply(changeResource, input);
+
+    ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
+    verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
+    assertEquals("LangChain/MoonShot/moonshot-v1-8k", captor.getValue().get("selectedAiModel"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void removesDefaultSelectedModelIdAliasWhenNoOtherDynamicConfigExists() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.modelId = "OpenAI/gpt-4.1";
+
+    view.apply(changeResource, input);
+
+    verify(pluginDataHandler).removeValue(KEY_DYNAMIC_CONFIG);
+    verify(pluginDataHandler, never()).setJsonValue(eq(KEY_DYNAMIC_CONFIG), any());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void storesDefaultSelectedModelWhenOtherDynamicConfigExists() throws Exception {
+    when(pluginDataHandler.getJsonObjectValue(KEY_DYNAMIC_CONFIG, String.class))
+        .thenReturn(Map.of("aiReviewTemperature", "0.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/review";
     input.modelId = "OpenAI/gpt-4.1";
@@ -161,6 +190,7 @@ public class AiReviewMessageTest extends TestBase {
     ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
     verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
     assertEquals("OpenAI/gpt-4.1", captor.getValue().get("selectedAiModel"));
+    assertEquals("0.1", captor.getValue().get("aiReviewTemperature"));
   }
 
   @Test
@@ -245,6 +275,41 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.waitForAssistantReply);
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
+    verify(revisionApi).review(any());
+  }
+
+  @Test
+  public void reviewAgentReviewCommandHidesDefaultSelectedModelOnlyPreamble() throws Exception {
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
+        .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("selectedAiModel", "OpenAI/gpt-4.1"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    assertEquals(null, output.responseText);
+    verify(revisionApi).review(any());
+  }
+
+  @Test
+  public void reviewAgentReviewCommandShowsNonDefaultSelectedModelOnlyPreamble() throws Exception {
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
+        .setJsonValue(
+            KEY_DYNAMIC_CONFIG,
+            Map.of("selectedAiModel", "LangChain/MoonShot/moonshot-v1-8k"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    assertTrue(output.responseText.contains("LangChain/MoonShot/moonshot-v1-8k"));
     verify(revisionApi).review(any());
   }
 

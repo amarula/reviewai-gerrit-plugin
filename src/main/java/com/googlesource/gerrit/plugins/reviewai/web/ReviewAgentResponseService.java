@@ -91,6 +91,7 @@ class ReviewAgentResponseService {
         new AiReviewMessage.Output(
             true,
             getDirectResponseText(
+                config,
                 commandContext.changeSetData(),
                 commandContext.pluginDataHandlerProvider(),
                 commandContext.localizer(),
@@ -115,6 +116,7 @@ class ReviewAgentResponseService {
         new AiReviewMessage.Output(
             true,
             getDirectResponseText(
+                config,
                 commandContext.changeSetData(),
                 commandContext.pluginDataHandlerProvider(),
                 commandContext.localizer(),
@@ -143,19 +145,21 @@ class ReviewAgentResponseService {
     }
     Optional.ofNullable(
             getDynamicConfigurationMessage(
-                commandContext.pluginDataHandlerProvider(), commandContext.localizer()))
+                config, commandContext.pluginDataHandlerProvider(), commandContext.localizer()))
         .ifPresent(messages::add);
     return messages.isEmpty() ? null : joinWithDoubleNewLine(messages);
   }
 
   private String getDirectResponseText(
+      Configuration config,
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       boolean prefixSystemMessage) {
     List<String> messages = new ArrayList<>();
     if (!changeSetData.getHideDynamicConfigMessage()) {
-      Optional.ofNullable(getDynamicConfigurationMessage(pluginDataHandlerProvider, localizer))
+      Optional.ofNullable(
+              getDynamicConfigurationMessage(config, pluginDataHandlerProvider, localizer))
           .ifPresent(messages::add);
     }
     if (changeSetData.getReviewSystemMessage() != null) {
@@ -226,9 +230,9 @@ class ReviewAgentResponseService {
   }
 
   private String getDynamicConfigurationMessage(
-      PluginDataHandlerProvider pluginDataHandlerProvider, Localizer localizer) {
+      Configuration config, PluginDataHandlerProvider pluginDataHandlerProvider, Localizer localizer) {
     Map<String, String> dynamicConfig =
-        new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfig();
+        new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfigForDisplay(config);
     if (dynamicConfig == null || dynamicConfig.isEmpty()) {
       return null;
     }

@@ -140,7 +140,7 @@ public class GerritClientReview extends GerritClientAccount {
     List<String> messages = new ArrayList<>();
     if (!change.getIsCommentEvent() && !changeSetData.getHideDynamicConfigMessage()) {
       Map<String, String> dynamicConfig =
-          new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfig();
+          new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfigForDisplay(config);
       if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
         messages.add(debugCodeBlocksDynamicConfiguration.getDebugCodeBlock(dynamicConfig));
       }
