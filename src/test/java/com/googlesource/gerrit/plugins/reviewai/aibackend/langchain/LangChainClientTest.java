@@ -29,12 +29,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
@@ -166,13 +166,13 @@ public class LangChainClientTest {
   public void resolvesStageConversationForLangChainOpenAiMultiAgentProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =
-        OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStages.REVIEW_CODE);
+        OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStage.REVIEW_CODE);
     when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_review_code");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setForcedReview(true);
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_CODE);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
 
     String conversationId =
         resolveConversationId(

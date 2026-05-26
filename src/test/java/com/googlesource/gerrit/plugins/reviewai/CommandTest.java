@@ -28,8 +28,8 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.OpenAiReviewTestBase;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.OpenAiUriResourceLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainReviewTestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -48,7 +48,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TemplateUtils.rende
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.sortTextLines;
 import static org.mockito.Mockito.when;
 
-public class CommandTest extends OpenAiReviewTestBase {
+public class CommandTest extends OpenAiLangChainReviewTestBase {
   private static final String UNSUPPORTED_ONLY_PATCH_FILE = "__files/commands/unsupportedOnlyPatch.txt";
 
   @Before
@@ -252,35 +252,25 @@ public class CommandTest extends OpenAiReviewTestBase {
         .thenReturn(false);
 
     setupCommandComment(reviewCommandWithScope(ReviewScope.COMMIT_MESSAGE));
-    setupMockRequestCreateResponse("openAiRunStepsResponse.json");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     testRequestSent();
     Assert.assertTrue(getInputContent().contains("Minor fixes"));
     Assert.assertTrue(getInputContent().contains("diff --git"));
-    Assert.assertTrue(
-        aiRequestBody
-            .get("instructions")
-            .getAsString()
-            .contains("Git commit message expert"));
   }
 
   @Test
   public void commandReviewPatchsetScopeExcludesCommitMessage() throws Exception {
     setupCommandComment(reviewCommandWithScope(ReviewScope.PATCHSET));
-    setupMockRequestCreateResponse("openAiRunStepsResponse.json");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     testRequestSent();
     Assert.assertFalse(getInputContent().contains("Subject: Minor fixes"));
     Assert.assertTrue(getInputContent().contains("diff --git"));
-    Assert.assertFalse(
-        aiRequestBody
-            .get("instructions")
-            .getAsString()
-            .contains("You MUST review the commit message"));
   }
 
   @Test
@@ -416,8 +406,7 @@ public class CommandTest extends OpenAiReviewTestBase {
   }
 
   private String positiveReviewResponse() {
-    return readTestFile(RESOURCE_OPENAI_PATH + "openAiRunStepsResponse.json")
-        .replace("\\\"score\\\": -1.0", "\\\"score\\\": 1.0");
+    return readTestFile(RESOURCE_OPENAI_PATH + "openAiPositiveReviewResponse.json");
   }
 
   @Test

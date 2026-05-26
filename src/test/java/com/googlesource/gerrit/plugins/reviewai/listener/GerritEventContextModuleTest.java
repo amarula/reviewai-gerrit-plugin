@@ -24,7 +24,6 @@ import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import java.lang.reflect.Method;
 import org.junit.Test;
 
@@ -33,7 +32,6 @@ public class GerritEventContextModuleTest {
   @Test
   public void selectsMultiAgentLangChainClientWhenEnabled() throws Exception {
     Configuration config = mock(Configuration.class);
-    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getMultiAgentMode()).thenReturn(true);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
@@ -47,7 +45,6 @@ public class GerritEventContextModuleTest {
   @Test
   public void selectsMultiAgentLangChainClientBasedOnlyOnMultiAgentMode() throws Exception {
     Configuration config = mock(Configuration.class);
-    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getAiReviewCommitMessages()).thenReturn(false);
     when(config.getMultiAgentMode()).thenReturn(true);
 
@@ -62,7 +59,6 @@ public class GerritEventContextModuleTest {
   @Test
   public void keepsUnifiedLangChainClientWhenMultiAgentModeDisabled() throws Exception {
     Configuration config = mock(Configuration.class);
-    when(config.getAiProviderTransport()).thenReturn(AiProviderTransport.LANGCHAIN);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getMultiAgentMode()).thenReturn(false);
 

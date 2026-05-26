@@ -116,7 +116,7 @@ public class GerritClientReview extends GerritClientAccount {
     if (changeSetData.getReviewSystemMessage() != null) {
       systemMessage = changeSetData.getReviewSystemMessage();
       reviewInput.notify = NotifyHandling.NONE;
-    } else if (!changeSetData.shouldHideOpenAiReview()) {
+    } else if (!changeSetData.shouldHideAiReview()) {
       comments = getReviewComments(reviewBatches);
       if (reviewScore != null) {
         reviewInput.label(LabelId.CODE_REVIEW, reviewScore);

@@ -33,8 +33,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.Plugi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewAgentRouter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
@@ -67,8 +67,8 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 @Slf4j
 @Singleton
 public class LangChainMultiAgentReviewClient extends LangChainClient implements IAiClient {
-  private static final List<ReviewAssistantStages> MULTI_AGENT_ASSISTANT_STAGES =
-      List.of(ReviewAssistantStages.REVIEW_CODE, ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+  private static final List<ReviewAssistantStage> MULTI_AGENT_ASSISTANT_STAGES =
+      List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
   private static final String ROUTER_SCOPE = "router";
 
   private final Executor executor;
@@ -176,7 +176,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     log.debug(
         "Multi-agent LangChain ask method called with changeId: {}", change.getFullChangeId());
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
-      ReviewAssistantStages routedStage = routeMessage(changeSetData, change);
+      ReviewAssistantStage routedStage = routeMessage(changeSetData, change);
       log.debug("LangChain routing agent selected stage {} for message", routedStage);
       ReviewRequestResult reviewRequestResult =
           askStage(changeSetData, change, patchSet, routedStage);
@@ -194,10 +194,10 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
-      List<ReviewAssistantStages> assistantStages)
+      List<ReviewAssistantStage> assistantStages)
       throws Exception {
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
-    for (ReviewAssistantStages assistantStage : assistantStages) {
+    for (ReviewAssistantStage assistantStage : assistantStages) {
       reviewRequestFutures.add(
           CompletableFuture.supplyAsync(
               () -> {
@@ -235,7 +235,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
-      ReviewAssistantStages assistantStage)
+      ReviewAssistantStage assistantStage)
       throws Exception {
     ChangeSetData stageChangeSetData = changeSetData.copy();
     stageChangeSetData.setReviewAssistantStage(assistantStage);
@@ -245,7 +245,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
   }
 
   @VisibleForTesting
-  protected ReviewAssistantStages routeMessage(ChangeSetData changeSetData, GerritChange change)
+  protected ReviewAssistantStage routeMessage(ChangeSetData changeSetData, GerritChange change)
       throws AiConnectionFailException {
     LangChainMemoryId routerMemoryId =
         new LangChainMemoryId(
@@ -380,20 +380,20 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     }
   }
 
-  private ReviewAssistantStages parseRoute(String route) {
+  private ReviewAssistantStage parseRoute(String route) {
     if (route == null) {
       log.warn("LangChain routing agent returned null route; defaulting to patchset agent");
-      return ReviewAssistantStages.REVIEW_CODE;
+      return ReviewAssistantStage.REVIEW_CODE;
     }
     String normalized = route.trim().toUpperCase(Locale.ROOT);
     if (normalized.contains("COMMIT_MESSAGE") || normalized.contains("COMMIT MESSAGE")) {
-      return ReviewAssistantStages.REVIEW_COMMIT_MESSAGE;
+      return ReviewAssistantStage.REVIEW_COMMIT_MESSAGE;
     }
     if (!normalized.contains("PATCHSET")) {
       log.warn(
           "LangChain routing agent returned unrecognized route `{}`; defaulting to patchset agent",
           route);
     }
-    return ReviewAssistantStages.REVIEW_CODE;
+    return ReviewAssistantStage.REVIEW_CODE;
   }
 }

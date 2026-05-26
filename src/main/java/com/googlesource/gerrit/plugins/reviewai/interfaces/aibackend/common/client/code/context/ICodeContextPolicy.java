@@ -16,19 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiToolCall;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiAssistantTools;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.api.openai.OpenAiResponseInputItem;
-
 import java.util.List;
 
 public interface ICodeContextPolicy {
-  void updateOpenAiTools(OpenAiAssistantTools openAIAssistantTools);
-
-  List<OpenAiResponseInputItem> buildToolResponseItems(List<AiToolCall> aiToolCalls)
-      throws AiConnectionFailException;
-
   void addCodeContextPolicyAwareAssistantInstructions(List<String> instructions);
 
   void addCodeContextPolicyAwareAssistantRule(List<String> rules);

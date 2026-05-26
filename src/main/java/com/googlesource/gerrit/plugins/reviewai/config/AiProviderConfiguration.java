@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config;
 
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -133,8 +132,7 @@ final class AiProviderConfiguration {
                     .stream()
                     .map(
                         model ->
-                            new AiModelRoute(
-                                providerRoute.transport(), providerRoute.provider(), model)))
+                            new AiModelRoute(providerRoute.provider(), model)))
         .map(AiModelRoute::modelRoute)
         .distinct()
         .toList();
@@ -182,15 +180,11 @@ final class AiProviderConfiguration {
     }
     return getDefaultAiModelRoute()
         .orElse(
-            new AiModelRoute(AiProviderTransport.OPENAI, AiProviderType.OPENAI, DEFAULT_OPENAI_AI_MODEL));
+            new AiModelRoute(AiProviderType.OPENAI, DEFAULT_OPENAI_AI_MODEL));
   }
 
   AiProviderType getAiProviderType() {
     return getSelectedAiModelRoute().provider();
-  }
-
-  AiProviderTransport getAiProviderTransport() {
-    return getSelectedAiModelRoute().transport();
   }
 
   private List<AiProviderRoute> getAiProviderRoutes() {
@@ -215,63 +209,28 @@ final class AiProviderConfiguration {
     if (providerRoute == null || providerRoute.isBlank()) {
       return Optional.empty();
     }
-    String[] parts = providerRoute.trim().split("/", 2);
-    if (parts.length == 1) {
-      return AiProviderType.fromConfigName(parts[0])
-          .map(provider -> new AiProviderRoute(getDefaultTransport(provider), provider));
-    }
-
-    Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
-    Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
-    if (transport.isPresent()
-        && provider.isPresent()
-        && supportsTransport(transport.get(), provider.get())) {
-      return Optional.of(new AiProviderRoute(transport.get(), provider.get()));
+    if (!providerRoute.contains("/")) {
+      return AiProviderType.fromConfigName(providerRoute).map(AiProviderRoute::new);
     }
     log.warn("Ignoring invalid AI provider route `{}`", providerRoute);
     return Optional.empty();
   }
 
-  private AiProviderTransport getDefaultTransport(AiProviderType provider) {
-    if (provider.supportsDirectConnection()) {
-      return AiProviderTransport.OPENAI;
-    }
-    return AiProviderTransport.LANGCHAIN;
-  }
-
-  private boolean supportsTransport(AiProviderTransport transport, AiProviderType provider) {
-    return transport != AiProviderTransport.OPENAI || provider.supportsDirectConnection();
-  }
-
   private ConfiguredAiModels getAiModelMap(
       List<String> configuredModels, List<AiProviderRoute> providerRoutes) {
     Map<AiProviderRoute, List<String>> routeModelMap = new LinkedHashMap<>();
-    Map<AiProviderType, List<String>> providerModelMap = new LinkedHashMap<>();
     for (String configuredModelRoute : configuredModels) {
       String modelRoute = unwrapDumpQuotes(configuredModelRoute);
       if (modelRoute == null || modelRoute.isBlank()) {
         continue;
       }
-      String[] parts = modelRoute.trim().split("/", 3);
-      if (parts.length == 3) {
-        Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
-        Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
-        if (transport.isPresent()
-            && provider.isPresent()
-            && supportsTransport(transport.get(), provider.get())) {
-          AiProviderRoute providerRoute = new AiProviderRoute(transport.get(), provider.get());
-          routeModelMap.computeIfAbsent(providerRoute, ignored -> new ArrayList<>()).add(parts[2]);
-        } else {
-          log.warn("Ignoring invalid AI model route `{}`", modelRoute);
-        }
-        continue;
-      }
+      String[] parts = modelRoute.trim().split("/", 2);
       if (parts.length == 2) {
         AiProviderType.fromConfigName(parts[0])
             .ifPresent(
                 provider ->
-                    providerModelMap
-                        .computeIfAbsent(provider, ignored -> new ArrayList<>())
+                    routeModelMap
+                        .computeIfAbsent(new AiProviderRoute(provider), ignored -> new ArrayList<>())
                         .add(parts[1]));
         continue;
       }
@@ -282,7 +241,7 @@ final class AiProviderConfiguration {
                       .computeIfAbsent(providerRoute, ignored -> new ArrayList<>())
                       .add(parts[0]));
     }
-    return new ConfiguredAiModels(routeModelMap, providerModelMap);
+    return new ConfiguredAiModels(routeModelMap);
   }
 
   private List<String> getDefaultAiModels(AiProviderType provider) {
@@ -320,22 +279,10 @@ final class AiProviderConfiguration {
       if (modelRoute == null || modelRoute.isBlank()) {
         continue;
       }
-      String[] parts = modelRoute.trim().split("/", 3);
-      if (parts.length == 3) {
-        Optional<AiProviderTransport> transport = AiProviderTransport.fromConfigName(parts[0]);
-        Optional<AiProviderType> provider = AiProviderType.fromConfigName(parts[1]);
-        if (transport.isPresent()
-            && provider.isPresent()
-            && supportsTransport(transport.get(), provider.get())) {
-          providerRoutes.add(new AiProviderRoute(transport.get(), provider.get()));
-        } else {
-          log.warn("Cannot infer provider from invalid AI model route `{}`", modelRoute);
-        }
-        continue;
-      }
+      String[] parts = modelRoute.trim().split("/", 2);
       if (parts.length == 2) {
         AiProviderType.fromConfigName(parts[0])
-            .map(provider -> new AiProviderRoute(getDefaultTransport(provider), provider))
+            .map(AiProviderRoute::new)
             .ifPresent(providerRoutes::add);
         continue;
       }
@@ -416,7 +363,7 @@ final class AiProviderConfiguration {
         .map(AiProviderType::fromConfigName)
         .filter(Optional::isPresent)
         .map(Optional::get)
-        .map(provider -> new AiProviderRoute(getDefaultTransport(provider), provider))
+        .map(AiProviderRoute::new)
         .toList();
   }
 
@@ -434,13 +381,7 @@ final class AiProviderConfiguration {
       if (modelRoute == null || modelRoute.isBlank()) {
         continue;
       }
-      String[] parts = modelRoute.trim().split("/", 3);
-      if (parts.length == 3) {
-        AiProviderType.fromConfigName(parts[1])
-            .filter(provider -> provider == targetProvider)
-            .ifPresent(provider -> providerModels.add(parts[2]));
-        continue;
-      }
+      String[] parts = modelRoute.trim().split("/", 2);
       if (parts.length == 2) {
         AiProviderType.fromConfigName(parts[0])
             .filter(provider -> provider == targetProvider)
@@ -452,7 +393,7 @@ final class AiProviderConfiguration {
 
   private Optional<AiProviderRoute> getOllamaProviderRoute(List<AiProviderRoute> providerRoutes) {
     return providerRoutes.isEmpty()
-        ? Optional.of(new AiProviderRoute(AiProviderTransport.LANGCHAIN, AiProviderType.OLLAMA))
+        ? Optional.of(new AiProviderRoute(AiProviderType.OLLAMA))
         : providerRoutes.stream()
             .filter(providerRoute -> providerRoute.provider() == AiProviderType.OLLAMA)
             .findFirst();
@@ -472,7 +413,7 @@ final class AiProviderConfiguration {
 
   private List<AiModelRoute> getMockAiModelRoutes(List<AiProviderRoute> providerRoutes) {
     return providerRoutes.stream()
-        .map(route -> new AiModelRoute(route.transport(), route.provider(), MOCK_AI_MODEL))
+        .map(route -> new AiModelRoute(route.provider(), MOCK_AI_MODEL))
         .toList();
   }
 
@@ -487,24 +428,15 @@ final class AiProviderConfiguration {
     return value.replaceAll("^\"|\"$", "");
   }
 
-  private record AiProviderRoute(AiProviderTransport transport, AiProviderType provider) {
+  private record AiProviderRoute(AiProviderType provider) {
     private String id() {
-      if (transport == AiProviderTransport.OPENAI && provider.supportsDirectConnection()) {
-        return provider.getConfigName();
-      }
-      return transport.getConfigName() + "/" + provider.getConfigName();
+      return provider.getConfigName();
     }
   }
 
-  private record ConfiguredAiModels(
-      Map<AiProviderRoute, List<String>> routeModelMap,
-      Map<AiProviderType, List<String>> providerModelMap) {
+  private record ConfiguredAiModels(Map<AiProviderRoute, List<String>> routeModelMap) {
     private Optional<List<String>> getModels(AiProviderRoute providerRoute) {
-      List<String> routeModels = routeModelMap.get(providerRoute);
-      if (routeModels != null) {
-        return Optional.of(routeModels);
-      }
-      return Optional.ofNullable(providerModelMap.get(providerRoute.provider()));
+      return Optional.ofNullable(routeModelMap.get(providerRoute));
     }
   }
 }

@@ -25,14 +25,14 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReview;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptReviewAgentRouter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptRequests;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptRoutedReviewAgentRequest;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewAgentRouter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptRequests;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.openai.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import java.util.Map;
 import org.junit.Test;
 
@@ -54,7 +54,7 @@ public class AiPromptFactoryTest {
   public void routedCommentEventUsesStageAwareRequestPrompt() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setForcedStagedReview(true);
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
@@ -69,7 +69,7 @@ public class AiPromptFactoryTest {
   @Test
   public void routedReviewAgentInstructionsAreLoadedIntoReviewPromptFields() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     new AiPromptRoutedReviewAgentRequest(
         mock(Configuration.class),
         changeSetData,
@@ -81,13 +81,13 @@ public class AiPromptFactoryTest {
     assertEquals(
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"),
         AiPromptReview.getRoutedReviewAgentInstructions(
-            ReviewAssistantStages.REVIEW_COMMIT_MESSAGE));
+            ReviewAssistantStage.REVIEW_COMMIT_MESSAGE));
   }
 
   @Test
   public void routedReviewAgentInstructionsReplaceDefaultSystemPrompt() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
-    changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_CODE);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
     changeSetData.setCommentPropertiesSize(1);
     Configuration config = mock(Configuration.class);
     when(config.getAiSystemPromptInstructions(anyString()))

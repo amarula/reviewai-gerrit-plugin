@@ -99,7 +99,7 @@ public class AiReviewMessageTest extends TestBase {
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getAiModels())
-        .thenReturn(List.of("OpenAI/gpt-4.1", "LangChain/MoonShot/moonshot-v1-8k"));
+        .thenReturn(List.of("OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"));
     when(gerritApi.changes()).thenReturn(changes);
     when(changes.id(PROJECT_NAME.get(), change.getChangeId())).thenReturn(changeApi);
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
@@ -140,13 +140,13 @@ public class AiReviewMessageTest extends TestBase {
   public void storesSelectedModelNameFromReviewAiDropdown() throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/review";
-    input.modelName = "LangChain/MoonShot/moonshot-v1-8k";
+    input.modelName = "MoonShot/moonshot-v1-8k";
 
     view.apply(changeResource, input);
 
     ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
     verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
-    assertEquals("LangChain/MoonShot/moonshot-v1-8k", captor.getValue().get("selectedAiModel"));
+    assertEquals("MoonShot/moonshot-v1-8k", captor.getValue().get("selectedAiModel"));
   }
 
   @Test
@@ -154,13 +154,13 @@ public class AiReviewMessageTest extends TestBase {
   public void storesNonDefaultSelectedModelIdAlias() throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/review";
-    input.modelId = "LangChain/MoonShot/moonshot-v1-8k";
+    input.modelId = "MoonShot/moonshot-v1-8k";
 
     view.apply(changeResource, input);
 
     ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
     verify(pluginDataHandler).setJsonValue(eq(KEY_DYNAMIC_CONFIG), captor.capture());
-    assertEquals("LangChain/MoonShot/moonshot-v1-8k", captor.getValue().get("selectedAiModel"));
+    assertEquals("MoonShot/moonshot-v1-8k", captor.getValue().get("selectedAiModel"));
   }
 
   @Test
@@ -299,7 +299,7 @@ public class AiReviewMessageTest extends TestBase {
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(
             KEY_DYNAMIC_CONFIG,
-            Map.of("selectedAiModel", "LangChain/MoonShot/moonshot-v1-8k"));
+            Map.of("selectedAiModel", "MoonShot/moonshot-v1-8k"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/review";
     input.reviewAgent = true;
@@ -309,7 +309,7 @@ public class AiReviewMessageTest extends TestBase {
     assertEquals(true, output.ok);
     assertTrue(output.waitForAssistantReply);
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
-    assertTrue(output.responseText.contains("LangChain/MoonShot/moonshot-v1-8k"));
+    assertTrue(output.responseText.contains("MoonShot/moonshot-v1-8k"));
     verify(revisionApi).review(any());
   }
 

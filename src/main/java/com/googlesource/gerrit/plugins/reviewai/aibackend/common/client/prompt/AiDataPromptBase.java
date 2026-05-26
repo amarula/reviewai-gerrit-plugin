@@ -19,7 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.InlineCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
@@ -98,8 +97,6 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
   }
 
   protected boolean shouldUseNonAiConversationHistory() {
-    return config != null
-        && config.getAiProviderTransport() == AiProviderTransport.LANGCHAIN
-        && config.getAiProviderType() == AiProviderType.OPENAI;
+    return config != null && config.getAiProviderType() == AiProviderType.OPENAI;
   }
 }

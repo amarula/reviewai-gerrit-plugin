@@ -17,7 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.model.OpenAiModelCompatibility;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ModelCompatibility;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
@@ -55,7 +55,7 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
             .config(config)
             .baseUrl(baseUrl)
             .modelName(modelName)
-            .temperature(OpenAiModelCompatibility.supportsTemperature(modelName) ? temperature : null)
+            .temperature(ModelCompatibility.supportsTemperature(modelName) ? temperature : null)
             .conversationId(conversationId)
             .instructions(instructions)
             .build();

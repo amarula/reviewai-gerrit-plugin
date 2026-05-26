@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.prompt.AiPromptBase.DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT;
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase.DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT;
 
 @Slf4j
 public class CodeContextPolicyNone extends CodeContextPolicyBase implements ICodeContextPolicy {

@@ -31,8 +31,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiConversation;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.openai.client.api.openai.OpenAiReviewClient.ReviewAssistantStages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
 
@@ -239,7 +239,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
 
   private void commandForceReview() {
     changeSetData.setForcedReview(true);
-    changeSetData.setHideOpenAiReview(false);
+    changeSetData.setHideAiReview(false);
     changeSetData.setReviewSystemMessage(null);
     log.info("Forced review command applied to the entire Change Set");
     applyReviewScopeOption();
@@ -265,12 +265,12 @@ public class ClientCommandExecutor extends ClientCommandBase {
       case FULL -> log.info("Forced review command scoped to the full Change Set");
       case PATCHSET -> {
         changeSetData.setForcedStagedReview(true);
-        changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_CODE);
+        changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
         log.info("Forced review command scoped to the PatchSet");
       }
       case COMMIT_MESSAGE -> {
         changeSetData.setForcedStagedReview(true);
-        changeSetData.setReviewAssistantStage(ReviewAssistantStages.REVIEW_COMMIT_MESSAGE);
+        changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
         log.info("Forced review command scoped to the commit message");
       }
     }

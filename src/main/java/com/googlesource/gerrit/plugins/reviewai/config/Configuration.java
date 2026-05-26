@@ -20,7 +20,6 @@ import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderTransport;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 import java.util.ArrayList;
@@ -217,10 +216,6 @@ public class Configuration extends ConfigCore {
 
   public AiProviderType getAiProviderType() {
     return aiProviderConfiguration.getAiProviderType();
-  }
-
-  public AiProviderTransport getAiProviderTransport() {
-    return aiProviderConfiguration.getAiProviderTransport();
   }
 
   // The default system prompt/instructions are specified in the prompt files and are passed as a

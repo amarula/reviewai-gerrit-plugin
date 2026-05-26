@@ -160,7 +160,7 @@ public class ClientCommandParser extends ClientCommandBase {
       return false;
     }
     Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
-    changeSetData.setHideOpenAiReview(true);
+    changeSetData.setHideAiReview(true);
     while (commandMatcher.find()) {
       log.debug("Parsing command: {} - Parsing args: {}", commandMatcher.group(1), commandMatcher.group(2));
       CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
@@ -177,7 +177,7 @@ public class ClientCommandParser extends ClientCommandBase {
       }
     }
     if (!changeSetData.getForcedReview()) {
-      changeSetData.setHideOpenAiReview(false);
+      changeSetData.setHideAiReview(false);
     }
     return commandFound;
   }
