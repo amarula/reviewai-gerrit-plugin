@@ -2,41 +2,45 @@
 
 ## Features
 
-This plugin allows you to use AI for code review in Gerrit conveniently. After submitting a Patch Set, AI will provide
-review feedback in the form of comments and, optionally, a vote.
-You can continue to ask AI by @{gerritUserName} or @{gerritEmailAddress} (provided that `gerritEmailAddress` is in the
-form "gerritUserName@<any_email_domain>") in the comments to further guide it in generating more targeted review
-comments.
-Reviews can be also triggered by directing a comment with the `/review` command to AI, and `/help` or `/help <command>`
-shows command reference directly in Gerrit.
+This plugin adds ReviewAI support to Gerrit through the Review Agent sidebar, giving users a standard chatbot interface
+inside the Gerrit change page. From the sidebar, users can ask questions about the Change, select the AI model, and keep
+conversation history tied to the review.
+
+ReviewAI can also review Patch Sets automatically, posting feedback as Gerrit comments and, optionally, a vote. Users
+can continue the discussion in Gerrit comments by mentioning @{gerritUserName} or @{gerritEmailAddress} (provided that
+`gerritEmailAddress` is in the form "gerritUserName@<any_email_domain>"), trigger reviews with `/review`, and view
+command help with `/help` or `/help <command>`.
 
 ## Getting Started
 
-1. **Build:** Requires JDK 11 or higher, Maven 3.0 or higher.
+1. **Build:** This version requires JDK 21 and Maven. The Maven build installs the configured Node.js version and runs
+   the frontend lint step.
 
    ```bash
    mvn -U clean package
     ```
 
-   If the user needs to disable test just run
+   To build without running tests:
    ```bash
    mvn -U -DskipTests=true clean package
    ```
 
 2. **Install:** Upload the compiled jar file to the `$gerrit_site/plugins` directory.
 
-3. **Configure:** First, you need to create an AI user in Gerrit.
-   Then, set up the basic parameters in your `$gerrit_site/etc/gerrit.config` file under the section
+3. **Configure:** First, create an AI user in Gerrit. Then set the basic parameters in
+   `$gerrit_site/etc/gerrit.config` under the section
 
    `[plugin "reviewai-gerrit-plugin"]`:
 
-- `aiProviders`: AI provider routes exposed to the Review Agent AI.
-- `aiModels`: AI model routes exposed to the Review Agent AI.
-- `aiTokens`: AI provider token routes.
-- `gerritUserName`: Gerrit username of AI user.
+    - `gerritUserName`: Gerrit username of AI user.
+    - `aiTokens`: AI provider token routes for token-backed providers such as OpenAI, Gemini, and MoonShot.
 
-  For enhanced security, consider storing sensitive information like aiTokens in a secure location or file.
-  Detailed instructions on how to do this will be provided later in this document.
+   `aiProviders` and `aiModels` are optional. If they are omitted, the plugin exposes the default OpenAI model routes.
+   Configure them when you want to expose specific provider/model routes or use providers such as Gemini, MoonShot, or
+   Ollama.
+
+   For enhanced security, consider storing sensitive information like `aiTokens` in a secure location or file.
+   Detailed instructions on how to do this will be provided later in this document.
 
 4. **Verify:** After restarting Gerrit, you can see the following information in Gerrit's logs:
 
@@ -80,15 +84,14 @@ as follows:
 ```
 [plugin "reviewai-gerrit-plugin"]
     # Required parameters
-    aiProviders = OpenAI
-    aiModels = OpenAI/gpt-5.4
+    gerritUserName = {gerritUserName}
     aiTokens = OpenAI/{openAiToken}
     ...
 
     # Optional parameters
     aiProviders = OpenAI
     aiProviders = MoonShot
-    aiModels = OpenAI/gpt-4.1
+    aiModels = OpenAI/gpt-5.2
     aiModels = MoonShot/moonshot-v1-8k
     aiModelsDefaultIndex = 1
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
@@ -97,8 +100,8 @@ as follows:
 
 #### Secure Configuration
 
-It is highly recommended to store sensitive information such as `aiTokens` in the `secure.config` file. Please edit the
-file at $gerrit_site/etc/`secure.config` and include the following details:
+It is highly recommended to store sensitive information such as `aiTokens` in the `secure.config` file. Please edit
+`$gerrit_site/etc/secure.config` and include the following details:
 
 ```
 [plugin "reviewai-gerrit-plugin"]
@@ -115,10 +118,6 @@ To add the following content, please edit the `project.config` file in `refs/met
 
 ```
 [plugin "reviewai-gerrit-plugin"]
-    # Required parameters
-    gerritUserName = {gerritUserName}
-    ...
-
     # Optional parameters
     aiProviders = {providerRoute}
     aiModels = {providerModelRoute}
@@ -133,8 +132,8 @@ Please ensure **strict control over the access permissions of `refs/meta/config`
 
 ## AI Provider Routes
 
-The plugin supports multiple AI providers. The Review Agent AI exposes each configured provider/model combination using
-`/` syntax. All configured providers use LangChain internally.
+The plugin supports multiple AI providers through LangChain. The Review Agent exposes each configured provider/model
+combination using `/` syntax.
 
 Supported providers are:
 
@@ -143,7 +142,9 @@ Supported providers are:
 - Gemini
 - Ollama
 
-Model and token settings are grouped by the provider part of the route:
+Model and token settings are grouped by the provider part of the route. If a provider is configured without explicit
+models, the plugin exposes the built-in defaults for that provider. The current default route set for OpenAI is
+`OpenAI/gpt-5.4`, `OpenAI/gpt-5.5`, `OpenAI/gpt-5.2`, and `OpenAI/gpt-4.1`, with the first model selected by default.
 
 ```
 [plugin "reviewai-gerrit-plugin"]
@@ -161,11 +162,11 @@ Model and token settings are grouped by the provider part of the route:
     aiTokens = MoonShot/{moonShotToken}
 ```
 
-With this configuration, the Review Agent AI exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`, `MoonShot/moonshot-v1-8k`, and
+With this configuration, the Review Agent exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`, `MoonShot/moonshot-v1-8k`, and
 `Ollama/llama3.2`.
-Ollama does not require an `aiTokens` entry. A bare model can also be configured as
-`aiModels = llama3.2`; when no configured provider token identifies the model route, the plugin guesses
-`Ollama/llama3.2`.
+Ollama does not require an `aiTokens` entry. A bare model can also be configured as `aiModels = llama3.2`. When no
+configured token-backed provider identifies the bare model route, the plugin guesses `Ollama/llama3.2`. If a bare model
+matches a configured or default model for a token-backed provider that has a token, that provider route is used.
 
 ## Optional Parameters
 
@@ -190,9 +191,10 @@ Ollama does not require an `aiTokens` entry. A bare model can also be configured
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
   setting of 0.2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more
-  focused and deterministic.
-- `aiCommentTemperature`: Specifies the temperature setting for AI when replying to a comment, with a default
-  setting of 1.0.
+  focused and deterministic. Some model families do not support temperature; for those models, the plugin omits the
+  temperature parameter.
+- `aiCommentTemperature`: Specifies the temperature setting for AI when replying to a comment, with a default setting of
+  1.0.
 - `aiReviewPatchSet`: Set to true by default. When switched to false, it disables the automatic review of Patch Sets as
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
@@ -258,11 +260,13 @@ directive = End each reply with \"Hope this helps!\"
 - `maxReviewLines`: The default value is 1000. This sets a limit on the number of lines of code included in the review.
 - `patchContextLines`: The default value is 3. This sets how many unchanged context lines are included around each
   changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.
-- `codeContextPolicy`: Defines the code context policy to provide AI with the missing code context from the ChangeSet.
+- `codeContextPolicy`: Defines the code context policy used when AI needs repository context outside the formatted
+  patch. The default value is `NONE`.
   The currently supported policies are:
     - **ON_DEMAND**: Lets the model request repository context during review through tool calls for listing the file
       tree, searching references, and reading file content.
-    - **NONE**: Skips file uploads entirely, relying solely on the formatted patch for reviews and interactions with AI.
+    - **NONE**: Does not expose repository context tools. Reviews and interactions rely on the formatted patch and
+      Gerrit discussion history only.
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
   This applies when ON_DEMAND code context tools are enabled and defaults to 3.
 
@@ -275,9 +279,11 @@ directive = End each reply with \"Hope this helps!\"
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
 
-### Optional Parameters Specific to Provider Routes
+### Optional Parameters Specific to LangChain Provider Routes
 
-- `aiMaxMemoryTokens`: Maximum number of tokens retained in memory per Change. The default value is 16K.
+- `aiMaxMemoryTokens`: Maximum number of tokens retained in LangChain memory per Change, Patch Set, and review scope.
+  The default value is 16K. OpenAI uses durable Responses API conversations plus transient local memory; Gemini,
+  MoonShot, and Ollama use the plugin's local LangChain memory store.
 
 ### Optional Parameters Specific to Ollama
 
@@ -286,60 +292,39 @@ directive = End each reply with \"Hope this helps!\"
 - `ollamaResponseLength`: Sets Ollama `num_predict`, the maximum generated response length. The default value is `-1`.
 - `ollamaThink`: Sets Ollama `think`, enabling thinking mode for supported models. The default value is `false`.
 
-### Advanced Connection Parameters for OpenAI
+### Advanced Connection Parameters
 
-These parameters are specific to connecting with the OpenAI server and should only be modified by advanced users:
+These parameters should only be modified by advanced users:
 
 - `aiConnectionTimeout`: Defines the timeout for connections to the OpenAI server, with a default of 30 seconds.
 - `aiConnectionMaxRetryAttempts`: Determines the maximum number of retry attempts, defaulting to 2.
-- `aiUploadedChunkSizeMb`: When uploading project repositories to OpenAI, the repositories are packaged and split into
-  chunk files. This setting specifies the maximum size of each chunk file, with a default of 5 MB.
+- `aiUploadedChunkSizeMb`: Sets the maximum size, in MB, of repository-content chunks built by the plugin when it needs
+  to serialize repository files. The default value is 5 MB.
 
 ## Commands
 
+Commands can be sent directly from the Review Agent sidebar. The sidebar already addresses messages to AI, so command
+examples in this section do not include a @{gerritUserName} prefix.
+
 ### Help
 
-Use `/help` in a comment directed at the AI user to display a summary of all supported commands and their main
-options directly in Gerrit. Use `/help <command>` or `/help /<command>` to show detailed help for a single command.
+Use `/help` to display a summary of all supported commands and their main options. Use `/help <command>` or
+`/help /<command>` to show detailed help for a single command.
 
 Example:
 
 ```
-@gpt /help
+/help
 ```
 
 ```
-@gpt /help /review
+/help /review
 ```
 
-### Message
+### Plain Messages
 
-To send messages to AI, simply mention the AI user in plain English within the message. However, if the message includes
-a string that begins with a slash followed by letters, it might be mistaken for a command and result in an "Unknown
-command" error. To avoid this, use the `/message` command to ensure the text is processed as a direct message to AI,
-rather than as a command.
-
-#### Command Example
-
-For example, sending
-
-```
-@gpt is it OK to use "and/or"?
-```
-
-might trigger the following system response
-
-```
-SYSTEM MESSAGE: Unknown command in comment `@gpt is it OK to use "and/or"?`
-```
-
-due to the interpretation of `/or` as a command. However, using
-
-```
-@gpt /message is it OK to use "and/or"?
-```
-
-ensures the message is correctly forwarded to AI.
+To ask AI a question, type the message directly in the Review Agent sidebar. The sidebar handles plain chat messages
+automatically by sending them as direct messages.
 
 ### Review Commands
 
@@ -348,8 +333,8 @@ this section.
 
 #### Basic Syntax
 
-- `/review`: when used in a comment directed at AI on any Change Set, triggers a review of the full Change Set. A vote
-  is cast on the Change Set if the voting feature is enabled and the AI Gerrit user is authorized to vote on it.
+- `/review`: triggers a review of the full Change Set. A vote is cast on the Change Set if the voting feature is
+  enabled and the AI Gerrit user is authorized to vote on it.
 
 #### Command Options
 
@@ -365,8 +350,8 @@ this section.
 
 ### Dynamic Configuration
 
-You can now dynamically alter the plugin configuration via messages sent to the AI user, primarily for testing and
-debugging purposes. This feature becomes available when the `enableMessageDebugging` configuration setting is enabled.
+You can dynamically alter the plugin configuration for the current Change Set, primarily for testing and debugging
+purposes. This feature becomes available when the `enableMessageDebugging` configuration setting is enabled.
 
 #### Basic Syntax
 
@@ -430,8 +415,9 @@ The index in the response to `/directives` query can be used to remove single dy
 ### Forgetting Conversation History
 
 For the OpenAI Responses backend, the plugin stores the OpenAI conversation ID for each Change Set so that forced or
-reiterated reviews continue on the same durable conversation object. This history can be removed with the
-`/forget_thread` command.
+reiterated reviews continue on the same durable conversation object. For the other LangChain providers, the plugin
+stores chat memory locally by Change, Patch Set, and review scope. This history can be removed with the `/forget_thread`
+command.
 This functionality is crucial for preventing AI from merely recycling old responses, particularly following
 modifications to configuration parameters.
 
@@ -451,8 +437,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 - `local_data`: Shows locally stored data
 - `config`: Shows the current configuration
 
-For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a
-single review mode.
+For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
 
 **NOTE**: This command is available when the `enableMessageDebugging` configuration setting is enabled.
 
@@ -461,7 +446,7 @@ single review mode.
 The `/show` command also enables you to view the prompts and assistant instructions used with your current
 configuration.
 
-For example, running `@gpt /show --prompts` will return something like:
+For example, running `/show --prompts` will return something like:
 
 ```
 PROMPT FOR FULL REVIEW
@@ -478,10 +463,9 @@ PROMPT FOR COMMIT MESSAGE ONLY
 Review the following Commit Message:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: ... <PATCH_SET> ` ` `
 ```
 
-Running `@gpt /show --prompts --scope=patchset` will return only the `PROMPT FOR PATCH SET ONLY`
-block.
+Running `/show --prompts --scope=patchset` will return only the `PROMPT FOR PATCH SET ONLY` block.
 
-Similarly, running `@gpt /show --instructions` will display something like:
+Similarly, running `/show --instructions` will display something like:
 
 ```
 INSTRUCTIONS FOR FULL REVIEW
@@ -511,8 +495,7 @@ INSTRUCTIONS FOR COMMIT MESSAGE ONLY
 ...
 ```
 
-Running `@gpt /show --instructions --scope=commit_message` will return only the
-`INSTRUCTIONS FOR COMMIT MESSAGE ONLY` block.
+Running `/show --instructions --scope=commit_message` will return only the `INSTRUCTIONS FOR COMMIT MESSAGE ONLY` block.
 
 #### Showing Locally Stored Data
 
@@ -534,9 +517,9 @@ originalLogLevel: INFO
 
 ### Change Scope
 conversationId: conv_XXXXXXXXXXXXXXXXXXXX
+conversationId.review_code: conv_YYYYYYYYYYYYYYYYYYYY
 dynamicConfig:
-    aiModels:
-        OpenAI/gpt-5.4
+    selectedAiModel: OpenAI/gpt-5.4
     enabledVoting: true
 ```
 
@@ -554,17 +537,29 @@ Example of the response:
 CONFIGURATION SETTINGS
 
 aiCommentTemperature: 1.0
+aiConnectionMaxRetryAttempts: 2
+aiConnectionTimeout: 180
 aiDomain: https://api.openai.com
 aiFullFileReview: true
-aiModels:
-    OpenAI/gpt-4-turbo
+aiMaxMemoryTokens: 16384
+aiMaxToolResponseRounds: 3
+aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.5, OpenAI/gpt-5.2, OpenAI/gpt-4.1, Gemini/gemini-3.1-pro, ...]
 aiModelsDefaultIndex: 1
+aiPollingInterval: 1000
+aiPollingTimeout: 180
 aiProviders:
     OpenAI
+    Gemini
+    MoonShot
+    Ollama
+aiRelevanceRules:
 aiReviewCommitMessages: true
 aiReviewPatchSet: true
-aiReviewTemperature: 0.2
-aiStreamOutput: false
+aiReviewTemperature: 0.01
+aiSystemPromptInstructions: Act as a PatchSet Reviewer
+aiUploadedChunkSizeMb: 5
+codeContextOnDemandBasePath:
+codeContextPolicy: NONE
 convertNeutralReviewScoreToPositive: true
 directive:
     First directive
@@ -586,9 +581,13 @@ gerritUserName: gpt
 ignoreOutdatedInlineComments: false
 ignoreResolvedAiComments: true
 inlineCommentsAsResolved: false
-maxReviewFileSize: 20000
 maxReviewLines: 1000
+mockAiAddress:
 multiAgentMode: false
+ollamaContextWindow: 16384
+ollamaDomain: http://localhost:11434
+ollamaResponseLength: -1
+ollamaThink: true
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
@@ -596,12 +595,18 @@ votingMaxScore: 1
 votingMinScore: -1
 ```
 
+### Traditional Gerrit Comments
+
+The same messages and commands can also be sent through regular Gerrit comments instead of the Review Agent sidebar. In
+that mode, the message must still be addressed to the AI user, for example `@gpt /review`, where `gpt` is the configured
+`gerritUserName`.
+
 ## Testing
 
 ### Overview
 
 - You can run the unit tests in the project to familiarize yourself with the plugin's source code.
-- If you want to individually test the Gerrit API or the OpenAI API, you can refer to the test cases in
+- If you want to individually test the Gerrit API or AI provider integrations, you can refer to the test cases in
   CodeReviewPluginIT.
 
 ### Log Level Override
@@ -638,28 +643,27 @@ such as all DEBUG messages in classes containing `EventHandler`:
 $ export GERRIT_AI_TEST_FILTER_VALUE=EventHandler
 ```
 
-For example, to filter DEBUG messages containing the OpenAI request and response bodies, the pipe ("|") prefix must be
-used:
+For example, to filter DEBUG messages containing the OpenAI Responses request log, the pipe ("|") prefix must be used:
 
 ```
-$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI request body, |OpenAI response body"
+$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI Responses LangChain request"
 ```
 
 For multiple items with spaces, enclose the settings string in double quotes and escape any internal double quotes:
 
 ```
-$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI request body, ChatGptRun|OpenAI Retrieve Run"
+$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI Responses LangChain request, LangChainExecutor"
 ```
 
-This setting shows the DEBUG log messages containing the string "OpenAI request body" and the ones in `OpenAiRun`
-containing "OpenAI Retrieve Run".
+This setting shows the DEBUG log messages whose message starts with "OpenAI Responses LangChain request" and the ones
+from classes containing `LangChainExecutor`.
 
 ## Debugging
 
 In addition to standard testing tools, we provide additional resources to assist with live debugging of the AI
 plugin when running on a Gerrit instance. These tools can be managed through both static configurations (such as
 modifying `gerrit.config` and `project.config`) and dynamic configurations (using the `/configure` command in a message
-addressed to OpenAI).
+addressed to the AI user).
 
 ### Enabling Message Debugging Tools
 
@@ -678,7 +682,7 @@ Once `enableMessageDebugging` is enabled, you can obtain additional useful debug
 relevance and scores, by using the `--debug` command option. For example:
 
 ```
-@gpt /review --debug
+/review --debug
 ```
 
 ### Selective Log Level Override
@@ -700,7 +704,7 @@ This effect can also be achieved for actions performed on a specific Change Set 
 configuration:
 
 ```
-@gpt /configure --selectiveLogLevelOverride="[ClientMessage, ClientCommandExecutor]"
+/configure --selectiveLogLevelOverride="[ClientMessage, ClientCommandExecutor]"
 ```
 
 The `selectiveLogLevelOverride` dynamic option uses the following general syntax:
@@ -716,11 +720,10 @@ Each item's filter may consist of a `className` and a `message` filter, separate
 the "contain" criterion for `className` and the "startsWith" criterion for `message`, multiple items with a common
 substring can be selected by setting that substring.
 
-For example, all DEBUG messages in classes whose log messages start with the OpenAI request and response bodies can be
-elevated with:
+For example, all DEBUG messages whose log messages start with the OpenAI Responses request log can be elevated with:
 
 ```
-@gpt /configure --selectiveLogLevelOverride="[\"|OpenAI request body\", \"|OpenAI response body\"]"
+/configure --selectiveLogLevelOverride="[\"|OpenAI Responses LangChain request\"]"
 ```
 
 ### Dynamically Changing Settings for Testing/Debugging
@@ -729,19 +732,19 @@ Settings can be locally modified for the current Change Set using the `/configur
 review temperature to "1.0," you can use:
 
 ```
-@gpt /configure --aiReviewTemperature=1.0
+/configure --aiReviewTemperature=1.0
 ```
 
 Following this configuration, a new Change Set review can be initiated with:
 
 ```
-@gpt /review
+/review
 ```
 
 It's also possible to make multiple changes at once:
 
 ```
-@gpt /configure --aiProviders=["OpenAI"] --aiModels=["OpenAI/gpt-4-turbo"] --aiModelsDefaultIndex=1
+/configure --multiAgentMode=true --codeContextPolicy=ON_DEMAND
 ```
 
 ## License
