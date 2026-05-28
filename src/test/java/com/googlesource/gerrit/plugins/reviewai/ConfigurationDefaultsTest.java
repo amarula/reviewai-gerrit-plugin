@@ -64,6 +64,34 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldUseProjectAiProvidersInsteadOfMergingWithGlobal() throws Exception {
+    Configuration configuration =
+        createConfiguration(
+            pluginConfigFromResource(
+                "src/test/resources/__files/config/globalMultipleAiProviders.config"),
+            pluginConfigFromResource(
+                "src/test/resources/__files/config/projectOpenAiProvider.config"));
+
+    assertEquals(List.of("OpenAI"), configuration.getAiProviders());
+    assertEquals(
+        "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL,
+        configuration.getAiModels().getLast());
+  }
+
+  @Test
+  public void shouldUseProjectAiModelsInsteadOfMergingWithGlobal() throws Exception {
+    Configuration configuration =
+        createConfiguration(
+            pluginConfigFromResource(
+                "src/test/resources/__files/config/globalOpenAiModels.config"),
+            pluginConfigFromResource(
+                "src/test/resources/__files/config/projectOpenAiModel.config"));
+
+    assertEquals(List.of("OpenAI"), configuration.getAiProviders());
+    assertEquals(List.of("OpenAI/gpt-4.1"), configuration.getAiModels());
+  }
+
+  @Test
   public void shouldSelectFirstAiModelsEntryWhenDefaultIndexIsUnset() {
     Configuration configuration =
         createConfiguration(
@@ -376,10 +404,13 @@ public class ConfigurationDefaultsTest {
   }
 
   private Configuration createConfigurationFromResource(String resourcePath) throws Exception {
+    return createConfiguration(pluginConfigFromResource(resourcePath), emptyPluginConfig());
+  }
+
+  private PluginConfig pluginConfigFromResource(String resourcePath) throws Exception {
     Config cfg = new Config();
     cfg.fromText(Files.readString(Path.of(resourcePath), StandardCharsets.UTF_8));
-    return createConfiguration(
-        PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+    return PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg);
   }
 
   private Configuration createConfiguration(PluginConfig globalConfig, PluginConfig projectConfig) {

@@ -94,8 +94,10 @@ final class AiProviderConfiguration {
   }
 
   List<String> getAiProviders() {
-    List<String> configuredProviders = config.splitListIntoItems(KEY_AI_PROVIDER, List.of());
-    List<String> configuredModels = config.splitListIntoItems(KEY_AI_MODELS, List.of());
+    List<String> configuredProviders =
+        config.splitListIntoItemsWithProjectOverride(KEY_AI_PROVIDER, List.of());
+    List<String> configuredModels =
+        config.splitListIntoItemsWithProjectOverride(KEY_AI_MODELS, List.of());
     List<String> providers =
         configuredProviders.isEmpty() && !hasProviderRouteModel(configuredModels)
             ? DEFAULT_AI_PROVIDER
@@ -119,7 +121,8 @@ final class AiProviderConfiguration {
   }
 
   List<String> getAiModels() {
-    List<String> configuredModels = config.splitListIntoItems(KEY_AI_MODELS, List.of());
+    List<String> configuredModels =
+        config.splitListIntoItemsWithProjectOverride(KEY_AI_MODELS, List.of());
     List<AiProviderRoute> providerRoutes = getAiProviderRoutes();
     ConfiguredAiModels modelMap = getAiModelMap(configuredModels, providerRoutes);
     List<String> resolvedModels =

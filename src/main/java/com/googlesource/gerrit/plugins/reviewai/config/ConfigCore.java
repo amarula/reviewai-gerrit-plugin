@@ -207,14 +207,30 @@ public abstract class ConfigCore {
 
   protected List<String> splitListIntoItems(String key, List<String> defaultValue) {
     log.debug("Retrieving and splitting Global and Project configuration items for key {}", key);
+    return splitListIntoItems(key, defaultValue, configScopes.values().stream().toList());
+  }
+
+  protected List<String> splitListIntoItemsWithProjectOverride(
+      String key, List<String> defaultValue) {
+    log.debug(
+        "Retrieving and splitting Project or Global configuration items for key {}", key);
+    List<PluginConfig> scopes =
+        projectConfig.getString(key) == null
+            ? List.of(globalConfig)
+            : List.of(projectConfig);
+    return splitListIntoItems(key, defaultValue, scopes);
+  }
+
+  private List<String> splitListIntoItems(
+      String key, List<String> defaultValue, List<PluginConfig> scopes) {
     List<String> items = new ArrayList<>();
-    for (Map.Entry<String, PluginConfig> configScope : configScopes.entrySet()) {
-      List<String> scopeItems = arrayToList(configScope.getValue().getStringList(key));
+    for (PluginConfig configScope : scopes) {
+      List<String> scopeItems = arrayToList(configScope.getStringList(key));
       items.addAll(scopeItems);
-      log.debug("{} configuration split items retrieved: {}", configScope.getKey(), scopeItems);
+      log.debug("Configuration split items retrieved: {}", scopeItems);
     }
 
-    log.debug("Global and Project configuration split items: {}", items);
+    log.debug("Configuration split items: {}", items);
     if (items.isEmpty()) {
       return defaultValue;
     }
