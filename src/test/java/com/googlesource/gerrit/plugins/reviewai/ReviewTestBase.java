@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
@@ -53,6 +54,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
+import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
@@ -142,7 +144,6 @@ public class ReviewTestBase extends TestBase {
   protected PatchSetReviewer patchSetReviewer;
   protected ConfigCreator mockConfigCreator;
   protected JsonObject aiRequestBody;
-  protected String promptTagComments;
   protected Localizer localizer;
   protected boolean includeEventAccountId = true;
   protected Integer eventAccountId = GERRIT_USER_ACCOUNT_ID;
@@ -320,7 +321,7 @@ public class ReviewTestBase extends TestBase {
                 new AbstractModule() {
                   @Override
                   protected void configure() {
-                    install(new TestGerritEventContextModule(config, event));
+                    install(new GerritEventContextModule(config, event));
 
                     bind(GerritClient.class).toInstance(gerritClient);
                     bind(ConfigCreator.class).toInstance(mockConfigCreator);
@@ -331,6 +332,10 @@ public class ReviewTestBase extends TestBase {
                     bind(IdentifiedUser.GenericFactory.class).toInstance(identifiedUserFactory);
                     bind(AccountCache.class).toInstance(accountCacheMock);
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
+                    bind(Path.class)
+                        .annotatedWith(PluginData.class)
+                        .toInstance(
+                            Paths.get(System.getProperty("pluginDataPath", "test-plugin-data")));
                   }
                 })
             .getInstance(EventHandlerTask.class);
@@ -363,10 +368,8 @@ public class ReviewTestBase extends TestBase {
                 changeSetData,
                 new GerritClientComments(
                     config,
-                    accountCacheMock,
                     changeSetData,
                     getCodeContextPolicy(),
-                    gitRepoFiles,
                     gerritClientPatchSet,
                     pluginDataHandlerProvider,
                     localizer),
@@ -377,8 +380,7 @@ public class ReviewTestBase extends TestBase {
             config,
             changeSetData,
             Providers.of(
-                new GerritClientReview(
-                    config, accountCacheMock, pluginDataHandlerProvider, localizer)),
+                new GerritClientReview(config, pluginDataHandlerProvider, localizer)),
             getOpenAIClient(),
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore));
@@ -449,18 +451,6 @@ public class ReviewTestBase extends TestBase {
     event.change = this::createChangeAttribute;
   }
 
-  private AccountCache mockAccountCache() {
-    AccountCache accountCache = mock(AccountCache.class);
-    Account account = Account.builder(Account.id(AI_USER_ACCOUNT_ID), Instant.now()).build();
-    AccountState accountState = AccountState.forAccount(account, Collections.emptyList());
-    lenient()
-        .doReturn(Optional.of(accountState))
-        .when(accountCache)
-        .getByUsername(GERRIT_AI_USERNAME);
-
-    return accountCache;
-  }
-
   private IAiClient getOpenAIClient() {
     return config.getMultiAgentMode()
         ? new LangChainMultiAgentReviewClient(
@@ -475,6 +465,6 @@ public class ReviewTestBase extends TestBase {
   }
 
   private IGerritClientPatchSet getGerritClientPatchSet() {
-    return new GerritClientPatchSetReviewAi(config, accountCacheMock);
+    return new GerritClientPatchSetReviewAi(config);
   }
 }

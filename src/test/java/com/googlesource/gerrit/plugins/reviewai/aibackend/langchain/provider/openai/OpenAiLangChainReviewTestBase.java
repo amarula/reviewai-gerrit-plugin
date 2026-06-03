@@ -28,9 +28,6 @@ import com.google.gson.JsonObject;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.ReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiUriResourceLocator;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.model.OpenAiResponsesResponse;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
@@ -41,12 +38,10 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.io.ByteArrayInputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -55,7 +50,6 @@ import static org.mockito.Mockito.when;
 @Slf4j
 public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
   protected static final String OPENAI_CONVERSATION_ID = "conv_TEST_CONVERSATION_ID";
-  protected static final String OPENAI_RESPONSE_ID = "resp_TEST_RESPONSE_ID";
   protected static final String RESOURCE_OPENAI_PATH = "__files/openai/";
 
   protected String formattedPatchContent;
@@ -122,7 +116,6 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
 
   protected void initComparisonContent() {
     super.initComparisonContent();
-    promptTagComments = readTestFile(RESOURCE_OPENAI_PATH + "openAiPromptTagRequests.json");
   }
 
   protected ArgumentCaptor<ReviewInput> testRequestSent() throws RestApiException {
@@ -142,52 +135,6 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
       requestContent = requestBody;
     }
     return reviewInputCaptor;
-  }
-
-  protected String getReviewMessage(String responseFile, int toolCallId) {
-    OpenAiResponsesResponse responseContent =
-        jsonToClass(readTestFile(responseFile), OpenAiResponsesResponse.class);
-    List<String> responseTexts = new ArrayList<>();
-    if (responseContent.getOutputText() != null && !responseContent.getOutputText().isEmpty()) {
-      responseTexts.add(responseContent.getOutputText());
-    } else if (responseContent.getOutput() != null) {
-      for (OpenAiResponsesResponse.OutputItem outputItem : responseContent.getOutput()) {
-        if (outputItem.getArguments() != null) {
-          responseTexts.add(outputItem.getArguments());
-          continue;
-        }
-        if (outputItem.getContent() == null) {
-          continue;
-        }
-        for (OpenAiResponsesResponse.OutputItem.Content content : outputItem.getContent()) {
-          if (content.getText() != null) {
-            responseTexts.add(content.getText());
-          }
-        }
-      }
-    }
-
-    AiResponseContent mergedResponse = new AiResponseContent("");
-    List<com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem>
-        replies = new ArrayList<>();
-    for (String responseText : responseTexts) {
-      AiResponseContent parsedResponse =
-          jsonToClass(unwrapJsonCode(responseText), AiResponseContent.class);
-      if (parsedResponse.getReplies() != null) {
-        replies.addAll(parsedResponse.getReplies());
-      }
-    }
-    mergedResponse.setReplies(replies);
-    return mergedResponse.getReplies().get(toolCallId).getReply();
-  }
-
-  protected List<ReviewInput.CommentInput> getCapturedComments(
-      ArgumentCaptor<ReviewInput> captor, String filename) {
-    return captor.getAllValues().get(0).comments.get(filename);
-  }
-
-  protected String getCapturedMessage(ArgumentCaptor<ReviewInput> captor, String filename) {
-    return getCapturedComments(captor, filename).get(0).message;
   }
 
   protected void setupMockRequestCreateResponseFromBody(
@@ -229,44 +176,13 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
     return getGson().toJson(response);
   }
 
-  protected void setupMockRequestCreateConversation(int statusCode) {
-    WireMock.stubFor(
-        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.conversationsUri()))
-            .willReturn(
-                WireMock.aResponse()
-                    .withStatus(statusCode)
-                    .withHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.toString())));
-  }
-
   protected void setupMockRequestCreateResponse(String bodyFile, String fromState, String toState) {
     setupMockRequestCreateResponseFromBody(
         readTestFile(RESOURCE_OPENAI_PATH + bodyFile), fromState, toState);
   }
 
-  protected void setupMockRequestCreateResponse(String bodyFile, String fromState) {
-    setupMockRequestCreateResponse(bodyFile, fromState, null);
-  }
-
   protected void setupMockRequestCreateResponse(String bodyFile) {
     setupMockRequestCreateResponse(bodyFile, null, null);
-  }
-
-  protected void setupMockRequestRetrieveResponseFromBody(String body, String responseId) {
-    WireMock.stubFor(
-        WireMock.get(WireMock.urlEqualTo(OpenAiUriResourceLocator.responseRetrieveUri(responseId)))
-            .willReturn(
-                WireMock.aResponse()
-                    .withStatus(HTTP_OK)
-                    .withHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.toString())
-                    .withBody(body)));
-  }
-
-  protected void setupMockRequestRetrieveResponse(String bodyFile, String responseId) {
-    setupMockRequestRetrieveResponseFromBody(readTestFile(RESOURCE_OPENAI_PATH + bodyFile), responseId);
-  }
-
-  protected void setupMockRequestRetrieveResponse(String bodyFile) {
-    setupMockRequestRetrieveResponse(bodyFile, OPENAI_RESPONSE_ID);
   }
 
   protected MappingBuilder getScenarioMapping(
@@ -302,9 +218,5 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
       throw new IllegalStateException("Request JSON array not found in input: " + inputContent);
     }
     return readContentToType(inputContent.substring(promptItemsStart), JsonArray.class);
-  }
-
-  protected JsonObject getUserPromptItem(int index) {
-    return getUserPromptItems().get(index).getAsJsonObject();
   }
 }

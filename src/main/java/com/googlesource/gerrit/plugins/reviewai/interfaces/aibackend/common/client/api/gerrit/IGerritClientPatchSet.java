@@ -32,8 +32,6 @@ public interface IGerritClientPatchSet {
 
   void retrieveRevisionBase(GerritChange change);
 
-  Integer getNotNullAccountId(String authorUsername);
-
   HashMap<String, FileDiffProcessed> getFileDiffsProcessed();
 
   List<String> getPatchSetFiles();

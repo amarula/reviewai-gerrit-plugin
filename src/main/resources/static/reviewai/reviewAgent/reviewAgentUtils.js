@@ -60,26 +60,6 @@
       .map(item => item.entry);
   }
 
-  function orderAssistantEntriesWithinTurns(entries) {
-    const orderedEntries = [];
-    let assistantEntries = [];
-    const flushAssistantEntries = () => {
-      orderedEntries.push(...orderAgentEntries(assistantEntries));
-      assistantEntries = [];
-    };
-
-    entries.forEach(entry => {
-      if (isAssistantEntry(entry)) {
-        assistantEntries.push(entry);
-        return;
-      }
-      flushAssistantEntries();
-      orderedEntries.push(entry);
-    });
-    flushAssistantEntries();
-    return orderedEntries;
-  }
-
   function isCommandPrompt(prompt) {
     return /^\s*\/\w+\b/.test(prompt || '');
   }
@@ -104,11 +84,6 @@
           : `${responseEntrySeparator}${header}`;
       })
       .replace(/(\n\n---\n\n)(?:---\n\n)+/g, responseEntrySeparator);
-  }
-
-  function parseTimestampMillis(value) {
-    const timestamp = reviewAi.entries.parseTimestamp(value);
-    return timestamp ? timestamp.getTime() : Date.now();
   }
 
   function formatAgentEntry(entry, options) {
@@ -200,10 +175,6 @@
     return hash >>> 0;
   }
 
-  function isSameConversationId(left, right) {
-    return String(left || '').toLowerCase() === String(right || '').toLowerCase();
-  }
-
   function toDisplayName(value) {
     const knownNames = {
       openai: 'OpenAI',
@@ -274,18 +245,15 @@
     entryKey,
     isAssistantEntry,
     isDynamicConfigurationEntry,
-    orderAssistantEntriesWithinTurns,
     isCommandPrompt,
     isDirectResponsePrompt,
     joinAgentResponses,
     normalizeResponseEntrySeparators,
-    parseTimestampMillis,
     formatAgentEntry,
     formatAgentEntries,
     buildClientData,
     getConversationTitle,
     stableUuid,
-    isSameConversationId,
     toProviderDisplayName,
     emptyModelsResponse,
     emptyActionsResponse,

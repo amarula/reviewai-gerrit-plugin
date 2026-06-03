@@ -25,7 +25,6 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import lombok.extern.slf4j.Slf4j;
 
@@ -84,47 +83,6 @@ public class ClientCommandParser extends ClientCommandBase {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        gitRepoFiles,
-        pluginDataHandlerProvider,
-        localizer,
-        null);
-  }
-
-  public ClientCommandParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        gitRepoFiles,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        null);
-  }
-
-  public ClientCommandParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
@@ -138,7 +96,6 @@ public class ClientCommandParser extends ClientCommandBase {
             changeSetData,
             change,
             codeContextPolicy,
-            gitRepoFiles,
             pluginDataHandlerProvider,
             localizer,
             IPatchSetProvider,

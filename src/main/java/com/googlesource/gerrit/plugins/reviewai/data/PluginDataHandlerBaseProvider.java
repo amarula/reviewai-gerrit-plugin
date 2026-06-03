@@ -46,10 +46,6 @@ public class PluginDataHandlerBaseProvider implements Provider<PluginDataHandler
         defaultPluginDataPath);
   }
 
-  public PluginDataHandlerBaseProvider(Path defaultPluginDataPath) {
-    this(defaultPluginDataPath, null);
-  }
-
   public PluginDataHandler get(String path) {
     Path dataFile = defaultPluginDataPath.resolve(path + PATH_SUFFIX);
     return handlers.computeIfAbsent(

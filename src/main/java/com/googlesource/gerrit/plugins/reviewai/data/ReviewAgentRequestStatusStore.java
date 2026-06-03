@@ -147,8 +147,6 @@ public class ReviewAgentRequestStatusStore {
     public String previousRequestId;
     public long updatedMillis;
 
-    public RequestStatus() {}
-
     public RequestStatus(String requestId, String status, String prompt, String responseText) {
       this.requestId = requestId;
       this.status = status;

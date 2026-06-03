@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.reflect.TypeToken;
 import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
@@ -35,7 +34,6 @@ import com.openai.models.responses.ResponseStatus;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.ResponseUsage;
 import com.openai.models.responses.ToolChoiceOptions;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiSdkClientFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -71,7 +69,6 @@ public class OpenAiResponsesChatModel implements ChatModel {
   private static final boolean STRICT_TOOL_SCHEMA = false;
 
   private final Configuration config;
-  private final String baseUrl;
   private final String modelName;
   private final Double temperature;
   private final String conversationId;
@@ -82,7 +79,6 @@ public class OpenAiResponsesChatModel implements ChatModel {
 
   private OpenAiResponsesChatModel(Builder builder) {
     this.config = builder.config;
-    this.baseUrl = builder.baseUrl;
     this.modelName = builder.modelName;
     this.temperature = builder.temperature;
     this.conversationId = builder.conversationId;
@@ -131,11 +127,6 @@ public class OpenAiResponsesChatModel implements ChatModel {
   @Override
   public ModelProvider provider() {
     return ModelProvider.OPEN_AI;
-  }
-
-  @VisibleForTesting
-  String getRequestBody() {
-    return requestBody;
   }
 
   private ResponseCreateParams createRequest(ChatRequest chatRequest) {
@@ -401,7 +392,6 @@ public class OpenAiResponsesChatModel implements ChatModel {
 
   public static class Builder {
     private Configuration config;
-    private String baseUrl;
     private String modelName;
     private Double temperature;
     private String conversationId;
@@ -409,11 +399,6 @@ public class OpenAiResponsesChatModel implements ChatModel {
 
     public Builder config(Configuration config) {
       this.config = config;
-      return this;
-    }
-
-    public Builder baseUrl(String baseUrl) {
-      this.baseUrl = baseUrl;
       return this;
     }
 

@@ -16,12 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructions;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,12 +60,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     loadDefaultPrompts("promptsAi");
     this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_REVIEW;
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
-  }
-
-  public String getDefaultAiAssistantDescription() {
-    String description = String.format(DEFAULT_AI_ASSISTANT_DESCRIPTION, change.getProjectName());
-    log.debug("Generated AI Assistant Description: {}", description);
-    return description;
   }
 
   public abstract void addAiAssistantInstructions(List<String> instructions);

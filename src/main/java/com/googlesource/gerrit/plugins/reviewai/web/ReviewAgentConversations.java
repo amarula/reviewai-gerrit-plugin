@@ -31,7 +31,6 @@ import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversatio
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -300,13 +299,11 @@ public class ReviewAgentConversations
   public static class Output {
     public final List<ReviewAgentConversationInfo> conversations;
     public final ReviewAgentConversationInfo conversation;
-    public final boolean ok;
 
     private Output(
         List<ReviewAgentConversationInfo> conversations, ReviewAgentConversationInfo conversation) {
       this.conversations = conversations;
       this.conversation = conversation;
-      this.ok = true;
     }
 
     public static Output list(List<ReviewAgentConversationInfo> conversations) {

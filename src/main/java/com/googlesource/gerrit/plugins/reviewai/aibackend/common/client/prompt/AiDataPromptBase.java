@@ -37,7 +37,6 @@ import java.util.List;
 
 @Slf4j
 public abstract class AiDataPromptBase implements IAiDataPrompt {
-  protected final GerritClientData gerritClientData;
   protected final Configuration config;
   protected final HashMap<String, FileDiffProcessed> fileDiffsProcessed;
   protected final CommentData commentData;
@@ -52,7 +51,6 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
       GerritClientData gerritClientData,
       Localizer localizer) {
     this.config = config;
-    this.gerritClientData = gerritClientData;
     fileDiffsProcessed = gerritClientData.getGerritClientPatchSet().getFileDiffsProcessed();
     commentData = gerritClientData.getCommentData();
     aiMessageHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);

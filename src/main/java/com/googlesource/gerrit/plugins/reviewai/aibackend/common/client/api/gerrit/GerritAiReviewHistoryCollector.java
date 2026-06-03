@@ -178,7 +178,7 @@ public class GerritAiReviewHistoryCollector {
     }
     String cleanedMessage = cleaner.getMessage();
     if (preservedAssistantMessage) {
-      cleanedMessage = cleanPreservedAssistantMessage(cleanedMessage, localizer);
+      cleanedMessage = cleanPreservedAssistantMessage(cleanedMessage);
     } else {
       cleaner.removeHeadings();
       cleanedMessage = cleaner.getMessage().trim();
@@ -255,7 +255,7 @@ public class GerritAiReviewHistoryCollector {
     return PATCH_SET_PREFIX_PATTERN.matcher(message).replaceFirst("");
   }
 
-  private String cleanPreservedAssistantMessage(String message, Localizer localizer) {
+  private String cleanPreservedAssistantMessage(String message) {
     return stripPatchSetHeading(message).trim();
   }
 

@@ -21,12 +21,9 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptParameters;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.*;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -46,7 +43,7 @@ public class AiPromptFactory {
       log.info("AiPromptFactory: Return AiPromptRequests");
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
-      AiPromptParameters aiPromptParameters = new AiPromptParameters(config, false);
+      AiPromptParameters aiPromptParameters = new AiPromptParameters(config);
       if (aiPromptParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
         return switch (changeSetData.getReviewAssistantStage()) {
           case REVIEW_CODE -> {
@@ -69,16 +66,6 @@ public class AiPromptFactory {
         return new AiPromptReview(config, changeSetData, change, codeContextPolicy);
       }
     }
-  }
-
-  public static IAiPrompt getAiPrompt(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      ReviewAssistantStage reviewAssistantStage) {
-    changeSetData.setReviewAssistantStage(reviewAssistantStage);
-    return getAiPrompt(config, changeSetData, change, codeContextPolicy);
   }
 
   public static IAiDataPrompt getAiDataPrompt(

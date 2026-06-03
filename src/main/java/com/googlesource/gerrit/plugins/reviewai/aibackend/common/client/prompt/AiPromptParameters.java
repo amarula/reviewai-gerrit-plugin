@@ -22,30 +22,12 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptParameters extends ClientBase {
-  private final boolean isCommentEvent;
 
-  public AiPromptParameters(Configuration config, boolean isCommentEvent) {
+  public AiPromptParameters(Configuration config) {
     super(config);
-    this.isCommentEvent = isCommentEvent;
-    log.debug("AiPromptParameters initialized with isCommentEvent: {}", isCommentEvent);
-  }
-
-  public double getAiTemperature() {
-    log.debug("Getting AI temperature");
-    if (isCommentEvent) {
-      return retrieveTemperature(
-          Configuration.KEY_AI_COMMENT_TEMPERATURE, Configuration.DEFAULT_AI_COMMENT_TEMPERATURE);
-    } else {
-      return retrieveTemperature(
-          Configuration.KEY_AI_REVIEW_TEMPERATURE, Configuration.DEFAULT_AI_REVIEW_TEMPERATURE);
-    }
   }
 
   public boolean isMultiAgentModeEnabled() {
     return config.getAiReviewCommitMessages() && config.getMultiAgentMode();
-  }
-
-  private Double retrieveTemperature(String temperatureKey, Double defaultTemperature) {
-    return Double.parseDouble(config.getString(temperatureKey, String.valueOf(defaultTemperature)));
   }
 }

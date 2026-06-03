@@ -23,7 +23,6 @@ import java.util.Optional;
 import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.DiffInfo;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
@@ -46,15 +45,15 @@ public class GerritClientPatchSet extends GerritClientAccount {
 
   private boolean isCommitMessage;
 
-  public GerritClientPatchSet(Configuration config, AccountCache accountCache) {
-    super(config, accountCache);
+  public GerritClientPatchSet(Configuration config) {
+    super(config);
     diffs = new ArrayList<>();
     log.debug("Initialized GerritClientPatchSet.");
   }
 
   public void retrieveRevisionBase(GerritChange change) {
     log.debug("Retrieving revision base for change: {}", change.getFullChangeId());
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeInfo changeInfo =
           config
               .getGerritApi()
@@ -83,7 +82,7 @@ public class GerritClientPatchSet extends GerritClientAccount {
   protected void retrieveFileDiff(GerritChange change, int revisionBase) throws Exception {
     List<String> enabledFileExtensions = config.getEnabledFileExtensions();
     log.debug("Retrieving file diff for change: {}", change.getFullChangeId());
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       for (String filename : patchSetFiles) {
         isCommitMessage = filename.equals("/COMMIT_MSG");
         if (!isCommitMessage && !matchesExtensionList(filename, enabledFileExtensions)) {

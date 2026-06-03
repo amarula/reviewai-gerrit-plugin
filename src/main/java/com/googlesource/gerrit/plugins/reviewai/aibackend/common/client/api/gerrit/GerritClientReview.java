@@ -24,7 +24,6 @@ import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewInput.CommentInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -59,10 +58,9 @@ public class GerritClientReview extends GerritClientAccount {
   @Inject
   public GerritClientReview(
       Configuration config,
-      AccountCache accountCache,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
-    super(config, accountCache);
+    super(config);
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
     debugCodeBlocksDynamicConfiguration = new DebugCodeBlocksDynamicConfiguration(localizer);
@@ -83,7 +81,7 @@ public class GerritClientReview extends GerritClientAccount {
       log.debug("No comments, messages, or labels to post for review.");
       return;
     }
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       ReviewResult result =
           config
               .getGerritApi()

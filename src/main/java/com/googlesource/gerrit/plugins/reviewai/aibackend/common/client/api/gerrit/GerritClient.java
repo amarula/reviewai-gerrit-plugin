@@ -56,10 +56,6 @@ public class GerritClient {
     return gerritClientFacade.isWorkInProgress(change);
   }
 
-  public Integer getNotNullAccountId(String authorUsername) {
-    return gerritClientFacade.getNotNullAccountId(authorUsername);
-  }
-
   public boolean retrieveLastComments(GerritChange change) {
     return gerritClientFacade.retrieveLastComments(change);
   }

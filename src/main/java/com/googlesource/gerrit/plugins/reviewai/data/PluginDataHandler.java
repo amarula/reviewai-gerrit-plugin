@@ -27,9 +27,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
@@ -121,11 +119,6 @@ public class PluginDataHandler {
     }
   }
 
-  public <T> List<T> getJsonArrayValue(String key, Class<T> clazz) {
-    Type typeOfArray = TypeToken.getParameterized(List.class, clazz).getType();
-    return getJsonValue(key, typeOfArray);
-  }
-
   public <T> Map<String, T> getJsonObjectValue(String key, Class<T> clazz) {
     Type typeOfMap = TypeToken.getParameterized(Map.class, String.class, clazz).getType();
     return getJsonValue(key, typeOfMap);
@@ -167,23 +160,6 @@ public class PluginDataHandler {
     }
   }
 
-  public synchronized <T> void appendJsonValue(String key, T value, Class<T> clazz) {
-    log.debug("Updating JSON value for key: {}", key);
-    synchronized (fileLock) {
-      Type typeOfArray = TypeToken.getParameterized(List.class, clazz).getType();
-      String jsonValue = getValue(key);
-      List<T> jsonProperty =
-          jsonValue == null || jsonValue.isEmpty()
-              ? null
-              : getGson().fromJson(jsonValue, typeOfArray);
-      if (jsonProperty == null) {
-        jsonProperty = new ArrayList<>();
-      }
-      jsonProperty.add(value);
-      setValue(key, getGson().toJson(jsonProperty));
-    }
-  }
-
   public synchronized void removeValue(String key) {
     log.debug("Removing value for key: {}", key);
     synchronized (fileLock) {
@@ -200,26 +176,6 @@ public class PluginDataHandler {
       } catch (SQLException e) {
         log.error("Failed to remove plugin data value for key {}", key, e);
         throw new RuntimeException(e);
-      }
-    }
-  }
-
-  public synchronized void destroy() {
-    log.debug("Destroying configuration file at: {}", configFile);
-    synchronized (fileLock) {
-      try (Connection c = db.getConnection();
-          PreparedStatement ps =
-              c.prepareStatement(
-                  """
-                  DELETE FROM plugin_data
-                  WHERE scope = ?
-                  """)) {
-        ps.setString(1, scope);
-        ps.executeUpdate();
-        Files.deleteIfExists(configFile);
-      } catch (IOException | SQLException e) {
-        log.error("Failed to delete the config file: " + configFile, e);
-        throw new RuntimeException("Failed to delete the config file: " + configFile, e);
       }
     }
   }

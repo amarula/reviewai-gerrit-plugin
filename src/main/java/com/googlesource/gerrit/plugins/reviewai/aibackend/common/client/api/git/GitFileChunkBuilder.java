@@ -37,7 +37,7 @@ public class GitFileChunkBuilder {
     maxChunkSize = 1024 * 1024 * (long) config.getAiUploadedChunkSizeMb();
   }
 
-  public void addFiles(String path, List<FileEntry> fileEntries) {
+  public void addFiles(List<FileEntry> fileEntries) {
     // Start a new chunk if adding the entire directory would exceed maxChunkSize
     long dirSize = fileEntries.stream().mapToLong(FileEntry::getSize).sum();
     if (currentChunkSize + dirSize > maxChunkSize) {

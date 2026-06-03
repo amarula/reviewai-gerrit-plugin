@@ -61,30 +61,6 @@ public class GerritClientPatchSetHelper {
     return result;
   }
 
-  public static String filterCommitMessage(String formattedPatch) {
-    // Extract commit message from formatted patch
-    Pattern CONFIG_ID_HEADING_PATTERN =
-        Pattern.compile(
-            GERRIT_COMMIT_MESSAGE_PATTERN
-                + "(.*?)"
-                + COMMIT_MESSAGE_FILTER_OUT_PREFIXES.get("CHANGE_ID"),
-            Pattern.DOTALL);
-    Matcher commitMessageMatcher = CONFIG_ID_HEADING_PATTERN.matcher(formattedPatch);
-    if (commitMessageMatcher.find()) {
-      String commitMessage = commitMessageMatcher.group(1).trim();
-      log.debug("Commit message extracted: {}", commitMessage);
-      return commitMessage;
-    } else if (!formattedPatch.contains("diff --git")
-        && !formattedPatch.contains(COMMIT_MESSAGE_FILTER_OUT_PREFIXES.get("CHANGE_ID"))) {
-      String commitMessage = formattedPatch.trim();
-      log.debug("Patch set already contains only the commit message: {}", commitMessage);
-      return commitMessage;
-    } else {
-      log.error("Commit message not found in patch set: {}", formattedPatch);
-      throw new RuntimeException("Commit message not found in patch set: " + formattedPatch);
-    }
-  }
-
   public static List<String> extractFilesFromPatch(String formattedPatch) {
     Matcher extractFilenameMatcher = EXTRACT_B_FILENAMES_FROM_PATCH_SET.matcher(formattedPatch);
     List<String> files = new ArrayList<>();

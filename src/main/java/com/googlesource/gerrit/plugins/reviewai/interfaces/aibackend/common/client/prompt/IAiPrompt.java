@@ -21,8 +21,6 @@ import java.util.List;
 public interface IAiPrompt {
   void addAiAssistantInstructions(List<String> instructions);
 
-  String getDefaultAiAssistantDescription();
-
   String getDefaultAiAssistantInstructions();
 
   String getDefaultAiThreadReviewMessage(String patchSet);
