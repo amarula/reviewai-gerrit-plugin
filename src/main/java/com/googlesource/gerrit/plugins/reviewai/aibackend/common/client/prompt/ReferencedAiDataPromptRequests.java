@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptRequests;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;

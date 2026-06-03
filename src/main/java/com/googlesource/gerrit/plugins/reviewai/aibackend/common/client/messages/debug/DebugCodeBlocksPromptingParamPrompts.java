@@ -55,7 +55,6 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
     this.reviewScope = reviewScope;
   }
 
-  @Override
   public String getDebugCodeBlock() {
     return getScopedDebugCodeBlock(reviewScope, SCOPED_PARAMETERS);
   }

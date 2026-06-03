@@ -36,7 +36,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.json.OutputFormat;
 import org.junit.Before;
 import org.junit.Test;
@@ -75,7 +74,6 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private AiReviewPermission aiReviewPermission;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
-  @Mock private AccountCache accountCache;
   @Mock private GitRepositoryManager repositoryManager;
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
@@ -117,7 +115,6 @@ public class AiReviewMessageTest extends TestBase {
             gerritApi,
             aiReviewPermission,
             pluginDataHandlerBaseProvider,
-            accountCache,
             repositoryManager,
             mockPluginDataPath,
             null,

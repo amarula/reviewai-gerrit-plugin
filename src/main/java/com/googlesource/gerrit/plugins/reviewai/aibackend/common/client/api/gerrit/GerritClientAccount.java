@@ -16,21 +16,15 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import com.google.gerrit.server.account.AccountCache;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
 
 @Slf4j
 public class GerritClientAccount extends GerritClientBase {
-  private final AccountCache accountCache;
-
-  public GerritClientAccount(Configuration config, AccountCache accountCache) {
+  public GerritClientAccount(Configuration config) {
     super(config);
-    this.accountCache = accountCache;
     log.debug("GerritClientAccount initialized.");
   }
 
@@ -49,28 +43,5 @@ public class GerritClientAccount extends GerritClientBase {
             || !topic.isEmpty() && disabledTopicFilter.stream().anyMatch(topic::contains);
     log.debug("Checking if topic '{}' is disabled: {}", topic, isDisabled);
     return isDisabled;
-  }
-
-  protected Optional<Integer> getAccountId(String authorUsername) {
-    try {
-      Optional<Integer> accountId =
-          accountCache
-              .getByUsername(authorUsername)
-              .map(accountState -> accountState.account().id().get());
-      log.debug("Retrieved account ID for username '{}': {}", authorUsername, accountId);
-      return accountId;
-    } catch (Exception e) {
-      log.error("Could not find account ID for username '{}'", authorUsername);
-      return Optional.empty();
-    }
-  }
-
-  public Integer getNotNullAccountId(String authorUsername) {
-    log.debug("Getting not null account ID for username '{}'", authorUsername);
-    return getAccountId(authorUsername)
-        .orElseThrow(
-            () ->
-                new NoSuchElementException(
-                    String.format("Error retrieving '%s' account ID in Gerrit", authorUsername)));
   }
 }

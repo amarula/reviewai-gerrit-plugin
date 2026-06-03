@@ -26,7 +26,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 import java.io.File;
@@ -58,19 +57,6 @@ public class GitRepoFiles {
           .collect(Collectors.toList());
     } catch (IOException | GitAPIException e) {
       throw new RuntimeException("Failed to retrieve files from change branch: ", e);
-    }
-  }
-
-  public List<FileEntry> getDirFiles(Configuration config, GerritChange change, String path) {
-    log.debug("Getting files from selected directory");
-    enabledFileExtensions = config.getEnabledFileExtensions();
-    try (Repository repository = openRepository(change)) {
-      Map<String, List<FileEntry>> dirFilesMap =
-          getDirFilesMap(repository, PathFilter.create(path));
-      log.debug("Retrieved file directories: {}", dirFilesMap.keySet());
-      return dirFilesMap.get(path);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to retrieve files in path " + path, e);
     }
   }
 
@@ -146,7 +132,7 @@ public class GitRepoFiles {
       String dirPath = entry.getKey();
       log.debug("File from dirFilesMap processed: {}", dirPath);
       List<FileEntry> fileEntries = entry.getValue();
-      gitFileChunkBuilder.addFiles(dirPath, fileEntries);
+      gitFileChunkBuilder.addFiles(fileEntries);
     }
 
     return gitFileChunkBuilder.getChunks();

@@ -29,11 +29,6 @@ public class TimeUtils {
     return updatedDateTime.toInstant(DEFAULT_ZONE_OFFSET).getEpochSecond();
   }
 
-  public static String now() {
-    LocalDateTime now = LocalDateTime.now(DEFAULT_ZONE_OFFSET);
-    return getFormatter().format(now);
-  }
-
   public static long getCurrentMillis() {
     return System.currentTimeMillis();
   }

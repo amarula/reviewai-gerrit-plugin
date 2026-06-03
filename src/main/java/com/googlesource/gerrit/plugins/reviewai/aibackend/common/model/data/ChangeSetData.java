@@ -56,10 +56,6 @@ public class ChangeSetData {
     parsedCommandOptions.clear();
   }
 
-  public void addParsedCommand(String command) {
-    addParsedCommand(command, Map.of());
-  }
-
   public void addParsedCommand(String command, Map<String, String> options) {
     parsedCommands.add(command);
     parsedCommandOptions.put(command, new HashMap<>(options));

@@ -21,22 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 import java.util.Locale;
 
 @Slf4j
 public class HashUtils {
-
-  public static String hashData(List<String> dataItems) {
-    StringBuilder concatenatedData = new StringBuilder();
-    for (String item : dataItems) {
-      concatenatedData.append(item);
-    }
-    log.debug("Concatenated data for hashing: {}", concatenatedData);
-    String hash = sha1(concatenatedData.toString());
-    log.debug("Computed SHA-1 hash: {}", hash);
-    return hash;
-  }
 
   public static String stableUuid(String value) {
     String input = String.valueOf(value).toLowerCase(Locale.ROOT);

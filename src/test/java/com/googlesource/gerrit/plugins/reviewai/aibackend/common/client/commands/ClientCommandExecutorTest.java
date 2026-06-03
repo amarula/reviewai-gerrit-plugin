@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -62,7 +61,6 @@ public class ClientCommandExecutorTest {
             changeSetData,
             change,
             null,
-            new GitRepoFiles(),
             pluginDataHandlerProvider,
             localizer,
             null,

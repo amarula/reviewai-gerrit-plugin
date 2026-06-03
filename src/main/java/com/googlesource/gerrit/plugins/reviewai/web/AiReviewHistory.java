@@ -76,7 +76,7 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     Localizer localizer = new Localizer(config);
     String projectName = GerritChange.getProjectName(change.getProject());
 
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeApi changeApi = config.getGerritApi().changes().id(projectName, change.getChangeId());
       Map<String, List<CommentInfo>> comments = changeApi.commentsRequest().get();
       ChangeInfo changeInfo = changeApi.get();

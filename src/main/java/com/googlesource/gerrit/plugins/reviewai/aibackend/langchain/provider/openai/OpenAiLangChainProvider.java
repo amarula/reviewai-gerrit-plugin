@@ -53,7 +53,6 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
     var model =
         OpenAiResponsesChatModel.builder()
             .config(config)
-            .baseUrl(baseUrl)
             .modelName(modelName)
             .temperature(ModelCompatibility.supportsTemperature(modelName) ? temperature : null)
             .conversationId(conversationId)

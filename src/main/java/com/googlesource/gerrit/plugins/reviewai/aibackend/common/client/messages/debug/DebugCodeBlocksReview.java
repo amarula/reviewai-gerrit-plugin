@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksComposer;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 

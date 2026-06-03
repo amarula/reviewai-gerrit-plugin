@@ -47,10 +47,6 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
     this(new LangChainChatMemoryRepository(db));
   }
 
-  public PluginChatMemoryStore(Path pluginDataDir) throws SQLException, IOException {
-    this(new ReviewAiDb(pluginDataDir));
-  }
-
   public PluginChatMemoryStore(String jdbcUrl) throws SQLException, IOException {
     this(new ReviewAiDb(Path.of("."), jdbcUrl));
   }

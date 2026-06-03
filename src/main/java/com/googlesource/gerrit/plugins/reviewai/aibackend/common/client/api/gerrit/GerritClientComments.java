@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.extensions.common.CommentInfo;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.util.ManualRequestContext;
@@ -35,7 +34,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,7 +52,6 @@ public class GerritClientComments extends GerritClientAccount {
 
   private final ChangeSetData changeSetData;
   private final ICodeContextPolicy codeContextPolicy;
-  private final GitRepoFiles gitRepoFiles;
   private final IGerritClientPatchSet gerritClientPatchSet;
   private final HashMap<String, GerritComment> commentMap;
   private final HashMap<String, GerritComment> patchSetCommentMap;
@@ -68,19 +65,15 @@ public class GerritClientComments extends GerritClientAccount {
   @VisibleForTesting
   public GerritClientComments(
       Configuration config,
-      AccountCache accountCache,
       ChangeSetData changeSetData,
       ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
       IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
     this(
         config,
-        accountCache,
         changeSetData,
         codeContextPolicy,
-        gitRepoFiles,
         gerritClientPatchSet,
         pluginDataHandlerProvider,
         localizer,
@@ -90,18 +83,15 @@ public class GerritClientComments extends GerritClientAccount {
   @Inject
   public GerritClientComments(
       Configuration config,
-      AccountCache accountCache,
       ChangeSetData changeSetData,
       ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
       IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore) {
-    super(config, accountCache);
+    super(config);
     this.changeSetData = changeSetData;
     this.codeContextPolicy = codeContextPolicy;
-    this.gitRepoFiles = gitRepoFiles;
     this.gerritClientPatchSet = gerritClientPatchSet;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
@@ -143,7 +133,7 @@ public class GerritClientComments extends GerritClientAccount {
   }
 
   private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       Map<String, List<CommentInfo>> comments =
           config
               .getGerritApi()
@@ -210,7 +200,6 @@ public class GerritClientComments extends GerritClientAccount {
             changeSetData,
             change,
             codeContextPolicy,
-            gitRepoFiles,
             pluginDataHandlerProvider,
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),

@@ -49,6 +49,7 @@ public class LogArgTest {
         result);
   }
 
+  // Fixture with a private field so the test exercises LogArg's reflective field rendering.
   private static class SerializableValue {
     private final String value;
 

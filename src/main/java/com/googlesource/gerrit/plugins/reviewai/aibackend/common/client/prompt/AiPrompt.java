@@ -77,12 +77,6 @@ public class AiPrompt {
     log.debug("AiPrompt initialized.");
   }
 
-  public AiPrompt(Configuration config, boolean isCommentEvent) {
-    this(config);
-    this.isCommentEvent = isCommentEvent;
-    log.debug("AiPrompt initialized with isCommentEvent: {}", isCommentEvent);
-  }
-
   public static String getReviewPromptCommitMessages() {
     log.debug("Constructing review prompt for commit messages.");
     return joinWithSpace(

@@ -16,22 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksComposer;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptParameters;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory.getAiPrompt;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER_BEGIN;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
@@ -45,8 +40,6 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
   protected final GerritChange change;
   protected final ICodeContextPolicy codeContextPolicy;
   protected final LinkedHashMap<String, String> promptingParameters = new LinkedHashMap<>();
-
-  protected IAiPrompt aIPrompt;
 
   public DebugCodeBlocksPromptingParamBase(
       Localizer localizer,
@@ -62,36 +55,7 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
     this.codeContextPolicy = codeContextPolicy;
   }
 
-  public String getDebugCodeBlock() {
-    return super.getDebugCodeBlock(getPromptingParameters());
-  }
-
-  private List<String> getPromptingParameters() {
-    populateAiPromptParameters();
-    return promptingParameters.entrySet().stream()
-        .map(e -> getAsTitle(e.getKey()) + "\n" + distanceCodeDelimiter(e.getValue()) + "\n")
-        .collect(Collectors.toList());
-  }
-
-  protected void populateAiPromptParameters() {
-    AiPromptParameters aiPromptParameters = new AiPromptParameters(config, false);
-    aIPrompt =
-        getAiPrompt(
-            config, changeSetData, change, codeContextPolicy, ReviewAssistantStage.REVIEW_CODE);
-    if (aiPromptParameters.isMultiAgentModeEnabled()) {
-      populateOpenAIMultiAgentCodeReviewParameters();
-      aIPrompt =
-          getAiPrompt(
-              config,
-              changeSetData,
-              change,
-              codeContextPolicy,
-              ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
-      populateOpenAIMultiAgentCommitMessageReviewParameters();
-    } else {
-      populateOpenAIReviewParameters();
-    }
-  }
+  protected abstract void populateAiPromptParameters();
 
   protected String getScopedDebugCodeBlock(
       ReviewScope reviewScope, List<ScopedPromptingParameter> scopedParameters) {
@@ -114,10 +78,4 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
   private boolean shouldInclude(ReviewScope requestedScope, ReviewScope scope) {
     return requestedScope == null || requestedScope == scope;
   }
-
-  protected void populateOpenAIMultiAgentCodeReviewParameters() {}
-
-  protected void populateOpenAIMultiAgentCommitMessageReviewParameters() {}
-
-  protected void populateOpenAIReviewParameters() {}
 }

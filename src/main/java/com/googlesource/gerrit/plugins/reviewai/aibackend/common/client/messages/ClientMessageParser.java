@@ -25,7 +25,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.regex.Matcher;
@@ -39,47 +38,6 @@ public class ClientMessageParser extends ClientMessageBase {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        gitRepoFiles,
-        pluginDataHandlerProvider,
-        localizer,
-        null);
-  }
-
-  public ClientMessageParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        gitRepoFiles,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        null);
-  }
-
-  public ClientMessageParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
@@ -91,7 +49,6 @@ public class ClientMessageParser extends ClientMessageBase {
             changeSetData,
             change,
             codeContextPolicy,
-            gitRepoFiles,
             pluginDataHandlerProvider,
             localizer,
             IPatchSetProvider,

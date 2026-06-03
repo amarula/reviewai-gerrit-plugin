@@ -23,10 +23,6 @@ public class OpenAiUriResourceLocator {
     return VERSION_URI + "/responses";
   }
 
-  public static String responseRetrieveUri(String responseId) {
-    return responsesUri() + "/" + responseId;
-  }
-
   public static String conversationsUri() {
     return VERSION_URI + "/conversations";
   }

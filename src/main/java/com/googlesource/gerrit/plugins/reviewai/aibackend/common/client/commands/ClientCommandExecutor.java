@@ -33,7 +33,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangC
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -47,7 +46,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private final ChangeSetData changeSetData;
   private final GerritChange change;
   private final ICodeContextPolicy codeContextPolicy;
-  private final GitRepoFiles gitRepoFiles;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
@@ -63,28 +61,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        gitRepoFiles,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        null);
-  }
-
-  public ClientCommandExecutor(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      GitRepoFiles gitRepoFiles,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
@@ -94,7 +70,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.changeSetData = changeSetData;
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
-    this.gitRepoFiles = gitRepoFiles;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
     this.IPatchSetProvider = IPatchSetProvider;

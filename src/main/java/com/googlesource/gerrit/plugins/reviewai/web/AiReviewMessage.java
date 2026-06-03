@@ -24,7 +24,6 @@ import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
@@ -60,7 +59,6 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GerritApi gerritApi,
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
-      AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath) {
     this(
@@ -68,7 +66,6 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         gerritApi,
         aiReviewPermission,
         pluginDataHandlerBaseProvider,
-        accountCache,
         repositoryManager,
         pluginDataPath,
         null,
@@ -81,7 +78,6 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GerritApi gerritApi,
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
-      AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
@@ -91,8 +87,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     reviewAgentResponseService =
-        new ReviewAgentResponseService(
-            accountCache, repositoryManager, pluginDataPath, chatMemoryStore, db);
+        new ReviewAgentResponseService(repositoryManager, pluginDataPath, chatMemoryStore, db);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 
@@ -188,10 +183,6 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
 
     @SerializedName(value = "request_id", alternate = {"requestId"})
     public final String requestId;
-
-    public Output(boolean ok) {
-      this(ok, null, true);
-    }
 
     public Output(boolean ok, String responseText) {
       this(ok, responseText, true);

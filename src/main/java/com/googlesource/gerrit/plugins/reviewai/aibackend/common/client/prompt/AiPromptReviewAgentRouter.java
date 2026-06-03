@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 public class AiPromptReviewAgentRouter extends AiPrompt {

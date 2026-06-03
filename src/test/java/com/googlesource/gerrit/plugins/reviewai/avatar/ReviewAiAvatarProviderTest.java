@@ -28,8 +28,6 @@ import com.google.gerrit.server.account.AccountState;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Optional;
 import org.junit.Test;
 

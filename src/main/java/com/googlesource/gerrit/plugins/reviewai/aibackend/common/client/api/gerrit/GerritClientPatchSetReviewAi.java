@@ -19,15 +19,12 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.common.CommitInfo;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSet;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
@@ -57,14 +54,14 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
 
   @Inject
   public GerritClientPatchSetReviewAi(
-      Configuration config, AccountCache accountCache, GitRepositoryManager repositoryManager) {
-    super(config, accountCache);
+      Configuration config, GitRepositoryManager repositoryManager) {
+    super(config);
     this.repositoryManager = repositoryManager;
   }
 
   @VisibleForTesting
-  public GerritClientPatchSetReviewAi(Configuration config, AccountCache accountCache) {
-    super(config, accountCache);
+  public GerritClientPatchSetReviewAi(Configuration config) {
+    super(config);
     this.repositoryManager = null;
   }
 
@@ -84,7 +81,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
   }
 
   private String getPatchFromGerrit() throws Exception {
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       RevisionApi currentRevision =
           config
               .getGerritApi()

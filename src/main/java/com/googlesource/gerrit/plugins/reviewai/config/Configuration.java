@@ -172,10 +172,6 @@ public class Configuration extends ConfigCore {
     return aiProviderConfiguration.getAiToken();
   }
 
-  public String getAiToken(AiProviderType provider) {
-    return aiProviderConfiguration.getAiToken(provider);
-  }
-
   public String getGerritUserName() {
     return getValidatedOrThrow(KEY_GERRIT_USERNAME);
   }
@@ -198,10 +194,6 @@ public class Configuration extends ConfigCore {
 
   public int getAiModelsDefaultIndex() {
     return aiProviderConfiguration.getAiModelsDefaultIndex();
-  }
-
-  public Map<String, String> getAiTokens() {
-    return aiProviderConfiguration.getAiTokens();
   }
 
   public AiModelRoute getSelectedAiModelRoute() {

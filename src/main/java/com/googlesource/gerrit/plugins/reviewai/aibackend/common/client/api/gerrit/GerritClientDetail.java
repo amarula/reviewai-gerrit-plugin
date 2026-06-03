@@ -121,7 +121,7 @@ public class GerritClientDetail {
   }
 
   private GerritPatchSetDetail getReviewDetail(GerritChange change) throws Exception {
-    try (ManualRequestContext requestContext = config.openRequestContext()) {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeInfo info =
           config
               .getGerritApi()

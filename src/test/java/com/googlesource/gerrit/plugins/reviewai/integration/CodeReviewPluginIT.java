@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.integration;
 
-import com.google.gerrit.server.account.AccountCache;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -51,8 +50,6 @@ public class CodeReviewPluginIT {
 
   @InjectMocks private GerritClient gerritClient;
 
-  @InjectMocks private AccountCache accountCache;
-
   @Test
   public void getPatchSet() throws Exception {
     when(config.getGerritUserName()).thenReturn("Your Gerrit username");
@@ -73,7 +70,7 @@ public class CodeReviewPluginIT {
     reviewBatches.add(new ReviewBatch("message"));
 
     GerritClientReview gerritClientReview =
-        new GerritClientReview(config, accountCache, pluginDataHandlerProvider, localizer);
+        new GerritClientReview(config, pluginDataHandlerProvider, localizer);
     gerritClientReview.setReview(new GerritChange("Your changeId"), reviewBatches, changeSetData);
   }
 }

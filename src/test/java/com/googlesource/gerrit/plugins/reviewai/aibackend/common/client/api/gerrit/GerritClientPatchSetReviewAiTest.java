@@ -24,7 +24,6 @@ import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.common.CommitInfo;
 import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -62,7 +61,6 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       "__files/openai/contextPatchModified.py";
 
   @Mock private Configuration config;
-  @Mock private AccountCache accountCache;
   @Mock private GitRepositoryManager repositoryManager;
   @Mock private GerritApi gerritApi;
   @Mock private Changes changes;
@@ -77,7 +75,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     mockGerritPatch(renameCommit);
 
     GerritClientPatchSetReviewAi client =
-        new GerritClientPatchSetReviewAi(config, accountCache, repositoryManager);
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
     String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
 
     Assert.assertTrue(patchSet.contains("diff --git a/old_name.py b/new_name.py"));
@@ -95,7 +93,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     mockGerritPatch(modifyCommit, getContextLinesPatch(), "context.py", 0);
 
     GerritClientPatchSetReviewAi client =
-        new GerritClientPatchSetReviewAi(config, accountCache, repositoryManager);
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
     String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
 
     String[] originalLines = getContextPatchOriginal().split("\\R");
@@ -123,7 +121,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     diffInfo.content = new ArrayList<>();
     when(fileApi.diff(0)).thenReturn(diffInfo);
 
-    GerritClientPatchSetReviewAi client = new GerritClientPatchSetReviewAi(config, accountCache);
+    GerritClientPatchSetReviewAi client = new GerritClientPatchSetReviewAi(config);
     String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
 
     Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));

@@ -17,10 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.entities.Account;
-import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
@@ -49,24 +47,16 @@ import java.util.Optional;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 class ReviewAgentResponseService {
-  private final AccountCache accountCache;
   private final GitRepositoryManager repositoryManager;
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewAiDb db;
 
   ReviewAgentResponseService(
-      AccountCache accountCache, GitRepositoryManager repositoryManager, Path pluginDataPath) {
-    this(accountCache, repositoryManager, pluginDataPath, null, null);
-  }
-
-  ReviewAgentResponseService(
-      AccountCache accountCache,
       GitRepositoryManager repositoryManager,
       Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db) {
-    this.accountCache = accountCache;
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
@@ -213,13 +203,12 @@ class ReviewAgentResponseService {
     PluginDataHandlerProvider pluginDataHandlerProvider =
         new PluginDataHandlerProvider(pluginDataPath, change, db);
     GerritClientPatchSetReviewAi gerritClientPatchSet =
-        new GerritClientPatchSetReviewAi(config, accountCache, repositoryManager);
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
     new ClientCommandParser(
             config,
             changeSetData,
             change,
-            getCodeContextPolicy(config, change),
-            new GitRepoFiles(),
+            getCodeContextPolicy(config),
             pluginDataHandlerProvider,
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
@@ -247,7 +236,7 @@ class ReviewAgentResponseService {
     return Optional.ofNullable(config.getUserId()).map(Account.Id::get).orElse(0);
   }
 
-  private ICodeContextPolicy getCodeContextPolicy(Configuration config, GerritChange change) {
+  private ICodeContextPolicy getCodeContextPolicy(Configuration config) {
     if (config.getCodeContextPolicy() != CodeContextPolicies.ON_DEMAND) {
       return new CodeContextPolicyNone(config);
     }

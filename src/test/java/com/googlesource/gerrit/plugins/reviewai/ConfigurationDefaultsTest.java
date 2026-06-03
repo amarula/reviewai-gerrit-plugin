@@ -424,11 +424,6 @@ public class ConfigurationDefaultsTest {
   }
 
   private PluginConfig pluginConfig(
-      String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
-    return pluginConfig(providers, models, defaultIndex, tokens, null);
-  }
-
-  private PluginConfig pluginConfig(
       String[] providers,
       String[] models,
       Integer defaultIndex,

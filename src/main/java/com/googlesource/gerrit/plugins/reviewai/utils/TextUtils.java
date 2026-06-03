@@ -110,11 +110,6 @@ public class TextUtils extends StringUtils {
     return getNumberedList(components, null, null);
   }
 
-  public static String getNumberedListString(
-      List<String> components, String prefix, String postfix) {
-    return joinWithSemicolon(getNumberedList(components, prefix, postfix));
-  }
-
   public static String prettyStringifyObject(Object object) {
     List<String> lines = new ArrayList<>();
     for (Field field : object.getClass().getDeclaredFields()) {
