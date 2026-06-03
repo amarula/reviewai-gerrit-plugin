@@ -52,21 +52,43 @@ command help with `/help` or `/help <command>`.
 
 ## Usage Examples
 
-### Auto review on Patch Set submission
+### Review Agent Sidebar
 
-In the following example, a Patch Set receives a score of "-1" indicating a recommendation.
+The Review Agent is available from the Gerrit change page sidebar. It provides quick actions for full reviews, as well
+as scoped Patch Set and Commit Message reviews.
 
-![Example of Vote](images/aireview_vote.png?raw=true)
+<kbd><img src="images/reviewai-sidebar.png?raw=true" alt="Review Agent sidebar"></kbd>
 
-**NOTE**: Voting is disabled by default. To use this feature, it needs to be activated either across all projects or on
-a per-project basis via the `enabledVoting` configuration option, as described below.
+### Model Selection
 
-### AI Score Adjustment Following User Interaction
+The sidebar also allows users to select the AI provider and model used for the review.
 
-In the example below, AI initially posits a potential unintended behavior in the code, assigning a "-1" score.
-Upon receiving clarification, it resets the score to "0".
+<kbd><img src="images/reviewai-sidebar-model_dropdown.png?raw=true" alt="ReviewAI model selection"></kbd>
 
-![Example of Dialogue](images/aireview_changed_mind.png?raw=true)
+### Auto Review on Patch Set Submission
+
+When a Patch Set is submitted, ReviewAI can automatically review the change and publish findings. In this example, the
+review produces a `Code-Review -1` recommendation.
+
+<kbd><img src="images/reviewai-sidebar-review.png?raw=true" alt="ReviewAI Patch Set review"></kbd>
+
+**NOTE**: Voting is disabled by default. To use this feature, activate it globally or per project through the
+`enabledVoting` configuration option, as described below.
+
+### Follow-up Interaction
+
+Users can continue the conversation with ReviewAI from the sidebar. In this example, the user asks for a full commit
+message based on the previous review, and ReviewAI replies in the same conversation.
+
+<kbd><img src="images/reviewai-sidebar-message_reply.png?raw=true" alt="ReviewAI follow-up message"></kbd>
+
+### Review Comments in the Gerrit Change Log
+
+ReviewAI comments are published directly in Gerrit, including patch-set-level feedback and inline comments on the
+affected files. As a foundation feature, this keeps review feedback and further AI interactions available in the Gerrit
+change log.
+
+<kbd><img src="images/reviewai-gerrit_change_log-review.png?raw=true" alt="ReviewAI comments in Gerrit change log"></kbd>
 
 More examples of AI's code reviews and inline discussions are available at
 https://wiki.amarulasolutions.com/opensource/products/chatgpt-gerrit.html
