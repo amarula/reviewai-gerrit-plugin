@@ -154,9 +154,21 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @Override
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    if (changeSetData.getSuggestMode()) {
+      return getSuggestClient().ask(changeSetData, change, patchSet);
+    }
+    return askReview(changeSetData, change, patchSet);
+  }
+
+  protected AiResponseContent askReview(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     ReviewRequestResult reviewRequestResult = askSingleRequest(changeSetData, change, patchSet);
     requestBody = reviewRequestResult == null ? null : reviewRequestResult.getRequestBody();
     return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
+  }
+
+  protected LangChainSuggestClient getSuggestClient() {
+    return new LangChainSuggestClient(this);
   }
 
   @VisibleForTesting

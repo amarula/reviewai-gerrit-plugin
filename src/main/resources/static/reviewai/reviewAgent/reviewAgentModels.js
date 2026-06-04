@@ -70,6 +70,13 @@
           initial_user_prompt: '/review --scope=commit_message',
         },
         {
+          id: 'suggest',
+          display_text: 'Post Gerrit suggested edits',
+          hover_text: 'Run /suggest',
+          enable_send_without_input: true,
+          initial_user_prompt: '/suggest',
+        },
+        {
           id: 'reviewai-help',
           display_text: 'Show ReviewAI help',
           hover_text: 'Run /help to list ReviewAI commands',

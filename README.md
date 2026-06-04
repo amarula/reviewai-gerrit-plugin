@@ -370,6 +370,22 @@ this section.
   **NOTE**: The usage of `--debug` option is disabled by default. To enable it, `enableMessageDebugging` setting must be
   set to true.
 
+### Suggest Command
+
+The `/suggest` command reviews the selected scope and posts one or more native Gerrit suggested edits for each negative
+review reply.
+
+#### Basic Syntax
+
+* `/suggest`: reviews both Patch Set code changes and the commit message, then posts native Gerrit suggested edits for
+  the negative review replies when suggestions are available.
+
+#### Command Options
+
+* `--scope=[patchset/commit_message]`: Limits the suggestion scope. `patchset` suggests fixes only for Patch Set code
+  changes, and `commit_message` suggests fixes only for the commit message. If omitted, suggestions are generated for
+  both.
+
 ### Dynamic Configuration
 
 You can dynamically alter the plugin configuration for the current Change Set, primarily for testing and debugging
