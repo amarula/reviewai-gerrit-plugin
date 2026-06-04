@@ -1,0 +1,18 @@
+Subject: Fix BLE test setup
+---
+
+diff --git a/app/src/androidTest/kotlin/com/example/testapp/BleTest.kt b/app/src/androidTest/kotlin/com/example/testapp/BleTest.kt
+index c1f6d6e..8040f90 100644
+--- a/app/src/androidTest/kotlin/com/example/testapp/BleTest.kt
++++ b/app/src/androidTest/kotlin/com/example/testapp/BleTest.kt
+@@ -26,8 +26,8 @@ class SampleBleTestChunk : SampleBleConnectivityListener {
+         appContext = InstrumentationRegistry.getInstrumentation().targetContext
+         bleAdapter =
+             (appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+-        bleManager = SampleBleManager(bleAdapter)
+-        bleManager.registerBleConnectivityListener(this)
++        bleManager = SampleBleManager(bleAdapter, appContext)
++        bleManager.registerBleConnectivityListener(this, appContext)
+         bleManager.scanDevice()
+         connectedLatch.await(defaultTimeoutSeconds, TimeUnit.SECONDS)
+     }
