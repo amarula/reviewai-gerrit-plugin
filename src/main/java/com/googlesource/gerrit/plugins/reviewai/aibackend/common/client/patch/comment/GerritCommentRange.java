@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -44,8 +45,8 @@ public class GerritCommentRange {
     log.debug("Retrieving Gerrit comment range for reply item: {}", replyItem);
     Optional<GerritCodeRange> gerritCommentRange = Optional.empty();
     String filename = replyItem.getFilename();
-    if (filename == null || filename.equals("/COMMIT_MSG")) {
-      log.debug("Filename is null or COMMIT_MSG, skipping code range extraction.");
+    if (filename == null) {
+      log.debug("Filename is null, skipping code range extraction.");
       return gerritCommentRange;
     }
     if (replyItem.getCodeSnippet() == null) {
@@ -60,6 +61,9 @@ public class GerritCommentRange {
           fileDiffsProcessed);
       return gerritCommentRange;
     }
+    if (filename.equals("/COMMIT_MSG")) {
+      return getCommitMessageRange(fileDiffsProcessed.get(filename));
+    }
     InlineCode inlineCode = new InlineCode(fileDiffsProcessed.get(filename));
     gerritCommentRange = inlineCode.findCommentRange(replyItem);
     if (gerritCommentRange.isEmpty()) {
@@ -68,5 +72,20 @@ public class GerritCommentRange {
       log.debug("Found inline code range: {}", gerritCommentRange.get());
     }
     return gerritCommentRange;
+  }
+
+  private Optional<GerritCodeRange> getCommitMessageRange(FileDiffProcessed commitMessageDiff) {
+    List<String> content = commitMessageDiff.getNewContent();
+    if (content == null || content.size() <= 1) {
+      return Optional.empty();
+    }
+    int endLine = content.size() - 1;
+    return Optional.of(
+        GerritCodeRange.builder()
+            .startLine(1)
+            .startCharacter(0)
+            .endLine(endLine)
+            .endCharacter(content.get(endLine).length())
+            .build());
   }
 }

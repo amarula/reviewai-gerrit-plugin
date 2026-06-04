@@ -32,6 +32,9 @@ public class MessageSanitizer {
 
   public static String sanitizeAiMessage(String message) {
     log.debug("Sanitizing AI message.");
+    if (message.contains(CODE_DELIMITER + "suggestion")) {
+      return message.strip();
+    }
     // Sanitize code blocks (delimited by CODE_DELIMITER) by stripping out the language for syntax
     // highlighting and
     // ensuring that is preceded by two "\n" chars. Additionally, sanitize the content outside these

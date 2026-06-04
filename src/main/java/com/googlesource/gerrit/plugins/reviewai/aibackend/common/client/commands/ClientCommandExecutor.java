@@ -94,6 +94,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     switch (command) {
       case HELP -> commandHelp();
       case REVIEW -> commandForceReview();
+      case SUGGEST -> commandSuggest();
       case FORGET_THREAD -> commandForgetThread();
       case CONFIGURE -> commandDynamicallyConfigure();
       case DIRECTIVES -> commandDirectives();
@@ -127,6 +128,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
                 localizer.getText("message.command.help.help"),
                 localizer.getText("message.command.help.message"),
                 localizer.getText("message.command.help.review"),
+                localizer.getText("message.command.help.suggest"),
                 localizer.getText("message.command.help.directives"),
                 localizer.getText("message.command.help.forget_thread"),
                 localizer.getText("message.command.help.configure"),
@@ -174,6 +176,15 @@ public class ClientCommandExecutor extends ClientCommandBase {
                   localizer.getText("message.command.help.command.review.syntax"),
                   localizer.getText("message.command.help.command.review.description"),
                   localizer.getText("message.command.help.command.review.options")));
+      case SUGGEST ->
+          joinWithNewLine(
+              List.of(
+                  String.format(
+                      localizer.getText("message.command.help.command.title"), "/suggest"),
+                  "",
+                  localizer.getText("message.command.help.command.suggest.syntax"),
+                  localizer.getText("message.command.help.command.suggest.description"),
+                  localizer.getText("message.command.help.command.suggest.options")));
       case DIRECTIVES ->
           joinWithNewLine(
               List.of(
@@ -229,6 +240,16 @@ public class ClientCommandExecutor extends ClientCommandBase {
       changeSetData.setDebugReviewMode(true);
       changeSetData.setReplyFilterEnabled(false);
     }
+  }
+
+  private void commandSuggest() {
+    changeSetData.setForcedReview(true);
+    changeSetData.setHideAiReview(false);
+    changeSetData.setReviewSystemMessage(null);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReplyFilterEnabled(false);
+    log.info("Suggest command applied to the Change Set");
+    applyReviewScopeOption();
   }
 
   private void applyReviewScopeOption() {

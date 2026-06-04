@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
@@ -222,6 +223,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(
         systemMessage.contains(
             "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
   }
@@ -249,6 +252,21 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
+  }
+
+  @Test
+  public void commandHelpSpecificSuggestCommand() throws Exception {
+    setupCommandComment("/help /suggest");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    Assert.assertEquals(false, changeSetData.getForcedReview());
+    Assert.assertTrue(systemMessage.contains("HELP FOR `/suggest`"));
+    Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(systemMessage.contains("native Gerrit suggested edits"));
+    Assert.assertTrue(systemMessage.contains("negative review reply"));
   }
 
   @Test
@@ -418,6 +436,63 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             "full",
             ReviewScope.reviewCommandOptionValues()),
         changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandSuggestScopeRejectsUnsupportedValue() throws Exception {
+    setupCommandComment("/suggest --scope=full");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
+            "SCOPE",
+            "full",
+            ReviewScope.reviewCommandOptionValues()),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandSuggestPatchsetScopeShowsSuggestion() throws Exception {
+    setupCommandComment("/suggest --scope=patchset");
+    setupSuggestResponses("openAiPatchSetSuggestionResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    ReviewInput.CommentInput suggestion =
+        captor.getValue().comments.get("test_file_1.py").get(0);
+    Assert.assertEquals(
+        readTestFile("__files/langchain/suggestPatchSetFixReply.txt").strip(),
+        suggestion.message);
+    Assert.assertNotNull(suggestion.range);
+    Assert.assertNull(captor.getValue().message);
+  }
+
+  @Test
+  public void commandSuggestCommitMessageScopeShowsSuggestion() throws Exception {
+    setupCommandComment("/suggest --scope=commit_message");
+    setupSuggestResponses("openAiCommitMessageSuggestionResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    ReviewInput.CommentInput suggestion =
+        captor.getValue().comments.get("/COMMIT_MSG").get(0);
+    Assert.assertEquals(
+        readTestFile("__files/langchain/suggestCommitMessageReply.txt").strip(),
+        suggestion.message);
+    Assert.assertNotNull(suggestion.range);
+    Assert.assertNull(captor.getValue().message);
+  }
+
+  private void setupSuggestResponses(String suggestionResponse) {
+    setupMockRequestCreateResponse(
+        "openAiNegativeReviewResponse.json", Scenario.STARTED, "initial-review-complete");
+    setupMockRequestCreateResponse(
+        suggestionResponse, "initial-review-complete", "suggestion-complete");
   }
 
   @Test

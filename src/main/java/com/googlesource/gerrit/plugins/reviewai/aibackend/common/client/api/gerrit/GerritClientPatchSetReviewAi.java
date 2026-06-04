@@ -25,6 +25,7 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
@@ -38,6 +39,7 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -74,6 +76,12 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
 
     String formattedPatch = getPatchFromGerrit();
     patchSetFiles = extractFilesFromPatch(formattedPatch);
+    if (changeSetData.getSuggestMode()
+        && changeSetData.getReviewScope() != ReviewScope.PATCHSET
+        && !patchSetFiles.contains("/COMMIT_MSG")) {
+      patchSetFiles = new ArrayList<>(patchSetFiles);
+      patchSetFiles.add("/COMMIT_MSG");
+    }
     log.debug("Files extracted from patch: {}", patchSetFiles);
     retrieveFileDiff(change, revisionBase);
 

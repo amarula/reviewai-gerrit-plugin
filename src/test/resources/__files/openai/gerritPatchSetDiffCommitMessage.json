@@ -1,0 +1,14 @@
+{
+  "meta_b": {
+    "name": "/COMMIT_MSG",
+    "content_type": "text/x-gerrit-commit-message",
+    "lines": 1
+  },
+  "content": [
+    {
+      "b": [
+        "Minor fixes"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_COMMIT_MESSAGE_SUGGESTION",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_COMMIT_MESSAGE_SUGGESTION",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"id\":0,\"filename\":\"/COMMIT_MSG\",\"reply\":\"```suggestion\\nFix module and class name splitting\\n\\nUse the intended split depth when resolving a class name.\\n```\",\"repeated\":false,\"conflicting\":false}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}

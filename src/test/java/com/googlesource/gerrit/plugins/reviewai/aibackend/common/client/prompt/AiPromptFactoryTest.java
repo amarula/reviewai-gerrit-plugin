@@ -81,6 +81,48 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void suggestModeUsesSuggestPrompt() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedReview(true);
+    changeSetData.setSuggestMode(true);
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    assertTrue(prompt instanceof AiPromptSuggest);
+  }
+
+  @Test
+  public void suggestPromptsAreLoadedFromResources() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedReview(true);
+    changeSetData.setSuggestMode(true);
+    AiPromptSuggest prompt =
+        new AiPromptSuggest(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsAiSuggest");
+
+    assertEquals(
+        prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE"),
+        AiPromptSuggest.DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE);
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("Suggestion Task"));
+    assertTrue(instructions.contains("at least one reply object"));
+    assertTrue(instructions.contains("filename"));
+    assertTrue(instructions.contains("lineNumber"));
+    assertTrue(instructions.contains("codeSnippet"));
+    assertTrue(instructions.contains("/COMMIT_MSG"));
+    assertTrue(prompt.getDefaultAiThreadReviewMessage("patch").contains("every negative review reply"));
+  }
+
+  @Test
   public void routedReviewAgentInstructionsReplaceDefaultSystemPrompt() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
@@ -116,6 +158,13 @@ public class AiPromptFactoryTest {
   private GerritChange commentEventChange() {
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    return change;
+  }
+
+  private GerritChange patchSetEventChange() {
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
     when(change.getFullChangeId()).thenReturn("change~1");
     return change;
   }

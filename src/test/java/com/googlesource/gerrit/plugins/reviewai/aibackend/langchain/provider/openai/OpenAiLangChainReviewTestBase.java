@@ -112,6 +112,13 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
         readTestFileToClass(
             RESOURCE_OPENAI_PATH + "gerritPatchSetDiffTestFile.json", DiffInfo.class);
     when(testFileMock.diff(0)).thenReturn(testFileDiff);
+
+    FileApi commitMessageFileMock = mock(FileApi.class);
+    when(revisionApiMock.file("/COMMIT_MSG")).thenReturn(commitMessageFileMock);
+    DiffInfo commitMessageDiff =
+        readTestFileToClass(
+            RESOURCE_OPENAI_PATH + "gerritPatchSetDiffCommitMessage.json", DiffInfo.class);
+    when(commitMessageFileMock.diff(0)).thenReturn(commitMessageDiff);
   }
 
   protected void initComparisonContent() {
