@@ -43,6 +43,10 @@ public class AiPromptFactory {
       log.info("AiPromptFactory: Return AiPromptRequests");
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
+      if (changeSetData.getSuggestMode()) {
+        log.info("AiPromptFactory: Return AiPromptSuggest");
+        return new AiPromptSuggest(config, changeSetData, change, codeContextPolicy);
+      }
       AiPromptParameters aiPromptParameters = new AiPromptParameters(config);
       if (aiPromptParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
         return switch (changeSetData.getReviewAssistantStage()) {

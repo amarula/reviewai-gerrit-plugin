@@ -1,0 +1,3 @@
+```suggestion
+       module_name, class_name = module_name.rsplit('.', 3)
+```

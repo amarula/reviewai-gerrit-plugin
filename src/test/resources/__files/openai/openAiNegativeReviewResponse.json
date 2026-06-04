@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_NEGATIVE_REVIEW",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_NEGATIVE_REVIEW",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"reply\":\"This negative review needs a suggested edit.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"conflicting\":false,\"filename\":\"test_file_1.py\",\"lineNumber\":21,\"codeSnippet\":\"       module_name, class_name = module_name.rsplit('.', 2)\"}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}

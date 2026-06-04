@@ -44,8 +44,8 @@ public class GerritCommentRange {
     log.debug("Retrieving Gerrit comment range for reply item: {}", replyItem);
     Optional<GerritCodeRange> gerritCommentRange = Optional.empty();
     String filename = replyItem.getFilename();
-    if (filename == null || filename.equals("/COMMIT_MSG")) {
-      log.debug("Filename is null or COMMIT_MSG, skipping code range extraction.");
+    if (filename == null) {
+      log.debug("Filename is null, skipping code range extraction.");
       return gerritCommentRange;
     }
     if (replyItem.getCodeSnippet() == null) {
@@ -59,6 +59,9 @@ public class GerritCommentRange {
           replyItem,
           fileDiffsProcessed);
       return gerritCommentRange;
+    }
+    if (filename.equals("/COMMIT_MSG")) {
+      return fileDiffsProcessed.get(filename).getCommitMessageRange();
     }
     InlineCode inlineCode = new InlineCode(fileDiffsProcessed.get(filename));
     gerritCommentRange = inlineCode.findCommentRange(replyItem);
