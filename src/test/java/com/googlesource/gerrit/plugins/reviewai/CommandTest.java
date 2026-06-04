@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
@@ -217,6 +218,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(
         systemMessage.contains(
             "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
   }
@@ -244,6 +247,20 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
+  }
+
+  @Test
+  public void commandHelpSpecificSuggestCommand() throws Exception {
+    setupCommandComment("/help /suggest");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    Assert.assertEquals(false, changeSetData.getForcedReview());
+    Assert.assertTrue(systemMessage.contains("HELP FOR `/suggest`"));
+    Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(systemMessage.contains("Runs a review when needed"));
   }
 
   @Test
@@ -399,6 +416,69 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             "full",
             ReviewScope.reviewCommandOptionValues()),
         changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandSuggestScopeRejectsUnsupportedValue() throws Exception {
+    setupCommandComment("/suggest --scope=full");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        String.format(
+            localizer.getText("message.command.option.value.invalid"),
+            "SCOPE",
+            "full",
+            ReviewScope.reviewCommandOptionValues()),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandSuggestPatchsetScopeShowsSuggestion() throws Exception {
+    setupCommandComment("/suggest --scope=patchset");
+    setupSuggestResponses("openAiPatchSetSuggestionResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    String response = getPatchSetLevelComment(captor.getValue());
+    Assert.assertTrue(response.contains("Suggested patchset fix:"));
+    Assert.assertTrue(response.contains("Final patchset:"));
+    Assert.assertNull(captor.getValue().message);
+  }
+
+  @Test
+  public void commandSuggestCommitMessageScopeShowsSuggestion() throws Exception {
+    setupCommandComment("/suggest --scope=commit_message");
+    setupSuggestResponses("openAiCommitMessageSuggestionResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertTrue(
+        getPatchSetLevelComment(captor.getValue()).contains("Suggested commit message:"));
+    Assert.assertNull(captor.getValue().message);
+  }
+
+  private void setupSuggestResponses(String suggestionResponse) {
+    setupMockRequestCreateResponse(
+        "openAiResponseRequest.json", Scenario.STARTED, "initial-review-complete");
+    setupMockRequestCreateResponse(
+        suggestionResponse, "initial-review-complete", "suggestion-1-complete");
+    setupMockRequestCreateResponse(
+        "openAiResponseRequest.json", "suggestion-1-complete", "validation-1-complete");
+    setupMockRequestCreateResponse(
+        suggestionResponse, "validation-1-complete", "suggestion-2-complete");
+    setupMockRequestCreateResponse(
+        "openAiResponseRequest.json", "suggestion-2-complete", "validation-2-complete");
+    setupMockRequestCreateResponse(
+        suggestionResponse, "validation-2-complete", "suggestion-3-complete");
+    setupMockRequestCreateResponse(
+        "openAiResponseRequest.json", "suggestion-3-complete", "validation-3-complete");
+  }
+
+  private String getPatchSetLevelComment(ReviewInput reviewInput) {
+    return reviewInput.comments.get("/PATCHSET_LEVEL").get(0).message;
   }
 
   private String reviewCommandWithScope(ReviewScope reviewScope) {

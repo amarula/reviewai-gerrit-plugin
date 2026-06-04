@@ -31,6 +31,7 @@ public abstract class ClientCommandBase extends ClientBase {
     HELP,
     MESSAGE,
     REVIEW,
+    SUGGEST,
     DIRECTIVES,
     FORGET_THREAD,
     CONFIGURE,
@@ -58,6 +59,7 @@ public abstract class ClientCommandBase extends ClientBase {
           "help", CommandSet.HELP,
           "message", CommandSet.MESSAGE,
           "review", CommandSet.REVIEW,
+          "suggest", CommandSet.SUGGEST,
           "directives", CommandSet.DIRECTIVES,
           "forget_thread", CommandSet.FORGET_THREAD,
           "configure", CommandSet.CONFIGURE,
@@ -67,7 +69,7 @@ public abstract class ClientCommandBase extends ClientBase {
   public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
       Set.of(CommandSet.HELP, CommandSet.SHOW);
   public static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
-      Set.of(CommandSet.REVIEW, CommandSet.CONFIGURE, CommandSet.SHOW);
+      Set.of(CommandSet.REVIEW, CommandSet.SUGGEST, CommandSet.CONFIGURE, CommandSet.SHOW);
 
   // Option values can be either a sequence of chars enclosed in double quotes or a sequence of
   // non-space chars.

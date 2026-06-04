@@ -1,0 +1,12 @@
+Suggested patchset fix:
+```diff
+diff --git a/app/src/main/kotlin/com/example/testapp/MeasurementTest.kt b/app/src/main/kotlin/com/example/testapp/MeasurementTest.kt
+index 2222222..3333333 100644
+--- a/app/src/main/kotlin/com/example/testapp/MeasurementTest.kt
++++ b/app/src/main/kotlin/com/example/testapp/MeasurementTest.kt
+@@ -3,2 +3,4 @@ package com.example.testapp
++import com.example.testapp.utils.PRESSURE
+ import com.example.testapp.utils.Pressure
++import com.example.testapp.utils.TEMPERATURE
+ import org.junit.Test
+```

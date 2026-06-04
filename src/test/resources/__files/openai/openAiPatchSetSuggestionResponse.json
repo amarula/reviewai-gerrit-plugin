@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_PATCHSET_SUGGESTION",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_PATCHSET_SUGGESTION",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"reply\":\"Suggested patchset fix:\\n```diff\\ndiff --git a/test_file_1.py b/test_file_1.py\\nindex a14c303..b25d414 100644\\n--- a/test_file_1.py\\n+++ b/test_file_1.py\\n@@ -18,7 +18,7 @@\\n \\\"\\\"\\\"\\n     if not class_name:\\n-       module_name, class_name = module_name.rsplit('.', 2)\\n+       module_name, class_name = module_name.rsplit('.', 3)\\n     loaded_module = importclass(module_name, fromlist=[class_name])\\n```\",\"repeated\":false,\"conflicting\":false}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}
