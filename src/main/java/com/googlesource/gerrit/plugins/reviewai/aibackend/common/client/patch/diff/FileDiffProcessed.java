@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch.CodeFinderDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent;
@@ -28,6 +29,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.TreeMap;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
@@ -42,6 +44,7 @@ public class FileDiffProcessed {
   @Getter private List<String> newContent;
   @Getter private List<DiffContent> reviewDiffContent;
   @Getter private String randomPlaceholder;
+  @Getter private Optional<GerritCodeRange> commitMessageRange = Optional.empty();
   private int lineNum;
   private DiffContent diffContentItem;
   private DiffContent reviewDiffContentItem;
@@ -54,10 +57,65 @@ public class FileDiffProcessed {
     this.config = config;
     this.isCommitMessage = isCommitMessage;
 
+    if (isCommitMessage) {
+      commitMessageRange = findCommitMessageRange(gerritPatchSetFileDiff);
+    }
     updateContent(gerritPatchSetFileDiff);
     updateRandomPlaceholder(gerritPatchSetFileDiff);
     log.debug(
         "FileDiffProcessed initialized for {}", (isCommitMessage ? "commit message" : "file diff"));
+  }
+
+  private Optional<GerritCodeRange> findCommitMessageRange(
+      GerritPatchSetFileDiff gerritPatchSetFileDiff) {
+    List<String> content = new ArrayList<>();
+    if (gerritPatchSetFileDiff.getContent() == null) {
+      return Optional.empty();
+    }
+    for (GerritPatchSetFileDiff.Content contentItem : gerritPatchSetFileDiff.getContent()) {
+      if (contentItem.ab != null) {
+        content.addAll(contentItem.ab);
+      }
+      if (contentItem.b != null) {
+        content.addAll(contentItem.b);
+      }
+    }
+    if (content.isEmpty()) {
+      return Optional.empty();
+    }
+
+    int lastHeaderLine = -1;
+    for (int i = 0; i < content.size(); i++) {
+      String line = content.get(i);
+      if (isImmutableCommitHeader(line)) {
+        lastHeaderLine = i;
+      } else if (lastHeaderLine >= 0) {
+        break;
+      }
+    }
+    int firstMessageLine = lastHeaderLine + 1;
+    while (firstMessageLine < content.size() && content.get(firstMessageLine).isEmpty()) {
+      firstMessageLine++;
+    }
+    if (firstMessageLine >= content.size()) {
+      return Optional.empty();
+    }
+
+    int lastMessageLine = content.size() - 1;
+    return Optional.of(
+        GerritCodeRange.builder()
+            .startLine(firstMessageLine + 1)
+            .startCharacter(0)
+            .endLine(lastMessageLine + 1)
+            .endCharacter(content.get(lastMessageLine).length())
+            .build());
+  }
+
+  private boolean isImmutableCommitHeader(String line) {
+    return Settings.COMMIT_MESSAGE_FILTER_OUT_PREFIXES.entrySet().stream()
+        .filter(entry -> !"CHANGE_ID".equals(entry.getKey()))
+        .map(java.util.Map.Entry::getValue)
+        .anyMatch(line::startsWith);
   }
 
   private void updateContent(GerritPatchSetFileDiff gerritPatchSetFileDiff) {

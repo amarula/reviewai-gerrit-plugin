@@ -52,6 +52,7 @@ public class ClientCommandParser extends ClientCommandBase {
       Map.of(
           CommandSet.REVIEW,
               List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG, BaseOptionSet.SCOPE),
+          CommandSet.SUGGEST, List.of(BaseOptionSet.SCOPE),
           CommandSet.CONFIGURE, List.of(BaseOptionSet.RESET, BaseOptionSet.CONFIGURATION_OPTION),
           CommandSet.DIRECTIVES, List.of(BaseOptionSet.RESET, BaseOptionSet.REMOVE),
           CommandSet.SHOW,
@@ -62,7 +63,7 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.INSTRUCTIONS,
                   BaseOptionSet.SCOPE));
   private static final List<CommandSet> REVIEW_COMMANDS =
-      new ArrayList<>(List.of(CommandSet.REVIEW));
+      new ArrayList<>(List.of(CommandSet.REVIEW, CommandSet.SUGGEST));
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
       new ArrayList<>(List.of(CommandSet.SHOW));
   private static final List<CommandSet> DEBUG_REQUIRED_COMMANDS =
@@ -270,7 +271,7 @@ public class ClientCommandParser extends ClientCommandBase {
     if (option != BaseOptionSet.SCOPE) {
       return null;
     }
-    return command == CommandSet.REVIEW
+    return command == CommandSet.REVIEW || command == CommandSet.SUGGEST
         ? ReviewScope.reviewCommandOptionValues()
         : ReviewScope.commandOptionValues();
   }

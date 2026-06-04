@@ -176,6 +176,15 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       throws Exception {
     log.debug(
         "Multi-agent LangChain ask method called with changeId: {}", change.getFullChangeId());
+    if (changeSetData.getSuggestMode()) {
+      return getSuggestClient().ask(changeSetData, change, patchSet);
+    }
+    return askReview(changeSetData, change, patchSet);
+  }
+
+  @Override
+  protected AiResponseContent askReview(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       ReviewAssistantStage routedStage = routeMessage(changeSetData, change);
       log.debug("LangChain routing agent selected stage {} for message", routedStage);

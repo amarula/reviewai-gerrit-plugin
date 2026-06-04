@@ -36,6 +36,7 @@ public class ChangeSetData {
   private ReviewAssistantStage reviewAssistantStage = ReviewAssistantStage.REVIEW_CODE;
   private Boolean forcedStagedReview = false;
   private ReviewScope reviewScope;
+  private Boolean suggestMode = false;
   @NonNull private Integer votingMinScore;
   @NonNull private Integer votingMaxScore;
 
@@ -84,6 +85,7 @@ public class ChangeSetData {
     copy.setReviewAssistantStage(reviewAssistantStage);
     copy.setForcedStagedReview(forcedStagedReview);
     copy.setReviewScope(reviewScope);
+    copy.setSuggestMode(suggestMode);
     copy.setForcedReview(forcedReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);

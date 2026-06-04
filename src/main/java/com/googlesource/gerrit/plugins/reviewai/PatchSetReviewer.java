@@ -219,6 +219,9 @@ public class PatchSetReviewer {
 
   private Integer getReviewScore(GerritChange change) {
     log.debug("Calculating review score for change ID: {}", change.getFullChangeId());
+    if (changeSetData.getSuggestMode()) {
+      return null;
+    }
     if (config.isVotingEnabled()) {
       if (change.getIsCommentEvent()) {
         return null;

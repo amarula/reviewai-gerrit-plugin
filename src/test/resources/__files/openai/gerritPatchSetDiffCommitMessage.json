@@ -1,0 +1,25 @@
+{
+  "meta_b": {
+    "name": "/COMMIT_MSG",
+    "content_type": "text/x-gerrit-commit-message",
+    "lines": 12
+  },
+  "content": [
+    {
+      "b": [
+        "Parent:     a3d0a979 (Previous commit)",
+        "Author:     Test User <test@example.com>",
+        "AuthorDate: 2026-06-04 16:08:23 +0200",
+        "Commit:     Test User <test@example.com>",
+        "CommitDate: 2026-06-11 12:14:24 +0200",
+        "",
+        "Minor fixes",
+        "",
+        "Describe the fix.",
+        "",
+        "Change-Id: myChangeId",
+        ""
+      ]
+    }
+  ]
+}
