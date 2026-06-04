@@ -1,0 +1,18 @@
+Suggested patchset fix:
+```diff
+diff --git a/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt b/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
+index 8040f90..c1f6d6e 100644
+--- a/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
++++ b/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
+@@ -36,8 +36,8 @@ class DeviceBleTest : DeviceBleConnectivityListener {
+         appContext = InstrumentationRegistry.getInstrumentation().targetContext
+         bleAdapter =
+             (appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+-        bleManager = DeviceBleManagerImpl(bleAdapter)
+-        bleManager.registerBleConnectivityListener(this, appContext)
++        bleManager = DeviceBleManagerImpl(bleAdapter, appContext)
++        bleManager.registerBleConnectivityListener(this)
+         bleManager.scanDevice()
+         connectedLatch.await(defaultTimeoutSeconds, TimeUnit.SECONDS)
+     }
+```

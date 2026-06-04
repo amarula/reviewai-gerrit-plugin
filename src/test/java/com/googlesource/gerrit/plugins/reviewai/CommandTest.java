@@ -217,6 +217,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(
         systemMessage.contains(
             "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
   }
@@ -244,6 +246,20 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains(
             "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
+  }
+
+  @Test
+  public void commandHelpSpecificSuggestCommand() throws Exception {
+    setupCommandComment("/help /suggest");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    Assert.assertEquals(false, changeSetData.getForcedReview());
+    Assert.assertTrue(systemMessage.contains("HELP FOR `/suggest`"));
+    Assert.assertTrue(
+        systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
+    Assert.assertTrue(systemMessage.contains("Runs a review when needed"));
   }
 
   @Test
@@ -389,6 +405,21 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewScopeRejectsUnsupportedValue() throws Exception {
     setupCommandComment("/review --scope=full");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        String.format(
+            localizer.getText("message.command.option.value.invalid"),
+            "SCOPE",
+            "full",
+            ReviewScope.reviewCommandOptionValues()),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandSuggestScopeRejectsUnsupportedValue() throws Exception {
+    setupCommandComment("/suggest --scope=full");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 

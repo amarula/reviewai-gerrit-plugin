@@ -1,0 +1,18 @@
+Subject: Fix BLE test setup
+---
+
+diff --git a/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt b/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
+index c1f6d6e..8040f90 100644
+--- a/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
++++ b/app/src/androidTest/kotlin/com/prismaelectronics/app/DeviceBleTest.kt
+@@ -36,8 +36,8 @@
+         appContext = InstrumentationRegistry.getInstrumentation().targetContext
+         bleAdapter =
+             (appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+-        bleManager = DeviceBleManagerImpl(bleAdapter, appContext)
+-        bleManager.registerBleConnectivityListener(this)
++        bleManager = DeviceBleManagerImpl(bleAdapter)
++        bleManager.registerBleConnectivityListener(this, appContext)
+         bleManager.scanDevice()
+         connectedLatch.await(defaultTimeoutSeconds, TimeUnit.SECONDS)
+     }
