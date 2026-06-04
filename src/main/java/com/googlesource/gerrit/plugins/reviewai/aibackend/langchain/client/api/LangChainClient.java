@@ -154,9 +154,16 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @Override
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    if (changeSetData.getSuggestMode()) {
+      return getSuggestClient().ask(changeSetData, change, patchSet);
+    }
     ReviewRequestResult reviewRequestResult = askSingleRequest(changeSetData, change, patchSet);
     requestBody = reviewRequestResult == null ? null : reviewRequestResult.getRequestBody();
     return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
+  }
+
+  protected LangChainSuggestClient getSuggestClient() {
+    return new LangChainSuggestClient(this, config, pluginDataHandlerProvider, localizer);
   }
 
   @VisibleForTesting
@@ -280,6 +287,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
+    String conversationKey = getConversationKey(changeSetData);
+    OpenAiConversation conversation =
+        new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
+    boolean existingConversation = conversation.hasExistingConversation();
+    return new ConversationResolution(
+        conversation.resolveConversationId(), existingConversation);
+  }
+
+  private String getConversationKey(ChangeSetData changeSetData) {
     String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
     if (changeSetData.getReviewAssistantStage() != null) {
       switch (changeSetData.getReviewAssistantStage()) {
@@ -293,11 +309,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           break;
       }
     }
-    OpenAiConversation conversation =
-        new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
-    boolean existingConversation = conversation.hasExistingConversation();
-    return new ConversationResolution(
-        conversation.resolveConversationId(), existingConversation);
+    return conversationKey;
   }
 
   @VisibleForTesting
