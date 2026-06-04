@@ -17,7 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,9 +33,13 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
+import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import dev.langchain4j.data.message.AiMessage;
@@ -45,6 +52,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import org.junit.Test;
 
 public class LangChainMultiAgentReviewClientTest {
@@ -59,6 +67,18 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/routerContextWithAiReviewExpectedMessages.txt";
   private static final String ROUTER_CONTEXT_WITH_AUTOMATIC_REVIEW_EXPECTED_MESSAGES_RESOURCE =
       "__files/langchain/routerContextWithAutomaticReviewExpectedMessages.txt";
+  private static final String SUGGEST_ORIGINAL_PATCH_SET_RESOURCE =
+      "__files/langchain/suggestOriginalPatchSet.txt";
+  private static final String SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE =
+      "__files/langchain/suggestPatchSetFixReply.txt";
+  private static final String SUGGEST_ORIGINAL_PATCH_SET_REVERTED_BY_FIX_RESOURCE =
+      "__files/langchain/suggestOriginalPatchSetRevertedByFix.txt";
+  private static final String SUGGEST_PATCH_SET_FIX_REVERTING_ORIGINAL_RESOURCE =
+      "__files/langchain/suggestPatchSetFixRevertingOriginal.txt";
+  private static final String SUGGEST_EMPTY_FINAL_PATCH_SET_MESSAGE_RESOURCE =
+      "__files/langchain/suggestEmptyFinalPatchSetMessage.txt";
+  private static final String SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE =
+      "__files/langchain/suggestSystemMessagePrefix.txt";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -134,6 +154,175 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(List.of(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE), client.recordedStages);
     assertEquals(List.of(true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
+  }
+
+  @Test
+  public void suggestPatchsetScopeRunsReviewSuggestionAndValidation() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+    String patchSet = readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE);
+
+    AiResponseContent response = client.ask(changeSetData, change, patchSet);
+
+    assertNotNull(response.getReplies());
+    assertEquals(1, response.getReplies().size());
+    assertTrue(response.getReplies().get(0).getReply().contains("return value.strip().casefold()"));
+    assertTrue(response.getReplies().get(0).getReply().contains("Final patchset:"));
+    assertNull(response.getReplies().get(0).getScore());
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.REVIEW_CODE,
+            ReviewAssistantStage.REVIEW_CODE,
+            ReviewAssistantStage.REVIEW_CODE),
+        client.recordedStages);
+    assertEquals(List.of(false, true, false), client.recordedSuggestModes);
+    assertEquals(patchSet, client.recordedPatchSets.get(0));
+    assertEquals(patchSet, client.recordedPatchSets.get(1));
+    assertTrue(client.recordedPatchSets.get(2).contains("return value.strip().casefold()"));
+    assertEquals(1, countOccurrences(client.recordedPatchSets.get(2), "diff --git a/a.py b/a.py"));
+    String finalPatchSet = extractFinalPatchSet(response.getReplies().get(0).getReply());
+    assertTrue(finalPatchSet.startsWith("diff --git a/a.py b/a.py"));
+    assertFalse(finalPatchSet.contains("Subject:"));
+    assertFalse(finalPatchSet.contains("Change-Id:"));
+  }
+
+  @Test
+  public void suggestPatchsetScopeDoesNotValidateEmptyFinalPatchset() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REVERTING_ORIGINAL_RESOURCE);
+    String patchSet = readTestResource(SUGGEST_ORIGINAL_PATCH_SET_REVERTED_BY_FIX_RESOURCE);
+
+    AiResponseContent response = client.ask(changeSetData, change, patchSet);
+
+    assertNotNull(response.getReplies());
+    assertEquals(1, response.getReplies().size());
+    String reply = response.getReplies().get(0).getReply();
+    assertEquals(emptyFinalPatchSetResponse(), reply);
+    assertFalse(reply.contains("Final patchset:"));
+    assertFalse(reply.contains("Suggested patchset fix:"));
+    assertFalse(reply.contains("Suggested commit message:"));
+    assertNull(response.getReplies().get(0).getScore());
+    assertEquals(
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_CODE),
+        client.recordedStages);
+    assertEquals(List.of(false, true), client.recordedSuggestModes);
+    assertEquals(List.of(patchSet, patchSet), client.recordedPatchSets);
+  }
+
+  @Test
+  public void suggestWithoutScopeStopsWhenPatchsetIsUnamendable() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REVERTING_ORIGINAL_RESOURCE);
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_REVERTED_BY_FIX_RESOURCE));
+
+    assertNotNull(response.getReplies());
+    assertEquals(1, response.getReplies().size());
+    String reply = response.getReplies().get(0).getReply();
+    assertEquals(emptyFinalPatchSetResponse(), reply);
+    assertFalse(reply.contains("Suggested patchset fix:"));
+    assertFalse(reply.contains("Suggested commit message:"));
+    assertEquals(
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_CODE),
+        client.recordedStages);
+    assertEquals(List.of(false, true), client.recordedSuggestModes);
+  }
+
+  @Test
+  public void suggestWithoutScopeProcessesPatchsetAndCommitMessage() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+    String patchSet = readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE);
+
+    AiResponseContent response = client.ask(changeSetData, change, patchSet);
+
+    assertNotNull(response.getReplies());
+    assertEquals(2, response.getReplies().size());
+    assertTrue(response.getReplies().get(0).getReply().contains("return value.strip().casefold()"));
+    assertTrue(response.getReplies().get(0).getReply().contains("Final patchset:"));
+    assertEquals("suggestion-REVIEW_COMMIT_MESSAGE", response.getReplies().get(1).getReply());
+    String finalPatchSet = extractFinalPatchSet(response.getReplies().get(0).getReply());
+    assertTrue(finalPatchSet.startsWith("diff --git a/a.py b/a.py"));
+    assertFalse(finalPatchSet.contains("Subject:"));
+    assertFalse(finalPatchSet.contains("Change-Id:"));
+    response.getReplies().forEach(reply -> assertNull(reply.getScore()));
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.REVIEW_CODE,
+            ReviewAssistantStage.REVIEW_CODE,
+            ReviewAssistantStage.REVIEW_CODE,
+            ReviewAssistantStage.REVIEW_COMMIT_MESSAGE,
+            ReviewAssistantStage.REVIEW_COMMIT_MESSAGE,
+            ReviewAssistantStage.REVIEW_COMMIT_MESSAGE),
+        client.recordedStages);
+    assertEquals(List.of(false, true, false, false, true, false), client.recordedSuggestModes);
+  }
+
+  @Test
+  public void suggestDoesNotReturnUnvalidatedSuggestion() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    client.validationScore = -1.0;
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertNotNull(response.getReplies());
+    assertEquals(0, response.getReplies().size());
+    assertEquals(7, client.recordedStages.size());
+  }
+
+  @Test
+  public void suggestSkipsInitialReviewWhenReviewConversationExists() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient(ReviewAssistantStage.REVIEW_CODE);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertNotNull(response.getReplies());
+    assertEquals(1, response.getReplies().size());
+    assertEquals(
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_CODE),
+        client.recordedStages);
+    assertEquals(List.of(true, false), client.recordedSuggestModes);
+    assertTrue(client.recordedPatchSets.get(1).contains("return value.strip().casefold()"));
   }
 
   @Test
@@ -228,8 +417,52 @@ public class LangChainMultiAgentReviewClientTest {
     return Files.readString(TEST_RESOURCES_PATH.resolve(resourceName));
   }
 
+  private static String readTestResourceUnchecked(String resourceName) {
+    try {
+      return readTestResource(resourceName);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static String emptyFinalPatchSetResponse() throws Exception {
+    return systemMessagePrefix() + ' ' + emptyFinalPatchSetMessage();
+  }
+
+  private static String systemMessagePrefix() throws Exception {
+    return readTestResource(SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE).stripTrailing();
+  }
+
+  private static String emptyFinalPatchSetMessage() throws Exception {
+    return readTestResource(SUGGEST_EMPTY_FINAL_PATCH_SET_MESSAGE_RESOURCE).stripTrailing();
+  }
+
   private static List<String> readTestResourceLines(String resourceName) throws Exception {
     return Files.readAllLines(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  private static int countOccurrences(String text, String value) {
+    int count = 0;
+    int index = text.indexOf(value);
+    while (index >= 0) {
+      count++;
+      index = text.indexOf(value, index + value.length());
+    }
+    return count;
+  }
+
+  private static String extractFinalPatchSet(String reply) {
+    String finalPatchSetPrefix = "Final patchset:\n```diff\n";
+    int finalPatchSetStart = reply.indexOf(finalPatchSetPrefix);
+    if (finalPatchSetStart < 0) {
+      return "";
+    }
+    String finalPatchSet = reply.substring(finalPatchSetStart + finalPatchSetPrefix.length());
+    int finalPatchSetEnd = finalPatchSet.lastIndexOf("\n```");
+    if (finalPatchSetEnd < 0) {
+      return finalPatchSet.strip();
+    }
+    return finalPatchSet.substring(0, finalPatchSetEnd).strip();
   }
 
   private static List<GerritComment> readCommentsResource(String resourceName) throws Exception {
@@ -248,8 +481,13 @@ public class LangChainMultiAgentReviewClientTest {
 
   private static Localizer localizer() {
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("system.message.prefix"))
+        .thenReturn(readTestResourceUnchecked(SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE).stripTrailing());
     when(localizer.getText("message.empty.review")).thenReturn("");
+    when(localizer.getText("message.suggest.patchset.unamendable"))
+        .thenReturn(
+            readTestResourceUnchecked(SUGGEST_EMPTY_FINAL_PATCH_SET_MESSAGE_RESOURCE)
+                .stripTrailing());
     return localizer;
   }
 
@@ -277,11 +515,29 @@ public class LangChainMultiAgentReviewClientTest {
       extends LangChainMultiAgentReviewClient {
     private final List<ReviewAssistantStage> recordedStages = new ArrayList<>();
     private final List<Boolean> recordedForcedStagedReview = new ArrayList<>();
+    private final List<Boolean> recordedSuggestModes = new ArrayList<>();
+    private final List<String> recordedPatchSets = new ArrayList<>();
+    private String patchSetSuggestion;
     private ReviewAssistantStage routedStage = ReviewAssistantStage.REVIEW_CODE;
+    private Double validationScore = 1.0;
     private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
-      super(null, null, null, null, Runnable::run);
+      this(new ArrayList<>());
+    }
+
+    RecordingLangChainMultiAgentReviewClient(ReviewAssistantStage existingReviewStage) {
+      this(new ArrayList<>(List.of(existingReviewStage)));
+    }
+
+    RecordingLangChainMultiAgentReviewClient(List<ReviewAssistantStage> existingReviewStages) {
+      super(
+          recordingConfig(),
+          null,
+          null,
+          localizer(),
+          pluginDataProvider(existingReviewStages),
+          Runnable::run);
     }
 
     @Override
@@ -290,8 +546,25 @@ public class LangChainMultiAgentReviewClientTest {
       ReviewAssistantStage stage = changeSetData.getReviewAssistantStage();
       recordedStages.add(stage);
       recordedForcedStagedReview.add(changeSetData.getForcedStagedReview());
+      recordedSuggestModes.add(changeSetData.getSuggestMode());
+      recordedPatchSets.add(patchSet);
 
-      AiReplyItem reply = AiReplyItem.builder().reply(stage.name()).build();
+      String replyText = stage.name();
+      Double score = null;
+      if (!changeSetData.getSuggestMode() && patchSet.contains("suggestion-")) {
+        replyText = "suggestion-valid";
+        score = validationScore;
+      } else if (!changeSetData.getSuggestMode() && patchSet.contains("casefold()")) {
+        replyText = "suggestion-valid";
+        score = validationScore;
+      } else if (changeSetData.getSuggestMode()) {
+        replyText =
+            stage == ReviewAssistantStage.REVIEW_CODE && patchSetSuggestion != null
+                ? patchSetSuggestion
+                : "suggestion-" + stage.name();
+        score = 1.0;
+      }
+      AiReplyItem reply = AiReplyItem.builder().reply(replyText).score(score).build();
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(new ArrayList<>(List.of(reply)));
 
@@ -303,6 +576,24 @@ public class LangChainMultiAgentReviewClientTest {
         throws AiConnectionFailException {
       routeCalls++;
       return routedStage;
+    }
+
+    private static Configuration recordingConfig() {
+      Configuration config = mock(Configuration.class);
+      when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+      return config;
+    }
+
+    private static PluginDataHandlerProvider pluginDataProvider(
+        List<ReviewAssistantStage> existingReviewStages) {
+      PluginDataHandler handler = mock(PluginDataHandler.class);
+      for (ReviewAssistantStage stage : existingReviewStages) {
+        when(handler.getValue("conversationId." + stage.name().toLowerCase(Locale.ROOT)))
+            .thenReturn("conv-" + stage.name());
+      }
+      PluginDataHandlerProvider provider = mock(PluginDataHandlerProvider.class);
+      when(provider.getChangeScope()).thenReturn(handler);
+      return provider;
     }
   }
 }
