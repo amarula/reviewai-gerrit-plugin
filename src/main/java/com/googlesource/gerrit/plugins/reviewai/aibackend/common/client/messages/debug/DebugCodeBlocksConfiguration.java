@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.message
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 
 import java.util.List;
 import java.util.TreeMap;
@@ -32,7 +33,8 @@ public class DebugCodeBlocksConfiguration extends DebugCodeBlocksComposer {
   public String getDebugCodeBlock(Configuration config) {
     TreeMap<String, String> configMap = config.dumpConfigMap();
     if (configMap == null) {
-      return localizer.getText("message.dump.configuration.error");
+      return SystemMessageFormatter.getLocalizedErrorMessage(
+          localizer, "message.dump.configuration.error");
     }
     return super.getDebugCodeBlock(List.of(prettyStringifyMap(configMap)));
   }
