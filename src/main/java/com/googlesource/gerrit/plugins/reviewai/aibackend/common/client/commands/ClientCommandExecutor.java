@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.DynamicDirecti
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -327,7 +328,8 @@ public class ClientCommandExecutor extends ClientCommandBase {
       }
     } catch (DynamicDirectivesModifyException e) {
       changeSetData.setReviewSystemMessage(
-          localizer.getText("message.dump.directives.modify.error"));
+          SystemMessageFormatter.getLocalizedErrorMessage(
+              localizer, "message.dump.directives.modify.error"));
       return;
     }
     changeSetData.setReviewSystemMessage(

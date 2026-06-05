@@ -27,16 +27,15 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ope
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class LangChainSuggestClient {
   private static final int MAX_SUGGEST_REVIEW_ITERATIONS = 3;
-  private static final String SYSTEM_MESSAGE_PREFIX_KEY = "system.message.prefix";
   private static final String EMPTY_FINAL_PATCHSET_MESSAGE_KEY =
       "message.suggest.patchset.unamendable";
 
@@ -260,15 +259,7 @@ public class LangChainSuggestClient {
   }
 
   private String emptyFinalPatchSetMessage() {
-    return getPrefixedSystemMessage(localizer.getText(EMPTY_FINAL_PATCHSET_MESSAGE_KEY));
-  }
-
-  private String getPrefixedSystemMessage(String message) {
-    String prefix =
-        Optional.ofNullable(localizer.getText(SYSTEM_MESSAGE_PREFIX_KEY)).orElse("").trim();
-    if (prefix.isEmpty() || message.stripLeading().startsWith(prefix)) {
-      return message;
-    }
-    return prefix + ' ' + message;
+    return SystemMessageFormatter.getPrefixedSystemMessage(
+        localizer, localizer.getText(EMPTY_FINAL_PATCHSET_MESSAGE_KEY));
   }
 }
