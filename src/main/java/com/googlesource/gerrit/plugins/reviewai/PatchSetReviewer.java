@@ -23,6 +23,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
@@ -117,7 +118,9 @@ public class PatchSetReviewer {
           openAiClient.getRequestBody() == null ? "<unavailable>" : openAiClient.getRequestBody(),
           e.getMessage(),
           e);
-      changeSetData.setReviewSystemMessage(localizer.getText("message.openai.connection.error"));
+      changeSetData.setReviewSystemMessage(
+          SystemMessageFormatter.getLocalizedErrorMessage(
+              localizer, "message.openai.connection.error"));
     }
     if (reviewReply != null) {
       retrieveReviewBatches(reviewReply, change);

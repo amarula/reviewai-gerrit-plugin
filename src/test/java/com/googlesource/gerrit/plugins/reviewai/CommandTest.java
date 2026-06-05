@@ -400,7 +400,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
 
     ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
-    Assert.assertEquals("SYSTEM MESSAGE: Error connecting to AI server", status.responseText);
+    Assert.assertEquals(
+        "SYSTEM MESSAGE: **ERROR:** Unable to connect to AI server", status.responseText);
   }
 
   @Test
