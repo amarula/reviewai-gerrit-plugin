@@ -35,11 +35,11 @@ public class SystemMessageFormatterTest {
     Localizer localizer = localizer();
 
     assertEquals(
-        "SYSTEM MESSAGE: No update",
+        "ReviewAI Message: No update",
         SystemMessageFormatter.getPrefixedSystemMessage(localizer, "No update"));
     assertEquals(
-        "SYSTEM MESSAGE: No update",
-        SystemMessageFormatter.getPrefixedSystemMessage(localizer, "SYSTEM MESSAGE: No update"));
+        "ReviewAI Message: No update",
+        SystemMessageFormatter.getPrefixedSystemMessage(localizer, "ReviewAI Message: No update"));
     assertNull(SystemMessageFormatter.getPrefixedSystemMessage(localizer, null));
   }
 
@@ -47,8 +47,10 @@ public class SystemMessageFormatterTest {
   public void detectsSystemMessages() {
     Localizer localizer = localizer();
 
-    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "SYSTEM MESSAGE: No update"));
-    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "  SYSTEM MESSAGE: No update"));
+    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "ReviewAI Message: No update"));
+    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "  ReviewAI Message: No update"));
+    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "ReviewAI **WARNING**: Warning"));
+    assertTrue(SystemMessageFormatter.isSystemMessage(localizer, "ReviewAI **ERROR**: Error"));
     assertFalse(SystemMessageFormatter.isSystemMessage(localizer, "No update"));
     assertFalse(SystemMessageFormatter.isSystemMessage(localizer, null));
   }
@@ -58,7 +60,7 @@ public class SystemMessageFormatterTest {
     Localizer localizer = localizer();
 
     assertEquals(
-        "**WARNING:** Unrecognized value for configuration setting `aiProvider`. "
+        "ReviewAI **WARNING**: Unrecognized value for configuration setting `aiProvider`. "
             + "Default value will be applied.",
         SystemMessageFormatter.getLocalizedWarningMessage(
             localizer, "message.config.unknown.enum.warning", "aiProvider"));
@@ -69,7 +71,7 @@ public class SystemMessageFormatterTest {
     Localizer localizer = localizer();
 
     assertEquals(
-        "**ERROR:** Unable to connect to AI server",
+        "ReviewAI **ERROR**: Unable to connect to AI server",
         SystemMessageFormatter.getLocalizedErrorMessage(
             localizer, "message.openai.connection.error"));
   }
@@ -85,16 +87,17 @@ public class SystemMessageFormatterTest {
 
     assertEquals(
         List.of(
-            "**WARNING:** Unrecognized value for configuration setting `aiProvider`. "
+            "ReviewAI **WARNING**: Unrecognized value for configuration setting `aiProvider`. "
                 + "Default value will be applied."),
         messages);
   }
 
   private Localizer localizer() {
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
-    when(localizer.getText("warning.message.prefix")).thenReturn("**WARNING:**");
-    when(localizer.getText("error.message.prefix")).thenReturn("**ERROR:**");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.config.unknown.enum.warning"))
         .thenReturn(
             "Unrecognized value for configuration setting `%s`. Default value will be applied.");

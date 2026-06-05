@@ -369,7 +369,7 @@ public class AiReviewMessageTest extends TestBase {
     assertEquals(true, output.ok);
     assertFalse(output.waitForAssistantReply);
     assertEquals(
-        "SYSTEM MESSAGE: Invalid value for option `SCOPE`: `wrong`. Supported values are: [patchset, " +
+        "ReviewAI Message: Invalid value for option `SCOPE`: `wrong`. Supported values are: [patchset, " +
             "commit_message]",
         output.responseText);
     verify(revisionApi, never()).review(any());
