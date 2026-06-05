@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -234,8 +235,7 @@ public class GerritAiReviewHistoryCollector {
   private boolean isSystemMessage(GerritComment comment, Localizer localizer) {
     String message =
         stripPatchSetHeading(Optional.ofNullable(comment.getMessage()).orElse("")).stripLeading();
-    String prefix = Optional.ofNullable(localizer.getText("system.message.prefix")).orElse("").trim();
-    return !prefix.isEmpty() && message.startsWith(prefix);
+    return SystemMessageFormatter.isSystemMessage(localizer, message);
   }
 
   private boolean isDynamicConfigurationMessage(GerritComment comment, Localizer localizer) {

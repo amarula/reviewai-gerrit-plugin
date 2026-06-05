@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import java.util.Optional;
 
 class ReviewAgentEventRequestStatusUpdater {
@@ -89,7 +90,9 @@ class ReviewAgentEventRequestStatusUpdater {
       if (requestId.isEmpty()) {
         return;
       }
-      complete(prefixSystemMessage(localizer.getText("message.empty.review")));
+      complete(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, localizer.getText("message.empty.review")));
     }
 
     void completeReview() {
@@ -100,7 +103,9 @@ class ReviewAgentEventRequestStatusUpdater {
         complete(null);
         return;
       }
-      complete(prefixSystemMessage(changeSetData.getReviewSystemMessage()));
+      complete(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewSystemMessage()));
     }
 
     void fail(String responseText) {
@@ -113,14 +118,6 @@ class ReviewAgentEventRequestStatusUpdater {
 
     private Optional<String> resolveRequestId() {
       return requestId.flatMap(statusStore::getPendingRequestId);
-    }
-
-    private String prefixSystemMessage(String message) {
-      String prefix = localizer.getText("system.message.prefix");
-      if (message == null || message.stripLeading().startsWith(prefix)) {
-        return message;
-      }
-      return prefix + ' ' + message;
     }
   }
 }
