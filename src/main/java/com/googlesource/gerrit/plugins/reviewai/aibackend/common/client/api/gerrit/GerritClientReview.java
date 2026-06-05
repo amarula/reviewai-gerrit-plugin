@@ -29,8 +29,8 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
-import com.googlesource.gerrit.plugins.reviewai.errors.ErrorMessageHandler;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
@@ -50,7 +50,6 @@ public class GerritClientReview extends GerritClientAccount {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
   private final DebugCodeBlocksDynamicConfiguration debugCodeBlocksDynamicConfiguration;
-  private final ErrorMessageHandler errorMessageHandler;
 
   private GerritChange change;
 
@@ -64,7 +63,6 @@ public class GerritClientReview extends GerritClientAccount {
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
     debugCodeBlocksDynamicConfiguration = new DebugCodeBlocksDynamicConfiguration(localizer);
-    errorMessageHandler = new ErrorMessageHandler(config, localizer);
     log.debug("GerritClientReview initialized.");
   }
 
@@ -145,14 +143,13 @@ public class GerritClientReview extends GerritClientAccount {
     }
     if (changeSetData.getReviewNoticeMessage() != null) {
       messages.add(
-          localizer.getText("system.message.prefix")
-              + ' '
-              + changeSetData.getReviewNoticeMessage());
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewNoticeMessage()));
     }
     if (emptyComments) {
-      messages.add(localizer.getText("system.message.prefix") + ' ' + systemMessage);
+      messages.add(SystemMessageFormatter.getPrefixedSystemMessage(localizer, systemMessage));
     }
-    errorMessageHandler.updateErrorMessages(messages);
+    SystemMessageFormatter.appendConfigurationWarningMessages(config, localizer, messages);
 
     if (!messages.isEmpty()) {
       reviewInput.message(joinWithDoubleNewLine(messages));
