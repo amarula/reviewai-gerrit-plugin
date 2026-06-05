@@ -6,4 +6,4 @@ DYNAMIC CONFIGURATION SETTINGS
 aiModel: OpenAI/gpt-4.1
 ```
 
-SYSTEM MESSAGE: Unable to execute command: Message Debugging functionalities are disabled
+ReviewAI Message: Unable to execute command: Message Debugging functionalities are disabled

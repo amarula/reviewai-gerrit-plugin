@@ -168,7 +168,10 @@ public class AiHistoryTest {
 
   private static Localizer localizer() {
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.empty.review")).thenReturn("");
     return localizer;
   }
