@@ -339,7 +339,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
     Mockito.verify(revisionApiMock).review(captor.capture());
     Assert.assertEquals(
-        "SYSTEM MESSAGE: No update to show for this Change Set", captor.getValue().message);
+        "ReviewAI Message: No update to show for this Change Set", captor.getValue().message);
     Assert.assertNull(captor.getValue().comments);
     WireMock.verify(
         0, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
@@ -360,7 +360,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertEquals(EventHandlerTask.Result.NOT_SUPPORTED, result);
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
     Assert.assertEquals(
-        "SYSTEM MESSAGE: No update to show for this Change Set",
+        "ReviewAI Message: No update to show for this Change Set",
         status.responseText);
   }
 
@@ -401,7 +401,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
     Assert.assertEquals(
-        "SYSTEM MESSAGE: **ERROR:** Unable to connect to AI server", status.responseText);
+        "ReviewAI **ERROR**: Unable to connect to AI server", status.responseText);
   }
 
   @Test
@@ -565,7 +565,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Mockito.verify(revisionApiMock).review(captor.capture());
 
     String reviewMessage = captor.getValue().message;
-    Assert.assertTrue(reviewMessage.contains("SYSTEM MESSAGE:"));
+    Assert.assertTrue(reviewMessage.contains("ReviewAI Message:"));
     List<String> expectedTitles =
         List.of(readTestFile("__files/commands/showPromptsTitles.txt").split("\\R"));
     for (String expectedTitle : expectedTitles) {

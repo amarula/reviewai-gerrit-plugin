@@ -17,14 +17,17 @@
 package com.googlesource.gerrit.plugins.reviewai.localization;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class SystemMessageFormatter {
-  private static final String SYSTEM_MESSAGE_PREFIX_KEY = "system.message.prefix";
-  private static final String WARNING_MESSAGE_PREFIX_KEY = "warning.message.prefix";
-  private static final String ERROR_MESSAGE_PREFIX_KEY = "error.message.prefix";
+  private static final String PLUGIN_MESSAGE_PREFIX_KEY = "plugin.message.prefix";
+  private static final String NORMAL_MESSAGE_LABEL_KEY = "plugin.message.label";
+  private static final String WARNING_MESSAGE_LABEL_KEY = "plugin.warning.label";
+  private static final String ERROR_MESSAGE_LABEL_KEY = "plugin.error.label";
   private static final String UNKNOWN_ENUM_CONFIG_WARNING_KEY =
       "message.config.unknown.enum.warning";
 
@@ -45,23 +48,31 @@ public final class SystemMessageFormatter {
   }
 
   public static String getPrefixedSystemMessage(Localizer localizer, String message) {
-    return getPrefixedMessage(localizer, SYSTEM_MESSAGE_PREFIX_KEY, message);
+    return getPrefixedMessage(localizer, NORMAL_MESSAGE_LABEL_KEY, message);
   }
 
   public static String getPrefixedWarningMessage(Localizer localizer, String message) {
-    return getPrefixedMessage(localizer, WARNING_MESSAGE_PREFIX_KEY, message);
+    return getPrefixedMessage(localizer, WARNING_MESSAGE_LABEL_KEY, message);
   }
 
   public static String getPrefixedErrorMessage(Localizer localizer, String message) {
-    return getPrefixedMessage(localizer, ERROR_MESSAGE_PREFIX_KEY, message);
+    return getPrefixedMessage(localizer, ERROR_MESSAGE_LABEL_KEY, message);
   }
 
   public static boolean isSystemMessage(Localizer localizer, String message) {
     if (message == null) {
       return false;
     }
-    String prefix = getPrefix(localizer, SYSTEM_MESSAGE_PREFIX_KEY);
-    return !prefix.isEmpty() && message.stripLeading().startsWith(prefix);
+    String strippedMessage = message.stripLeading();
+    return getMessagePrefixes(localizer).stream().anyMatch(strippedMessage::startsWith);
+  }
+
+  public static String getMessagePrefixPattern(Localizer localizer) {
+    return String.join(
+        "|",
+        getMessagePrefixes(localizer).stream()
+            .map(Pattern::quote)
+            .toList());
   }
 
   public static void appendConfigurationWarningMessages(
@@ -83,19 +94,33 @@ public final class SystemMessageFormatter {
         .toList();
   }
 
-  private static String getPrefixedMessage(Localizer localizer, String prefixKey, String message) {
+  private static String getPrefixedMessage(Localizer localizer, String labelKey, String message) {
     if (message == null) {
       return null;
     }
-    String prefix = getPrefix(localizer, prefixKey);
-    if (prefix.isEmpty() || message.stripLeading().startsWith(prefix)) {
+    String prefix = getMessagePrefix(localizer, labelKey);
+    if (prefix.isEmpty() || isSystemMessage(localizer, message)) {
       return message;
     }
     return prefix + ' ' + message;
   }
 
-  private static String getPrefix(Localizer localizer, String prefixKey) {
-    return Optional.ofNullable(localizer.getText(prefixKey)).orElse("").trim();
+  private static List<String> getMessagePrefixes(Localizer localizer) {
+    List<String> prefixes = new ArrayList<>();
+    prefixes.add(getMessagePrefix(localizer, NORMAL_MESSAGE_LABEL_KEY));
+    prefixes.add(getMessagePrefix(localizer, WARNING_MESSAGE_LABEL_KEY));
+    prefixes.add(getMessagePrefix(localizer, ERROR_MESSAGE_LABEL_KEY));
+    return prefixes.stream().filter(prefix -> !prefix.isEmpty()).toList();
+  }
+
+  private static String getMessagePrefix(Localizer localizer, String labelKey) {
+    String pluginPrefix =
+        Optional.ofNullable(localizer.getText(PLUGIN_MESSAGE_PREFIX_KEY)).orElse("").trim();
+    String label = Optional.ofNullable(localizer.getText(labelKey)).orElse("").trim();
+    if (pluginPrefix.isEmpty() || label.isEmpty()) {
+      return "";
+    }
+    return pluginPrefix + ' ' + label + ':';
   }
 
   private static String format(String message, Object... args) {
