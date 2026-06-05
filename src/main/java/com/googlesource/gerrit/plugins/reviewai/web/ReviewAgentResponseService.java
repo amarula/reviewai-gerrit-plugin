@@ -38,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -154,19 +155,11 @@ class ReviewAgentResponseService {
     if (changeSetData.getReviewSystemMessage() != null) {
       messages.add(
           prefixSystemMessage
-              ? getPrefixedSystemMessage(localizer, changeSetData.getReviewSystemMessage())
+              ? SystemMessageFormatter.getPrefixedSystemMessage(
+                  localizer, changeSetData.getReviewSystemMessage())
               : changeSetData.getReviewSystemMessage());
     }
     return joinWithDoubleNewLine(messages);
-  }
-
-  private String getPrefixedSystemMessage(Localizer localizer, String message) {
-    String prefix =
-        Optional.ofNullable(localizer.getText("system.message.prefix")).orElse("").trim();
-    if (prefix.isEmpty() || message.stripLeading().startsWith(prefix)) {
-      return message;
-    }
-    return prefix + ' ' + message;
   }
 
   private String getPartialReviewPositiveScoreMessage(ReviewAgentCommandContext commandContext) {
@@ -184,7 +177,7 @@ class ReviewAgentResponseService {
       return null;
     }
     Localizer localizer = commandContext.localizer();
-    return getPrefixedSystemMessage(
+    return SystemMessageFormatter.getPrefixedSystemMessage(
         localizer, localizer.getText("message.review.partial.positive.score.skipped"));
   }
 
