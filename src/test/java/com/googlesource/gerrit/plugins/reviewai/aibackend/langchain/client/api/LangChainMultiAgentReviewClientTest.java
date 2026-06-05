@@ -39,6 +39,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
@@ -77,8 +78,6 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/suggestPatchSetFixRevertingOriginal.txt";
   private static final String SUGGEST_EMPTY_FINAL_PATCH_SET_MESSAGE_RESOURCE =
       "__files/langchain/suggestEmptyFinalPatchSetMessage.txt";
-  private static final String SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE =
-      "__files/langchain/suggestSystemMessagePrefix.txt";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -426,11 +425,8 @@ public class LangChainMultiAgentReviewClientTest {
   }
 
   private static String emptyFinalPatchSetResponse() throws Exception {
-    return systemMessagePrefix() + ' ' + emptyFinalPatchSetMessage();
-  }
-
-  private static String systemMessagePrefix() throws Exception {
-    return readTestResource(SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE).stripTrailing();
+    return SystemMessageFormatter.getPrefixedSystemMessage(
+        localizer(), emptyFinalPatchSetMessage());
   }
 
   private static String emptyFinalPatchSetMessage() throws Exception {
@@ -481,8 +477,10 @@ public class LangChainMultiAgentReviewClientTest {
 
   private static Localizer localizer() {
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix"))
-        .thenReturn(readTestResourceUnchecked(SUGGEST_SYSTEM_MESSAGE_PREFIX_RESOURCE).stripTrailing());
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.empty.review")).thenReturn("");
     when(localizer.getText("message.suggest.patchset.unamendable"))
         .thenReturn(

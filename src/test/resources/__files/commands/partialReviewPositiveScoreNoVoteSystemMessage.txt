@@ -1,1 +1,1 @@
-SYSTEM MESSAGE: Positive Code-Review votes are skipped for partial reviews. Run `/review` without `--scope` to review the full Change Set before updating the global score.
+ReviewAI Message: Positive Code-Review votes are skipped for partial reviews. Run `/review` without `--scope` to review the full Change Set before updating the global score.

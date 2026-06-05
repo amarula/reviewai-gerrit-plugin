@@ -42,7 +42,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -126,7 +129,7 @@ public class GerritAiReviewHistoryCollectorTest {
             "msg-4",
             7,
             "ReviewAI",
-            "SYSTEM MESSAGE: No update to show for this Change Set",
+            "ReviewAI Message: No update to show for this Change Set",
             "2026-04-09 10:05:00.000000",
             5,
             null,
@@ -175,7 +178,7 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals(false, inlineReplyEntry.isSystemMessage());
 
     AiReviewHistoryInfo.Entry systemReplyEntry =
-        findEntry(info, "SYSTEM MESSAGE: No update to show for this Change Set");
+        findEntry(info, "ReviewAI Message: No update to show for this Change Set");
     assertNotNull(systemReplyEntry);
     assertEquals("ReviewAI", systemReplyEntry.getAuthor());
     assertEquals("assistant", systemReplyEntry.getRole());
@@ -195,7 +198,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -247,7 +253,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -281,7 +290,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -315,7 +327,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -326,7 +341,7 @@ public class GerritAiReviewHistoryCollectorTest {
             "msg-system",
             7,
             "ReviewAI",
-            "Patch Set 5:\n\nSYSTEM MESSAGE: No update to show for this Change Set",
+            "Patch Set 5:\n\nReviewAI Message: No update to show for this Change Set",
             "2026-04-09 10:05:00.000000",
             5,
             null,
@@ -339,7 +354,7 @@ public class GerritAiReviewHistoryCollectorTest {
     AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
     assertEquals("assistant", entry.getRole());
     assertEquals(true, entry.isSystemMessage());
-    assertEquals("SYSTEM MESSAGE: No update to show for this Change Set", entry.getMessage());
+    assertEquals("ReviewAI Message: No update to show for this Change Set", entry.getMessage());
   }
 
   @Test
@@ -349,7 +364,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.dump.dynamic.configuration.title"))
         .thenReturn("DYNAMIC CONFIGURATION SETTINGS");
 
@@ -384,7 +402,10 @@ public class GerritAiReviewHistoryCollectorTest {
     when(config.getGerritUserEmail()).thenReturn("");
 
     Localizer localizer = mock(Localizer.class);
-    when(localizer.getText("system.message.prefix")).thenReturn("SYSTEM MESSAGE:");
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.filterProperties("message.dump.", ".title"))
         .thenReturn(
             List.of(
@@ -412,7 +433,7 @@ public class GerritAiReviewHistoryCollectorTest {
     AiReviewHistoryInfo.Entry entry = info.getEntries().get(0);
     assertEquals("assistant", entry.getRole());
     assertEquals(true, entry.isSystemMessage());
-    assertTrue(entry.getMessage().contains("SYSTEM MESSAGE:"));
+    assertTrue(entry.getMessage().contains("ReviewAI Message:"));
     assertTrue(entry.getMessage().contains("PROMPT FOR FULL REVIEW"));
     assertTrue(entry.getMessage().contains("PROMPT FOR PATCH SET ONLY"));
     assertTrue(entry.getMessage().contains("PROMPT FOR COMMIT MESSAGE ONLY"));

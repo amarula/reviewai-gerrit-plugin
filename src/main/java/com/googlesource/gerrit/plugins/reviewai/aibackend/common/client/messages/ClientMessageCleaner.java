@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.message
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandCleaner;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksCleaner;
 import lombok.Getter;
@@ -43,7 +44,7 @@ public class ClientMessageCleaner extends ClientMessageBase {
     clientCommandCleaner = new ClientCommandCleaner(config);
     messageHeadingPattern =
         Pattern.compile(
-            localizer.getText("system.message.prefix")
+            SystemMessageFormatter.getMessagePrefixPattern(localizer)
                 + ".*$|^"
                 + GERRIT_DEFAULT_MESSAGE_PATCH_SET
                 + " \\d+:[^\\n]*(?:\\s+\\(\\d+ "
