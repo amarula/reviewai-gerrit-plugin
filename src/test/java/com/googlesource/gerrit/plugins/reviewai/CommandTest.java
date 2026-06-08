@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiUriResourceLocator;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -411,8 +412,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     Assert.assertEquals(
-        String.format(
-            localizer.getText("message.command.option.value.invalid"),
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
             "SCOPE",
             "full",
             ReviewScope.reviewCommandOptionValues()),
@@ -426,8 +428,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     Assert.assertEquals(
-        String.format(
-            localizer.getText("message.command.option.value.invalid"),
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
             "SCOPE",
             "full",
             ReviewScope.reviewCommandOptionValues()),
@@ -468,11 +471,42 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
 
     Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
     Assert.assertEquals(
-        String.format(
-            localizer.getText("message.command.option.value.invalid"),
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
             "codeContextPolicy",
             invalidValue,
             List.of(CodeContextPolicies.values())),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandConfigureRejectsUnknownSettingWithWarning() throws Exception {
+    setupCommandComment("/configure --unknownSetting=value");
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer, "message.command.option.config.unknown", "unknownSetting"),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandConfigureRejectsMalformedListWithWarning() throws Exception {
+    setupCommandComment("/configure --aiModels=not-an-array");
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer, "message.command.option.config.array.malformed", "aiModels"),
         changeSetData.getReviewSystemMessage());
   }
 
