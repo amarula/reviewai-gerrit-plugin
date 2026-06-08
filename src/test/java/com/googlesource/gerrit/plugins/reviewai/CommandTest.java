@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TemplateUtils.renderTemplate;
@@ -503,6 +504,43 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     String dynamicChanges = changeHandler.getValue(KEY_DYNAMIC_CONFIG);
     String expectedChanges = getGson().toJson(Map.of(dynamicKey, dynamicValue));
     Assert.assertEquals(expectedChanges, dynamicChanges);
+  }
+
+  @Test
+  public void commandConfigureRejectsInvalidCodeContextPolicy() throws Exception {
+    String invalidValue = "INVALID";
+    setupCommandComment("/configure --codeContextPolicy=" + invalidValue);
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+    Assert.assertEquals(
+        String.format(
+            localizer.getText("message.command.option.value.invalid"),
+            "codeContextPolicy",
+            invalidValue,
+            List.of(CodeContextPolicies.values())),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandConfigureValidCodeContextPolicyClearsOldInvalidValueWarning() throws Exception {
+    when(projectConfig.getString("codeContextPolicy")).thenReturn("INVALID");
+    Assert.assertEquals(CodeContextPolicies.ON_DEMAND, config.getCodeContextPolicy());
+    setupCommandComment("/configure --codeContextPolicy=NONE");
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        getGson().toJson(Map.of("codeContextPolicy", "NONE")),
+        changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+    Assert.assertTrue(config.getUnknownEnumSettings().isEmpty());
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertFalse(captor.getValue().message.contains("**WARNING**"));
   }
 
   @Test

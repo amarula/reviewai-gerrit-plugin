@@ -23,6 +23,7 @@ import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -393,6 +394,13 @@ public class Configuration extends ConfigCore {
 
   public boolean isDefinedKey(String key) {
     return isDefinedKey(this.getClass(), key);
+  }
+
+  public Optional<List<String>> getValidDynamicConfigValues(String key) {
+    if (KEY_CODE_CONTEXT_POLICY.equals(key)) {
+      return Optional.of(Arrays.stream(CodeContextPolicies.values()).map(Enum::name).toList());
+    }
+    return Optional.empty();
   }
 
   public TreeMap<String, String> dumpConfigMap() {

@@ -197,6 +197,10 @@ public abstract class ConfigCore {
     }
   }
 
+  public void clearUnknownEnumSetting(String key) {
+    unknownEnumSettings.remove(key);
+  }
+
   protected List<String> splitConfig(String value) {
     return value.isEmpty() ? List.of() : TextUtils.splitString(value);
   }
