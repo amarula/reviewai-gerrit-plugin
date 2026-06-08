@@ -281,6 +281,22 @@ public class ClientCommandParser extends ClientCommandBase {
             String.format(localizer.getText("message.command.option.config.unknown"), key));
         return true;
       }
+      Optional<List<String>> validValues = config.getValidDynamicConfigValues(key);
+      if (validValues.isPresent() && !validValues.get().contains(dynamicEntry.getValue())) {
+        changeSetData.setReviewSystemMessage(
+            String.format(
+                localizer.getText("message.command.option.value.invalid"),
+                key,
+                dynamicEntry.getValue(),
+                validValues.get()));
+        log.debug(
+            "Invalid value for configuration option `{}`: {}. Valid values are: {}",
+            key,
+            dynamicEntry.getValue(),
+            validValues.get());
+        return true;
+      }
+      validValues.ifPresent(values -> config.clearUnknownEnumSetting(key));
       if (Configuration.LIST_TYPE_ENTRY_KEYS.contains(key)
           && jsonArrayToList(dynamicEntry.getValue()).isEmpty()) {
         log.debug("Value of `{}` must be formatted as a JSON array", key);
