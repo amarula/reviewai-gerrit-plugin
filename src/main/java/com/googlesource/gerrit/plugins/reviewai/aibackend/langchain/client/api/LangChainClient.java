@@ -182,8 +182,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String userMessage =
           getUserMessageForRequest(prompt, patchSet, omitRequestContext);
 
-      log.info("LangChain system instructions for {}: {}", memoryId, systemInstructions);
-      log.info("LangChain user prompt for {}: {}", memoryId, userMessage);
+      log.debug("LangChain system instructions for {}: {}", memoryId, systemInstructions);
+      log.debug("LangChain user prompt for {}: {}", memoryId, userMessage);
 
       ChatMemory memory =
           providerType == AiProviderType.OPENAI ? buildTransientMemory(memoryId) : buildMemory(memoryId);
