@@ -21,29 +21,24 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn
 import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import org.h2.tools.Server;
+import lombok.extern.slf4j.Slf4j;
 
 @Singleton
+@Slf4j
 public class ReviewAiDb {
   private static final String DB_FILE_NAME = "reviewai";
-  private static final String TCP_HOST = "localhost";
-  private static final int TCP_PORT = 9092;
-  private static final String TCP_URL_PREFIX = "jdbc:h2:tcp://" + TCP_HOST + ":" + TCP_PORT + "/";
-  private static final Object TCP_SERVER_LOCK = new Object();
-
-  private static Server tcpServer;
 
   private final Path pluginDataDir;
   private final String jdbcUrl;
+  private volatile boolean connectionInfoLogged;
 
   @Inject
   public ReviewAiDb(@PluginData Path pluginDataDir) throws IOException {
@@ -54,12 +49,12 @@ public class ReviewAiDb {
     Files.createDirectories(pluginDataDir);
     this.pluginDataDir = pluginDataDir;
     this.jdbcUrl = jdbcUrl;
-    ensureTcpServerStarted();
   }
 
   public static String buildJdbcUrl(Path pluginDataDir) {
-    Path dbFile = pluginDataDir.resolve(DB_FILE_NAME).toAbsolutePath();
-    return TCP_URL_PREFIX + dbFile + ";AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1";
+    Path dbFile = pluginDataDir.resolve(DB_FILE_NAME).toAbsolutePath().normalize();
+    // Match Gerrit's embedded-H2 style: use an on-disk DB URL, no dedicated H2 TCP server.
+    return "jdbc:h2:" + dbFile.toUri() + ";AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1";
   }
 
   public Path getPluginDataDir() {
@@ -67,8 +62,28 @@ public class ReviewAiDb {
   }
 
   public Connection getConnection() throws SQLException {
-    ensureTcpServerStarted();
-    return DriverManager.getConnection(jdbcUrl);
+    Path dbFilePath = pluginDataDir.resolve(DB_FILE_NAME + ".mv.db").toAbsolutePath().normalize();
+    boolean dbFileExistedBeforeConnect = Files.exists(dbFilePath);
+    if (!connectionInfoLogged) {
+      log.info(
+          "Opening ReviewAI DB connection: jdbcUrl='{}', pluginDataDir='{}', dbFile='{}', "
+              + "dbFileExistedBeforeConnect={}",
+          jdbcUrl,
+          pluginDataDir.toAbsolutePath().normalize(),
+          dbFilePath,
+          dbFileExistedBeforeConnect);
+    }
+    Connection connection = DriverManager.getConnection(jdbcUrl);
+    if (!connectionInfoLogged) {
+      boolean dbFileExistsAfterConnect = Files.exists(dbFilePath);
+      log.info(
+          "ReviewAI DB connection opened: dbFile='{}', dbFileExistsAfterConnect={}, dbFileSizeBytes={}",
+          dbFilePath,
+          dbFileExistsAfterConnect,
+          dbFileExistsAfterConnect ? new File(dbFilePath.toString()).length() : 0);
+      connectionInfoLogged = true;
+    }
+    return connection;
   }
 
   public <T> T withConnection(ConnectionCallback<T> callback) throws SQLException {
@@ -164,38 +179,6 @@ public class ReviewAiDb {
           }
           return null;
         });
-  }
-
-  private void ensureTcpServerStarted() {
-    if (!usesManagedTcpServer()) {
-      return;
-    }
-    synchronized (TCP_SERVER_LOCK) {
-      if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
-        return;
-      }
-      try {
-        tcpServer =
-            Server.createTcpServer(
-                    "-tcpPort", Integer.toString(TCP_PORT), "-tcpDaemon", "-ifNotExists")
-                .start();
-      } catch (SQLException e) {
-        throw new RuntimeException("Failed to start H2 TCP server for ReviewAI DB", e);
-      }
-    }
-  }
-
-  private boolean usesManagedTcpServer() {
-    return jdbcUrl.startsWith(TCP_URL_PREFIX);
-  }
-
-  private static boolean isTcpServerAvailable() {
-    try (Socket socket = new Socket()) {
-      socket.connect(new InetSocketAddress(TCP_HOST, TCP_PORT), 200);
-      return true;
-    } catch (IOException e) {
-      return false;
-    }
   }
 
   @FunctionalInterface

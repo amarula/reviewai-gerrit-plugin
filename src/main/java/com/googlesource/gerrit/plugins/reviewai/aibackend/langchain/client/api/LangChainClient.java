@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.openai.errors.OpenAIServiceException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiClientBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -51,6 +52,7 @@ import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import java.util.List;
+import java.util.Locale;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -89,6 +91,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected record ConversationResolution(String conversationId, boolean existingConversation) {}
+  protected record ExecutionOutcome(AiMessage aiMessage, ChatMemory memory) {}
 
   @Inject
   public LangChainClient(
@@ -179,7 +182,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       log.info("LangChain user prompt for {}: {}", memoryId, userMessage);
 
       ChatMemory memory =
-          providerType == AiProviderType.OPENAI ? buildTransientMemory(memoryId) : buildMemory(memoryId);
+          createMemory(providerType, conversationResolution.conversationId(), memoryId);
       boolean hasStoredMemory = !memory.messages().isEmpty();
 
       if (!hasStoredMemory && providerType != AiProviderType.OPENAI) {
@@ -226,7 +229,21 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           memorySnapshot.size(),
           memorySnapshot);
 
-      AiMessage ai = toolExecutor.execute(model, change, memory);
+      ExecutionOutcome executionOutcome =
+          executeWithConversationFallback(
+              providerType,
+              conversationResolution.conversationId(),
+              changeSetData,
+              change,
+              memory,
+              provider,
+              temperature,
+              systemInstructions,
+              memoryId,
+              model,
+              providerModel.getEndpoint());
+      ChatMemory memoryForResponse = executionOutcome.memory();
+      AiMessage ai = executionOutcome.aiMessage();
       String responseText = ai != null ? ai.text() : null;
 
       if (responseText == null) {
@@ -237,7 +254,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       if (ai.hasToolExecutionRequests()) {
         log.warn("Skipping final LangChain memory update because response still has tool requests");
       } else {
-        memory.add(ai);
+        memoryForResponse.add(ai);
       }
 
       return new ReviewRequestResult(toResponseContent(responseText), userMessage);
@@ -280,24 +297,156 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
-    String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
-    if (changeSetData.getReviewAssistantStage() != null) {
-      switch (changeSetData.getReviewAssistantStage()) {
-        case REVIEW_CODE:
-        case REVIEW_COMMIT_MESSAGE:
-          conversationKey =
-              OpenAiConversation.getMultiAgentConversationKey(
-                  changeSetData.getReviewAssistantStage());
-          break;
-        default:
-          break;
-      }
-    }
+    String conversationKey = getConversationStorageKey(changeSetData);
     OpenAiConversation conversation =
         new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
     boolean existingConversation = conversation.hasExistingConversation();
     return new ConversationResolution(
         conversation.resolveConversationId(), existingConversation);
+  }
+
+  protected String getConversationStorageKey(ChangeSetData changeSetData) {
+    String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
+    if (changeSetData.getReviewAssistantStage() == null) {
+      return conversationKey;
+    }
+    switch (changeSetData.getReviewAssistantStage()) {
+      case REVIEW_CODE:
+      case REVIEW_COMMIT_MESSAGE:
+        return OpenAiConversation.getMultiAgentConversationKey(
+            changeSetData.getReviewAssistantStage());
+      default:
+        return conversationKey;
+    }
+  }
+
+  protected ExecutionOutcome executeWithConversationFallback(
+      AiProviderType providerType,
+      String conversationId,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ChatMemory memory,
+      ILangChainProvider provider,
+      double temperature,
+      String systemInstructions,
+      Object memoryId,
+      ChatModel model,
+      String endpoint) {
+    try {
+      return new ExecutionOutcome(toolExecutor.execute(model, change, memory), memory);
+    } catch (RuntimeException e) {
+      if (!shouldRetryWithoutConversation(providerType, conversationId, e)) {
+        throw e;
+      }
+      log.warn(
+          "OpenAI rejected conversation parameter for {} (conversationId={}); retrying once "
+              + "without conversation and persisting local memory mode for this Change Set",
+          memoryId,
+          conversationId,
+          e);
+      clearResolvedConversationId(changeSetData);
+      LangChainProvider retryProviderModel =
+          provider.buildChatModel(config, temperature, null, systemInstructions);
+      ChatMemory retryMemory = createMemory(providerType, null, memoryId);
+      if (retryMemory.messages().isEmpty()) {
+        for (ChatMessage message : memory.messages()) {
+          retryMemory.add(message);
+        }
+      }
+      log.info(
+          "Retrying LangChain request for {} using provider {} model {} "
+              + "(temperature={}, endpoint={})",
+          memoryId,
+          providerType,
+          config.getAiModel(),
+          temperature,
+          retryProviderModel.getEndpoint() == null ? endpoint : retryProviderModel.getEndpoint());
+      return new ExecutionOutcome(
+          toolExecutor.execute(retryProviderModel.getModel(), change, retryMemory), retryMemory);
+    }
+  }
+
+  protected boolean shouldRetryWithoutConversation(
+      AiProviderType providerType, String conversationId, Throwable throwable) {
+    if (providerType != AiProviderType.OPENAI
+        || conversationId == null
+        || conversationId.isBlank()
+        || throwable == null) {
+      return false;
+    }
+    OpenAIServiceException openAiException = findOpenAiServiceException(throwable);
+    if (openAiException != null) {
+      String param = openAiException.param().orElse("");
+      String code = openAiException.code().orElse("");
+      String body = String.valueOf(openAiException.body()).toLowerCase(Locale.ROOT);
+      if ("conversation".equalsIgnoreCase(param)
+          && ("unsupported_parameter".equalsIgnoreCase(code)
+              || body.contains("zero data retention"))) {
+        return true;
+      }
+    }
+    String message = flattenMessages(throwable).toLowerCase(Locale.ROOT);
+    return message.contains("param=conversation")
+        && (message.contains("unsupported_parameter")
+            || message.contains("zero data retention"));
+  }
+
+  protected void clearResolvedConversationId(ChangeSetData changeSetData) {
+    if (pluginDataHandlerProvider == null) {
+      return;
+    }
+    OpenAiConversation conversation =
+        new OpenAiConversation(
+            config, pluginDataHandlerProvider, getConversationStorageKey(changeSetData));
+    try {
+      conversation.setConversationDisabled(true);
+      pluginDataHandlerProvider
+          .getChangeScope()
+          .removeValue(getConversationStorageKey(changeSetData));
+    } catch (RuntimeException e) {
+      log.warn(
+          "Failed to switch OpenAI conversation mode to local memory for key {}",
+          getConversationStorageKey(changeSetData),
+          e);
+    }
+  }
+
+  protected ChatMemory createMemory(
+      AiProviderType providerType, String conversationId, Object memoryId) {
+    if (providerType != AiProviderType.OPENAI) {
+      return buildMemory(memoryId);
+    }
+    if (conversationId == null || conversationId.isBlank()) {
+      return buildMemory(memoryId);
+    }
+    return buildTransientMemory(memoryId);
+  }
+
+  private OpenAIServiceException findOpenAiServiceException(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof OpenAIServiceException serviceException) {
+        return serviceException;
+      }
+      current = current.getCause();
+    }
+    return null;
+  }
+
+  private String flattenMessages(Throwable throwable) {
+    StringBuilder builder = new StringBuilder();
+    Throwable current = throwable;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null && !message.isBlank()) {
+        if (!builder.isEmpty()) {
+          builder.append(" | ");
+        }
+        builder.append(message);
+      }
+      current = current.getCause();
+    }
+    return builder.toString();
   }
 
   @VisibleForTesting

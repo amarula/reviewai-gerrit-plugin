@@ -34,6 +34,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 @Slf4j
 public class OpenAiConversation {
   public static final String KEY_CONVERSATION_ID = "conversationId";
+  public static final String KEY_CONVERSATION_DISABLED = "conversationDisabled";
 
   private final Configuration config;
   private final PluginDataHandler changeDataHandler;
@@ -59,6 +60,10 @@ public class OpenAiConversation {
   }
 
   public String resolveConversationId() throws AiConnectionFailException {
+    if (isConversationDisabled()) {
+      log.info("OpenAI conversation support disabled for this Change Set; using local memory only");
+      return null;
+    }
     String conversationId = getExistingConversationId();
     if (conversationId == null) {
       return createConversation();
@@ -70,7 +75,22 @@ public class OpenAiConversation {
   }
 
   public boolean hasExistingConversation() {
+    if (isConversationDisabled()) {
+      return false;
+    }
     return getExistingConversationId() != null;
+  }
+
+  public boolean isConversationDisabled() {
+    return Boolean.parseBoolean(changeDataHandler.getValue(KEY_CONVERSATION_DISABLED));
+  }
+
+  public void setConversationDisabled(boolean disabled) {
+    if (disabled) {
+      changeDataHandler.setValue(KEY_CONVERSATION_DISABLED, Boolean.TRUE.toString());
+      return;
+    }
+    changeDataHandler.removeValue(KEY_CONVERSATION_DISABLED);
   }
 
   private String getExistingConversationId() {
@@ -109,6 +129,7 @@ public class OpenAiConversation {
 
   public void clear() {
     changeDataHandler.removeValue(KEY_CONVERSATION_ID);
+    changeDataHandler.removeValue(KEY_CONVERSATION_DISABLED);
     for (ReviewAssistantStage assistantStage : ReviewAssistantStage.values()) {
       changeDataHandler.removeValue(getMultiAgentConversationKey(assistantStage));
     }

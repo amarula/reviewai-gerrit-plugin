@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -124,6 +125,8 @@ public class LangChainClientTest {
   @Test
   public void resolvesOpenAiConversationForLangChainOpenAiProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_DISABLED))
+        .thenReturn("false");
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
         .thenReturn("conv_langchain_openai");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
@@ -145,6 +148,8 @@ public class LangChainClientTest {
   @Test
   public void resolvesOpenAiConversationForNormalFollowUpMessage() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_DISABLED))
+        .thenReturn("false");
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
         .thenReturn("conv_follow_up");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
@@ -167,6 +172,8 @@ public class LangChainClientTest {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =
         OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStage.REVIEW_CODE);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_DISABLED))
+        .thenReturn("false");
     when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_review_code");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
@@ -195,6 +202,76 @@ public class LangChainClientTest {
             changeSetData);
 
     assertEquals(null, conversationId);
+  }
+
+  @Test
+  public void resolvesNoConversationWhenOpenAiConversationIsDisabled() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_DISABLED))
+        .thenReturn("true");
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setReviewAssistantStage(null);
+
+    String conversationId =
+        resolveConversationId(
+            new LangChainClient(
+                Mockito.mock(Configuration.class), null, null, null, pluginDataHandlerProvider),
+            AiProviderType.OPENAI,
+            changeSetData);
+
+    assertNull(conversationId);
+  }
+
+  @Test
+  public void retriesWithoutConversationForZeroDataRetentionConversationError() {
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    boolean shouldRetry =
+        client.shouldRetryWithoutConversation(
+            AiProviderType.OPENAI,
+            "conv_123",
+            new RuntimeException(
+                "status=400 code=unsupported_parameter type=invalid_request_error "
+                    + "param=conversation body={message=Conversation ID cannot be used for this "
+                    + "organization due to Zero Data Retention.}"));
+
+    assertTrue(shouldRetry);
+  }
+
+  @Test
+  public void doesNotRetryWithoutConversationForNonOpenAiProvider() {
+    TestableLangChainClient client = new TestableLangChainClient();
+
+    boolean shouldRetry =
+        client.shouldRetryWithoutConversation(
+            AiProviderType.GEMINI,
+            "conv_123",
+            new RuntimeException(
+                "status=400 code=unsupported_parameter type=invalid_request_error "
+                    + "param=conversation body={message=Conversation ID cannot be used for this "
+                    + "organization due to Zero Data Retention.}"));
+
+    assertFalse(shouldRetry);
+  }
+
+  @Test
+  public void clearsStageSpecificConversationKeyWhenFallbackIsNeeded() {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
+
+    TestableLangChainClient client =
+        new TestableLangChainClient(
+            Mockito.mock(Configuration.class), pluginDataHandlerProvider);
+    client.clearResolvedConversationId(changeSetData);
+
+    verify(changeDataHandler).setValue(OpenAiConversation.KEY_CONVERSATION_DISABLED, "true");
+    verify(changeDataHandler)
+        .removeValue(OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStage.REVIEW_CODE));
   }
 
   @Test
@@ -314,6 +391,12 @@ public class LangChainClientTest {
       super(null, null, null, null);
     }
 
+    private TestableLangChainClient(
+        Configuration config,
+        PluginDataHandlerProvider pluginDataHandlerProvider) {
+      super(config, null, null, null, pluginDataHandlerProvider);
+    }
+
     private AiResponseContent parseResponseContent(String responseText) {
       return toResponseContent(responseText);
     }
@@ -333,6 +416,15 @@ public class LangChainClientTest {
           existingConversation,
           changeSetData,
           change);
+    }
+
+    protected boolean shouldRetryWithoutConversation(
+        AiProviderType providerType, String conversationId, Throwable throwable) {
+      return super.shouldRetryWithoutConversation(providerType, conversationId, throwable);
+    }
+
+    protected void clearResolvedConversationId(ChangeSetData changeSetData) {
+      super.clearResolvedConversationId(changeSetData);
     }
   }
 }
