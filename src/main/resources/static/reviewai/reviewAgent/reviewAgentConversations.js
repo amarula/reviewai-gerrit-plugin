@@ -17,6 +17,10 @@
 
       const storedConversation = await this._getStoredConversation(change, conversationId);
       if (storedConversation) {
+        reviewAi.agentUtils.linkConversationReplyHeaders(
+          storedConversation,
+          await this._fetchEntries(change)
+        );
         return Array.isArray(storedConversation.turns) ? storedConversation.turns : [];
       }
 
