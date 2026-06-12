@@ -98,9 +98,19 @@
         ? reviewAi.entries.formatLocationWithReviewScore(entry)
         : reviewAi.entries.formatLocation(entry);
     if (location && location !== 'Change thread') {
-      return `**${location}**\n${entry.message || ''}`;
+      const changeMessageId = getChangeMessageId(entry);
+      const locationHeader =
+        entry.filename && changeMessageId
+          ? `[${location}](${changeLogMessageUrl(changeMessageId)})`
+          : location;
+      return `**${locationHeader}**\n${entry.message || ''}`;
     }
     return entry.message || '';
+  }
+
+  function changeLogMessageUrl(changeMessageId) {
+    const changePath = global.location.pathname.replace(/(\/\+\/\d+).*/, '$1');
+    return `${changePath}?forceReload=true#message-${encodeURIComponent(changeMessageId)}`;
   }
 
   function formatAgentEntries(entries) {
@@ -120,6 +130,45 @@
       messages.push(`**${reviewScore}**`);
     }
     return messages.join(responseEntrySeparator);
+  }
+
+  function unwrapCommitMessageSuggestion(text) {
+    return text.replace(
+      /(^\*\*(?:\[\/COMMIT_MSG(?::\d+)?\]\([^\r\n]+\)|\/COMMIT_MSG(?::\d+)?)\*\*\r?\n[\s\S]*?)^```suggestion[^\r\n]*\r?\n([\s\S]*?)\r?\n```(?=\r?\n\r?\n---|\s*$)/gm,
+      '$1$2'
+    );
+  }
+
+  function linkConversationReplyHeaders(conversation, entries) {
+    const assistantEntries = entries.filter(
+      entry => isAssistantEntry(entry) && entry.filename && getChangeMessageId(entry)
+    );
+    (conversation.turns || []).forEach(turn => {
+      [turn.response, turn.chat_response].filter(Boolean).forEach(response => {
+        (response.response_parts || []).forEach(part => {
+          if (!part.text) {
+            return;
+          }
+          part.text = unwrapCommitMessageSuggestion(part.text);
+          assistantEntries.forEach(entry => {
+            const plainEntry = formatAgentEntry(
+              {...entry, changeMessageId: null, change_message_id: null},
+              {includeReviewScore: false, suppressScoredPatchSetLocation: true}
+            );
+            const linkedEntry = formatAgentEntry(entry, {
+              includeReviewScore: false,
+              suppressScoredPatchSetLocation: true,
+            });
+            part.text = part.text.replace(plainEntry, linkedEntry);
+          });
+        });
+      });
+    });
+    return conversation;
+  }
+
+  function getChangeMessageId(entry) {
+    return entry.changeMessageId || entry.change_message_id;
   }
 
   function buildClientData(overridesPreviousTurn) {
@@ -251,6 +300,7 @@
     normalizeResponseEntrySeparators,
     formatAgentEntry,
     formatAgentEntries,
+    linkConversationReplyHeaders,
     buildClientData,
     getConversationTitle,
     stableUuid,

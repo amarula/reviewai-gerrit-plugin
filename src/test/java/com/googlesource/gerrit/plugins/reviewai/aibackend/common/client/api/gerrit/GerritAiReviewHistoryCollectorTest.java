@@ -93,6 +93,7 @@ public class GerritAiReviewHistoryCollectorTest {
             "src/main/java/Foo.java",
             42);
     inlineAiReply.setInReplyTo("c-1");
+    inlineAiReply.setChangeMessageId("msg-inline-reply");
     GerritComment nonAddressedInline =
         newComment(
             "c-2",
@@ -176,6 +177,7 @@ public class GerritAiReviewHistoryCollectorTest {
     assertEquals("ReviewAI", inlineReplyEntry.getAuthor());
     assertEquals("assistant", inlineReplyEntry.getRole());
     assertEquals(false, inlineReplyEntry.isSystemMessage());
+    assertEquals("msg-inline-reply", inlineReplyEntry.getChangeMessageId());
 
     AiReviewHistoryInfo.Entry systemReplyEntry =
         findEntry(info, "ReviewAI Message: No update to show for this Change Set");

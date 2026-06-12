@@ -30,6 +30,7 @@ public class AiReviewHistoryInfo {
   @AllArgsConstructor
   public static class Entry {
     private final String id;
+    private final String changeMessageId;
     private final String role;
     private final boolean systemMessage;
     private final String author;
