@@ -287,6 +287,9 @@ public class ClientCommandParser extends ClientCommandBase {
                 localizer, "message.command.option.config.unknown", key));
         return true;
       }
+      if (baseOptions.containsKey(BaseOptionSet.RESET) && dynamicEntry.getValue().isEmpty()) {
+        continue;
+      }
       Optional<List<String>> validValues = config.getValidDynamicConfigValues(key);
       if (validValues.isPresent() && !validValues.get().contains(dynamicEntry.getValue())) {
         changeSetData.setReviewSystemMessage(
