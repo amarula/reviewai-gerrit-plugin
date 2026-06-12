@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
+import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_SELECTIVE_LOG_LEVEL_OVERRIDE;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
@@ -548,6 +549,26 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     String dynamicChanges = changeHandler.getValue(KEY_DYNAMIC_CONFIG);
     String expectedChanges = getGson().toJson(Map.of(dynamicKey, dynamicValue));
     Assert.assertEquals(expectedChanges, dynamicChanges);
+  }
+
+  @Test
+  public void commandConfigureSelectivelyResetsListSetting() throws Exception {
+    setupCommandComment("/configure --reset --" + KEY_SELECTIVE_LOG_LEVEL_OVERRIDE);
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+    changeHandler.setJsonValue(
+        KEY_DYNAMIC_CONFIG,
+        Map.of(
+            KEY_SELECTIVE_LOG_LEVEL_OVERRIDE,
+            getGson().toJson(List.of("ClientMessage")),
+            "aiModel",
+            "OpenAI/gpt-4.1"));
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        getGson().toJson(Map.of("aiModel", "OpenAI/gpt-4.1")),
+        changeHandler.getValue(KEY_DYNAMIC_CONFIG));
   }
 
   @Test
