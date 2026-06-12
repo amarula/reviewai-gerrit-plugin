@@ -37,6 +37,10 @@ public class AiPromptSuggest extends AiPromptReview {
   public static String DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE;
   public static String DEFAULT_AI_SUGGEST_RESPONSE_FORMAT;
   public static String DEFAULT_AI_SUGGEST_MESSAGE;
+  public static String DEFAULT_AI_SUGGEST_REVIEW_REPLIES_REQUEST;
+  public static String DEFAULT_AI_SUGGEST_EXISTING_CONTEXT_REQUEST;
+  public static String DEFAULT_AI_SUGGEST_SCOPE_PATCHSET;
+  public static String DEFAULT_AI_SUGGEST_SCOPE_COMMIT_MESSAGE;
 
   public AiPromptSuggest(
       Configuration config,

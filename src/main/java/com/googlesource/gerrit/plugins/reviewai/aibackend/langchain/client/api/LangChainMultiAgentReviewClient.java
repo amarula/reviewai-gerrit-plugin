@@ -200,6 +200,11 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     return askStages(changeSetData, change, patchSet, MULTI_AGENT_ASSISTANT_STAGES);
   }
 
+  @Override
+  protected boolean requireOpenAiScopeForExistingReviewContext() {
+    return true;
+  }
+
   private AiResponseContent askStages(
       ChangeSetData changeSetData,
       GerritChange change,

@@ -222,6 +222,28 @@ public class LangChainMultiAgentReviewClientTest {
   }
 
   @Test
+  public void suggestPatchsetScopeUsesExistingReviewContextWithoutInitialReview() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    client.existingReviewContext = true;
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertEquals(1, response.getReplies().size());
+    assertEquals(List.of(true), client.recordedSuggestModes);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.recordedStages);
+    assertTrue(client.recordedPatchSets.get(0).contains("already present"));
+    assertNull(response.getReplies().get(0).getId());
+    assertNull(response.getReplies().get(0).getScore());
+  }
+
+  @Test
   public void suggestIncludesRepeatedNegativeReviewInSingleSuggestionRequest() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     AiReplyItem repeatedNegative =
@@ -577,6 +599,7 @@ public class LangChainMultiAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Commit message review issue").score(-1.0).build());
     private List<AiReplyItem> suggestionReplies = List.of();
     private ReviewAssistantStage routedStage = ReviewAssistantStage.REVIEW_CODE;
+    private boolean existingReviewContext;
     private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
@@ -614,6 +637,11 @@ public class LangChainMultiAgentReviewClientTest {
       }
 
       return new ReviewRequestResult(response, "body-" + stage.name());
+    }
+
+    @Override
+    protected boolean hasExistingReviewContext(ChangeSetData changeSetData) {
+      return existingReviewContext;
     }
 
     @Override
