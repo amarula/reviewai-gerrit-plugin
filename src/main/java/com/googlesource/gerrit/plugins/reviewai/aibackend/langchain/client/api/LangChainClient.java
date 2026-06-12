@@ -292,24 +292,22 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (providerType != AiProviderType.OPENAI || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
-    String conversationKey = OpenAiConversation.KEY_CONVERSATION_ID;
-    if (changeSetData.getReviewAssistantStage() != null) {
-      switch (changeSetData.getReviewAssistantStage()) {
-        case REVIEW_CODE:
-        case REVIEW_COMMIT_MESSAGE:
-          conversationKey =
-              OpenAiConversation.getMultiAgentConversationKey(
-                  changeSetData.getReviewAssistantStage());
-          break;
-        default:
-          break;
-      }
-    }
     OpenAiConversation conversation =
-        new OpenAiConversation(config, pluginDataHandlerProvider, conversationKey);
+        new OpenAiConversation(
+            config, pluginDataHandlerProvider, LangChainOpenAiConversationKey.from(changeSetData));
     boolean existingConversation = conversation.hasExistingConversation();
     return new ConversationResolution(
         conversation.resolveConversationId(), existingConversation);
+  }
+
+  protected boolean hasExistingReviewContext(ChangeSetData changeSetData) {
+    return new LangChainReviewContextChecker(
+            config, pluginDataHandlerProvider, requireOpenAiScopeForExistingReviewContext())
+        .hasExistingReviewContext(changeSetData);
+  }
+
+  protected boolean requireOpenAiScopeForExistingReviewContext() {
+    return false;
   }
 
   @VisibleForTesting

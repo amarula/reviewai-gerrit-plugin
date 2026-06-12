@@ -17,10 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSuggestRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -46,6 +46,9 @@ public class LangChainSuggestClient {
 
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    if (client.hasExistingReviewContext(LangChainSuggestData.review(changeSetData))) {
+      return new LangChainDirectSuggestClient(client).ask(changeSetData, change, patchSet);
+    }
     List<AiReplyItem> negativeReplies = askReview(changeSetData, change, patchSet);
     List<AiReplyItem> suggestions =
         negativeReplies.isEmpty()
@@ -59,7 +62,7 @@ public class LangChainSuggestClient {
   private List<AiReplyItem> askReview(
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
-    ChangeSetData reviewData = buildReviewData(changeSetData);
+    ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
     AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
     if (reviewResponse == null) {
       return List.of();
@@ -82,7 +85,7 @@ public class LangChainSuggestClient {
     log.info(
         "Requesting Gerrit suggested edits in one AI query for {} negative review replies",
         negativeReplies.size());
-    ChangeSetData suggestionData = buildSuggestionData(changeSetData);
+    ChangeSetData suggestionData = LangChainSuggestData.suggestion(changeSetData);
     LangChainClient.ReviewRequestResult suggestionResult =
         client.askSingleRequest(
             suggestionData, change, buildSuggestionRequest(patchSet, negativeReplies));
@@ -142,34 +145,6 @@ public class LangChainSuggestClient {
     return suggestions;
   }
 
-  private ChangeSetData buildReviewData(ChangeSetData changeSetData) {
-    ChangeSetData reviewData = changeSetData.copy();
-    reviewData.setForcedReview(true);
-    reviewData.setSuggestMode(false);
-    ReviewScope scope = changeSetData.getReviewScope();
-    if (scope == ReviewScope.PATCHSET || scope == ReviewScope.COMMIT_MESSAGE) {
-      reviewData.setForcedStagedReview(true);
-      reviewData.setReviewAssistantStage(toReviewAssistantStage(scope));
-    } else {
-      reviewData.setForcedStagedReview(false);
-    }
-    return reviewData;
-  }
-
-  private ChangeSetData buildSuggestionData(ChangeSetData changeSetData) {
-    ChangeSetData suggestionData = changeSetData.copy();
-    suggestionData.setForcedReview(true);
-    suggestionData.setForcedStagedReview(true);
-    suggestionData.setSuggestMode(true);
-    return suggestionData;
-  }
-
-  private ReviewAssistantStage toReviewAssistantStage(ReviewScope scope) {
-    return scope == ReviewScope.COMMIT_MESSAGE
-        ? ReviewAssistantStage.REVIEW_COMMIT_MESSAGE
-        : ReviewAssistantStage.REVIEW_CODE;
-  }
-
   private List<AiReplyItem> negativeReplies(AiResponseContent responseContent) {
     return responseReplies(responseContent).stream()
         .filter(reply -> reply.getScore() != null && reply.getScore() < 0)
@@ -207,9 +182,7 @@ public class LangChainSuggestClient {
   }
 
   private String buildSuggestionRequest(String patchSet, List<AiReplyItem> negativeReplies) {
-    return patchSet
-        + "\n\nGenerate one or more Gerrit suggested edits for every negative review reply:\n"
-        + getGson().toJson(negativeReplies);
+    return AiPromptSuggestRequest.forReviewReplies(patchSet, getGson().toJson(negativeReplies));
   }
 
   private void prepareReviewLocation(
