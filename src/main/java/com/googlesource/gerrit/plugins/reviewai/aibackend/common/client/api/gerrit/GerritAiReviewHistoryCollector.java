@@ -192,6 +192,7 @@ public class GerritAiReviewHistoryCollector {
     entries.add(
         new AiReviewHistoryInfo.Entry(
             comment.getId(),
+            comment.getChangeMessageId(),
             fromAi ? Settings.OPENAI_ROLE_ASSISTANT : Settings.OPENAI_ROLE_USER,
             systemMessage,
             getAuthorName(comment),
