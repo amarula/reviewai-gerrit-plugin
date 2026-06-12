@@ -17,10 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSuggestRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,9 +35,6 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 public class LangChainSuggestClient {
-  private static final String COMMIT_MESSAGE_FILENAME = "/COMMIT_MSG";
-  private static final String SUGGESTION_FENCE = "```suggestion";
-
   private final LangChainClient client;
 
   public LangChainSuggestClient(LangChainClient client) {
@@ -46,6 +43,9 @@ public class LangChainSuggestClient {
 
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    if (client.hasExistingReviewContext(LangChainSuggestData.review(changeSetData))) {
+      return new LangChainDirectSuggestClient(client).ask(changeSetData, change, patchSet);
+    }
     List<AiReplyItem> negativeReplies = askReview(changeSetData, change, patchSet);
     List<AiReplyItem> suggestions =
         negativeReplies.isEmpty()
@@ -59,7 +59,7 @@ public class LangChainSuggestClient {
   private List<AiReplyItem> askReview(
       ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
-    ChangeSetData reviewData = buildReviewData(changeSetData);
+    ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
     AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
     if (reviewResponse == null) {
       return List.of();
@@ -87,7 +87,7 @@ public class LangChainSuggestClient {
               change,
               patchSet,
               negativeReplies.stream()
-                  .filter(reply -> !COMMIT_MESSAGE_FILENAME.equals(reply.getFilename()))
+                  .filter(reply -> !SuggestedEditSupport.isCommitMessageFile(reply.getFilename()))
                   .toList(),
               ReviewScope.PATCHSET));
       suggestions.addAll(
@@ -96,7 +96,7 @@ public class LangChainSuggestClient {
               change,
               patchSet,
               negativeReplies.stream()
-                  .filter(reply -> COMMIT_MESSAGE_FILENAME.equals(reply.getFilename()))
+                  .filter(reply -> SuggestedEditSupport.isCommitMessageFile(reply.getFilename()))
                   .toList(),
               ReviewScope.COMMIT_MESSAGE));
       return suggestions;
@@ -123,7 +123,7 @@ public class LangChainSuggestClient {
     log.info(
         "Requesting Gerrit suggested edits in one AI query for {} negative review replies",
         negativeReplies.size());
-    ChangeSetData suggestionData = buildSuggestionData(changeSetData, reviewScope);
+    ChangeSetData suggestionData = LangChainSuggestData.suggestion(changeSetData, reviewScope);
     LangChainClient.ReviewRequestResult suggestionResult =
         client.askSingleRequest(
             suggestionData, change, buildSuggestionRequest(patchSet, negativeReplies));
@@ -136,13 +136,14 @@ public class LangChainSuggestClient {
         negativeReplies.stream().collect(Collectors.toMap(AiReplyItem::getId, Function.identity()));
     Set<Integer> commitMessageReviewIds =
         negativeReplies.stream()
-            .filter(reply -> COMMIT_MESSAGE_FILENAME.equals(reply.getFilename()))
+            .filter(reply -> SuggestedEditSupport.isCommitMessageFile(reply.getFilename()))
             .map(AiReplyItem::getId)
             .collect(Collectors.toSet());
     List<AiReplyItem> suggestions = new ArrayList<>();
     Set<Integer> suggestedReviewIds = new HashSet<>();
     boolean commitMessageSuggestionAdded = false;
-    for (AiReplyItem suggestion : responseReplies(suggestionResult.getResponseContent())) {
+    for (AiReplyItem suggestion :
+        SuggestedEditSupport.responseReplies(suggestionResult.getResponseContent())) {
       Integer reviewId = suggestion.getId();
       AiReplyItem reviewReply = reviewsById.get(reviewId);
       if (reviewReply == null) {
@@ -150,7 +151,7 @@ public class LangChainSuggestClient {
         continue;
       }
       boolean commitMessageSuggestion =
-          COMMIT_MESSAGE_FILENAME.equals(reviewReply.getFilename());
+          SuggestedEditSupport.isCommitMessageFile(reviewReply.getFilename());
       if (commitMessageSuggestion && commitMessageSuggestionAdded) {
         log.warn("Ignoring additional AI commit-message suggestion for negative review ID {}", reviewId);
         continue;
@@ -183,40 +184,8 @@ public class LangChainSuggestClient {
     return suggestions;
   }
 
-  private ChangeSetData buildReviewData(ChangeSetData changeSetData) {
-    ChangeSetData reviewData = changeSetData.copy();
-    reviewData.setForcedReview(true);
-    reviewData.setSuggestMode(false);
-    ReviewScope scope = changeSetData.getReviewScope();
-    if (scope == ReviewScope.PATCHSET || scope == ReviewScope.COMMIT_MESSAGE) {
-      reviewData.setForcedStagedReview(true);
-      reviewData.setReviewAssistantStage(toReviewAssistantStage(scope));
-    } else {
-      reviewData.setForcedStagedReview(false);
-    }
-    return reviewData;
-  }
-
-  private ChangeSetData buildSuggestionData(ChangeSetData changeSetData, ReviewScope reviewScope) {
-    ChangeSetData suggestionData = changeSetData.copy();
-    suggestionData.setForcedReview(true);
-    suggestionData.setForcedStagedReview(true);
-    suggestionData.setSuggestMode(true);
-    if (reviewScope == ReviewScope.PATCHSET || reviewScope == ReviewScope.COMMIT_MESSAGE) {
-      suggestionData.setReviewScope(reviewScope);
-      suggestionData.setReviewAssistantStage(toReviewAssistantStage(reviewScope));
-    }
-    return suggestionData;
-  }
-
-  private ReviewAssistantStage toReviewAssistantStage(ReviewScope scope) {
-    return scope == ReviewScope.COMMIT_MESSAGE
-        ? ReviewAssistantStage.REVIEW_COMMIT_MESSAGE
-        : ReviewAssistantStage.REVIEW_CODE;
-  }
-
   private List<AiReplyItem> negativeReplies(AiResponseContent responseContent) {
-    return responseReplies(responseContent).stream()
+    return SuggestedEditSupport.responseReplies(responseContent).stream()
         .filter(reply -> reply.getScore() != null && reply.getScore() < 0)
         .map(this::copyReply)
         .toList();
@@ -236,15 +205,6 @@ public class LangChainSuggestClient {
         .build();
   }
 
-  private List<AiReplyItem> responseReplies(AiResponseContent responseContent) {
-    if (responseContent.getReplies() == null) {
-      return List.of();
-    }
-    return responseContent.getReplies().stream()
-        .filter(reply -> reply.getReply() != null && !reply.getReply().isBlank())
-        .toList();
-  }
-
   private void assignReplyIds(List<AiReplyItem> negativeReplies) {
     for (int i = 0; i < negativeReplies.size(); i++) {
       negativeReplies.get(i).setId(i);
@@ -252,9 +212,7 @@ public class LangChainSuggestClient {
   }
 
   private String buildSuggestionRequest(String patchSet, List<AiReplyItem> negativeReplies) {
-    return patchSet
-        + "\n\nGenerate one or more Gerrit suggested edits for every negative review reply:\n"
-        + getGson().toJson(negativeReplies);
+    return AiPromptSuggestRequest.forReviewReplies(patchSet, getGson().toJson(negativeReplies));
   }
 
   private void prepareReviewLocation(
@@ -265,50 +223,23 @@ public class LangChainSuggestClient {
     if (!commitMessageReview) {
       return;
     }
-    reviewReply.setFilename(COMMIT_MESSAGE_FILENAME);
+    reviewReply.setFilename(SuggestedEditSupport.COMMIT_MESSAGE_FILENAME);
     reviewReply.setLineNumber(null);
-    reviewReply.setCodeSnippet(extractCommitMessage(patchSet));
-  }
-
-  private String extractCommitMessage(String patchSet) {
-    int separatorIndex = patchSet.indexOf("\n---\n");
-    String header = separatorIndex >= 0 ? patchSet.substring(0, separatorIndex) : patchSet;
-    int subjectIndex = header.indexOf("Subject: ");
-    if (subjectIndex >= 0) {
-      header = header.substring(subjectIndex + "Subject: ".length());
-    }
-    int changeIdIndex = header.indexOf("\nChange-Id:");
-    if (changeIdIndex >= 0) {
-      header = header.substring(0, changeIdIndex);
-    }
-    return header.strip();
+    reviewReply.setCodeSnippet(SuggestedEditSupport.extractCommitMessage(patchSet));
   }
 
   private boolean prepareNativeSuggestedEdit(AiReplyItem suggestion, AiReplyItem reviewReply) {
-    if (!hasSuggestionFence(suggestion)) {
+    if (!SuggestedEditSupport.hasSuggestionFence(suggestion)) {
       return false;
     }
-    if (COMMIT_MESSAGE_FILENAME.equals(reviewReply.getFilename())) {
-      if (!COMMIT_MESSAGE_FILENAME.equals(suggestion.getFilename())) {
+    if (SuggestedEditSupport.isCommitMessageFile(reviewReply.getFilename())) {
+      if (!SuggestedEditSupport.isCommitMessageFile(suggestion.getFilename())) {
         return false;
       }
       suggestion.setLineNumber(null);
       suggestion.setCodeSnippet(reviewReply.getCodeSnippet());
       return suggestion.getCodeSnippet() != null;
     }
-    return hasCodeSuggestionTarget(suggestion);
-  }
-
-  private boolean hasSuggestionFence(AiReplyItem suggestion) {
-    return suggestion.getReply().contains(SUGGESTION_FENCE);
-  }
-
-  private boolean hasCodeSuggestionTarget(AiReplyItem suggestion) {
-    return suggestion.getFilename() != null
-        && !suggestion.getFilename().isBlank()
-        && !COMMIT_MESSAGE_FILENAME.equals(suggestion.getFilename())
-        && suggestion.getLineNumber() != null
-        && suggestion.getCodeSnippet() != null
-        && !suggestion.getCodeSnippet().isBlank();
+    return SuggestedEditSupport.hasCodeSuggestionTarget(suggestion);
   }
 }
