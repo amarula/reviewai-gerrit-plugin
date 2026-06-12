@@ -86,12 +86,14 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
     }
     PatchSetAttribute patchSetAttribute = patchSetAttributeOptional.get();
     ChangeKind patchSetEventKind = patchSetAttribute.kind;
-    // The only Change kind that automatically triggers the review is REWORK. If review is forced
-    // via command, this
-    // condition is bypassed
-    if (patchSetEventKind != ChangeKind.REWORK && !changeSetData.getForcedReview()) {
+    // Automatically review code and commit-message changes. If review is forced via command, this
+    // condition is bypassed.
+    if (patchSetEventKind != ChangeKind.REWORK
+        && patchSetEventKind != ChangeKind.NO_CODE_CHANGE
+        && patchSetEventKind != ChangeKind.TRIVIAL_REBASE_WITH_MESSAGE_UPDATE
+        && !changeSetData.getForcedReview()) {
       log.debug(
-          "Change kind '{}' is not REWORK and no forced review, for change ID: {}",
+          "Change kind '{}' is not reviewable and no forced review, for change ID: {}",
           patchSetEventKind,
           change.getFullChangeId());
       return false;
