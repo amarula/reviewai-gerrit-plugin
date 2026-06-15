@@ -50,6 +50,7 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ResponseFormat;
+import dev.langchain4j.model.chat.request.ResponseFormatType;
 import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -123,9 +124,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
             && config.getAiProviderType() == AiProviderType.OPENAI;
     ResponseFormat toolExecutorResponseFormat =
-        supportsStructuredResponseWithTools(config, contextTools)
-            ? structuredResponseFormat
-            : null;
+        getProviderResponseFormat(config, contextTools);
     this.toolExecutor =
         new LangChainExecutor(
             config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
@@ -342,12 +341,20 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         .build();
   }
 
-  private boolean supportsStructuredResponseWithTools(
+  private ResponseFormat getProviderResponseFormat(
       Configuration config, List<ToolSpecification> contextTools) {
-    return config == null
-        || config.getAiProviderType() != AiProviderType.GEMINI
-        || contextTools == null
-        || contextTools.isEmpty();
+    if (config == null) {
+      return structuredResponseFormat;
+    }
+    if (config.getAiProviderType() == AiProviderType.DEEPSEEK) {
+      return ResponseFormat.builder().type(ResponseFormatType.JSON).build();
+    }
+    if (config.getAiProviderType() == AiProviderType.GEMINI
+        && contextTools != null
+        && !contextTools.isEmpty()) {
+      return null;
+    }
+    return structuredResponseFormat;
   }
 
   @Override

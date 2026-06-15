@@ -17,48 +17,21 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.moonshot;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.MOONSHOT_DOMAIN;
-import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.OPENAI_DOMAIN;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.FallbackTokenCountEstimator;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ModelCompatibility;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.OpenAiCompatibleLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
-import java.time.Duration;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class MoonshotLangChainProvider implements ILangChainProvider {
+public class MoonshotLangChainProvider extends OpenAiCompatibleLangChainProvider {
 
   @Override
-  public LangChainProvider buildChatModel(Configuration config, double temperature) {
-    String baseUrl = config.getAiDomain();
-    if (baseUrl == null || baseUrl.isBlank() || OPENAI_DOMAIN.equals(baseUrl)) {
-      baseUrl = MOONSHOT_DOMAIN;
-    }
-    if (!baseUrl.endsWith("/v1")) {
-      baseUrl = baseUrl.endsWith("/") ? baseUrl + "v1" : baseUrl + "/v1";
-    }
-    String modelName = config.getAiModel();
-
-    OpenAiChatModel.OpenAiChatModelBuilder builder =
-        OpenAiChatModel.builder()
-            .baseUrl(baseUrl)
-            .apiKey(config.getAiToken())
-            .modelName(modelName)
-            .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
-            .maxRetries(LANGCHAIN_MAX_RETRIES);
-    if (ModelCompatibility.supportsTemperature(modelName)) {
-      builder.temperature(temperature);
-    }
-
-    var model = builder.build();
-
-    return new LangChainProvider(model, baseUrl);
+  protected String defaultBaseUrl() {
+    return MOONSHOT_DOMAIN;
   }
 
   @Override
