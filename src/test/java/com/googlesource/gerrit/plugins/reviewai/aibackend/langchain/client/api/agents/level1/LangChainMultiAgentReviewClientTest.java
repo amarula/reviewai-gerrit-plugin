@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -34,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -636,7 +637,7 @@ public class LangChainMultiAgentReviewClientTest {
             new ArrayList<>(List.of(AiReplyItem.builder().reply(stage.name()).build())));
       }
 
-      return new ReviewRequestResult(response, "body-" + stage.name());
+      return new ReviewRequestResult(response, "body-" + stage.name()) {};
     }
 
     @Override
@@ -685,7 +686,7 @@ public class LangChainMultiAgentReviewClientTest {
                           .reply("Commit message review issue")
                           .score(-1.0)
                           .build())));
-      return new ReviewRequestResult(response, "body");
+      return new ReviewRequestResult(response, "body") {};
     }
   }
 }

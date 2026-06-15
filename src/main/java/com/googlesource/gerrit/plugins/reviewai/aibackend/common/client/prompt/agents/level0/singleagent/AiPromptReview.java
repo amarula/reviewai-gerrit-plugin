@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -62,7 +63,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
     this.codeContextPolicy = codeContextPolicy;
-    loadDefaultPrompts("promptsAiReview");
+    loadDefaultPrompts("agents/level0/single-agent/prompts");
     log.debug("AiPromptReview initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -99,8 +100,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .getConfiguredAiSystemPromptInstructions()
                 .orElseGet(
                     () ->
-                        GerritUiPromptLoader.resolveReviewInstructions(
-                            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS))));
+                        resolveReviewInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS))));
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
@@ -137,6 +137,14 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected boolean includeCommitMessageReviewRequirement() {
     return config.getAiReviewCommitMessages();
+  }
+
+  protected String resolveCommitMessageInstructions(String fallbackPrompt) {
+    return GerritUiPromptLoader.resolveCommitMessageInstructions(fallbackPrompt);
+  }
+
+  private String resolveReviewInstructions(String fallbackPrompt) {
+    return GerritUiPromptLoader.resolveReviewInstructions(fallbackPrompt);
   }
 
   protected void addReviewInstructions(List<String> instructions) {

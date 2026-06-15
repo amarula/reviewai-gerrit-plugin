@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptRequests;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -30,7 +32,7 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts(AiPromptReview.class, "promptsReviewRoutedRequests");
+    loadDefaultPrompts(AiPromptReview.class, "agents/level1/router/routed-request-prompts");
     log.debug(
         "AiPromptRoutedReviewAgentRequest initialized for stage {} and change ID {}",
         changeSetData.getReviewAssistantStage(),

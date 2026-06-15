@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -25,35 +26,26 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.filterPatchWithoutCommitMessage;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
 
 @Slf4j
-public class AiPromptReviewCode extends AiPromptReview implements IAiPrompt {
+public class AiPromptReviewReiterated extends AiPromptReview implements IAiPrompt {
 
-  public AiPromptReviewCode(
+  public AiPromptReviewReiterated(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    log.debug("AiPromptReviewCode initialized for project: {}", change.getProjectName());
-  }
-
-  @Override
-  public void addAiAssistantInstructions(List<String> instructions) {
-    addReviewInstructions(instructions);
-    log.debug("Review Code specific AI Assistant Instructions added: {}", instructions);
-  }
-
-  @Override
-  protected boolean includeCommitMessageReviewRequirement() {
-    return false;
+    log.debug("AiPromptReviewReiterated initialized for project: {}", change.getProjectName());
   }
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
-    String filteredPatchSet = filterPatchWithoutCommitMessage(change, patchSet);
-    log.debug("Filtered Patch Set for Review Code: {}", filteredPatchSet);
-    return super.getDefaultAiThreadReviewMessage(filteredPatchSet);
+    return joinWithNewLine(
+        List.of(
+            DEFAULT_AI_MESSAGE_REQUEST_RESEND_FORMATTED,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
   }
 }

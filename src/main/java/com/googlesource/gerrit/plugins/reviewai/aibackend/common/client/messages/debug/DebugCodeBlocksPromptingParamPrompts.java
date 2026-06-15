@@ -22,9 +22,9 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReview;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewCode;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptReviewCommitMessage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 
 import java.util.List;
 

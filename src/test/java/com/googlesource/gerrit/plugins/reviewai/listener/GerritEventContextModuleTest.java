@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.lang.reflect.Method;
 import org.junit.Test;

@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 
 public class AiPromptReviewAgentRouter extends AiPrompt {
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER;
@@ -24,7 +25,7 @@ public class AiPromptReviewAgentRouter extends AiPrompt {
 
   public AiPromptReviewAgentRouter(Configuration config) {
     super(config);
-    loadDefaultPrompts("promptsReviewAgentRouter");
+    loadDefaultPrompts("agents/level1/router/prompts");
   }
 
   public String getDefaultAiAssistantInstructions() {
