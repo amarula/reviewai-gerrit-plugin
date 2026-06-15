@@ -33,11 +33,11 @@ command help with `/help` or `/help <command>`.
    `[plugin "reviewai-gerrit-plugin"]`:
 
     - `gerritUserName`: Gerrit username of AI user.
-    - `aiTokens`: AI provider token routes for token-backed providers such as OpenAI, Gemini, and MoonShot.
+    - `aiTokens`: AI provider token routes for token-backed providers such as OpenAI, Gemini, DeepSeek, and MoonShot.
 
    `aiProviders` and `aiModels` are optional. If they are omitted, the plugin exposes the default OpenAI model routes.
-   Configure them when you want to expose specific provider/model routes or use providers such as Gemini, MoonShot, or
-   Ollama.
+   Configure them when you want to expose specific provider/model routes or use providers such as Gemini, DeepSeek,
+   MoonShot, or Ollama.
 
    For enhanced security, consider storing sensitive information like `aiTokens` in a secure location or file.
    Detailed instructions on how to do this will be provided later in this document.
@@ -160,6 +160,7 @@ combination using `/` syntax.
 Supported providers are:
 
 - OpenAI
+- DeepSeek
 - MoonShot
 - Gemini
 - Ollama
@@ -171,21 +172,24 @@ models, the plugin exposes the built-in defaults for that provider. The current 
 ```
 [plugin "reviewai-gerrit-plugin"]
     aiProviders = OpenAI
+    aiProviders = DeepSeek
     aiProviders = MoonShot
     aiProviders = Ollama
 
     aiModels = OpenAI/gpt-5.4
     aiModels = OpenAI/gpt-4.1
+    aiModels = DeepSeek/deepseek-v4-flash
     aiModels = MoonShot/moonshot-v1-8k
     aiModels = llama3.2
     aiModelsDefaultIndex = 1
 
     aiTokens = OpenAI/{openAiToken}
+    aiTokens = DeepSeek/{deepSeekToken}
     aiTokens = MoonShot/{moonShotToken}
 ```
 
-With this configuration, the Review Agent exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`, `MoonShot/moonshot-v1-8k`, and
-`Ollama/llama3.2`.
+With this configuration, the Review Agent exposes `OpenAI/gpt-5.4`, `OpenAI/gpt-4.1`,
+`DeepSeek/deepseek-v4-flash`, `MoonShot/moonshot-v1-8k`, and `Ollama/llama3.2`.
 Ollama does not require an `aiTokens` entry. A bare model can also be configured as `aiModels = llama3.2`. When no
 configured token-backed provider identifies the bare model route, the plugin guesses `Ollama/llama3.2`. If a bare model
 matches a configured or default model for a token-backed provider that has a token, that provider route is used.
@@ -198,12 +202,13 @@ matches a configured or default model for a token-backed provider that has a tok
 - `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
   value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
   when no model has been selected yet.
-- `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `MoonShot/{token}`, and so on. Ollama
-  does not require a token.
+- `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `DeepSeek/{token}`,
+  `MoonShot/{token}`, and so on. Ollama does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider. By default, it uses the provider’s standard domain:
-  `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com` (Gemini), `https://api.moonshot.ai`
-  (Moonshot), or `http://localhost:11434` (Ollama). Override only when you need a custom endpoint; leaving it unset lets
-  the plugin pick the provider default automatically.
+  `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com` (Gemini),
+  `https://api.deepseek.com` (DeepSeek), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama).
+  Override only when you need a custom endpoint; leaving it unset lets the plugin pick the provider default
+  automatically.
 - `mockAiAddress`: Configures a custom address for a mock AI server. When set, a `mock-ai` model is added for each
   configured provider route, such as `OpenAI/mock-ai`, `MoonShot/mock-ai`, or `Ollama/mock-ai`. Selecting one of these
   models keeps the same provider and token behavior as the corresponding live model route, but sends AI requests to the

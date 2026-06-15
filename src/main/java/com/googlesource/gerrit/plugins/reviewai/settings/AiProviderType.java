@@ -21,6 +21,7 @@ import java.util.Optional;
 public enum AiProviderType {
   OPENAI("OpenAI"),
   GEMINI("Gemini"),
+  DEEPSEEK("DeepSeek"),
   MOONSHOT("MoonShot"),
   OLLAMA("Ollama");
 

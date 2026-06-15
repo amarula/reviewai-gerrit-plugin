@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.deepseek.DeepSeekLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.gemini.GeminiLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.moonshot.MoonshotLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ollama.OllamaLangChainProvider;
@@ -27,6 +28,7 @@ public final class LangChainProviderFactory {
 
   private static final ILangChainProvider OPENAI_PROVIDER = new OpenAiLangChainProvider();
   private static final ILangChainProvider GEMINI_PROVIDER = new GeminiLangChainProvider();
+  private static final ILangChainProvider DEEPSEEK_PROVIDER = new DeepSeekLangChainProvider();
   private static final ILangChainProvider MOONSHOT_PROVIDER = new MoonshotLangChainProvider();
   private static final ILangChainProvider OLLAMA_PROVIDER = new OllamaLangChainProvider();
 
@@ -36,6 +38,7 @@ public final class LangChainProviderFactory {
     return switch (provider) {
       case OPENAI -> OPENAI_PROVIDER;
       case GEMINI -> GEMINI_PROVIDER;
+      case DEEPSEEK -> DEEPSEEK_PROVIDER;
       case MOONSHOT -> MOONSHOT_PROVIDER;
       case OLLAMA -> OLLAMA_PROVIDER;
     };

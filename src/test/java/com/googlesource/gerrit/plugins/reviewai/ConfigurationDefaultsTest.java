@@ -306,6 +306,23 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldResolveDeepSeekProviderDefaults() {
+    Config cfg = new Config();
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiProviders", List.of("DeepSeek"));
+    cfg.setStringList("plugin", PLUGIN_NAME, "aiTokens", List.of("DeepSeek/test-token"));
+    cfg.setString("plugin", PLUGIN_NAME, "selectedAiModel", "DeepSeek/deepseek-v4-flash");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals("DeepSeek/deepseek-v4-flash", configuration.getSelectedAiModelRoute().modelRoute());
+    assertEquals("deepseek-v4-flash", configuration.getAiModel());
+    assertEquals("DeepSeek", configuration.getAiProviderType().getConfigName());
+    assertEquals(Configuration.DEEPSEEK_DOMAIN, configuration.getAiDomain());
+    assertEquals("test-token", configuration.getAiToken());
+  }
+
+  @Test
   public void shouldDefaultNeutralReviewScoreConversionToEnabled() {
     Configuration configuration = createConfiguration();
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());
