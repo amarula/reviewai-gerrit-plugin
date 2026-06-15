@@ -33,6 +33,8 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 @Slf4j
 public class AiPrompt {
+  private static final String PROMPT_EXTENDS_ATTRIBUTE = "$extends";
+
   // Reply attributes
   public static final String ATTRIBUTE_ID = "id";
   public static final String ATTRIBUTE_REPLY = "reply";
@@ -91,7 +93,15 @@ public class AiPrompt {
   public static Map<String, Object> getJsonPromptValues(String promptFilename) {
     String promptFile = String.format("config/%s.json", promptFilename);
     try (InputStreamReader reader = FileUtils.getInputStreamReader(promptFile)) {
-      return getGson().fromJson(reader, new TypeToken<Map<String, Object>>() {}.getType());
+      Map<String, Object> values =
+          getGson().fromJson(reader, new TypeToken<Map<String, Object>>() {}.getType());
+      Object parentPromptFilename = values.remove(PROMPT_EXTENDS_ATTRIBUTE);
+      if (parentPromptFilename == null) {
+        return values;
+      }
+      Map<String, Object> inheritedValues = getJsonPromptValues(parentPromptFilename.toString());
+      inheritedValues.putAll(values);
+      return inheritedValues;
     } catch (IOException e) {
       log.error("Failed to load prompts from file: {}", promptFilename, e);
       throw new RuntimeException("Failed to load prompts", e);
