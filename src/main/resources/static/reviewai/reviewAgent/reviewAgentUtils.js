@@ -220,6 +220,7 @@
     const knownNames = {
       openai: 'OpenAI',
       gemini: 'Gemini',
+      deepseek: 'DeepSeek',
       moonshot: 'Moonshot',
     };
     const normalized = String(value || '').toLowerCase();

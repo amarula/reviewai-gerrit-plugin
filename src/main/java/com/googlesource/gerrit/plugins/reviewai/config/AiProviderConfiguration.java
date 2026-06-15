@@ -28,21 +28,26 @@ import lombok.extern.slf4j.Slf4j;
 final class AiProviderConfiguration {
   static final String OPENAI_DOMAIN = "https://api.openai.com";
   static final String GEMINI_DOMAIN = "https://generativelanguage.googleapis.com";
+  static final String DEEPSEEK_DOMAIN = "https://api.deepseek.com";
   static final String MOONSHOT_DOMAIN = "https://api.moonshot.ai";
   static final String OLLAMA_DOMAIN = "http://localhost:11434";
   static final String DEFAULT_OPENAI_AI_MODEL = "gpt-4.1";
   static final String DEFAULT_GEMINI_AI_MODEL = "gemini-2.5-flash";
+  static final String DEFAULT_DEEPSEEK_AI_MODEL = "deepseek-v4-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_AI_MODEL = "llama3.2";
   static final String MOCK_AI_MODEL = "mock-ai";
   static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
+  static final String DEFAULT_DEEPSEEK_ESTIMATOR_MODEL = DEFAULT_DEEPSEEK_AI_MODEL;
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = DEFAULT_OLLAMA_AI_MODEL;
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
       List.of("gpt-5.4", "gpt-5.5", "gpt-5.2", DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =
       List.of("gemini-3.1-pro", "gemini-3.1-flash", "gemini-2.5-pro", DEFAULT_GEMINI_AI_MODEL);
+  static final List<String> DEFAULT_DEEPSEEK_AI_MODELS =
+      List.of("deepseek-v4-pro", DEFAULT_DEEPSEEK_AI_MODEL);
   static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
       List.of("kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-thinking-turbo", "kimi-k2-turbo-preview", DEFAULT_MOONSHOT_AI_MODEL);
   static final List<String> DEFAULT_OLLAMA_AI_MODELS = List.of(DEFAULT_OLLAMA_AI_MODEL);
@@ -249,6 +254,7 @@ final class AiProviderConfiguration {
 
   private List<String> getDefaultAiModels(AiProviderType provider) {
     return switch (provider) {
+      case DEEPSEEK -> DEFAULT_DEEPSEEK_AI_MODELS;
       case GEMINI -> DEFAULT_GEMINI_AI_MODELS;
       case MOONSHOT -> DEFAULT_MOONSHOT_AI_MODELS;
       case OLLAMA -> DEFAULT_OLLAMA_AI_MODELS;
@@ -258,6 +264,7 @@ final class AiProviderConfiguration {
 
   private String getDefaultAiDomain(AiProviderType provider) {
     return switch (provider) {
+      case DEEPSEEK -> DEEPSEEK_DOMAIN;
       case GEMINI -> GEMINI_DOMAIN;
       case MOONSHOT -> MOONSHOT_DOMAIN;
       case OLLAMA -> OLLAMA_DOMAIN;
