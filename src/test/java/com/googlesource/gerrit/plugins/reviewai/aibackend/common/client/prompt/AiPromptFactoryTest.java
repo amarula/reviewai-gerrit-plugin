@@ -24,6 +24,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
@@ -73,7 +77,7 @@ public class AiPromptFactoryTest {
         commentEventChange(),
         mock(ICodeContextPolicy.class));
 
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsReviewRoutedRequests");
+    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/router/routed-request-prompts");
 
     assertEquals(
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"),
@@ -215,10 +219,25 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void patchsetAgentPromptsAreLoadedFromResource() {
+    new AiPromptReviewCode(
+        mock(Configuration.class),
+        new ChangeSetData(1, -1, 1),
+        patchSetEventChange(),
+        mock(ICodeContextPolicy.class));
+    Map<String, Object> prompts =
+        AiPrompt.getJsonPromptValues("agents/level1/patchset/prompts");
+
+    assertEquals(
+        prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS"),
+        AiPromptReview.DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS);
+  }
+
+  @Test
   public void reviewAgentRouterPromptsAreLoadedFromResource() {
     AiPromptReviewAgentRouter routerPrompt =
         new AiPromptReviewAgentRouter(mock(Configuration.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsReviewAgentRouter");
+    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/router/prompts");
 
     assertEquals(
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER"),

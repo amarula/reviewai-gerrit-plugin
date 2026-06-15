@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -36,6 +37,7 @@ public class AiPromptReviewCode extends AiPromptReview implements IAiPrompt {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
+    loadDefaultPrompts("agents/level1/patchset/prompts");
     log.debug("AiPromptReviewCode initialized for project: {}", change.getProjectName());
   }
 

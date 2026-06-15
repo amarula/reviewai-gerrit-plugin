@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent;
 
 import lombok.extern.slf4j.Slf4j;
 
