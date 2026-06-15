@@ -41,14 +41,17 @@ public class Configuration extends ConfigCore {
   // Default Config values
   public static final String OPENAI_DOMAIN = AiProviderConfiguration.OPENAI_DOMAIN;
   public static final String GEMINI_DOMAIN = AiProviderConfiguration.GEMINI_DOMAIN;
+  public static final String DEEPSEEK_DOMAIN = AiProviderConfiguration.DEEPSEEK_DOMAIN;
   public static final String MOONSHOT_DOMAIN = AiProviderConfiguration.MOONSHOT_DOMAIN;
   public static final String OLLAMA_DOMAIN = AiProviderConfiguration.OLLAMA_DOMAIN;
   public static final String DEFAULT_OPENAI_AI_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_AI_MODEL;
   public static final String DEFAULT_GEMINI_AI_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_AI_MODEL;
+  public static final String DEFAULT_DEEPSEEK_AI_MODEL = AiProviderConfiguration.DEFAULT_DEEPSEEK_AI_MODEL;
   public static final String DEFAULT_MOONSHOT_AI_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_AI_MODEL;
   public static final String DEFAULT_OLLAMA_AI_MODEL = AiProviderConfiguration.DEFAULT_OLLAMA_AI_MODEL;
   public static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
   public static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
+  public static final String DEFAULT_DEEPSEEK_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_DEEPSEEK_ESTIMATOR_MODEL;
   public static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
   public static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_OLLAMA_ESTIMATOR_MODEL;
   public static final double DEFAULT_AI_REVIEW_TEMPERATURE = 0.2;

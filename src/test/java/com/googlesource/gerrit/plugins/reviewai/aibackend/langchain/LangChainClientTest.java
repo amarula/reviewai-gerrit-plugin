@@ -122,6 +122,21 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void usesJsonObjectResponseFormatWithoutSchemaForDeepSeek() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.DEEPSEEK);
+
+    LangChainClient client = new LangChainClient(config, null, null, null);
+
+    ResponseFormat responseFormat = getToolExecutorStructuredResponseFormat(client);
+    assertNotNull(responseFormat);
+    assertEquals(ResponseFormatType.JSON, responseFormat.type());
+    assertNull(responseFormat.jsonSchema());
+    assertTrue(getToolExecutorOnDemandTools(client).size() > 0);
+  }
+
+  @Test
   public void resolvesOpenAiConversationForLangChainOpenAiProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
@@ -295,12 +310,23 @@ public class LangChainClientTest {
 
   private ResponseFormat getToolExecutorStructuredResponseFormat(LangChainClient client)
       throws Exception {
-    Field executorField = LangChainClient.class.getDeclaredField("toolExecutor");
-    executorField.setAccessible(true);
-    Object executor = executorField.get(client);
+    Object executor = getToolExecutor(client);
     Field responseFormatField = executor.getClass().getDeclaredField("structuredResponseFormat");
     responseFormatField.setAccessible(true);
     return (ResponseFormat) responseFormatField.get(executor);
+  }
+
+  private java.util.List<?> getToolExecutorOnDemandTools(LangChainClient client) throws Exception {
+    Object executor = getToolExecutor(client);
+    Field toolsField = executor.getClass().getDeclaredField("onDemandTools");
+    toolsField.setAccessible(true);
+    return (java.util.List<?>) toolsField.get(executor);
+  }
+
+  private Object getToolExecutor(LangChainClient client) throws Exception {
+    Field executorField = LangChainClient.class.getDeclaredField("toolExecutor");
+    executorField.setAccessible(true);
+    return executorField.get(client);
   }
 
   private String readTestResource(String resourceName) throws Exception {
