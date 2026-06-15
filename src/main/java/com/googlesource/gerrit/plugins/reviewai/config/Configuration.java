@@ -90,6 +90,7 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS = false;
   private static final boolean DEFAULT_IGNORE_RESOLVED_AI_COMMENTS = true;
   private static final boolean DEFAULT_MULTI_AGENT_MODE = false;
+  private static final String DEFAULT_AGENT_SPECIALIZATION_LEVEL = "SINGLE_AGENT";
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
@@ -149,6 +150,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_IGNORE_OUTDATED_INLINE_COMMENTS = "ignoreOutdatedInlineComments";
   private static final String KEY_IGNORE_RESOLVED_AI_COMMENTS = "ignoreResolvedAiComments";
   private static final String KEY_MULTI_AGENT_MODE = "multiAgentMode";
+  private static final String KEY_AGENT_SPECIALIZATION_LEVEL = "agentSpecializationLevel";
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
@@ -170,6 +172,11 @@ public class Configuration extends ConfigCore {
       Account.Id userId) {
     super(context, gerritApi, globalConfig, projectConfig, gerritUserEmail, userId);
     aiProviderConfiguration = new AiProviderConfiguration(this);
+  }
+
+  public enum AgentSpecializationLevel {
+    SINGLE_AGENT,
+    SCOPED_AGENTS
   }
 
   public String getAiToken() {
@@ -332,7 +339,22 @@ public class Configuration extends ConfigCore {
   }
 
   public boolean getMultiAgentMode() {
+    if (getString(KEY_AGENT_SPECIALIZATION_LEVEL, null) != null) {
+      return getAgentSpecializationLevel() == AgentSpecializationLevel.SCOPED_AGENTS;
+    }
     return getBoolean(KEY_MULTI_AGENT_MODE, DEFAULT_MULTI_AGENT_MODE);
+  }
+
+  public AgentSpecializationLevel getAgentSpecializationLevel() {
+    if (getString(KEY_AGENT_SPECIALIZATION_LEVEL, null) == null) {
+      return getBoolean(KEY_MULTI_AGENT_MODE, DEFAULT_MULTI_AGENT_MODE)
+          ? AgentSpecializationLevel.SCOPED_AGENTS
+          : AgentSpecializationLevel.SINGLE_AGENT;
+    }
+    return getEnum(
+        KEY_AGENT_SPECIALIZATION_LEVEL,
+        DEFAULT_AGENT_SPECIALIZATION_LEVEL,
+        AgentSpecializationLevel.class);
   }
 
   public int getAiConnectionTimeout() {
@@ -402,6 +424,10 @@ public class Configuration extends ConfigCore {
   public Optional<List<String>> getValidDynamicConfigValues(String key) {
     if (KEY_CODE_CONTEXT_POLICY.equals(key)) {
       return Optional.of(Arrays.stream(CodeContextPolicies.values()).map(Enum::name).toList());
+    }
+    if (KEY_AGENT_SPECIALIZATION_LEVEL.equals(key)) {
+      return Optional.of(
+          Arrays.stream(AgentSpecializationLevel.values()).map(Enum::name).toList());
     }
     return Optional.empty();
   }

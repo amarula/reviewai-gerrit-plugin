@@ -26,6 +26,7 @@ import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
@@ -588,6 +589,26 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             "codeContextPolicy",
             invalidValue,
             List.of(CodeContextPolicies.values())),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandConfigureRejectsInvalidAgentSpecializationLevel() throws Exception {
+    String invalidValue = "INVALID";
+    setupCommandComment("/configure --agentSpecializationLevel=" + invalidValue);
+    enableMessageDebugging();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
+            "agentSpecializationLevel",
+            invalidValue,
+            List.of(AgentSpecializationLevel.values())),
         changeSetData.getReviewSystemMessage());
   }
 

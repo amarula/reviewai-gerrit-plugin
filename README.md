@@ -299,9 +299,13 @@ directive = End each reply with \"Hope this helps!\"
 
 ### Optional Parameters Specific to Review Processing
 
-- `multiAgentMode`: This option allows for dividing the Patch Set review between two specialized agents: one
+- `multiAgentMode` (deprecated): This option allows for dividing the Patch Set review between two specialized agents: one
   focused to the Patch's code and another to the commit message. When this option is set to false (default value), the
   Patch Set review is unified into one single request processed by one agent instructed for both tasks.
+- `agentSpecializationLevel`: Controls how review work is assigned to agents. Supported values are `SINGLE_AGENT`
+  (default), which uses one agent for both the Patch's code and commit message, and `SCOPED_AGENTS`, which divides the
+  review between specialized code and commit-message agents. This option overrides the deprecated `multiAgentMode`;
+  `SINGLE_AGENT` is equivalent to `multiAgentMode=false` and `SCOPED_AGENTS` to `multiAgentMode=true`.
 
   **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
   AI API.
@@ -787,7 +791,7 @@ Following this configuration, a new Change Set review can be initiated with:
 It's also possible to make multiple changes at once:
 
 ```
-/configure --multiAgentMode=true --codeContextPolicy=ON_DEMAND
+/configure --agentSpecializationLevel=SCOPED_AGENTS --codeContextPolicy=ON_DEMAND
 ```
 
 ## License
