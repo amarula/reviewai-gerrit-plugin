@@ -24,6 +24,7 @@ import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -326,6 +327,52 @@ public class ConfigurationDefaultsTest {
   public void shouldDefaultNeutralReviewScoreConversionToEnabled() {
     Configuration configuration = createConfiguration();
     assertEquals(true, configuration.getConvertNeutralReviewScoreToPositive());
+  }
+
+  @Test
+  public void shouldDefaultAgentSpecializationLevelToSingleAgent() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(AgentSpecializationLevel.SINGLE_AGENT, configuration.getAgentSpecializationLevel());
+    assertEquals(false, configuration.getMultiAgentMode());
+  }
+
+  @Test
+  public void shouldMapLegacyMultiAgentModeToAgentSpecializationLevel() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "multiAgentMode", true);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(AgentSpecializationLevel.SCOPED_AGENTS, configuration.getAgentSpecializationLevel());
+    assertEquals(true, configuration.getMultiAgentMode());
+  }
+
+  @Test
+  public void shouldPreferAgentSpecializationLevelOverMultiAgentMode() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "multiAgentMode", true);
+    cfg.setString("plugin", PLUGIN_NAME, "agentSpecializationLevel", "SINGLE_AGENT");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(AgentSpecializationLevel.SINGLE_AGENT, configuration.getAgentSpecializationLevel());
+    assertEquals(false, configuration.getMultiAgentMode());
+  }
+
+  @Test
+  public void shouldEnableMultiAgentModeForScopedAgents() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "multiAgentMode", false);
+    cfg.setString("plugin", PLUGIN_NAME, "agentSpecializationLevel", "SCOPED_AGENTS");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(AgentSpecializationLevel.SCOPED_AGENTS, configuration.getAgentSpecializationLevel());
+    assertEquals(true, configuration.getMultiAgentMode());
   }
 
   @Test

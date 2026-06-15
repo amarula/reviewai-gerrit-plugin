@@ -3,6 +3,7 @@
 ```
 CONFIGURATION SETTINGS
 
+agentSpecializationLevel: SINGLE_AGENT
 aiCommentTemperature: 1.0
 aiConnectionMaxRetryAttempts: 1
 aiConnectionTimeout: 180
