@@ -800,6 +800,30 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandShowPromptsSuggestModeIncludesOnlySuggestPrompt() throws Exception {
+    setupCommandComment("/show --prompts --mode=suggest");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    List<String> expectedTitles =
+        List.of(readTestFile("__files/commands/showSuggestPromptsTitles.txt").split("\\R"));
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(systemMessage.contains(expectedTitle));
+    }
+    List<String> reviewTitles =
+        List.of(readTestFile("__files/commands/showPromptsTitles.txt").split("\\R"));
+    for (String reviewTitle : reviewTitles) {
+      Assert.assertFalse(systemMessage.contains(reviewTitle));
+    }
+    Assert.assertTrue(systemMessage.contains("Generate Gerrit suggested edits"));
+    Assert.assertTrue(systemMessage.contains("every negative review reply"));
+    Assert.assertTrue(systemMessage.contains("diff --git a/test_file_1.py b/test_file_1.py"));
+    Assert.assertEquals(2, systemMessage.split(TextUtils.CODE_DELIMITER, -1).length - 1);
+  }
+
+  @Test
   public void commandShowInstructionsIncludesAllReviewScopes() throws Exception {
     setupCommandComment("/show --instructions");
     enableMessageDebugging();
@@ -876,6 +900,110 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandShowInstructionsSuggestModeIncludesAllSuggestScopes()
+      throws Exception {
+    setupCommandComment("/show --instructions --mode=suggest");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String systemMessage = changeSetData.getReviewSystemMessage();
+    List<String> expectedTitles =
+        List.of(readTestFile("__files/commands/showSuggestInstructionsTitles.txt").split("\\R"));
+    for (String expectedTitle : expectedTitles) {
+      Assert.assertTrue(systemMessage.contains(expectedTitle));
+    }
+    List<String> reviewTitles =
+        List.of(readTestFile("__files/commands/showInstructionsTitles.txt").split("\\R"));
+    for (String reviewTitle : reviewTitles) {
+      Assert.assertFalse(systemMessage.contains(reviewTitle));
+    }
+    Assert.assertTrue(
+        systemMessage.contains(
+            readTestFile("__files/commands/showSuggestInstructionsPatchSetText.txt").strip()));
+    Assert.assertTrue(
+        systemMessage.contains(
+            readTestFile("__files/commands/showSuggestInstructionsCommitMessageText.txt")
+                .strip()));
+    Assert.assertEquals(6, systemMessage.split(TextUtils.CODE_DELIMITER, -1).length - 1);
+  }
+
+  @Test
+  public void commandShowInstructionsSuggestModeFullScopeIncludesOnlyFullInstructions()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --mode=suggest --scope="
+            + ReviewScope.FULL.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedSuggestShowBlock(
+        changeSetData.getReviewSystemMessage(), ReviewScope.FULL);
+    Assert.assertTrue(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsPatchSetText.txt").strip()));
+    Assert.assertTrue(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsCommitMessageText.txt")
+                    .strip()));
+  }
+
+  @Test
+  public void commandShowInstructionsSuggestModePatchSetScopeIncludesOnlyPatchSetInstructions()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --mode=suggest --scope="
+            + ReviewScope.PATCHSET.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedSuggestShowBlock(
+        changeSetData.getReviewSystemMessage(), ReviewScope.PATCHSET);
+    Assert.assertTrue(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsPatchSetText.txt").strip()));
+    Assert.assertFalse(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsCommitMessageText.txt")
+                    .strip()));
+  }
+
+  @Test
+  public void commandShowInstructionsSuggestCommitMessageScopeIncludesOnlyCommitMessage()
+      throws Exception {
+    setupCommandComment(
+        "/show --instructions --mode=suggest --scope="
+            + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    assertOnlyScopedSuggestShowBlock(
+        changeSetData.getReviewSystemMessage(), ReviewScope.COMMIT_MESSAGE);
+    Assert.assertFalse(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsPatchSetText.txt").strip()));
+    Assert.assertTrue(
+        changeSetData
+            .getReviewSystemMessage()
+            .contains(
+                readTestFile("__files/commands/showSuggestInstructionsCommitMessageText.txt")
+                    .strip()));
+  }
+
+  @Test
   public void commandShowScopeWithoutPromptsOrInstructionsIsRejected() throws Exception {
     setupCommandComment("/show --config --scope=" + ReviewScope.FULL.getCommandOptionValue());
     enableMessageDebugging();
@@ -888,6 +1016,39 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertEquals(
         SystemMessageFormatter.getLocalizedWarningMessage(
             localizer, "message.command.option.invalid", CommandSet.SHOW, options),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandShowModeWithoutPromptsOrInstructionsIsRejected() throws Exception {
+    setupCommandComment("/show --config --mode=suggest");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Map<BaseOptionSet, String> options = new HashMap<>();
+    options.put(BaseOptionSet.CONFIG, "");
+    options.put(BaseOptionSet.MODE, "suggest");
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer, "message.command.option.invalid", CommandSet.SHOW, options),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandShowRejectsUnsupportedMode() throws Exception {
+    setupCommandComment("/show --prompts --mode=review");
+    enableMessageDebugging();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.command.option.value.invalid",
+            BaseOptionSet.MODE,
+            "review",
+            List.of("suggest")),
         changeSetData.getReviewSystemMessage());
   }
 
@@ -941,5 +1102,26 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       case PATCHSET -> 1;
       case COMMIT_MESSAGE -> 2;
     };
+  }
+
+  private void assertOnlyScopedSuggestShowBlock(String systemMessage, ReviewScope reviewScope) {
+    List<String> titles =
+        List.of(readTestFile("__files/commands/showSuggestInstructionsTitles.txt").split("\\R"));
+    String includedTitle =
+        switch (reviewScope) {
+          case FULL -> titles.get(0);
+          case PATCHSET -> titles.get(1);
+          case COMMIT_MESSAGE -> titles.get(2);
+        };
+    for (String title : titles) {
+      if (title.equals(includedTitle)) {
+        Assert.assertTrue(systemMessage.contains(title));
+      } else {
+        Assert.assertFalse(systemMessage.contains(title));
+      }
+    }
+    String codeFence = TextUtils.CODE_DELIMITER;
+    Assert.assertTrue(systemMessage.contains(codeFence + "\n" + includedTitle));
+    Assert.assertEquals(2, systemMessage.split(codeFence, -1).length - 1);
   }
 }

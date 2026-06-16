@@ -484,6 +484,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 - `config`: Shows the current configuration
 
 For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
+Use `--mode=suggest` to show the prompts or instructions used by `/suggest`.
 
 **NOTE**: This command is available when the `enableMessageDebugging` configuration setting is enabled.
 
@@ -510,6 +511,7 @@ Review the following Commit Message:  ` ` `Subject: <COMMIT_MESSAGE> Change-Id: 
 ```
 
 Running `/show --prompts --scope=patchset` will return only the `PROMPT FOR PATCH SET ONLY` block.
+Running `/show --prompts --mode=suggest` will return the `/suggest` prompt block.
 
 Similarly, running `/show --instructions` will display something like:
 
@@ -542,6 +544,7 @@ INSTRUCTIONS FOR COMMIT MESSAGE ONLY
 ```
 
 Running `/show --instructions --scope=commit_message` will return only the `INSTRUCTIONS FOR COMMIT MESSAGE ONLY` block.
+Running `/show --instructions --mode=suggest` will return the `/suggest` instructions block.
 
 #### Showing Locally Stored Data
 

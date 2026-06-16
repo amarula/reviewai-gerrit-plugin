@@ -78,6 +78,24 @@ public class ChangeSetData {
     return reviewSystemMessage == null && !shouldHideAiReview();
   }
 
+  public ChangeSetData copyForSuggestion() {
+    ChangeSetData suggestionData = copy();
+    suggestionData.setForcedReview(true);
+    suggestionData.setForcedStagedReview(true);
+    suggestionData.setSuggestMode(true);
+    ReviewScope scope = suggestionData.getReviewScope();
+    if (scope == ReviewScope.PATCHSET || scope == ReviewScope.COMMIT_MESSAGE) {
+      suggestionData.setReviewAssistantStage(toReviewAssistantStage(scope));
+    }
+    return suggestionData;
+  }
+
+  private ReviewAssistantStage toReviewAssistantStage(ReviewScope scope) {
+    return scope == ReviewScope.COMMIT_MESSAGE
+        ? ReviewAssistantStage.REVIEW_COMMIT_MESSAGE
+        : ReviewAssistantStage.REVIEW_CODE;
+  }
+
   public ChangeSetData copy() {
     ChangeSetData copy = new ChangeSetData(aiAccountId, votingMinScore, votingMaxScore);
     copy.setAiDataPrompt(aiDataPrompt);
