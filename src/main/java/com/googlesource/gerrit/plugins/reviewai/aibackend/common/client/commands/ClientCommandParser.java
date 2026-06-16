@@ -47,7 +47,8 @@ public class ClientCommandParser extends ClientCommandBase {
           "config", BaseOptionSet.CONFIG,
           "local_data", BaseOptionSet.LOCAL_DATA,
           "prompts", BaseOptionSet.PROMPTS,
-          "instructions", BaseOptionSet.INSTRUCTIONS);
+          "instructions", BaseOptionSet.INSTRUCTIONS,
+          "mode", BaseOptionSet.MODE);
   private static final Map<CommandSet, List<BaseOptionSet>> COMMAND_VALID_OPTIONS_MAP =
       Map.of(
           CommandSet.REVIEW,
@@ -61,7 +62,8 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.LOCAL_DATA,
                   BaseOptionSet.PROMPTS,
                   BaseOptionSet.INSTRUCTIONS,
-                  BaseOptionSet.SCOPE));
+                  BaseOptionSet.SCOPE,
+                  BaseOptionSet.MODE));
   private static final List<CommandSet> REVIEW_COMMANDS =
       new ArrayList<>(List.of(CommandSet.REVIEW, CommandSet.SUGGEST));
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
@@ -212,7 +214,7 @@ public class ClientCommandParser extends ClientCommandBase {
               localizer, "message.command.option.invalid", command, baseOptions));
       return true;
     }
-    if (showScopeOptionMismatch(command)) {
+    if (showPromptOptionMismatch(command)) {
       return true;
     }
     if (baseOptionValuesMismatch(command)) {
@@ -231,8 +233,10 @@ public class ClientCommandParser extends ClientCommandBase {
     return false;
   }
 
-  private boolean showScopeOptionMismatch(CommandSet command) {
-    if (command != CommandSet.SHOW || !baseOptions.containsKey(BaseOptionSet.SCOPE)) {
+  private boolean showPromptOptionMismatch(CommandSet command) {
+    if (command != CommandSet.SHOW
+        || (!baseOptions.containsKey(BaseOptionSet.SCOPE)
+            && !baseOptions.containsKey(BaseOptionSet.MODE))) {
       return false;
     }
     if (baseOptions.containsKey(BaseOptionSet.PROMPTS)
@@ -268,12 +272,15 @@ public class ClientCommandParser extends ClientCommandBase {
   }
 
   private List<String> getValidBaseOptionValues(CommandSet command, BaseOptionSet option) {
-    if (option != BaseOptionSet.SCOPE) {
-      return null;
+    if (option == BaseOptionSet.MODE) {
+      return command == CommandSet.SHOW ? List.of(SHOW_MODE_SUGGEST) : null;
     }
-    return command == CommandSet.REVIEW || command == CommandSet.SUGGEST
-        ? ReviewScope.reviewCommandOptionValues()
-        : ReviewScope.commandOptionValues();
+    if (option == BaseOptionSet.SCOPE) {
+      return command == CommandSet.REVIEW || command == CommandSet.SUGGEST
+          ? ReviewScope.reviewCommandOptionValues()
+          : ReviewScope.commandOptionValues();
+    }
+    return null;
   }
 
   private boolean configurationOptionsMismatch() {

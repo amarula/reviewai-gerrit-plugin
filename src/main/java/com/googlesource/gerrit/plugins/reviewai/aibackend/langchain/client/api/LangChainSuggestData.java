@@ -42,15 +42,9 @@ final class LangChainSuggestData {
   }
 
   static ChangeSetData suggestion(ChangeSetData changeSetData, ReviewScope scope) {
-    ChangeSetData suggestionData = changeSetData.copy();
-    suggestionData.setForcedReview(true);
-    suggestionData.setForcedStagedReview(true);
-    suggestionData.setSuggestMode(true);
-    if (scope == ReviewScope.PATCHSET || scope == ReviewScope.COMMIT_MESSAGE) {
-      suggestionData.setReviewScope(scope);
-      suggestionData.setReviewAssistantStage(toReviewAssistantStage(scope));
-    }
-    return suggestionData;
+    ChangeSetData scopedData = changeSetData.copy();
+    scopedData.setReviewScope(scope);
+    return scopedData.copyForSuggestion();
   }
 
   private static ReviewAssistantStage toReviewAssistantStage(ReviewScope scope) {

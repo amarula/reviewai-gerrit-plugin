@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
@@ -32,6 +33,7 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
   private static final String TITLE_FULL_REVIEW = "PROMPT FOR FULL REVIEW";
   private static final String TITLE_PATCH_SET_ONLY = "PROMPT FOR PATCH SET ONLY";
   private static final String TITLE_COMMIT_MESSAGE_ONLY = "PROMPT FOR COMMIT MESSAGE ONLY";
+  private static final String TITLE_SUGGEST = "PROMPT FOR SUGGEST";
   private static final List<ScopedPromptingParameter> SCOPED_PARAMETERS =
       List.of(
           new ScopedPromptingParameter(ReviewScope.FULL, TITLE_FULL_REVIEW),
@@ -56,11 +58,22 @@ public class DebugCodeBlocksPromptingParamPrompts extends DebugCodeBlocksPrompti
   }
 
   public String getDebugCodeBlock() {
+    if (changeSetData.getSuggestMode()) {
+      populateAiPromptParameters();
+      return getDelimitedSection(TITLE_SUGGEST, promptingParameters.get(TITLE_SUGGEST));
+    }
     return getScopedDebugCodeBlock(reviewScope, SCOPED_PARAMETERS);
   }
 
   @Override
   protected void populateAiPromptParameters() {
+    if (changeSetData.getSuggestMode()) {
+      promptingParameters.put(
+          TITLE_SUGGEST,
+          AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy)
+              .getDefaultAiThreadReviewMessage(patchSet));
+      return;
+    }
     promptingParameters.put(
         TITLE_FULL_REVIEW,
         new AiPromptReview(config, changeSetData.copy(), change, codeContextPolicy)

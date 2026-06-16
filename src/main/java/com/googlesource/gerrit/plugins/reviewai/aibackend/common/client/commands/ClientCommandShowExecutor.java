@@ -73,6 +73,7 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
         case PROMPTS -> commandShowPrompts(baseOptions);
         case INSTRUCTIONS -> commandShowInstructions(baseOptions);
         case SCOPE -> {}
+        case MODE -> {}
       }
     }
     changeSetData.setReviewSystemMessage(joinWithDoubleNewLine(itemsToShow));
@@ -103,7 +104,7 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
         new DebugCodeBlocksPromptingParamPrompts(
             localizer,
             config,
-            changeSetData,
+            getPromptChangeSetData(baseOptions),
             change,
             codeContextPolicy,
             patchSet,
@@ -116,11 +117,20 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
         new DebugCodeBlocksPromptingParamInstructions(
             localizer,
             config,
-            changeSetData,
+            getPromptChangeSetData(baseOptions),
             change,
             codeContextPolicy,
             getReviewScope(baseOptions));
     itemsToShow.add(debugCodeBlocksPromptingParamInstructions.getDebugCodeBlock());
+  }
+
+  private ChangeSetData getPromptChangeSetData(Map<BaseOptionSet, String> baseOptions) {
+    ChangeSetData promptChangeSetData = changeSetData.copy();
+    promptChangeSetData.setReviewScope(getReviewScope(baseOptions));
+    if (SHOW_MODE_SUGGEST.equals(baseOptions.get(BaseOptionSet.MODE))) {
+      return promptChangeSetData.copyForSuggestion();
+    }
+    return promptChangeSetData;
   }
 
   private ReviewScope getReviewScope(Map<BaseOptionSet, String> baseOptions) {
