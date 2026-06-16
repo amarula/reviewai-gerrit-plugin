@@ -68,7 +68,7 @@ public abstract class DebugCodeBlocksPromptingParamBase extends DebugCodeBlocksC
         .collect(Collectors.joining("\n\n"));
   }
 
-  private String getDelimitedSection(String title, String body) {
+  protected String getDelimitedSection(String title, String body) {
     return CODE_DELIMITER_BEGIN
         + joinWithNewLine(List.of(title, distanceCodeDelimiter(body)))
         + "\n"

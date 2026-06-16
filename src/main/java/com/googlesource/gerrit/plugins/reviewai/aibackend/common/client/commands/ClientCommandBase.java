@@ -51,8 +51,11 @@ public abstract class ClientCommandBase extends ClientBase {
     CONFIG,
     LOCAL_DATA,
     PROMPTS,
-    INSTRUCTIONS
+    INSTRUCTIONS,
+    MODE
   }
+
+  protected static final String SHOW_MODE_SUGGEST = "suggest";
 
   protected static final ImmutableBiMap<String, CommandSet> COMMAND_MAP =
       ImmutableBiMap.of(

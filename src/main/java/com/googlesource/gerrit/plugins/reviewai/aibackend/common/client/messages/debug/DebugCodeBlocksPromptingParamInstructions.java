@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
@@ -32,11 +33,23 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
   private static final String TITLE_FULL_REVIEW = "INSTRUCTIONS FOR FULL REVIEW";
   private static final String TITLE_PATCH_SET_ONLY = "INSTRUCTIONS FOR PATCH SET ONLY";
   private static final String TITLE_COMMIT_MESSAGE_ONLY = "INSTRUCTIONS FOR COMMIT MESSAGE ONLY";
+  private static final String TITLE_SUGGEST_FULL_REVIEW =
+      "INSTRUCTIONS FOR SUGGEST FULL REVIEW";
+  private static final String TITLE_SUGGEST_PATCH_SET_ONLY =
+      "INSTRUCTIONS FOR SUGGEST PATCH SET ONLY";
+  private static final String TITLE_SUGGEST_COMMIT_MESSAGE_ONLY =
+      "INSTRUCTIONS FOR SUGGEST COMMIT MESSAGE ONLY";
   private static final List<ScopedPromptingParameter> SCOPED_PARAMETERS =
       List.of(
           new ScopedPromptingParameter(ReviewScope.FULL, TITLE_FULL_REVIEW),
           new ScopedPromptingParameter(ReviewScope.PATCHSET, TITLE_PATCH_SET_ONLY),
           new ScopedPromptingParameter(ReviewScope.COMMIT_MESSAGE, TITLE_COMMIT_MESSAGE_ONLY));
+  private static final List<ScopedPromptingParameter> SUGGEST_SCOPED_PARAMETERS =
+      List.of(
+          new ScopedPromptingParameter(ReviewScope.FULL, TITLE_SUGGEST_FULL_REVIEW),
+          new ScopedPromptingParameter(ReviewScope.PATCHSET, TITLE_SUGGEST_PATCH_SET_ONLY),
+          new ScopedPromptingParameter(
+              ReviewScope.COMMIT_MESSAGE, TITLE_SUGGEST_COMMIT_MESSAGE_ONLY));
 
   private final ReviewScope reviewScope;
 
@@ -58,11 +71,23 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
   }
 
   public String getDebugCodeBlock() {
+    if (changeSetData.getSuggestMode()) {
+      return getScopedDebugCodeBlock(reviewScope, SUGGEST_SCOPED_PARAMETERS);
+    }
     return getScopedDebugCodeBlock(reviewScope, SCOPED_PARAMETERS);
   }
 
   @Override
   protected void populateAiPromptParameters() {
+    if (changeSetData.getSuggestMode()) {
+      promptingParameters.put(
+          TITLE_SUGGEST_FULL_REVIEW, getSuggestInstructions(ReviewScope.FULL));
+      promptingParameters.put(
+          TITLE_SUGGEST_PATCH_SET_ONLY, getSuggestInstructions(ReviewScope.PATCHSET));
+      promptingParameters.put(
+          TITLE_SUGGEST_COMMIT_MESSAGE_ONLY, getSuggestInstructions(ReviewScope.COMMIT_MESSAGE));
+      return;
+    }
     promptingParameters.put(
         TITLE_FULL_REVIEW,
         new AiPromptReview(config, changeSetData.copy(), change, codeContextPolicy)
@@ -75,5 +100,13 @@ public class DebugCodeBlocksPromptingParamInstructions extends DebugCodeBlocksPr
         TITLE_COMMIT_MESSAGE_ONLY,
         new AiPromptReviewCommitMessage(config, changeSetData.copy(), change, codeContextPolicy)
             .getDefaultAiAssistantInstructions());
+  }
+
+  private String getSuggestInstructions(ReviewScope reviewScope) {
+    ChangeSetData scopedChangeSetData = changeSetData.copy();
+    scopedChangeSetData.setReviewScope(reviewScope);
+    return AiPromptFactory.getAiPrompt(
+            config, scopedChangeSetData.copyForSuggestion(), change, codeContextPolicy)
+        .getDefaultAiAssistantInstructions();
   }
 }
