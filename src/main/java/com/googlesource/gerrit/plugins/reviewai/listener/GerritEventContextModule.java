@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -73,9 +74,11 @@ public class GerritEventContextModule extends FactoryModule {
   }
 
   private Class<? extends IAiClient> getAiClient() {
-    return config.getMultiAgentMode()
-        ? LangChainMultiAgentReviewClient.class
-        : LangChainClient.class;
+    return switch (config.getAgentSpecializationLevel()) {
+      case SPECIALIZED_AGENTS -> LangChainSpecializedAgentReviewClient.class;
+      case SCOPED_AGENTS -> LangChainMultiAgentReviewClient.class;
+      case SINGLE_AGENT -> LangChainClient.class;
+    };
   }
 
   private Class<? extends IGerritClientPatchSet> getClientPatchSet() {

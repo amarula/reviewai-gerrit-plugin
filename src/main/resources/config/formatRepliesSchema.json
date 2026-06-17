@@ -28,6 +28,15 @@
             "conflicting": {
               "type": "boolean"
             },
+            "source_agent": {
+              "type": "string"
+            },
+            "repeated_reason": {
+              "type": "string"
+            },
+            "conflicting_reason": {
+              "type": "string"
+            },
             "filename": {
               "type": "string"
             },

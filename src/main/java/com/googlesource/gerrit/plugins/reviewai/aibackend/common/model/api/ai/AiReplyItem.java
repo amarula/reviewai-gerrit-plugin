@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai;
 
+import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
@@ -29,4 +30,10 @@ public class AiReplyItem extends AiDialogueItem {
   private Double relevance;
   private boolean repeated;
   private boolean conflicting;
+  @SerializedName("source_agent")
+  private String sourceAgent;
+  @SerializedName("repeated_reason")
+  private String repeatedReason;
+  @SerializedName("conflicting_reason")
+  private String conflictingReason;
 }
