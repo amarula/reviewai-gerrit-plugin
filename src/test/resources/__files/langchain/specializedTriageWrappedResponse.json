@@ -1,0 +1,12 @@
+{
+  "replies": [
+    {
+      "reply": "{\"agents\":[{\"agent\":\"COMMIT_MESSAGE\",\"enabled\":true,\"reason\":\"The commit message should match the refactor.\",\"patchset_context\":\"selected commit message context\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"commit message instructions\"},{\"agent\":\"CORRECTNESS\",\"enabled\":true,\"reason\":\"The patch changes API usage.\",\"patchset_context\":\"selected correctness context\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"correctness instructions\"},{\"agent\":\"SECURITY\",\"enabled\":false,\"reason\":\"No security-sensitive paths changed.\",\"patchset_context\":\"\",\"history_context\":\"\",\"custom_instructions\":\"\"}]}",
+      "score": null,
+      "relevance": null,
+      "repeated": false,
+      "conflicting": false
+    }
+  ],
+  "changeId": "change~1"
+}

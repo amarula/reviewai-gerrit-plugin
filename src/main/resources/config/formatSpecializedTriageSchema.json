@@ -1,0 +1,47 @@
+{
+  "name": "format_specialized_triage",
+  "description": "Provide Level 2 specialized review triage decisions.",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "agents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "agent": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "patchset_context": {
+              "type": "string"
+            },
+            "history_context": {
+              "type": "string"
+            },
+            "custom_instructions": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "agent",
+            "enabled",
+            "reason",
+            "patchset_context",
+            "history_context",
+            "custom_instructions"
+          ]
+        }
+      }
+    },
+    "required": [
+      "agents"
+    ]
+  }
+}

@@ -37,6 +37,11 @@ public class ChangeSetData {
   private Boolean forcedStagedReview = false;
   private ReviewScope reviewScope;
   private Boolean suggestMode = false;
+  private String specializedAgentName;
+  private String specializedAgentDescription;
+  private String specializedAgentInstructions;
+  private String specializedAgentCustomInstructions;
+  private Boolean specializedAgentReview = false;
   @NonNull private Integer votingMinScore;
   @NonNull private Integer votingMaxScore;
 
@@ -104,6 +109,11 @@ public class ChangeSetData {
     copy.setForcedStagedReview(forcedStagedReview);
     copy.setReviewScope(reviewScope);
     copy.setSuggestMode(suggestMode);
+    copy.setSpecializedAgentName(specializedAgentName);
+    copy.setSpecializedAgentDescription(specializedAgentDescription);
+    copy.setSpecializedAgentInstructions(specializedAgentInstructions);
+    copy.setSpecializedAgentCustomInstructions(specializedAgentCustomInstructions);
+    copy.setSpecializedAgentReview(specializedAgentReview);
     copy.setForcedReview(forcedReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);
