@@ -13,9 +13,13 @@
     "reply": "contains the text of the insight",
     "id": "corresponds to the `id` value from the related request in the request JSON array",
     "score": "represents a rating (a floating-point number from %d to %d, decimals allowed) attributed to the change being addressed in your reply, based on the reply content",
+    "filename": "is the exact path of the file where the issue appears, matching the patchset path",
+    "lineNumber": "is the exact changed-line number where the issue should be attached",
+    "codeSnippet": "is the smallest relevant code excerpt from the changed file that supports the reply",
     "relevance": "is a floating-point number ranging from 0 to 1, representing the importance you assign to the reply following the rules: %s",
     "changeId": "must be included in the response, mirroring the value provided in the corresponding request",
     "repeated": "is marked true if any message in the history either contains the same core message as the `reply` or addresses the same code snippet, and is marked false otherwise",
+    "duplicated": "is marked true if another new reply in the same response contains the same core message as the `reply` or addresses the same code snippet, and is marked false otherwise",
     "conflicting": "is marked true if either of these conditions is met: 1. issuing the reply goes against one of the Directives, or 2. any message in the history, identified by the 'assistant' role, is in conflict with the reply"
   },
   "DEFAULT_AI_RELEVANCE_RULES": "lower values for improvement suggestions, commit messages not providing details on the testing or verification process, and missing documentation or testing of functionalities; for code issues, set `relevance` in direct relation to the issue's severity; for commit messages that do not thoroughly describe the changes, adjust `relevance` based on the significance of the unexplained aspects"

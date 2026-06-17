@@ -27,7 +27,10 @@ final class LangChainOpenAiConversationKey {
       return OpenAiConversation.KEY_CONVERSATION_ID;
     }
     return switch (changeSetData.getReviewAssistantStage()) {
-      case REVIEW_CODE, REVIEW_COMMIT_MESSAGE ->
+      case REVIEW_SPECIALIZED_AGENT ->
+          OpenAiConversation.getSpecializedAgentConversationKey(
+              changeSetData.getSpecializedAgentName());
+      case REVIEW_CODE, REVIEW_COMMIT_MESSAGE, REVIEW_SPECIALIZED_TRIAGE, REVIEW_SPECIALIZED_COLLECTOR ->
           OpenAiConversation.getMultiAgentConversationKey(changeSetData.getReviewAssistantStage());
       default -> OpenAiConversation.KEY_CONVERSATION_ID;
     };

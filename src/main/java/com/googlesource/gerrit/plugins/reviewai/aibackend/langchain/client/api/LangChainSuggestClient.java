@@ -188,6 +188,7 @@ public class LangChainSuggestClient {
   private List<AiReplyItem> negativeReplies(AiResponseContent responseContent) {
     return SuggestedEditSupport.responseReplies(responseContent).stream()
         .filter(reply -> reply.getScore() != null && reply.getScore() < 0)
+        .filter(reply -> !reply.isDuplicated())
         .map(this::copyReply)
         .toList();
   }
@@ -199,7 +200,11 @@ public class LangChainSuggestClient {
         .score(reply.getScore())
         .relevance(reply.getRelevance())
         .repeated(reply.isRepeated())
+        .duplicated(reply.isDuplicated())
         .conflicting(reply.isConflicting())
+        .repeatedReason(reply.getRepeatedReason())
+        .duplicatedReason(reply.getDuplicatedReason())
+        .conflictingReason(reply.getConflictingReason())
         .filename(reply.getFilename())
         .lineNumber(reply.getLineNumber())
         .codeSnippet(reply.getCodeSnippet())

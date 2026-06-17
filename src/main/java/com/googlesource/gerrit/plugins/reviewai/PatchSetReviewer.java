@@ -178,8 +178,15 @@ public class PatchSetReviewer {
       boolean isNotNegative = isNotNegativeReply(score);
       boolean isIrrelevant = isIrrelevantReply(replyItem);
       boolean isHidden =
-          replyItem.isRepeated() || replyItem.isConflicting() || isIrrelevant || isNotNegative;
-      if (!replyItem.isConflicting() && !isIrrelevant && score != null) {
+          replyItem.isRepeated()
+              || replyItem.isDuplicated()
+              || replyItem.isConflicting()
+              || isIrrelevant
+              || isNotNegative;
+      if (!replyItem.isDuplicated()
+          && !replyItem.isConflicting()
+          && !isIrrelevant
+          && score != null) {
         log.debug("Score added: {}", score);
         reviewScores.add(score);
       }

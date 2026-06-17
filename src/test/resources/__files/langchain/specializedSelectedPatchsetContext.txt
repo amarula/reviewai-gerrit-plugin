@@ -1,0 +1,5 @@
+a.py
+@@ -1,3 +1,3 @@
+ def parse(value):
+-    return value.strip()
++    return value.strip().lower()

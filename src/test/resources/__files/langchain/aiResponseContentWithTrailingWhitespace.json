@@ -5,10 +5,10 @@
       "score": 1.0,
       "relevance": 0.9,
       "repeated": false,
-      "conflicting": false
+      "conflicting": false,
+      "source_agent": "CORRECTNESS"
     }
   ],
   "changeId": "myChangeId"
 }
-
 
