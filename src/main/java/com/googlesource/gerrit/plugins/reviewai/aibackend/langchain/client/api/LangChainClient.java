@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -63,6 +64,10 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJso
 public class LangChainClient extends AiClientBase implements IAiClient {
 
   private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
+  private static final String FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE =
+      "config/formatSpecializedRepliesSchema.json";
+  private static final String FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE =
+      "config/formatSpecializedTriageSchema.json";
   private static final List<String> ON_DEMAND_TOOL_RESOURCES =
       List.of("config/treeTool.json", "config/getContentTool.json", "config/grepTool.json");
 
@@ -74,7 +79,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final PluginChatMemoryStore chatMemoryStore;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
+  private final ResponseFormat specializedRepliesResponseFormat;
+  private final ResponseFormat specializedTriageResponseFormat;
   private final LangChainExecutor toolExecutor;
+  private final LangChainExecutor specializedRepliesToolExecutor;
+  private final LangChainExecutor specializedTriageToolExecutor;
 
   private String requestBody;
 
@@ -85,6 +94,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
     protected ReviewRequestResult(AiResponseContent responseContent, String requestBody) {
       this.responseContent = responseContent;
+      this.requestBody = requestBody;
+    }
+  }
+
+  @Getter
+  protected static class RawReviewRequestResult {
+    private final String responseText;
+    private final String requestBody;
+
+    protected RawReviewRequestResult(String responseText, String requestBody) {
+      this.responseText = responseText;
       this.requestBody = requestBody;
     }
   }
@@ -109,6 +129,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
+    this.specializedRepliesResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
+    this.specializedTriageResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
     List<ToolSpecification> contextTools = List.of();
     if (config != null && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND) {
       contextTools =
@@ -124,10 +150,20 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
             && config.getAiProviderType() == AiProviderType.OPENAI;
     ResponseFormat toolExecutorResponseFormat =
-        getProviderResponseFormat(config, contextTools);
+        getProviderResponseFormat(config, contextTools, structuredResponseFormat);
     this.toolExecutor =
         new LangChainExecutor(
             config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
+    ResponseFormat specializedToolExecutorResponseFormat =
+        getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
+    this.specializedRepliesToolExecutor =
+        new LangChainExecutor(
+            config, specializedToolExecutorResponseFormat, contextTools, requireInitialToolUse);
+    ResponseFormat specializedTriageToolExecutorResponseFormat =
+        getProviderResponseFormat(config, contextTools, specializedTriageResponseFormat);
+    this.specializedTriageToolExecutor =
+        new LangChainExecutor(
+            config, specializedTriageToolExecutorResponseFormat, contextTools, requireInitialToolUse);
     log.debug("Initialized LangChainClient");
   }
 
@@ -173,6 +209,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @VisibleForTesting
   protected ReviewRequestResult askSingleRequest(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    RawReviewRequestResult rawResult = askSingleRawRequest(changeSetData, change, patchSet);
+    return rawResult == null
+        ? null
+        : new ReviewRequestResult(
+            toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+  }
+
+  protected RawReviewRequestResult askSingleRawRequest(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     try {
       AiProviderType providerType = config.getAiProviderType();
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
@@ -197,7 +242,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(LangChainChatMessages.systemMessage(systemInstructions));
       }
 
-      if (!hasStoredMemory) {
+      if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData)) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
         AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
         List<ChatMessage> history =
@@ -237,7 +282,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           memorySnapshot.size(),
           memorySnapshot);
 
-      AiMessage ai = toolExecutor.execute(model, change, memory);
+      AiMessage ai = getToolExecutor(changeSetData).execute(model, change, memory);
       String responseText = ai != null ? ai.text() : null;
 
       if (responseText == null) {
@@ -251,11 +296,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(ai);
       }
 
-      return new ReviewRequestResult(toResponseContent(responseText), userMessage);
+      return new RawReviewRequestResult(responseText, userMessage);
     } catch (Exception e) {
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
     }
+  }
+
+  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
+    return true;
   }
 
   protected boolean shouldOmitRequestContext(
@@ -341,10 +390,22 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         .build();
   }
 
+  private LangChainExecutor getToolExecutor(ChangeSetData changeSetData) {
+    if (changeSetData != null
+        && changeSetData.getReviewAssistantStage()
+            == ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE) {
+      return specializedTriageToolExecutor;
+    }
+    if (changeSetData != null && Boolean.TRUE.equals(changeSetData.getSpecializedAgentReview())) {
+      return specializedRepliesToolExecutor;
+    }
+    return toolExecutor;
+  }
+
   private ResponseFormat getProviderResponseFormat(
-      Configuration config, List<ToolSpecification> contextTools) {
+      Configuration config, List<ToolSpecification> contextTools, ResponseFormat responseFormat) {
     if (config == null) {
-      return structuredResponseFormat;
+      return responseFormat;
     }
     if (config.getAiProviderType() == AiProviderType.DEEPSEEK) {
       return ResponseFormat.builder().type(ResponseFormatType.JSON).build();
@@ -354,7 +415,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         && !contextTools.isEmpty()) {
       return null;
     }
-    return structuredResponseFormat;
+    return responseFormat;
   }
 
   @Override

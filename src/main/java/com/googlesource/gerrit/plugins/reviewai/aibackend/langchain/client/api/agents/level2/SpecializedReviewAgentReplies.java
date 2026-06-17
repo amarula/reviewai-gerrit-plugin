@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
-public enum ReviewAssistantStage {
-  REVIEW_CODE,
-  REVIEW_COMMIT_MESSAGE,
-  REVIEW_REITERATED,
-  REVIEW_SPECIALIZED_TRIAGE,
-  REVIEW_SPECIALIZED_AGENT,
-  REVIEW_SPECIALIZED_COLLECTOR
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import java.util.List;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+
+@Data
+@RequiredArgsConstructor
+class SpecializedReviewAgentReplies {
+  private final String agent;
+  private final List<AiReplyItem> replies;
 }

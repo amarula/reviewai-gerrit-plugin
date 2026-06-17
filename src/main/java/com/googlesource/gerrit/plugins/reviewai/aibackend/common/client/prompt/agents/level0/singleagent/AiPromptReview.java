@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -70,7 +71,11 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   public static String getRoutedReviewAgentInstructions(ReviewAssistantStage stage) {
     return switch (stage) {
       case REVIEW_COMMIT_MESSAGE -> DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
-      case REVIEW_CODE, REVIEW_REITERATED ->
+      case REVIEW_CODE,
+          REVIEW_REITERATED,
+          REVIEW_SPECIALIZED_TRIAGE,
+          REVIEW_SPECIALIZED_AGENT,
+          REVIEW_SPECIALIZED_COLLECTOR ->
           DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
     };
   }
@@ -182,10 +187,19 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   }
 
   protected String buildSection(String title, String body) {
-    return "# " + title + "\n\n" + body.strip();
+    return AiPromptSections.buildSection(title, body);
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
+    return getAiAssistantInstructionsReview(true, ruleFilter);
+  }
+
+  protected String getAiAssistantInstructionsReviewWithoutDirectives(boolean... ruleFilter) {
+    return getAiAssistantInstructionsReview(false, ruleFilter);
+  }
+
+  private String getAiAssistantInstructionsReview(
+      boolean includeConfiguredDirectives, boolean... ruleFilter) {
     // Rules are applied by default unless the corresponding ruleFilter values is set to false
     List<String> rules = new ArrayList<>();
     codeContextPolicy.addCodeContextPolicyAwareAssistantRule(rules);
@@ -193,7 +207,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
         List.of(
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY,
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET));
-    if (config.getDirective() != null) {
+    if (includeConfiguredDirectives && config.getDirective() != null) {
       rules.addAll(config.getDirective());
     }
     log.debug("Rules used in the assistant: {}", rules);

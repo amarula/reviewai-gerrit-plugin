@@ -23,7 +23,9 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import java.lang.reflect.Method;
 import org.junit.Test;
 
@@ -32,7 +34,7 @@ public class GerritEventContextModuleTest {
   @Test
   public void selectsMultiAgentLangChainClientWhenEnabled() throws Exception {
     Configuration config = mock(Configuration.class);
-    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SCOPED_AGENTS);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
 
@@ -46,7 +48,7 @@ public class GerritEventContextModuleTest {
   public void selectsMultiAgentLangChainClientBasedOnlyOnMultiAgentMode() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiReviewCommitMessages()).thenReturn(false);
-    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SCOPED_AGENTS);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
 
@@ -60,7 +62,7 @@ public class GerritEventContextModuleTest {
   public void keepsUnifiedLangChainClientWhenMultiAgentModeDisabled() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
-    when(config.getMultiAgentMode()).thenReturn(false);
+    when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
 
     GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
 
@@ -68,5 +70,19 @@ public class GerritEventContextModuleTest {
     getAiClient.setAccessible(true);
 
     assertEquals(LangChainClient.class, getAiClient.invoke(module));
+  }
+
+  @Test
+  public void selectsSpecializedLangChainClientForSpecializedAgents() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getAgentSpecializationLevel())
+        .thenReturn(AgentSpecializationLevel.SPECIALIZED_AGENTS);
+
+    GerritEventContextModule module = new GerritEventContextModule(config, mock(Event.class));
+
+    Method getAiClient = GerritEventContextModule.class.getDeclaredMethod("getAiClient");
+    getAiClient.setAccessible(true);
+
+    assertEquals(LangChainSpecializedAgentReviewClient.class, getAiClient.invoke(module));
   }
 }

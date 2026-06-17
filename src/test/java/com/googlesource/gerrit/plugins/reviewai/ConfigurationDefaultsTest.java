@@ -376,6 +376,20 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldEnableMultiAgentModeForSpecializedAgents() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "multiAgentMode", false);
+    cfg.setString("plugin", PLUGIN_NAME, "agentSpecializationLevel", "SPECIALIZED_AGENTS");
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(
+        AgentSpecializationLevel.SPECIALIZED_AGENTS, configuration.getAgentSpecializationLevel());
+    assertEquals(true, configuration.getMultiAgentMode());
+  }
+
+  @Test
   public void shouldDefaultPatchContextLinesToJGitDefault() {
     Configuration configuration = createConfiguration();
 

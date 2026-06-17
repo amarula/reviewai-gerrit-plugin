@@ -176,7 +176,8 @@ public class Configuration extends ConfigCore {
 
   public enum AgentSpecializationLevel {
     SINGLE_AGENT,
-    SCOPED_AGENTS
+    SCOPED_AGENTS,
+    SPECIALIZED_AGENTS
   }
 
   public String getAiToken() {
@@ -340,7 +341,7 @@ public class Configuration extends ConfigCore {
 
   public boolean getMultiAgentMode() {
     if (getString(KEY_AGENT_SPECIALIZATION_LEVEL, null) != null) {
-      return getAgentSpecializationLevel() == AgentSpecializationLevel.SCOPED_AGENTS;
+      return getAgentSpecializationLevel() != AgentSpecializationLevel.SINGLE_AGENT;
     }
     return getBoolean(KEY_MULTI_AGENT_MODE, DEFAULT_MULTI_AGENT_MODE);
   }

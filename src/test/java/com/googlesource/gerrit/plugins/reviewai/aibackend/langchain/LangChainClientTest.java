@@ -19,6 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -46,6 +48,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -82,6 +85,92 @@ public class LangChainClientTest {
     assertTrue(repliesSchema.items() instanceof JsonObjectSchema);
     JsonObjectSchema replyItemSchema = (JsonObjectSchema) repliesSchema.items();
     assertTrue(replyItemSchema.properties().containsKey("reply"));
+    assertTrue(replyItemSchema.properties().containsKey("source_agent"));
+  }
+
+  @Test
+  public void shouldLoadSpecializedStructuredResponseFormatWithoutCollectorFields()
+      throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+
+    ResponseFormat responseFormat = getSpecializedRepliesResponseFormat(client);
+
+    assertNotNull("Specialized response format should be loaded", responseFormat);
+    assertEquals(ResponseFormatType.JSON, responseFormat.type());
+
+    JsonSchema jsonSchema = responseFormat.jsonSchema();
+    assertNotNull(jsonSchema);
+    assertEquals("format_specialized_replies", jsonSchema.name());
+    assertTrue(jsonSchema.rootElement() instanceof JsonObjectSchema);
+
+    JsonObjectSchema root = (JsonObjectSchema) jsonSchema.rootElement();
+    assertTrue(root.properties().containsKey("replies"));
+    assertFalse(root.properties().containsKey("changeId"));
+
+    JsonArraySchema repliesSchema = (JsonArraySchema) root.properties().get("replies");
+    assertNotNull(repliesSchema.items());
+    assertTrue(repliesSchema.items() instanceof JsonObjectSchema);
+    JsonObjectSchema replyItemSchema = (JsonObjectSchema) repliesSchema.items();
+    assertTrue(replyItemSchema.properties().containsKey("reply"));
+    assertTrue(replyItemSchema.properties().containsKey("score"));
+    assertTrue(replyItemSchema.properties().containsKey("filename"));
+    assertTrue(replyItemSchema.properties().containsKey("lineNumber"));
+    assertTrue(replyItemSchema.properties().containsKey("codeSnippet"));
+    assertFalse(replyItemSchema.properties().containsKey("relevance"));
+    assertFalse(replyItemSchema.properties().containsKey("repeated"));
+    assertFalse(replyItemSchema.properties().containsKey("conflicting"));
+    assertFalse(replyItemSchema.properties().containsKey("source_agent"));
+    assertFalse(replyItemSchema.properties().containsKey("repeated_reason"));
+    assertFalse(replyItemSchema.properties().containsKey("conflicting_reason"));
+  }
+
+  @Test
+  public void usesSpecializedExecutorForSpecializedAgentRequests() throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setSpecializedAgentReview(true);
+
+    assertSame(getSpecializedRepliesToolExecutor(client), getToolExecutor(client, changeSetData));
+  }
+
+  @Test
+  public void shouldLoadSpecializedTriageResponseFormatWithDirectAgents() throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+
+    ResponseFormat responseFormat = getSpecializedTriageResponseFormat(client);
+
+    assertNotNull("Specialized triage response format should be loaded", responseFormat);
+    assertEquals(ResponseFormatType.JSON, responseFormat.type());
+
+    JsonSchema jsonSchema = responseFormat.jsonSchema();
+    assertNotNull(jsonSchema);
+    assertEquals("format_specialized_triage", jsonSchema.name());
+    assertTrue(jsonSchema.rootElement() instanceof JsonObjectSchema);
+
+    JsonObjectSchema root = (JsonObjectSchema) jsonSchema.rootElement();
+    assertTrue(root.properties().containsKey("agents"));
+    assertFalse(root.properties().containsKey("replies"));
+    assertFalse(root.properties().containsKey("changeId"));
+
+    JsonArraySchema agentsSchema = (JsonArraySchema) root.properties().get("agents");
+    assertNotNull(agentsSchema.items());
+    assertTrue(agentsSchema.items() instanceof JsonObjectSchema);
+    JsonObjectSchema agentItemSchema = (JsonObjectSchema) agentsSchema.items();
+    assertTrue(agentItemSchema.properties().containsKey("agent"));
+    assertTrue(agentItemSchema.properties().containsKey("enabled"));
+    assertTrue(agentItemSchema.properties().containsKey("reason"));
+    assertTrue(agentItemSchema.properties().containsKey("patchset_context"));
+    assertTrue(agentItemSchema.properties().containsKey("history_context"));
+    assertTrue(agentItemSchema.properties().containsKey("custom_instructions"));
+  }
+
+  @Test
+  public void usesSpecializedTriageExecutorForTriageRequests() throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE);
+
+    assertSame(getSpecializedTriageToolExecutor(client), getToolExecutor(client, changeSetData));
   }
 
   @Test
@@ -97,6 +186,7 @@ public class LangChainClientTest {
     assertEquals(
         "Trailing whitespace should not prevent parsing.",
         responseContent.getReplies().get(0).getReply());
+    assertEquals("CORRECTNESS", responseContent.getReplies().get(0).getSourceAgent());
   }
 
   @Test
@@ -197,6 +287,31 @@ public class LangChainClientTest {
             changeSetData);
 
     assertEquals("conv_review_code", conversationId);
+  }
+
+  @Test
+  public void resolvesSeparateOpenAiConversationForEachSpecializedAgent() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    for (String agent : List.of("CORRECTNESS", "TESTABILITY", "CUSTOM_AGENT")) {
+      String conversationKey = OpenAiConversation.getSpecializedAgentConversationKey(agent);
+      when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_" + agent);
+
+      ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+      changeSetData.setForcedReview(true);
+      changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+      changeSetData.setSpecializedAgentName(agent);
+
+      String conversationId =
+          resolveConversationId(
+              new LangChainClient(
+                  Mockito.mock(Configuration.class), null, null, null, pluginDataHandlerProvider),
+              AiProviderType.OPENAI,
+              changeSetData);
+
+      assertEquals("conv_" + agent, conversationId);
+    }
   }
 
   @Test
@@ -325,6 +440,41 @@ public class LangChainClientTest {
 
   private Object getToolExecutor(LangChainClient client) throws Exception {
     Field executorField = LangChainClient.class.getDeclaredField("toolExecutor");
+    executorField.setAccessible(true);
+    return executorField.get(client);
+  }
+
+  private Object getToolExecutor(LangChainClient client, ChangeSetData changeSetData)
+      throws Exception {
+    Method method = LangChainClient.class.getDeclaredMethod("getToolExecutor", ChangeSetData.class);
+    method.setAccessible(true);
+    return method.invoke(client, changeSetData);
+  }
+
+  private ResponseFormat getSpecializedRepliesResponseFormat(LangChainClient client)
+      throws Exception {
+    Field field = LangChainClient.class.getDeclaredField("specializedRepliesResponseFormat");
+    field.setAccessible(true);
+    return (ResponseFormat) field.get(client);
+  }
+
+  private Object getSpecializedRepliesToolExecutor(LangChainClient client) throws Exception {
+    Field executorField =
+        LangChainClient.class.getDeclaredField("specializedRepliesToolExecutor");
+    executorField.setAccessible(true);
+    return executorField.get(client);
+  }
+
+  private ResponseFormat getSpecializedTriageResponseFormat(LangChainClient client)
+      throws Exception {
+    Field field = LangChainClient.class.getDeclaredField("specializedTriageResponseFormat");
+    field.setAccessible(true);
+    return (ResponseFormat) field.get(client);
+  }
+
+  private Object getSpecializedTriageToolExecutor(LangChainClient client) throws Exception {
+    Field executorField =
+        LangChainClient.class.getDeclaredField("specializedTriageToolExecutor");
     executorField.setAccessible(true);
     return executorField.get(client);
   }
