@@ -1,0 +1,40 @@
+{
+  "name": "format_specialized_replies",
+  "description": "Provide Level 2 specialized review replies.",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "replies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "reply": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "lineNumber": {
+              "type": "integer"
+            },
+            "codeSnippet": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reply",
+            "score"
+          ]
+        }
+      }
+    },
+    "required": [
+      "replies"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "replies": [
+    {
+      "reply": "Duplicate specialized review.",
+      "score": -1.0,
+      "relevance": 0.9,
+      "duplicated": true,
+      "repeated": false,
+      "conflicting": false,
+      "source_agent": "TESTABILITY",
+      "duplicated_reason": "Same issue already reported by CORRECTNESS.",
+      "filename": "src/Test.java",
+      "lineNumber": 42,
+      "codeSnippet": "assertThat(result).isTrue();"
+    }
+  ],
+  "changeId": "myProject~myBranchName~myChangeId"
+}

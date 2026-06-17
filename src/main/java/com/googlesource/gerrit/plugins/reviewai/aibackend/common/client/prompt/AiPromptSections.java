@@ -14,13 +14,20 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-public enum ReviewAssistantStage {
-  REVIEW_CODE,
-  REVIEW_COMMIT_MESSAGE,
-  REVIEW_REITERATED,
-  REVIEW_SPECIALIZED_TRIAGE,
-  REVIEW_SPECIALIZED_AGENT,
-  REVIEW_SPECIALIZED_COLLECTOR
+import java.util.List;
+
+public final class AiPromptSections {
+  private AiPromptSections() {}
+
+  public static void addSection(List<String> sections, String title, String content) {
+    if (content != null && !content.isBlank()) {
+      sections.add(buildSection(title, content));
+    }
+  }
+
+  public static String buildSection(String title, String body) {
+    return "# " + title + "\n\n" + body.strip();
+  }
 }

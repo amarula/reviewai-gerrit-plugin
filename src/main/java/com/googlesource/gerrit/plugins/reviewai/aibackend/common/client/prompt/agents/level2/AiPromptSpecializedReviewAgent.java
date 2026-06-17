@@ -1,0 +1,142 @@
+/*
+ * Copyright (c) 2026. The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
+public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage {
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES;
+  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW;
+
+  public AiPromptSpecializedReviewAgent(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy) {
+    super(config, changeSetData, change, codeContextPolicy);
+    loadDefaultPrompts("agents/level2/specialized/prompts");
+  }
+
+  @Override
+  public String getDefaultAiAssistantInstructions() {
+    if (changeSetData.getSpecializedAgentName() == null) {
+      return getCommitMessageSpecialistInstructions();
+    }
+
+    List<String> sections = new ArrayList<>();
+    sections.add(buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, getSpecializationInstructions()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            getScopeAndReviewConstraints()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
+            getAiAssistantInstructionsReviewWithoutDirectives()));
+    String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
+    if (customInstructions != null && !customInstructions.isBlank()) {
+      sections.add(buildSection("Triage-Selected Instructions", customInstructions));
+    }
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            getSpecializedReplyFieldDefinitions(true)));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES));
+    return joinWithDoubleNewLine(sections);
+  }
+
+  private String getCommitMessageSpecialistInstructions() {
+    List<String> sections = new ArrayList<>();
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE,
+            resolveCommitMessageInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES)));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            getScopeAndReviewConstraints()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
+            getAiAssistantInstructionsReviewWithoutDirectives(false, true, false)));
+    String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
+    if (customInstructions != null && !customInstructions.isBlank()) {
+      sections.add(buildSection("Triage-Selected Instructions", customInstructions));
+    }
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
+            getReviewPromptCommitMessages()));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            getSpecializedReplyFieldDefinitions(false)));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT));
+    sections.add(
+        buildSection(
+            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES));
+    return joinWithDoubleNewLine(sections);
+  }
+
+  private String getSpecializationInstructions() {
+    return changeSetData.getSpecializedAgentInstructions();
+  }
+
+  private String getSpecializedReplyFieldDefinitions(boolean includeInlineLocationFields) {
+    updateScoreDescription();
+    List<String> attributes = new ArrayList<>(List.of(ATTRIBUTE_REPLY, ATTRIBUTE_SCORE));
+    if (includeInlineLocationFields) {
+      attributes.add(ATTRIBUTE_FILENAME);
+      attributes.add(ATTRIBUTE_LINE_NUMBER);
+      attributes.add(ATTRIBUTE_CODE_SNIPPET);
+    }
+    return buildFieldSpecifications(attributes);
+  }
+
+  @Override
+  public String getDefaultAiThreadReviewMessage(String patchSet) {
+    if (changeSetData.getSpecializedAgentName() == null) {
+      return super.getDefaultAiThreadReviewMessage(patchSet);
+    }
+    return String.format(DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW, patchSet);
+  }
+}
