@@ -299,16 +299,21 @@ directive = End each reply with \"Hope this helps!\"
 
 ### Optional Parameters Specific to Review Processing
 
-- `multiAgentMode` (deprecated): This option allows for dividing the Patch Set review between two specialized agents: one
-  focused to the Patch's code and another to the commit message. When this option is set to false (default value), the
-  Patch Set review is unified into one single request processed by one agent instructed for both tasks.
-- `agentSpecializationLevel`: Controls how review work is assigned to agents. Supported values are `SINGLE_AGENT`
-  (default), which uses one agent for both the Patch's code and commit message, and `SCOPED_AGENTS`, which divides the
-  review between specialized code and commit-message agents. This option overrides the deprecated `multiAgentMode`;
-  `SINGLE_AGENT` is equivalent to `multiAgentMode=false` and `SCOPED_AGENTS` to `multiAgentMode=true`.
+- `multiAgentMode` (deprecated): This option allows for dividing the Patch Set review between two specialized agents:
+  one focused to the Patch's code and another to the commit message. When this option is set to false (default value),
+  the Patch Set review is unified into one single request processed by one agent instructed for both tasks.
 
-  **NOTE**: Enabling this feature may result in duplicate requests to AI, potentially increasing the usage costs of the
-  AI API.
+- `agentSpecializationLevel`: Controls how review work is assigned to AI agents. This option overrides the deprecated
+  `multiAgentMode` setting. Supported values are:
+    * `SINGLE_AGENT`: Uses one agent to review both Patch Set code changes and the commit message. This is the default
+      value and is equivalent to `multiAgentMode=false`.
+    * `SCOPED_AGENTS`: Splits the review between dedicated Patch Set and Commit-Message agents. This is equivalent to
+      `multiAgentMode=true`.
+    * `SPECIALIZED_AGENTS`: Uses dedicated Patch Set review agents for correctness, testability, code quality,
+      documentation, and security.
+
+  **NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
+  costs.
 
 ### Optional Parameters Specific to LangChain Provider Routes
 

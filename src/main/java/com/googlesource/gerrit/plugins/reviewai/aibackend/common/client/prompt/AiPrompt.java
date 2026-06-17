@@ -40,9 +40,16 @@ public class AiPrompt {
   public static final String ATTRIBUTE_REPLY = "reply";
   public static final String ATTRIBUTE_SCORE = "score";
   public static final String ATTRIBUTE_REPEATED = "repeated";
+  public static final String ATTRIBUTE_DUPLICATED = "duplicated";
   public static final String ATTRIBUTE_CONFLICTING = "conflicting";
   public static final String ATTRIBUTE_RELEVANCE = "relevance";
+  public static final String ATTRIBUTE_REPEATED_REASON = "repeated_reason";
+  public static final String ATTRIBUTE_DUPLICATED_REASON = "duplicated_reason";
+  public static final String ATTRIBUTE_CONFLICTING_REASON = "conflicting_reason";
   public static final String ATTRIBUTE_CHANGE_ID = "changeId";
+  public static final String ATTRIBUTE_FILENAME = "filename";
+  public static final String ATTRIBUTE_LINE_NUMBER = "lineNumber";
+  public static final String ATTRIBUTE_CODE_SNIPPET = "codeSnippet";
   public static final List<String> PATCH_SET_REVIEW_REPLY_ATTRIBUTES =
       new ArrayList<>(
           Arrays.asList(
@@ -169,7 +176,7 @@ public class AiPrompt {
     return getPatchSetReviewPromptInstructions() + SPACE + DEFAULT_AI_REPLIES_PROMPT_INLINE;
   }
 
-  private void updateScoreDescription() {
+  protected void updateScoreDescription() {
     log.debug("Updating score description.");
     String scoreDescription = DEFAULT_AI_REPLIES_ATTRIBUTES.get(ATTRIBUTE_SCORE);
     if (scoreDescription.contains("%d")) {

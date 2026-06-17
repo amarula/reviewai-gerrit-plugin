@@ -29,6 +29,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.AiPromptReviewReiterated;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -67,6 +70,21 @@ public class AiPromptFactory {
           case REVIEW_REITERATED -> {
             log.info("AiPromptFactory: Return AiPromptReviewReiterate");
             yield new AiPromptReviewReiterated(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_TRIAGE -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedReviewTriage");
+            yield new AiPromptSpecializedReviewTriage(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_AGENT -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
+            yield new AiPromptSpecializedReviewAgent(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_COLLECTOR -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedReviewCollector");
+            yield new AiPromptSpecializedReviewCollector(
                 config, changeSetData, change, codeContextPolicy);
           }
         };

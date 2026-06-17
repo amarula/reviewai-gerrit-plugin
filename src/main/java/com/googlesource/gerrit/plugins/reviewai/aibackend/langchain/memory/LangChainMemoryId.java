@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import java.util.Locale;
@@ -67,6 +68,13 @@ public final class LangChainMemoryId {
     ReviewAssistantStage assistantStage = changeSetData.getReviewAssistantStage();
     if (assistantStage == null) {
       return DEFAULT_SCOPE;
+    }
+    if (assistantStage == ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT
+        && changeSetData.getSpecializedAgentName() != null) {
+      return assistantStage.name().toLowerCase(Locale.ROOT)
+          + "."
+          + SpecializedReviewAgentDefinition.normalizeName(changeSetData.getSpecializedAgentName())
+              .toLowerCase(Locale.ROOT);
     }
     return assistantStage.name().toLowerCase(Locale.ROOT);
   }
