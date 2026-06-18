@@ -55,9 +55,7 @@ final class AiProviderConfiguration {
   static final String KEY_AI_MODELS = "aiModels";
   static final String KEY_AI_PROVIDER = "aiProviders";
   static final String KEY_AI_DOMAIN = "aiDomain";
-  static final String KEY_AI_MODELS_DEFAULT_INDEX = "aiModelsDefaultIndex";
-
-  private static final int DEFAULT_AI_MODELS_DEFAULT_INDEX = 1;
+  static final String KEY_AI_MODELS_DEFAULT = "aiModelsDefault";
 
   private static final List<String> DEFAULT_AI_PROVIDER = List.of("OpenAI");
   private static final String SELECTED_AI_MODEL = "selectedAiModel";
@@ -173,8 +171,8 @@ final class AiProviderConfiguration {
     return tokens;
   }
 
-  int getAiModelsDefaultIndex() {
-    return config.getInt(KEY_AI_MODELS_DEFAULT_INDEX, DEFAULT_AI_MODELS_DEFAULT_INDEX);
+  String getAiModelsDefault() {
+    return config.getString(KEY_AI_MODELS_DEFAULT);
   }
 
   AiModelRoute getSelectedAiModelRoute() {
@@ -195,7 +193,7 @@ final class AiProviderConfiguration {
   }
 
   Optional<AiModelRoute> getDefaultRealAiModelRoute() {
-    return mockAiConfiguration.getDefaultRealAiModelRoute(getAiModels(), getAiModelsDefaultIndex());
+    return mockAiConfiguration.getDefaultRealAiModelRoute(getAiModels(), getAiModelsDefault());
   }
 
   AiProviderType getAiProviderType() {
@@ -210,11 +208,22 @@ final class AiProviderConfiguration {
         .toList();
   }
 
-  private Optional<AiModelRoute> getDefaultAiModelRoute() {
+  Optional<AiModelRoute> getDefaultAiModelRoute() {
     List<String> models = getAiModels();
-    int zeroBasedIndex = getAiModelsDefaultIndex() - 1;
-    if (zeroBasedIndex >= 0 && zeroBasedIndex < models.size()) {
-      return AiModelRoute.parse(models.get(zeroBasedIndex));
+    if (models.isEmpty()) {
+      return Optional.empty();
+    }
+    String configuredDefault = unwrapDumpQuotes(getAiModelsDefault());
+    if (configuredDefault != null && !configuredDefault.isBlank()) {
+      Optional<AiModelRoute> parsedRoute = AiModelRoute.parse(configuredDefault);
+      if (parsedRoute.isPresent() && models.contains(parsedRoute.get().modelRoute())) {
+        return parsedRoute;
+      }
+      log.warn(
+          "Configured AI models default `{}` is not present in resolved AI models {}. Using first model `{}`.",
+          configuredDefault,
+          models,
+          models.getFirst());
     }
     return models.stream().findFirst().flatMap(AiModelRoute::parse);
   }

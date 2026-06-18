@@ -95,7 +95,7 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
-  public void shouldSelectFirstAiModelsEntryWhenDefaultIndexIsUnset() {
+  public void shouldSelectFirstAiModelsEntryWhenDefaultIsUnset() {
     Configuration configuration =
         createConfiguration(
             new String[] {"OpenAI"},
@@ -106,17 +106,29 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
-  public void shouldSelectConfiguredAiModelsDefaultIndex() {
+  public void shouldSelectConfiguredAiModelsDefault() {
     Configuration configuration =
         createConfiguration(
             new String[] {"OpenAI"},
             new String[] {"OpenAI/gpt-4.1", "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL},
-            2);
+            "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL);
 
     assertEquals(Configuration.DEFAULT_OPENAI_AI_MODEL, configuration.getAiModel());
     assertEquals(
         "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL,
         configuration.getSelectedAiModelRoute().modelRoute());
+  }
+
+  @Test
+  public void shouldUseFirstAiModelsEntryWhenConfiguredDefaultIsMissing() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI"},
+            new String[] {"OpenAI/gpt-4.1", "OpenAI/" + Configuration.DEFAULT_OPENAI_AI_MODEL},
+            "OpenAI/not-configured");
+
+    assertEquals("gpt-4.1", configuration.getAiModel());
+    assertEquals("OpenAI/gpt-4.1", configuration.getSelectedAiModelRoute().modelRoute());
   }
 
   @Test
@@ -276,12 +288,12 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
-  public void shouldSelectMockAiModelByConfiguredDefaultIndex() {
+  public void shouldSelectMockAiModelByConfiguredDefault() {
     Configuration configuration =
         createConfiguration(
             new String[] {"OpenAI"},
             new String[] {"OpenAI/gpt-4.1"},
-            2,
+            "OpenAI/mock-ai",
             new String[] {"OpenAI/test-token"},
             "http://localhost:9090");
 
@@ -297,7 +309,7 @@ public class ConfigurationDefaultsTest {
         createConfiguration(
             new String[] {"OpenAI"},
             new String[] {"OpenAI/gpt-4.1"},
-            2,
+            "OpenAI/mock-ai",
             new String[] {"OpenAI/test-token"},
             "http://localhost:9090");
 
@@ -312,7 +324,7 @@ public class ConfigurationDefaultsTest {
         createConfiguration(
             new String[] {"OpenAI"},
             new String[] {"OpenAI/gpt-4.1"},
-            2,
+            "OpenAI/mock-ai",
             new String[] {"OpenAI/test-token"},
             "http://localhost:9090");
 
@@ -525,23 +537,24 @@ public class ConfigurationDefaultsTest {
   }
 
   private Configuration createConfiguration(
-      String[] providers, String[] models, Integer defaultIndex) {
-    return createConfiguration(providers, models, defaultIndex, new String[] {});
+      String[] providers, String[] models, String defaultModelRoute) {
+    return createConfiguration(providers, models, defaultModelRoute, new String[] {});
   }
 
   private Configuration createConfiguration(
-      String[] providers, String[] models, Integer defaultIndex, String[] tokens) {
-    return createConfiguration(providers, models, defaultIndex, tokens, null);
+      String[] providers, String[] models, String defaultModelRoute, String[] tokens) {
+    return createConfiguration(providers, models, defaultModelRoute, tokens, null);
   }
 
   private Configuration createConfiguration(
       String[] providers,
       String[] models,
-      Integer defaultIndex,
+      String defaultModelRoute,
       String[] tokens,
       String mockAiAddress) {
     PluginConfig projectConfig = emptyPluginConfig();
-    PluginConfig globalConfig = pluginConfig(providers, models, defaultIndex, tokens, mockAiAddress);
+    PluginConfig globalConfig =
+        pluginConfig(providers, models, defaultModelRoute, tokens, mockAiAddress);
 
     return createConfiguration(globalConfig, projectConfig);
   }
@@ -569,15 +582,15 @@ public class ConfigurationDefaultsTest {
   private PluginConfig pluginConfig(
       String[] providers,
       String[] models,
-      Integer defaultIndex,
+      String defaultModelRoute,
       String[] tokens,
       String mockAiAddress) {
     Config cfg = new Config();
     cfg.setStringList("plugin", PLUGIN_NAME, "aiProviders", List.of(providers));
     cfg.setStringList("plugin", PLUGIN_NAME, "aiModels", List.of(models));
     cfg.setStringList("plugin", PLUGIN_NAME, "aiTokens", List.of(tokens));
-    if (defaultIndex != null) {
-      cfg.setInt("plugin", PLUGIN_NAME, "aiModelsDefaultIndex", defaultIndex);
+    if (defaultModelRoute != null) {
+      cfg.setString("plugin", PLUGIN_NAME, "aiModelsDefault", defaultModelRoute);
     }
     if (mockAiAddress != null) {
       cfg.setString("plugin", PLUGIN_NAME, "mockAiAddress", mockAiAddress);

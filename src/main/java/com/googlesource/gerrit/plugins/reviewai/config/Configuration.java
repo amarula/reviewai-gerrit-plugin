@@ -143,8 +143,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_FILTER_RELEVANT_COMMENTS = "filterRelevantComments";
   private static final String KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD =
       "filterCommentsRelevanceThreshold";
-  private static final String KEY_AI_MODELS_DEFAULT_INDEX =
-      AiProviderConfiguration.KEY_AI_MODELS_DEFAULT_INDEX;
+  private static final String KEY_AI_MODELS_DEFAULT = AiProviderConfiguration.KEY_AI_MODELS_DEFAULT;
   private static final String KEY_AI_MAX_MEMORY_TOKENS = "aiMaxMemoryTokens";
   private static final String KEY_INLINE_COMMENTS_AS_RESOLVED = "inlineCommentsAsResolved";
   private static final String KEY_PATCH_SET_COMMENTS_AS_RESOLVED = "patchSetCommentsAsResolved";
@@ -207,12 +206,16 @@ public class Configuration extends ConfigCore {
     return aiProviderConfiguration.getAiModels();
   }
 
-  public int getAiModelsDefaultIndex() {
-    return aiProviderConfiguration.getAiModelsDefaultIndex();
+  public String getAiModelsDefault() {
+    return aiProviderConfiguration.getAiModelsDefault();
   }
 
   public AiModelRoute getSelectedAiModelRoute() {
     return aiProviderConfiguration.getSelectedAiModelRoute();
+  }
+
+  public Optional<AiModelRoute> getDefaultAiModelRoute() {
+    return aiProviderConfiguration.getDefaultAiModelRoute();
   }
 
   public Optional<AiModelRoute> getDefaultRealAiModelRoute() {
@@ -221,7 +224,7 @@ public class Configuration extends ConfigCore {
 
   public Optional<AiModelRoute> resolveMockAiFallbackRoute(String responseText) {
     return mockAiConfiguration.resolveFallbackRoute(
-        responseText, getAiModels(), getAiModelsDefaultIndex());
+        responseText, getAiModels(), getAiModelsDefault());
   }
 
   public <T> T withAiModelRoute(AiModelRoute route, Callable<T> callable) throws Exception {
