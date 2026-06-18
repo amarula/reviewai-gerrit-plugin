@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config.dynamic;
 
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -96,11 +97,11 @@ public class DynamicConfigManager {
     if (aiModels == null || aiModels.isEmpty()) {
       return "";
     }
-    int zeroBasedIndex = config.getAiModelsDefaultIndex() - 1;
-    if (zeroBasedIndex >= 0 && zeroBasedIndex < aiModels.size()) {
-      return aiModels.get(zeroBasedIndex);
-    }
-    return aiModels.get(0);
+    Optional<AiModelRoute> defaultRoute = config.getDefaultAiModelRoute();
+    return Optional.ofNullable(defaultRoute)
+        .orElse(Optional.empty())
+        .map(AiModelRoute::modelRoute)
+        .orElse(aiModels.get(0));
   }
 
   private void resetDynamicConfig() {

@@ -115,7 +115,7 @@ as follows:
     aiProviders = MoonShot
     aiModels = OpenAI/gpt-5.2
     aiModels = MoonShot/moonshot-v1-8k
-    aiModelsDefaultIndex = 1
+    aiModelsDefault = OpenAI/gpt-5.2
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
@@ -181,7 +181,7 @@ models, the plugin exposes the built-in defaults for that provider. The current 
     aiModels = DeepSeek/deepseek-v4-flash
     aiModels = MoonShot/moonshot-v1-8k
     aiModels = llama3.2
-    aiModelsDefaultIndex = 1
+    aiModelsDefault = OpenAI/gpt-5.4
 
     aiTokens = OpenAI/{openAiToken}
     aiTokens = DeepSeek/{deepSeekToken}
@@ -199,9 +199,9 @@ matches a configured or default model for a token-backed provider that has a tok
 - `aiProviders`: Selects provider routes to expose. The default value is `OpenAI`.
 - `aiModels`: Selects model routes by provider. When no models are configured for an exposed provider, the plugin
   exposes built-in defaults.
-- `aiModelsDefaultIndex`: Selects the default model by 1-based index from the expanded `aiModels` list. The default
-  value is `1`. This model is used for automatic Patch Set reviews and as the initial Review Agent dropdown value
-  when no model has been selected yet.
+- `aiModelsDefault`: Selects the default model by provider/model route, such as `OpenAI/gpt-5.4`. This model is used
+  for automatic Patch Set reviews and as the initial Review Agent dropdown value when no model has been selected yet.
+  If unset or not found in the expanded `aiModels` list, the first available provider/model route is used.
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `DeepSeek/{token}`,
   `MoonShot/{token}`, and so on. Ollama does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider. By default, it uses the provider’s standard domain:
@@ -213,7 +213,7 @@ matches a configured or default model for a token-backed provider that has a tok
   configured provider route, such as `OpenAI/mock-ai`, `MoonShot/mock-ai`, or `Ollama/mock-ai`. Selecting one of these
   models keeps the same provider and token behavior as the corresponding live model route, but sends AI requests to the
   configured mock server address instead. Because mock models are appended to the regular model list, they can be
-  selected through `aiModelsDefaultIndex` like any other model.
+  selected through `aiModelsDefault` like any other model.
 - `aiSystemPromptInstructions`: You can customize the default instructions ("Act as a PatchSet Reviewer") to your
   preferred prompt.
 - `aiReviewTemperature`: Specifies the temperature setting for AI when reviewing a Patch Set, with a default
@@ -593,7 +593,7 @@ aiFullFileReview: true
 aiMaxMemoryTokens: 16384
 aiMaxToolResponseRounds: 3
 aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.5, OpenAI/gpt-5.2, OpenAI/gpt-4.1, Gemini/gemini-3.1-pro, ...]
-aiModelsDefaultIndex: 1
+aiModelsDefault: 
 aiPollingInterval: 1000
 aiPollingTimeout: 180
 aiProviders:

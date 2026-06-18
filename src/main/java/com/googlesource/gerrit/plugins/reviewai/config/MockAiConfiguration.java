@@ -69,26 +69,32 @@ public final class MockAiConfiguration {
     return providers.stream().map(provider -> new AiModelRoute(provider, MOCK_AI_MODEL)).toList();
   }
 
-  Optional<AiModelRoute> getDefaultRealAiModelRoute(List<String> modelRoutes, int defaultIndex) {
+  Optional<AiModelRoute> getDefaultRealAiModelRoute(
+      List<String> modelRoutes, String configuredDefault) {
     List<String> realModelRoutes =
         modelRoutes.stream()
             .filter(modelRoute -> modelRoute != null && !modelRoute.endsWith("/" + MOCK_AI_MODEL))
             .toList();
-    int zeroBasedIndex = defaultIndex - 1;
-    if (zeroBasedIndex >= 0 && zeroBasedIndex < realModelRoutes.size()) {
-      return AiModelRoute.parse(realModelRoutes.get(zeroBasedIndex));
+    if (realModelRoutes.isEmpty()) {
+      return Optional.empty();
+    }
+    if (configuredDefault != null && !configuredDefault.isBlank()) {
+      Optional<AiModelRoute> parsedRoute = AiModelRoute.parse(configuredDefault);
+      if (parsedRoute.isPresent() && realModelRoutes.contains(parsedRoute.get().modelRoute())) {
+        return parsedRoute;
+      }
     }
     return realModelRoutes.stream().findFirst().flatMap(AiModelRoute::parse);
   }
 
   Optional<AiModelRoute> resolveFallbackRoute(
-      String responseText, List<String> modelRoutes, int defaultIndex) {
+      String responseText, List<String> modelRoutes, String configuredDefault) {
     if (responseText == null) {
       return Optional.empty();
     }
     String directive = responseText.trim();
     if (FALLBACK_DIRECTIVE.equals(directive)) {
-      return getDefaultRealAiModelRoute(modelRoutes, defaultIndex)
+      return getDefaultRealAiModelRoute(modelRoutes, configuredDefault)
           .filter(route -> !isMockAiModelRoute(route));
     }
     if (!directive.startsWith(FALLBACK_DIRECTIVE_PREFIX)) {
