@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt.getJsonPromptValues;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
@@ -162,6 +163,8 @@ public class Configuration extends ConfigCore {
   private static final String KEY_ENABLE_MESSAGE_DEBUGGING = "enableMessageDebugging";
 
   private final AiProviderConfiguration aiProviderConfiguration;
+  private final MockAiConfiguration mockAiConfiguration;
+  private final ThreadLocal<AiModelRoute> aiModelRouteOverride = new ThreadLocal<>();
 
   public Configuration(
       OneOffRequestContext context,
@@ -172,6 +175,7 @@ public class Configuration extends ConfigCore {
       Account.Id userId) {
     super(context, gerritApi, globalConfig, projectConfig, gerritUserEmail, userId);
     aiProviderConfiguration = new AiProviderConfiguration(this);
+    mockAiConfiguration = new MockAiConfiguration(this);
   }
 
   public enum AgentSpecializationLevel {
@@ -209,6 +213,33 @@ public class Configuration extends ConfigCore {
 
   public AiModelRoute getSelectedAiModelRoute() {
     return aiProviderConfiguration.getSelectedAiModelRoute();
+  }
+
+  public Optional<AiModelRoute> getDefaultRealAiModelRoute() {
+    return aiProviderConfiguration.getDefaultRealAiModelRoute();
+  }
+
+  public Optional<AiModelRoute> resolveMockAiFallbackRoute(String responseText) {
+    return mockAiConfiguration.resolveFallbackRoute(
+        responseText, getAiModels(), getAiModelsDefaultIndex());
+  }
+
+  public <T> T withAiModelRoute(AiModelRoute route, Callable<T> callable) throws Exception {
+    AiModelRoute previousRoute = aiModelRouteOverride.get();
+    aiModelRouteOverride.set(route);
+    try {
+      return callable.call();
+    } finally {
+      if (previousRoute == null) {
+        aiModelRouteOverride.remove();
+      } else {
+        aiModelRouteOverride.set(previousRoute);
+      }
+    }
+  }
+
+  Optional<AiModelRoute> getAiModelRouteOverride() {
+    return Optional.ofNullable(aiModelRouteOverride.get());
   }
 
   public AiProviderType getAiProviderType() {

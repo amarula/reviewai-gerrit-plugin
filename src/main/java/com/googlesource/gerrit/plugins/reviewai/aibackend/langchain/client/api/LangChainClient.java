@@ -16,6 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.isJsonObjectAsString;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -34,13 +37,14 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -52,11 +56,9 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import java.util.List;
+import java.util.Optional;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.isJsonObjectAsString;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
 
 @Slf4j
 @Singleton
@@ -74,6 +76,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final PluginChatMemoryStore chatMemoryStore;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
+  private final List<ToolSpecification> contextTools;
   private final LangChainExecutor toolExecutor;
 
   private String requestBody;
@@ -85,6 +88,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
     protected ReviewRequestResult(AiResponseContent responseContent, String requestBody) {
       this.responseContent = responseContent;
+      this.requestBody = requestBody;
+    }
+  }
+
+  @Getter
+  protected static class RawReviewRequestResult {
+    private final String responseText;
+    private final String requestBody;
+
+    protected RawReviewRequestResult(String responseText, String requestBody) {
+      this.responseText = responseText;
       this.requestBody = requestBody;
     }
   }
@@ -119,12 +133,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               .filter(toolSpecification -> toolSpecification != null)
               .toList();
     }
+    this.contextTools = contextTools;
     boolean requireInitialToolUse =
         config != null
             && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
             && config.getAiProviderType() == AiProviderType.OPENAI;
-    ResponseFormat toolExecutorResponseFormat =
-        getProviderResponseFormat(config, contextTools);
+    ResponseFormat toolExecutorResponseFormat = getProviderResponseFormat(config, contextTools);
     this.toolExecutor =
         new LangChainExecutor(
             config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
@@ -173,6 +187,53 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @VisibleForTesting
   protected ReviewRequestResult askSingleRequest(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    RawReviewRequestResult rawResult = askSingleRawRequest(changeSetData, change, patchSet);
+    Optional<AiModelRoute> fallbackRoute =
+        rawResult == null
+            ? Optional.empty()
+            : config.resolveMockAiFallbackRoute(rawResult.getResponseText());
+    if (fallbackRoute.isPresent()) {
+      log.info(
+          "Mock AI response requested fallback to provider/model {}",
+          fallbackRoute.get().modelRoute());
+      rawResult = askSingleRawRequest(changeSetData, change, patchSet, fallbackRoute.get());
+    }
+    return rawResult == null
+        ? null
+        : new ReviewRequestResult(
+            toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+  }
+
+  protected RawReviewRequestResult askSingleRawRequest(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    return askSingleRawRequest(changeSetData, change, patchSet, null);
+  }
+
+  @VisibleForTesting
+  protected RawReviewRequestResult askSingleRawRequest(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      AiModelRoute aiModelRouteOverride)
+      throws Exception {
+    if (aiModelRouteOverride == null) {
+      return doAskSingleRawRequest(changeSetData, change, patchSet, false);
+    }
+    return config.withAiModelRoute(
+        aiModelRouteOverride, () -> doAskSingleRawRequest(changeSetData, change, patchSet, true));
+  }
+
+  @VisibleForTesting
+  protected RawReviewRequestResult rawReviewRequestResult(String responseText, String requestBody) {
+    return new RawReviewRequestResult(responseText, requestBody);
+  }
+
+  private RawReviewRequestResult doAskSingleRawRequest(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      boolean rebuildToolExecutor)
+      throws Exception {
     try {
       AiProviderType providerType = config.getAiProviderType();
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
@@ -183,8 +244,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       boolean omitRequestContext =
           shouldOmitRequestContext(
               providerType, conversationResolution.existingConversation(), changeSetData, change);
-      String userMessage =
-          getUserMessageForRequest(prompt, patchSet, omitRequestContext);
+      String userMessage = getUserMessageForRequest(prompt, patchSet, omitRequestContext);
 
       log.debug("LangChain system instructions for {}: {}", memoryId, systemInstructions);
       log.debug("LangChain user prompt for {}: {}", memoryId, userMessage);
@@ -197,7 +257,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(LangChainChatMessages.systemMessage(systemInstructions));
       }
 
-      if (!hasStoredMemory) {
+      if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData)) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
         AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
         List<ChatMessage> history =
@@ -237,7 +297,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           memorySnapshot.size(),
           memorySnapshot);
 
-      AiMessage ai = toolExecutor.execute(model, change, memory);
+      AiMessage ai =
+          (rebuildToolExecutor ? buildToolExecutor() : toolExecutor).execute(model, change, memory);
       String responseText = ai != null ? ai.text() : null;
 
       if (responseText == null) {
@@ -251,11 +312,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(ai);
       }
 
-      return new ReviewRequestResult(toResponseContent(responseText), userMessage);
+      return new RawReviewRequestResult(responseText, userMessage);
     } catch (Exception e) {
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
     }
+  }
+
+  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
+    return true;
   }
 
   protected boolean shouldOmitRequestContext(
@@ -339,6 +404,18 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         .id(memoryId)
         .maxTokens(config.getAiMaxMemoryTokens(), tokenEstimatorProvider.get())
         .build();
+  }
+
+  private LangChainExecutor buildToolExecutor() {
+    boolean requireInitialToolUse =
+        config != null
+            && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
+            && config.getAiProviderType() == AiProviderType.OPENAI;
+    return new LangChainExecutor(
+        config,
+        getProviderResponseFormat(config, contextTools),
+        contextTools,
+        requireInitialToolUse);
   }
 
   private ResponseFormat getProviderResponseFormat(

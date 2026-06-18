@@ -36,7 +36,6 @@ final class AiProviderConfiguration {
   static final String DEFAULT_DEEPSEEK_AI_MODEL = "deepseek-v4-flash";
   static final String DEFAULT_MOONSHOT_AI_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_AI_MODEL = "llama3.2";
-  static final String MOCK_AI_MODEL = "mock-ai";
   static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = "gpt-4o";
   static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = "gemini-2.5-flash";
   static final String DEFAULT_DEEPSEEK_ESTIMATOR_MODEL = DEFAULT_DEEPSEEK_AI_MODEL;
@@ -64,9 +63,11 @@ final class AiProviderConfiguration {
   private static final String SELECTED_AI_MODEL = "selectedAiModel";
 
   private final Configuration config;
+  private final MockAiConfiguration mockAiConfiguration;
 
   AiProviderConfiguration(Configuration config) {
     this.config = config;
+    this.mockAiConfiguration = new MockAiConfiguration(config);
   }
 
   String getAiToken() {
@@ -83,8 +84,9 @@ final class AiProviderConfiguration {
   }
 
   String getAiDomain() {
-    if (isMockAiModelRoute(getSelectedAiModelRoute())) {
-      return getMockAiAddress();
+    Optional<String> mockAiDomain = mockAiConfiguration.getMockAiDomain(getSelectedAiModelRoute());
+    if (mockAiDomain.isPresent()) {
+      return mockAiDomain.get();
     }
     String aiDomain = config.getString(KEY_AI_DOMAIN);
     if (aiDomain != null && !aiDomain.isEmpty()) {
@@ -144,12 +146,9 @@ final class AiProviderConfiguration {
         .map(AiModelRoute::modelRoute)
         .distinct()
         .toList();
-    if (hasMockAiAddress()) {
-      List<String> modelsWithMock = new ArrayList<>(resolvedModels);
-      modelsWithMock.addAll(
-          getMockAiModelRoutes(providerRoutes).stream().map(AiModelRoute::modelRoute).toList());
-      resolvedModels = modelsWithMock.stream().distinct().toList();
-    }
+    resolvedModels =
+        mockAiConfiguration.appendMockAiModelRoutes(
+            resolvedModels, providerRoutes.stream().map(AiProviderRoute::provider).toList());
     log.debug(
         "AI model routes resolved. configuredModels={}, resolvedProviders={}, tokenProviders={}, resolvedModels={}",
         configuredModels,
@@ -179,6 +178,10 @@ final class AiProviderConfiguration {
   }
 
   AiModelRoute getSelectedAiModelRoute() {
+    Optional<AiModelRoute> overrideRoute = config.getAiModelRouteOverride();
+    if (overrideRoute.isPresent()) {
+      return overrideRoute.get();
+    }
     String selectedRoute = config.getString(SELECTED_AI_MODEL);
     if (!selectedRoute.isBlank()) {
       Optional<AiModelRoute> parsedRoute = AiModelRoute.parse(selectedRoute);
@@ -189,6 +192,10 @@ final class AiProviderConfiguration {
     return getDefaultAiModelRoute()
         .orElse(
             new AiModelRoute(AiProviderType.OPENAI, DEFAULT_OPENAI_AI_MODEL));
+  }
+
+  Optional<AiModelRoute> getDefaultRealAiModelRoute() {
+    return mockAiConfiguration.getDefaultRealAiModelRoute(getAiModels(), getAiModelsDefaultIndex());
   }
 
   AiProviderType getAiProviderType() {
@@ -411,24 +418,6 @@ final class AiProviderConfiguration {
 
   private List<String> getAiTokenProviders() {
     return getAiTokens().keySet().stream().toList();
-  }
-
-  private boolean hasMockAiAddress() {
-    return !getMockAiAddress().isBlank();
-  }
-
-  private String getMockAiAddress() {
-    return config.getMockAiAddress() == null ? "" : config.getMockAiAddress().trim();
-  }
-
-  private List<AiModelRoute> getMockAiModelRoutes(List<AiProviderRoute> providerRoutes) {
-    return providerRoutes.stream()
-        .map(route -> new AiModelRoute(route.provider(), MOCK_AI_MODEL))
-        .toList();
-  }
-
-  private boolean isMockAiModelRoute(AiModelRoute route) {
-    return hasMockAiAddress() && route != null && MOCK_AI_MODEL.equals(route.model());
   }
 
   private String unwrapDumpQuotes(String value) {

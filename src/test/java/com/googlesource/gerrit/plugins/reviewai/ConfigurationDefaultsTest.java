@@ -23,8 +23,10 @@ import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -287,6 +289,83 @@ public class ConfigurationDefaultsTest {
     assertEquals("OpenAI/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
     assertEquals("http://localhost:9090", configuration.getAiDomain());
     assertEquals("test-token", configuration.getAiToken());
+  }
+
+  @Test
+  public void shouldResolveDefaultRealAiModelRouteForMockFallback() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI"},
+            new String[] {"OpenAI/gpt-4.1"},
+            2,
+            new String[] {"OpenAI/test-token"},
+            "http://localhost:9090");
+
+    assertEquals("OpenAI/mock-ai", configuration.getSelectedAiModelRoute().modelRoute());
+    assertEquals(
+        "OpenAI/gpt-4.1", configuration.getDefaultRealAiModelRoute().get().modelRoute());
+  }
+
+  @Test
+  public void shouldResolveProviderFallbackDirectiveToDefaultRealModel() {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI"},
+            new String[] {"OpenAI/gpt-4.1"},
+            2,
+            new String[] {"OpenAI/test-token"},
+            "http://localhost:9090");
+
+    assertEquals(
+        "OpenAI/gpt-4.1",
+        configuration.resolveMockAiFallbackRoute(" FORWARD\n").get().modelRoute());
+  }
+
+  @Test
+  public void shouldResolveProviderFallbackDirectiveToExplicitModelRoute() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(
+        "MoonShot/kimi-k2.6",
+        configuration
+            .resolveMockAiFallbackRoute("FORWARD:MoonShot/kimi-k2.6")
+            .get()
+            .modelRoute());
+  }
+
+  @Test
+  public void shouldIgnoreProviderFallbackDirectiveToMockRoute() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(
+        false,
+        configuration.resolveMockAiFallbackRoute("FORWARD:OpenAI/mock-ai").isPresent());
+  }
+
+  @Test
+  public void shouldTemporarilyOverrideAiModelRoute() throws Exception {
+    Configuration configuration =
+        createConfiguration(
+            new String[] {"OpenAI", "MoonShot"},
+            new String[] {"OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"},
+            null,
+            new String[] {"OpenAI/openai-token", "MoonShot/moonshot-token"});
+    AiModelRoute fallbackRoute =
+        new AiModelRoute(AiProviderType.MOONSHOT, "moonshot-v1-8k");
+
+    String resolvedModel =
+        configuration.withAiModelRoute(
+            fallbackRoute,
+            () -> {
+              assertEquals("MoonShot", configuration.getAiProviderType().getConfigName());
+              assertEquals("moonshot-v1-8k", configuration.getAiModel());
+              assertEquals(Configuration.MOONSHOT_DOMAIN, configuration.getAiDomain());
+              assertEquals("moonshot-token", configuration.getAiToken());
+              return configuration.getSelectedAiModelRoute().modelRoute();
+            });
+
+    assertEquals("MoonShot/moonshot-v1-8k", resolvedModel);
+    assertEquals("OpenAI/gpt-4.1", configuration.getSelectedAiModelRoute().modelRoute());
   }
 
   @Test

@@ -31,6 +31,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -46,6 +47,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Optional;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -97,6 +99,22 @@ public class LangChainClientTest {
     assertEquals(
         "Trailing whitespace should not prevent parsing.",
         responseContent.getReplies().get(0).getReply());
+  }
+
+  @Test
+  public void resendsRequestWhenMockReturnsProviderFallbackDirective() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    AiModelRoute defaultRoute = new AiModelRoute(AiProviderType.OPENAI, "gpt-5.4");
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.resolveMockAiFallbackRoute("FORWARD")).thenReturn(Optional.of(defaultRoute));
+    FallbackTestLangChainClient client = new FallbackTestLangChainClient(config);
+
+    AiResponseContent responseContent = client.request();
+
+    assertEquals("real response", responseContent.getMessageContent());
+    assertEquals(2, client.requestCount);
+    assertEquals("OpenAI/gpt-5.4", client.fallbackRoute.modelRoute());
   }
 
   @Test
@@ -340,6 +358,10 @@ public class LangChainClientTest {
       super(null, null, null, null);
     }
 
+    private TestableLangChainClient(Configuration config) {
+      super(config, null, null, null);
+    }
+
     private AiResponseContent parseResponseContent(String responseText) {
       return toResponseContent(responseText);
     }
@@ -359,6 +381,37 @@ public class LangChainClientTest {
           existingConversation,
           changeSetData,
           change);
+    }
+  }
+
+  private static class FallbackTestLangChainClient extends LangChainClient {
+    private int requestCount;
+    private AiModelRoute fallbackRoute;
+
+    private FallbackTestLangChainClient(Configuration config) {
+      super(config, null, null, null);
+    }
+
+    private AiResponseContent request() throws Exception {
+      return askSingleRequest(null, null, "").getResponseContent();
+    }
+
+    @Override
+    protected RawReviewRequestResult askSingleRawRequest(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) {
+      requestCount++;
+      return rawReviewRequestResult("FORWARD", "mock request");
+    }
+
+    @Override
+    protected RawReviewRequestResult askSingleRawRequest(
+        ChangeSetData changeSetData,
+        GerritChange change,
+        String patchSet,
+        AiModelRoute aiModelRouteOverride) {
+      requestCount++;
+      fallbackRoute = aiModelRouteOverride;
+      return rawReviewRequestResult("real response", "fallback request");
     }
   }
 }
