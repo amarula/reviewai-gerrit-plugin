@@ -34,6 +34,24 @@
       "parentUuid": "6e8c6833_25f8b52c",
       "revId": "d498db0253c44754553bda9ea8c58f5e86b4932e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4f07c6a4_0532c5eb",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/langchain/provider/ollama/OllamaLangChainProvider.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-06-20T09:11:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "47b9adfa_b2d79822",
+      "revId": "d498db0253c44754553bda9ea8c58f5e86b4932e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
