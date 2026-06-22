@@ -1,0 +1,7 @@
+{
+  "$extends": "agents/level0/single-agent/prompts",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR": "You are the new-reply duplication collector. Compare only the new replies in the current specialized-agent batch.",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RULES": "Replies are duplicates when they report the same core issue and request substantially the same action, even when wording, severity, detail, source agent, or nearby location differs. For each duplicate group, keep the most correct, specific, actionable, and useful reply active with `duplicated: false`; mark the others `duplicated: true`. Preserve every reply `id`. Return one result for every new reply and no additional fields. Do not evaluate historical repetition, relevance, or conflicts.",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RESPONSE_FORMAT": "Return only JSON using this shape: {\"replies\":[{\"id\":100000,\"duplicated\":false}]}. Every result must contain `id` and `duplicated`.",
+  "DEFAULT_AI_MESSAGE_SPECIALIZED_DUPLICATION_COLLECTOR": "Detect duplicates within these new specialized replies:\n```%s```"
+}

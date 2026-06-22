@@ -1,0 +1,7 @@
+{
+  "$extends": "agents/level0/single-agent/prompts",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR": "You are the historical repetition collector. Compare each new specialized-agent reply only with past review replies.",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RULES": "Use prior replies available in the model conversation history and any supplied `past_replies`. A new reply is repeated when at least one past reply reports the same core issue or requests substantially the same action. Do not compare new replies with each other. Preserve every new reply `id`. Set `repetition_reply_id` to the exact matched past reply ID when `repeated` is true. Set it to the empty string when `repeated` is false; the plugin converts that value to null in the final reply. Return one result for every new reply and no additional fields.",
+  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RESPONSE_FORMAT": "Return only JSON using this shape: {\"replies\":[{\"id\":100000,\"repeated\":false,\"repetition_reply_id\":\"\"}]}. Every result must contain `id`, `repeated`, and `repetition_reply_id`.",
+  "DEFAULT_AI_MESSAGE_SPECIALIZED_REPETITION_COLLECTOR": "Detect historical repetition for these new specialized replies:\n```%s```"
+}

@@ -91,6 +91,7 @@ public class LangChainClientTest {
     JsonObjectSchema replyItemSchema = (JsonObjectSchema) repliesSchema.items();
     assertTrue(replyItemSchema.properties().containsKey("reply"));
     assertTrue(replyItemSchema.properties().containsKey("source_agent"));
+    assertTrue(replyItemSchema.properties().containsKey("repetition_reply_id"));
     assertTrue(replyItemSchema.properties().containsKey("duplicated"));
     assertTrue(replyItemSchema.properties().containsKey("duplicated_reason"));
   }
@@ -128,6 +129,7 @@ public class LangChainClientTest {
     assertFalse(replyItemSchema.properties().containsKey("repeated"));
     assertFalse(replyItemSchema.properties().containsKey("conflicting"));
     assertFalse(replyItemSchema.properties().containsKey("source_agent"));
+    assertFalse(replyItemSchema.properties().containsKey("repetition_reply_id"));
     assertFalse(replyItemSchema.properties().containsKey("duplicated_reason"));
     assertFalse(replyItemSchema.properties().containsKey("repeated_reason"));
     assertFalse(replyItemSchema.properties().containsKey("conflicting_reason"));
@@ -140,6 +142,24 @@ public class LangChainClientTest {
     changeSetData.setSpecializedAgentReview(true);
 
     assertSame(getSpecializedRepliesToolExecutor(client), getToolExecutor(client, changeSetData));
+  }
+
+  @Test
+  public void usesDedicatedExecutorForEachSpecializedCollector() throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+
+    assertCollectorExecutor(
+        client,
+        ReviewAssistantStage.REVIEW_SPECIALIZED_REPETITION_COLLECTOR,
+        "specializedRepetitionToolExecutor");
+    assertCollectorExecutor(
+        client,
+        ReviewAssistantStage.REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR,
+        "specializedDuplicationToolExecutor");
+    assertCollectorExecutor(
+        client,
+        ReviewAssistantStage.REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR,
+        "specializedRelevanceToolExecutor");
   }
 
   @Test
@@ -487,6 +507,17 @@ public class LangChainClientTest {
     Method method = LangChainClient.class.getDeclaredMethod("getToolExecutor", ChangeSetData.class);
     method.setAccessible(true);
     return method.invoke(client, changeSetData);
+  }
+
+  private void assertCollectorExecutor(
+      LangChainClient client, ReviewAssistantStage stage, String executorFieldName)
+      throws Exception {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setReviewAssistantStage(stage);
+    Field field = LangChainClient.class.getDeclaredField(executorFieldName);
+    field.setAccessible(true);
+
+    assertSame(field.get(client), getToolExecutor(client, changeSetData));
   }
 
   private ResponseFormat getSpecializedRepliesResponseFormat(LangChainClient client)

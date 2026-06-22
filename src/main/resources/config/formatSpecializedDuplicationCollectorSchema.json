@@ -1,0 +1,22 @@
+{
+  "name": "format_specialized_duplication",
+  "description": "Mark duplicates among new specialized replies.",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "replies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "duplicated": { "type": "boolean" }
+          },
+          "required": ["id", "duplicated"]
+        }
+      }
+    },
+    "required": ["replies"]
+  }
+}

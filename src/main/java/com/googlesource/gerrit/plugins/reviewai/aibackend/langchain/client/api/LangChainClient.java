@@ -70,6 +70,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       "config/formatSpecializedRepliesSchema.json";
   private static final String FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE =
       "config/formatSpecializedTriageSchema.json";
+  private static final String FORMAT_SPECIALIZED_REPETITION_SCHEMA_RESOURCE =
+      "config/formatSpecializedRepetitionCollectorSchema.json";
+  private static final String FORMAT_SPECIALIZED_DUPLICATION_SCHEMA_RESOURCE =
+      "config/formatSpecializedDuplicationCollectorSchema.json";
+  private static final String FORMAT_SPECIALIZED_RELEVANCE_SCHEMA_RESOURCE =
+      "config/formatSpecializedRelevanceCollectorSchema.json";
   private static final List<String> ON_DEMAND_TOOL_RESOURCES =
       List.of("config/treeTool.json", "config/getContentTool.json", "config/grepTool.json");
 
@@ -83,10 +89,16 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final ResponseFormat structuredResponseFormat;
   private final ResponseFormat specializedRepliesResponseFormat;
   private final ResponseFormat specializedTriageResponseFormat;
+  private final ResponseFormat specializedRepetitionResponseFormat;
+  private final ResponseFormat specializedDuplicationResponseFormat;
+  private final ResponseFormat specializedRelevanceResponseFormat;
   private final List<ToolSpecification> contextTools;
   private final LangChainExecutor toolExecutor;
   private final LangChainExecutor specializedRepliesToolExecutor;
   private final LangChainExecutor specializedTriageToolExecutor;
+  private final LangChainExecutor specializedRepetitionToolExecutor;
+  private final LangChainExecutor specializedDuplicationToolExecutor;
+  private final LangChainExecutor specializedRelevanceToolExecutor;
 
   private String requestBody;
 
@@ -138,6 +150,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.specializedTriageResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
+    this.specializedRepetitionResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_REPETITION_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
+    this.specializedDuplicationResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_DUPLICATION_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
+    this.specializedRelevanceResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_RELEVANCE_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
     List<ToolSpecification> contextTools = List.of();
     if (config != null && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND) {
       contextTools =
@@ -168,6 +189,24 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.specializedTriageToolExecutor =
         new LangChainExecutor(
             config, specializedTriageToolExecutorResponseFormat, contextTools, requireInitialToolUse);
+    this.specializedRepetitionToolExecutor =
+        new LangChainExecutor(
+            config,
+            getProviderResponseFormat(config, contextTools, specializedRepetitionResponseFormat),
+            contextTools,
+            requireInitialToolUse);
+    this.specializedDuplicationToolExecutor =
+        new LangChainExecutor(
+            config,
+            getProviderResponseFormat(config, contextTools, specializedDuplicationResponseFormat),
+            contextTools,
+            requireInitialToolUse);
+    this.specializedRelevanceToolExecutor =
+        new LangChainExecutor(
+            config,
+            getProviderResponseFormat(config, contextTools, specializedRelevanceResponseFormat),
+            contextTools,
+            requireInitialToolUse);
     log.debug("Initialized LangChainClient");
   }
 
@@ -434,10 +473,18 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   private LangChainExecutor getToolExecutor(ChangeSetData changeSetData) {
-    if (changeSetData != null
-        && changeSetData.getReviewAssistantStage()
-            == ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE) {
-      return specializedTriageToolExecutor;
+    if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
+      LangChainExecutor collectorExecutor =
+          switch (changeSetData.getReviewAssistantStage()) {
+            case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageToolExecutor;
+            case REVIEW_SPECIALIZED_REPETITION_COLLECTOR -> specializedRepetitionToolExecutor;
+            case REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR -> specializedDuplicationToolExecutor;
+            case REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR -> specializedRelevanceToolExecutor;
+            default -> null;
+          };
+      if (collectorExecutor != null) {
+        return collectorExecutor;
+      }
     }
     if (changeSetData != null && Boolean.TRUE.equals(changeSetData.getSpecializedAgentReview())) {
       return specializedRepliesToolExecutor;
@@ -447,13 +494,20 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   private LangChainExecutor buildToolExecutor(ChangeSetData changeSetData) {
     ResponseFormat responseFormat = structuredResponseFormat;
-    if (changeSetData != null
-        && changeSetData.getReviewAssistantStage()
-            == ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE) {
-      responseFormat = specializedTriageResponseFormat;
-    } else if (changeSetData != null
-        && Boolean.TRUE.equals(changeSetData.getSpecializedAgentReview())) {
-      responseFormat = specializedRepliesResponseFormat;
+    if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
+      responseFormat =
+          switch (changeSetData.getReviewAssistantStage()) {
+            case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageResponseFormat;
+            case REVIEW_SPECIALIZED_REPETITION_COLLECTOR ->
+                specializedRepetitionResponseFormat;
+            case REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR ->
+                specializedDuplicationResponseFormat;
+            case REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR -> specializedRelevanceResponseFormat;
+            default ->
+                Boolean.TRUE.equals(changeSetData.getSpecializedAgentReview())
+                    ? specializedRepliesResponseFormat
+                    : responseFormat;
+          };
     }
     boolean requireInitialToolUse =
         config != null

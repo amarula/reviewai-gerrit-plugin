@@ -25,43 +25,35 @@ import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
-public class AiPromptSpecializedReviewCollector extends AiPromptReview {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR;
-  public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_SCOPE_AND_REVIEW_CONSTRAINTS;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_MANDATORY_RULES;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_COLLECTOR;
-
-  public AiPromptSpecializedReviewCollector(
+public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview {
+  protected AiPromptSpecializedReviewCollector(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
-      ICodeContextPolicy codeContextPolicy) {
+      ICodeContextPolicy codeContextPolicy,
+      String promptResource) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts("agents/level2/collector/prompts");
-    this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_SPECIALIZED_COLLECTOR;
+    loadDefaultPrompts(promptResource);
+    this.defaultAiMessageReview = getCollectorMessage();
   }
 
   @Override
   public String getDefaultAiAssistantInstructions() {
     return joinWithDoubleNewLine(
         List.of(
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR),
+            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, getCollectorRole()),
             buildSection(
-                DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
-                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_SCOPE_AND_REVIEW_CONSTRAINTS),
-            buildSection(
-                DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
-                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_MANDATORY_RULES),
+                DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES, getCollectorRules()),
             buildSection(
                 DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
                 getCollectorResponseFormat())));
   }
 
-  private String getCollectorResponseFormat() {
-    return String.format(
-        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COLLECTOR_RESPONSE_FORMAT,
-        "COMMIT_MESSAGE, " + SpecializedReviewAgentDefinitions.agentNames());
-  }
+  protected abstract String getCollectorRole();
+
+  protected abstract String getCollectorRules();
+
+  protected abstract String getCollectorResponseFormat();
+
+  protected abstract String getCollectorMessage();
 }

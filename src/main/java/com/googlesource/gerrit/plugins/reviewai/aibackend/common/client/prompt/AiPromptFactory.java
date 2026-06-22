@@ -30,7 +30,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.AiPromptReviewReiterated;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedDuplicationCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedRelevanceCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedRepetitionCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import lombok.extern.slf4j.Slf4j;
 
@@ -82,9 +84,19 @@ public class AiPromptFactory {
             yield new AiPromptSpecializedReviewAgent(
                 config, changeSetData, change, codeContextPolicy);
           }
-          case REVIEW_SPECIALIZED_COLLECTOR -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedReviewCollector");
-            yield new AiPromptSpecializedReviewCollector(
+          case REVIEW_SPECIALIZED_REPETITION_COLLECTOR -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedRepetitionCollector");
+            yield new AiPromptSpecializedRepetitionCollector(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedDuplicationCollector");
+            yield new AiPromptSpecializedDuplicationCollector(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedRelevanceCollector");
+            yield new AiPromptSpecializedRelevanceCollector(
                 config, changeSetData, change, codeContextPolicy);
           }
         };

@@ -33,6 +33,8 @@ public class AiReplyItem extends AiDialogueItem {
   private boolean conflicting;
   @SerializedName("source_agent")
   private String sourceAgent;
+  @SerializedName("repetition_reply_id")
+  private String repetitionReplyId;
   @SerializedName("repeated_reason")
   private String repeatedReason;
   @SerializedName("duplicated_reason")

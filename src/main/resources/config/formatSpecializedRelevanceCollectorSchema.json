@@ -1,0 +1,22 @@
+{
+  "name": "format_specialized_relevance",
+  "description": "Assign relevance to new specialized replies.",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "replies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "relevance": { "type": "number" }
+          },
+          "required": ["id", "relevance"]
+        }
+      }
+    },
+    "required": ["replies"]
+  }
+}

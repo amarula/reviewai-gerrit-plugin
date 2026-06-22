@@ -40,10 +40,13 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -58,6 +61,11 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJso
 @Singleton
 public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentReviewClient {
   private static final String COMMIT_MESSAGE_AGENT = "COMMIT_MESSAGE";
+  private static final List<SpecializedReviewCollectorAgent> COLLECTORS =
+      List.of(
+          new SpecializedReviewRepetitionCollector(),
+          new SpecializedReviewDuplicationCollector(),
+          new SpecializedReviewRelevanceCollector());
 
   private final Executor executor;
   private final ICodeContextPolicy codeContextPolicy;
@@ -247,17 +255,79 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       GerritChange change,
       List<SpecializedReviewAgentReplies> specializedReplies)
       throws Exception {
+    List<AiReviewHistoryInfo.Entry> pastReplies =
+        config.getAiProviderType() == AiProviderType.OPENAI
+            ? List.of()
+            : collectPastReviewReplies(changeSetData, change);
+    Map<ReviewAssistantStage, CompletableFuture<AiResponseContent>> responseFutures =
+        new LinkedHashMap<>();
+    for (SpecializedReviewCollectorAgent collector : COLLECTORS) {
+      responseFutures.put(
+          collector.stage(),
+          askCollectorAsync(
+              changeSetData,
+              change,
+              specializedReplies,
+              collector.selectHistory(config.getAiProviderType(), pastReplies),
+              collector.stage()));
+    }
+    try {
+      Map<ReviewAssistantStage, AiResponseContent> responses = new LinkedHashMap<>();
+      responseFutures.forEach((stage, future) -> responses.put(stage, future.join()));
+      AiResponseContent response =
+          SpecializedReviewCollectorResultMerger.merge(
+              specializedReplies, COLLECTORS, responses);
+      setRequestBody(
+          buildCollectorInput(
+              specializedReplies,
+              COLLECTORS.get(0).selectHistory(config.getAiProviderType(), pastReplies)));
+      return response;
+    } catch (CompletionException e) {
+      if (e.getCause() instanceof Exception exception) {
+        throw exception;
+      }
+      throw e;
+    }
+  }
+
+  private CompletableFuture<AiResponseContent> askCollectorAsync(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      List<SpecializedReviewAgentReplies> specializedReplies,
+      List<AiReviewHistoryInfo.Entry> pastReplies,
+      ReviewAssistantStage stage) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          try {
+            return askCollectorStage(
+                changeSetData, change, specializedReplies, pastReplies, stage);
+          } catch (Exception e) {
+            throw new CompletionException(e);
+          }
+        },
+        executor);
+  }
+
+  @VisibleForTesting
+  protected AiResponseContent askCollectorStage(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      List<SpecializedReviewAgentReplies> specializedReplies,
+      List<AiReviewHistoryInfo.Entry> pastReplies,
+      ReviewAssistantStage stage)
+      throws Exception {
     ChangeSetData collectorData = changeSetData.copy();
-    collectorData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_COLLECTOR);
+    collectorData.setReviewAssistantStage(stage);
     collectorData.setForcedStagedReview(true);
     ReviewRequestResult result =
         askSingleRequest(
             collectorData,
             change,
-            buildCollectorInput(
-                specializedReplies, collectPastReviewReplies(changeSetData, change)));
-    setRequestBody(result == null ? null : result.getRequestBody());
-    return result == null ? null : result.getResponseContent();
+            buildCollectorInput(specializedReplies, pastReplies));
+    if (result == null || result.getResponseContent() == null) {
+      throw new IllegalStateException("No response from " + stage);
+    }
+    return result.getResponseContent();
   }
 
   @VisibleForTesting
@@ -273,7 +343,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         .toJson(SpecializedReviewCollectorInput.from(specializedReplies, pastReplies));
   }
 
-  private List<AiReviewHistoryInfo.Entry> collectPastReviewReplies(
+  @VisibleForTesting
+  protected List<AiReviewHistoryInfo.Entry> collectPastReviewReplies(
       ChangeSetData changeSetData, GerritChange change) {
     if (gerritClient == null || localizer == null) {
       return List.of();
