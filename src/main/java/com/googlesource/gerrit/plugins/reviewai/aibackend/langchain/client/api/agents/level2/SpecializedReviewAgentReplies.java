@@ -35,6 +35,7 @@ class SpecializedReviewAgentReplies {
   @Data
   @RequiredArgsConstructor
   static class SpecializedReviewAgentReply {
+    private Integer id;
     private final String reply;
     private final Double score;
     private final String filename;
@@ -42,12 +43,15 @@ class SpecializedReviewAgentReplies {
     private final String codeSnippet;
 
     private static SpecializedReviewAgentReply from(AiReplyItem reply) {
-      return new SpecializedReviewAgentReply(
+      SpecializedReviewAgentReply specializedReply =
+          new SpecializedReviewAgentReply(
           reply.getReply(),
           reply.getScore(),
           reply.getFilename(),
           reply.getLineNumber(),
           reply.getCodeSnippet());
+      specializedReply.setId(reply.getId());
+      return specializedReply;
     }
   }
 }

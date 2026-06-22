@@ -23,6 +23,9 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
@@ -36,6 +39,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -289,6 +293,8 @@ public class LangChainSpecializedAgentReviewClientTest {
         client.buildCollectorInput(
             List.of(SpecializedReviewAgentReplies.from("CORRECTNESS", List.of(reply))));
 
+    assertTrue(collectorInput.contains("\"new_replies\""));
+    assertTrue(collectorInput.contains("\"past_replies\":[]"));
     assertTrue(collectorInput.contains("\"reply\":\"Review issue\""));
     assertTrue(collectorInput.contains("\"score\":-1.0"));
     assertTrue(collectorInput.contains("\"filename\":\"src/Test.java\""));
@@ -300,6 +306,47 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertFalse(collectorInput.contains("conflicting"));
     assertFalse(collectorInput.contains("source_agent"));
     assertFalse(collectorInput.contains("_reason"));
+  }
+
+  @Test
+  public void collectorInputIncludesStableIdsForPastReplies() {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    AiReviewHistoryInfo.Entry commentReply =
+        historyEntry("comment-id", "change-message-id", "First past reply");
+    AiReviewHistoryInfo.Entry changeMessageReply =
+        historyEntry(null, "fallback-change-message-id", "Second past reply");
+    AiReviewHistoryInfo.Entry unidentifiedReply =
+        historyEntry(null, null, "Unidentified past reply");
+
+    String collectorInput =
+        client.buildCollectorInput(
+            List.of(), List.of(commentReply, changeMessageReply, unidentifiedReply));
+
+    JsonObject input = JsonParser.parseString(collectorInput).getAsJsonObject();
+    JsonArray pastReplies = input.getAsJsonArray("past_replies");
+    assertEquals(2, pastReplies.size());
+    assertEquals("comment-id", pastReplies.get(0).getAsJsonObject().get("id").getAsString());
+    assertEquals(
+        "fallback-change-message-id",
+        pastReplies.get(1).getAsJsonObject().get("id").getAsString());
+    assertEquals(
+        "Second past reply", pastReplies.get(1).getAsJsonObject().get("reply").getAsString());
+  }
+
+  private static AiReviewHistoryInfo.Entry historyEntry(
+      String id, String changeMessageId, String message) {
+    return new AiReviewHistoryInfo.Entry(
+        id,
+        changeMessageId,
+        "assistant",
+        false,
+        "ReviewAI",
+        "2026-06-22T10:00:00Z",
+        1,
+        "src/Test.java",
+        42,
+        null,
+        message);
   }
 
   private static SpecializedReviewTriage triage(SpecializedReviewTriage.AgentPlan... plans) {

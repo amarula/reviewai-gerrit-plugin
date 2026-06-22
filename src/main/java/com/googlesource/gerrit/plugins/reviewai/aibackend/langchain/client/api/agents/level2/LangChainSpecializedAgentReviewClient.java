@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
@@ -32,12 +33,15 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
+import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +65,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
+  private final GerritAiReviewHistoryCollector aiReviewHistoryCollector;
 
   @Inject
   public LangChainSpecializedAgentReviewClient(
@@ -117,6 +122,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     this.localizer = localizer;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
+    this.aiReviewHistoryCollector = new GerritAiReviewHistoryCollector();
   }
 
   @Override
@@ -151,6 +157,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
     List<SpecializedReviewAgentReplies> specializedReplies =
         askSpecializedAgents(changeSetData, change, patchSet, enabledPlans);
+    SpecializedReviewReplyIdAssigner.assign(
+        LangChainMemoryId.getPatchSetNumber(change), specializedReplies);
     AiResponseContent collectorResponse =
         askCollector(changeSetData, change, specializedReplies);
     return collectorResponse == null ? new AiResponseContent("") : collectorResponse;
@@ -243,14 +251,49 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     collectorData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_COLLECTOR);
     collectorData.setForcedStagedReview(true);
     ReviewRequestResult result =
-        askSingleRequest(collectorData, change, buildCollectorInput(specializedReplies));
+        askSingleRequest(
+            collectorData,
+            change,
+            buildCollectorInput(
+                specializedReplies, collectPastReviewReplies(changeSetData, change)));
     setRequestBody(result == null ? null : result.getRequestBody());
     return result == null ? null : result.getResponseContent();
   }
 
   @VisibleForTesting
   protected String buildCollectorInput(List<SpecializedReviewAgentReplies> specializedReplies) {
-    return getGson().toJson(specializedReplies);
+    return buildCollectorInput(specializedReplies, List.of());
+  }
+
+  @VisibleForTesting
+  protected String buildCollectorInput(
+      List<SpecializedReviewAgentReplies> specializedReplies,
+      List<AiReviewHistoryInfo.Entry> pastReplies) {
+    return getGson()
+        .toJson(SpecializedReviewCollectorInput.from(specializedReplies, pastReplies));
+  }
+
+  private List<AiReviewHistoryInfo.Entry> collectPastReviewReplies(
+      ChangeSetData changeSetData, GerritChange change) {
+    if (gerritClient == null || localizer == null) {
+      return List.of();
+    }
+    try {
+      return aiReviewHistoryCollector
+          .collect(
+              config,
+              localizer,
+              changeSetData.getAiAccountId(),
+              gerritClient.getClientData(change))
+          .getEntries()
+          .stream()
+          .filter(entry -> Settings.OPENAI_ROLE_ASSISTANT.equals(entry.getRole()))
+          .filter(entry -> !entry.isSystemMessage())
+          .toList();
+    } catch (Exception e) {
+      log.debug("Unable to add structured past replies to collector input", e);
+      return List.of();
+    }
   }
 
   private List<SpecializedReviewTriage.AgentPlan> enabledPlans(
