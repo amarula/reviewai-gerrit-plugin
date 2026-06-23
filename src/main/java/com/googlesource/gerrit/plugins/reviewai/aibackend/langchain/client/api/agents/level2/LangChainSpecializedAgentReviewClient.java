@@ -19,12 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -32,23 +31,20 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.SuggestedEditSupport;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
-import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import lombok.extern.slf4j.Slf4j;
@@ -60,19 +56,22 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJso
 @Singleton
 public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentReviewClient {
   private static final String COMMIT_MESSAGE_AGENT = "COMMIT_MESSAGE";
-  private static final List<SpecializedReviewCollectorAgent> COLLECTORS =
-      List.of(
-          new SpecializedReviewRepetitionCollector(),
-          new SpecializedReviewDuplicationCollector(),
-          new SpecializedReviewRelevanceCollector());
+  private static final ReviewAssistantStage CONSOLIDATION_STAGE =
+      ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION;
+  private static final ReviewAssistantStage HISTORICAL_REPETITION_STAGE =
+      ReviewAssistantStage.REVIEW_SPECIALIZED_HISTORICAL_REPETITION;
+  private static final ReviewAssistantStage CONFLICT_RESOLUTION_STAGE =
+      ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION;
+  private static final ReviewAssistantStage VERIFICATION_STAGE =
+      ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION;
 
-  private final Executor executor;
+  private final SpecializedReviewStageExecutor stageExecutor;
+  private final SpecializedReviewPastCommentsCollector pastCommentsCollector;
   private final ICodeContextPolicy codeContextPolicy;
   private final GerritClient gerritClient;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
-  private final GerritAiReviewHistoryCollector aiReviewHistoryCollector;
 
   @Inject
   public LangChainSpecializedAgentReviewClient(
@@ -123,13 +122,14 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         conversationStore,
         chatMemoryStore,
         executor);
-    this.executor = executor;
+    this.stageExecutor = new SpecializedReviewStageExecutor(executor);
+    this.pastCommentsCollector =
+        new SpecializedReviewPastCommentsCollector(config, gerritClient, localizer);
     this.codeContextPolicy = codeContextPolicy;
     this.gerritClient = gerritClient;
     this.localizer = localizer;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
-    this.aiReviewHistoryCollector = new GerritAiReviewHistoryCollector();
   }
 
   @Override
@@ -162,12 +162,10 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       return response;
     }
 
-    List<SpecializedReviewAgentReplies> specializedReplies =
+    List<SpecializedReviewFindings.AgentFindings> specializedFindings =
         askSpecializedAgents(changeSetData, change, patchSet, enabledPlans);
-    SpecializedReviewReplyIdAssigner.assign(
-        LangChainMemoryId.getPatchSetNumber(change), specializedReplies);
     AiResponseContent collectorResponse =
-        askCollector(changeSetData, change, specializedReplies);
+        askCollector(changeSetData, change, patchSet, specializedFindings);
     return collectorResponse == null ? new AiResponseContent("") : collectorResponse;
   }
 
@@ -176,11 +174,11 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return !isSpecializedAgentStage(changeSetData.getReviewAssistantStage());
   }
 
-  protected SpecializedReviewTriage askTriage(
+  SpecializedReviewTriage askTriage(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
-    ChangeSetData triageData = changeSetData.copy();
-    triageData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE);
-    triageData.setForcedStagedReview(true);
+    ChangeSetData triageData =
+        SpecializedReviewStageData.staged(
+            changeSetData, ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE);
     RawReviewRequestResult result = askSingleRawRequest(triageData, change, patchSet);
     setRequestBody(result == null ? null : result.getRequestBody());
     return result == null
@@ -189,7 +187,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   }
 
   @VisibleForTesting
-  protected SpecializedReviewTriage parseTriageResponse(String responseText) {
+  SpecializedReviewTriage parseTriageResponse(String responseText) {
     String unwrappedResponse = unwrapJsonCode(responseText);
     SpecializedReviewTriage triage =
         getGson().fromJson(unwrappedResponse, SpecializedReviewTriage.class);
@@ -219,7 +217,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return triage != null && triage.getAgents() != null && !triage.getAgents().isEmpty();
   }
 
-  protected AiResponseContent askSpecializedAgent(
+  SpecializedReviewFindings askSpecializedAgent(
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
@@ -244,125 +242,132 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     agentData.setForcedStagedReview(true);
     agentData.setSpecializedAgentReview(true);
     agentData.setSpecializedAgentCustomInstructions(plan.getCustomInstructions());
-    ReviewRequestResult result =
-        askSingleRequest(agentData, change, buildSpecializedInput(patchSet, plan));
-    return result == null ? null : result.getResponseContent();
+    RawReviewRequestResult result =
+        askSingleRawRequestWithFallback(agentData, change, buildSpecializedInput(patchSet, plan));
+    return result == null
+        ? SpecializedReviewFindings.empty()
+        : parseFindingsResponse(result.getResponseText());
   }
 
-  protected AiResponseContent askCollector(
+  AiResponseContent askCollector(
       ChangeSetData changeSetData,
       GerritChange change,
-      List<SpecializedReviewAgentReplies> specializedReplies)
+      String patchSet,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings)
       throws Exception {
-    boolean useOpenAiResponses = shouldUseOpenAiResponses(config.getAiProviderType());
-    List<AiReviewHistoryInfo.Entry> pastReplies =
-        useOpenAiResponses ? List.of() : collectPastReviewReplies(changeSetData, change);
-    Map<ReviewAssistantStage, CompletableFuture<AiResponseContent>> responseFutures =
-        new LinkedHashMap<>();
-    for (SpecializedReviewCollectorAgent collector : COLLECTORS) {
-      responseFutures.put(
-          collector.stage(),
-          askCollectorAsync(
-              changeSetData,
-              change,
-              specializedReplies,
-              collector.selectHistory(useOpenAiResponses, pastReplies),
-              collector.stage()));
-    }
-    try {
-      Map<ReviewAssistantStage, AiResponseContent> responses = new LinkedHashMap<>();
-      responseFutures.forEach((stage, future) -> responses.put(stage, future.join()));
-      AiResponseContent response =
-          SpecializedReviewCollectorResultMerger.merge(
-              specializedReplies, COLLECTORS, responses);
-      setRequestBody(
-          buildCollectorInput(
-              specializedReplies,
-              COLLECTORS.get(0).selectHistory(useOpenAiResponses, pastReplies)));
-      return response;
-    } catch (CompletionException e) {
-      if (e.getCause() instanceof Exception exception) {
-        throw exception;
-      }
-      throw e;
-    }
-  }
-
-  private CompletableFuture<AiResponseContent> askCollectorAsync(
-      ChangeSetData changeSetData,
-      GerritChange change,
-      List<SpecializedReviewAgentReplies> specializedReplies,
-      List<AiReviewHistoryInfo.Entry> pastReplies,
-      ReviewAssistantStage stage) {
-    return CompletableFuture.supplyAsync(
-        () -> {
-          try {
-            return askCollectorStage(
-                changeSetData, change, specializedReplies, pastReplies, stage);
-          } catch (Exception e) {
-            throw new CompletionException(e);
-          }
-        },
-        executor);
+    SpecializedReviewConcernIds.assignRawConcernIds(specializedFindings);
+    Set<String> expectedConcernIds = SpecializedReviewConcernIds.rawConcernIds(specializedFindings);
+    CompletableFuture<SpecializedReviewFindings> consolidationFuture =
+        stageExecutor.supplyAsync(
+            () ->
+                askFindingsStage(
+                    changeSetData,
+                    change,
+                    buildConsolidationInput(specializedFindings),
+                    CONSOLIDATION_STAGE));
+    CompletableFuture<SpecializedReviewFindings.HistoricalRepetitionResult>
+        historicalRepetitionFuture =
+            stageExecutor.supplyAsync(
+                () ->
+                    askHistoricalRepetitionStage(
+                        changeSetData,
+                        change,
+                        buildHistoricalRepetitionInput(changeSetData, change, specializedFindings),
+                        expectedConcernIds));
+    SpecializedReviewFindings consolidatedFindings = stageExecutor.join(consolidationFuture);
+    SpecializedReviewFindings.HistoricalRepetitionResult historicalRepetitionResult =
+        stageExecutor.join(historicalRepetitionFuture);
+    consolidatedFindings =
+        currentRunConsolidationOrFallback(
+            consolidatedFindings, specializedFindings, expectedConcernIds);
+    SpecializedReviewFindings annotatedFindings =
+        applyHistoricalRepetition(consolidatedFindings, historicalRepetitionResult);
+    SpecializedReviewFindings conflictResolvedFindings =
+        askFindingsStage(
+            changeSetData,
+            change,
+            buildConflictResolutionInput(annotatedFindings),
+            CONFLICT_RESOLUTION_STAGE);
+    conflictResolvedFindings =
+        currentRunConflictResolutionOrFallback(conflictResolvedFindings, annotatedFindings);
+    copyRepeatedAnnotations(conflictResolvedFindings, annotatedFindings);
+    String verificationInput = buildVerificationInput(patchSet, conflictResolvedFindings);
+    AiResponseContent response = askVerificationStage(changeSetData, change, verificationInput);
+    inheritRepeatedAnnotations(response, conflictResolvedFindings);
+    setRequestBody(verificationInput);
+    return response;
   }
 
   @VisibleForTesting
-  protected AiResponseContent askCollectorStage(
+  SpecializedReviewFindings.HistoricalRepetitionResult askHistoricalRepetitionStage(
       ChangeSetData changeSetData,
       GerritChange change,
-      List<SpecializedReviewAgentReplies> specializedReplies,
-      List<AiReviewHistoryInfo.Entry> pastReplies,
+      String input,
+      Set<String> expectedConcernIds)
+      throws Exception {
+    ChangeSetData repetitionData =
+        SpecializedReviewStageData.staged(changeSetData, HISTORICAL_REPETITION_STAGE);
+    RawReviewRequestResult result = askSingleRawRequestWithFallback(repetitionData, change, input);
+    if (result == null || result.getResponseText() == null) {
+      throw new IllegalStateException("No response from " + HISTORICAL_REPETITION_STAGE);
+    }
+    SpecializedReviewFindings.HistoricalRepetitionResult repetitionResult =
+        parseHistoricalRepetitionResponse(result.getResponseText());
+    SpecializedReviewPayloads.validateHistoricalRepetitionResult(
+        repetitionResult, expectedConcernIds);
+    return repetitionResult;
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings askFindingsStage(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String input,
       ReviewAssistantStage stage)
       throws Exception {
-    ChangeSetData collectorData = changeSetData.copy();
-    collectorData.setReviewAssistantStage(stage);
-    collectorData.setForcedStagedReview(true);
-    ReviewRequestResult result =
-        askSingleRequest(
-            collectorData,
-            change,
-            buildCollectorInput(specializedReplies, pastReplies));
-    if (result == null || result.getResponseContent() == null) {
+    ChangeSetData collectorData = SpecializedReviewStageData.staged(changeSetData, stage);
+    RawReviewRequestResult result = askSingleRawRequestWithFallback(collectorData, change, input);
+    if (result == null || result.getResponseText() == null) {
       throw new IllegalStateException("No response from " + stage);
+    }
+    return parseFindingsResponse(result.getResponseText());
+  }
+
+  @VisibleForTesting
+  AiResponseContent askVerificationStage(
+      ChangeSetData changeSetData, GerritChange change, String input) throws Exception {
+    ChangeSetData verificationData =
+        SpecializedReviewStageData.staged(changeSetData, VERIFICATION_STAGE);
+    ReviewRequestResult result = askSingleRequest(verificationData, change, input);
+    if (result == null || result.getResponseContent() == null) {
+      throw new IllegalStateException("No response from " + VERIFICATION_STAGE);
     }
     return result.getResponseContent();
   }
 
   @VisibleForTesting
-  protected String buildCollectorInput(List<SpecializedReviewAgentReplies> specializedReplies) {
-    return buildCollectorInput(specializedReplies, List.of());
+  String buildConsolidationInput(
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
+    return SpecializedReviewPayloads.buildConsolidationInput(specializedFindings);
   }
 
   @VisibleForTesting
-  protected String buildCollectorInput(
-      List<SpecializedReviewAgentReplies> specializedReplies,
-      List<AiReviewHistoryInfo.Entry> pastReplies) {
-    return getGson()
-        .toJson(SpecializedReviewCollectorInput.from(specializedReplies, pastReplies));
+  String buildHistoricalRepetitionInput(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
+    return SpecializedReviewPayloads.buildHistoricalRepetitionInput(
+        specializedFindings, collectPastReviewComments(changeSetData, change));
   }
 
   @VisibleForTesting
-  protected List<AiReviewHistoryInfo.Entry> collectPastReviewReplies(
-      ChangeSetData changeSetData, GerritChange change) {
-    if (gerritClient == null || localizer == null) {
-      return List.of();
-    }
-    try {
-      return aiReviewHistoryCollector
-          .collect(
-              config,
-              localizer,
-              changeSetData.getAiAccountId(),
-              gerritClient.getClientData(change))
-          .getEntries()
-          .stream()
-          .filter(entry -> Settings.OPENAI_ROLE_ASSISTANT.equals(entry.getRole()))
-          .filter(entry -> !entry.isSystemMessage())
-          .toList();
-    } catch (Exception e) {
-      log.debug("Unable to add structured past replies to collector input", e);
-      return List.of();
-    }
+  String buildConflictResolutionInput(SpecializedReviewFindings consolidatedFindings) {
+    return SpecializedReviewPayloads.buildConflictResolutionInput(consolidatedFindings);
+  }
+
+  @VisibleForTesting
+  String buildVerificationInput(String patchSet, SpecializedReviewFindings findings) {
+    return SpecializedReviewPayloads.buildVerificationInput(patchSet, findings);
   }
 
   private List<SpecializedReviewTriage.AgentPlan> enabledPlans(
@@ -387,51 +392,103 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         && SpecializedReviewAgentDefinitions.findByName(agent).isPresent();
   }
 
-  private List<SpecializedReviewAgentReplies> askSpecializedAgents(
+  private List<SpecializedReviewFindings.AgentFindings> askSpecializedAgents(
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
       List<SpecializedReviewTriage.AgentPlan> enabledPlans)
       throws Exception {
-    List<CompletableFuture<SpecializedReviewAgentReplies>> futures = new ArrayList<>();
+    List<CompletableFuture<SpecializedReviewFindings.AgentFindings>> futures = new ArrayList<>();
     for (SpecializedReviewTriage.AgentPlan plan : enabledPlans) {
       futures.add(
-          CompletableFuture.supplyAsync(
+          stageExecutor.supplyAsync(
               () -> {
-                try {
-                  AiResponseContent response =
-                      askSpecializedAgent(changeSetData, change, patchSet, plan);
-                  return SpecializedReviewAgentReplies.from(
-                      normalizedAgentName(plan.getAgent()),
-                      response == null || response.getReplies() == null
-                          ? List.of()
-                          : response.getReplies());
-                } catch (Exception e) {
-                  throw new CompletionException(e);
-                }
-              },
-              executor));
+                SpecializedReviewFindings findings =
+                    askSpecializedAgent(changeSetData, change, patchSet, plan);
+                return SpecializedReviewFindings.AgentFindings.from(
+                    normalizedAgentName(plan.getAgent()),
+                    findings == null ? SpecializedReviewFindings.empty() : findings);
+              }));
     }
 
-    List<SpecializedReviewAgentReplies> replies = new ArrayList<>();
-    try {
-      for (CompletableFuture<SpecializedReviewAgentReplies> future : futures) {
-        replies.add(future.join());
-      }
-    } catch (CompletionException e) {
-      if (e.getCause() instanceof Exception exception) {
-        throw exception;
-      }
-      throw e;
+    List<SpecializedReviewFindings.AgentFindings> replies = new ArrayList<>();
+    for (CompletableFuture<SpecializedReviewFindings.AgentFindings> future : futures) {
+      replies.add(stageExecutor.join(future));
     }
     return replies;
   }
 
   @VisibleForTesting
-  protected String buildSpecializedInput(
+  SpecializedReviewFindings parseFindingsResponse(String responseText) {
+    return SpecializedReviewPayloads.parseFindingsResponse(responseText);
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings.HistoricalRepetitionResult parseHistoricalRepetitionResponse(
+      String responseText) {
+    return SpecializedReviewPayloads.parseHistoricalRepetitionResponse(responseText);
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings currentRunConsolidationOrFallback(
+      SpecializedReviewFindings consolidatedFindings,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings,
+      Set<String> expectedConcernIds) {
+    return SpecializedReviewConcernIds.currentRunConsolidationOrFallback(
+        consolidatedFindings, specializedFindings, expectedConcernIds);
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings currentRunConflictResolutionOrFallback(
+      SpecializedReviewFindings conflictResolvedFindings, SpecializedReviewFindings fallbackFindings) {
+    return SpecializedReviewConcernIds.currentRunConflictResolutionOrFallback(
+        conflictResolvedFindings, fallbackFindings);
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings copyRepeatedAnnotations(
+      SpecializedReviewFindings targetFindings, SpecializedReviewFindings sourceFindings) {
+    return SpecializedReviewRepetitionMerger.copyRepeatedAnnotations(
+        targetFindings, sourceFindings);
+  }
+
+  @VisibleForTesting
+  SpecializedReviewFindings applyHistoricalRepetition(
+      SpecializedReviewFindings consolidatedFindings,
+      SpecializedReviewFindings.HistoricalRepetitionResult historicalRepetitionResult) {
+    return SpecializedReviewRepetitionMerger.applyHistoricalRepetition(
+        consolidatedFindings, historicalRepetitionResult);
+  }
+
+  @VisibleForTesting
+  AiResponseContent inheritRepeatedAnnotations(
+      AiResponseContent response, SpecializedReviewFindings findings) {
+    return SpecializedReviewRepetitionMerger.inheritRepeatedAnnotations(response, findings);
+  }
+
+  @VisibleForTesting
+  List<SpecializedReviewFindings.PastComment> collectPastReviewComments(
+      ChangeSetData changeSetData, GerritChange change) {
+    return pastCommentsCollector.collect(changeSetData, change);
+  }
+
+  private RawReviewRequestResult askSingleRawRequestWithFallback(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    RawReviewRequestResult rawResult = askSingleRawRequest(changeSetData, change, patchSet);
+    Optional<AiModelRoute> fallbackRoute =
+        rawResult == null
+            ? Optional.empty()
+            : config.resolveMockAiFallbackRoute(rawResult.getResponseText());
+    return fallbackRoute.isEmpty()
+        ? rawResult
+        : askSingleRawRequest(changeSetData, change, patchSet, fallbackRoute.get());
+  }
+
+  @VisibleForTesting
+  String buildSpecializedInput(
       String patchSet, SpecializedReviewTriage.AgentPlan plan) {
     List<String> sections = new ArrayList<>();
-    sections.add("# Commit message\n" + extractCommitMessage(patchSet));
+    sections.add("# Commit message\n" + SuggestedEditSupport.extractCommitMessage(patchSet));
     AiPromptSections.addSection(
         sections,
         isCommitMessageAgent(plan.getAgent()) ? "Patchset summary" : "Selected patchset hunks",
@@ -454,24 +511,4 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return SpecializedReviewAgentDefinition.normalizeName(agent);
   }
 
-  private String extractCommitMessage(String patchSet) {
-    if (patchSet == null) {
-      return "";
-    }
-    int separatorIndex = patchSet.indexOf("\n---\n");
-    String header = separatorIndex >= 0 ? patchSet.substring(0, separatorIndex) : patchSet;
-    int subjectIndex = header.indexOf("Subject: ");
-    if (subjectIndex >= 0) {
-      header = header.substring(subjectIndex + "Subject: ".length());
-    }
-    int changeIdIndex = header.indexOf("\nChange-Id:");
-    if (changeIdIndex >= 0) {
-      header = header.substring(0, changeIdIndex);
-    }
-    return header.strip();
-  }
-
-  private String nullToEmpty(String value) {
-    return value == null ? "" : value;
-  }
 }

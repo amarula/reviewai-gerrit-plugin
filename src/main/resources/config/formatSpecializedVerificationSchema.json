@@ -1,0 +1,28 @@
+{
+  "name": "format_specialized_verification",
+  "description": "Verify Level 2 concerns and return final review replies.",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "replies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "reply": { "type": "string" },
+            "score": { "type": "number" },
+            "repeated": { "type": "boolean" },
+            "repetition_reply_id": { "type": "string" },
+            "repeated_reason": { "type": "string" },
+            "filename": { "type": "string" },
+            "lineNumber": { "type": "integer" },
+            "codeSnippet": { "type": "string" }
+          },
+          "required": ["reply", "score", "repeated"]
+        }
+      }
+    },
+    "required": ["replies"]
+  }
+}

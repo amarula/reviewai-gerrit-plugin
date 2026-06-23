@@ -33,9 +33,10 @@ final class LangChainOpenAiConversationKey {
       case REVIEW_CODE,
           REVIEW_COMMIT_MESSAGE,
           REVIEW_SPECIALIZED_TRIAGE,
-          REVIEW_SPECIALIZED_REPETITION_COLLECTOR,
-          REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR,
-          REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR ->
+          REVIEW_SPECIALIZED_CONSOLIDATION,
+          REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
+          REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
+          REVIEW_SPECIALIZED_VERIFICATION ->
           OpenAiConversation.getMultiAgentConversationKey(changeSetData.getReviewAssistantStage());
       default -> OpenAiConversation.KEY_CONVERSATION_ID;
     };

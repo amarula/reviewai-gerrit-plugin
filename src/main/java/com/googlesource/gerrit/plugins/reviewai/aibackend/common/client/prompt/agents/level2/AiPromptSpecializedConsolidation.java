@@ -21,14 +21,14 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 
-public class AiPromptSpecializedRepetitionCollector extends AiPromptSpecializedReviewCollector {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RULES;
+public class AiPromptSpecializedConsolidation extends AiPromptSpecializedReviewCollector {
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES;
   public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_REPETITION_COLLECTOR;
+      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT;
+  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION;
 
-  public AiPromptSpecializedRepetitionCollector(
+  public AiPromptSpecializedConsolidation(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
@@ -38,26 +38,26 @@ public class AiPromptSpecializedRepetitionCollector extends AiPromptSpecializedR
         changeSetData,
         change,
         codeContextPolicy,
-        "agents/level2/collector/repetition/prompts");
+        "agents/level2/stages/consolidation/prompts");
   }
 
   @Override
   protected String getCollectorRole() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION;
   }
 
   @Override
   protected String getCollectorRules() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RULES;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES;
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_REPETITION_COLLECTOR_RESPONSE_FORMAT;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT;
   }
 
   @Override
   protected String getCollectorMessage() {
-    return DEFAULT_AI_MESSAGE_SPECIALIZED_REPETITION_COLLECTOR;
+    return DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION;
   }
 }

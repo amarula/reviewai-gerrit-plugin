@@ -122,6 +122,38 @@ public class AiHistoryTest {
   }
 
   @Test
+  public void patchSetHistoryDropsReviewContextNoise() {
+    HashMap<String, GerritComment> patchSetCommentMap =
+        mapById(
+            List.of(
+                patchSetComment("noise-1", "DYNAMIC CONFIGURATION SETTINGS\n\nmultiAgentMode: false"),
+                patchSetComment("noise-2", "```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```"),
+                patchSetComment("noise-3", "ReviewAI Message: Dynamic configuration modified"),
+                patchSetComment(
+                    "noise-4",
+                    "Uploaded patch set 2.\n\nOutdated Votes:\n* Code-Review-1"),
+                patchSetComment("real-1", "Please check null handling.")));
+
+    AiHistory aiHistory =
+        new AiHistory(
+            config(),
+            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new GerritClientData(
+                null,
+                List.of(),
+                new CommentData(List.of(), new HashMap<>(), patchSetCommentMap),
+                0),
+            localizer());
+
+    GerritComment patchSetMarker = new GerritComment();
+    patchSetMarker.setFilename(GERRIT_PATCH_SET_FILENAME);
+
+    assertEquals(
+        List.of("user:Please check null handling."),
+        historySummary(aiHistory.retrieveHistory(patchSetMarker)));
+  }
+
+  @Test
   public void openAiRequestPromptRetrievesFilteredHistoryOnlyOnce() throws Exception {
     AiHistoryFixture fixture =
         readFixture("nonAiDiscussionHistoryExcludesAiConversationMessages.json");
@@ -192,6 +224,21 @@ public class AiHistoryTest {
       commentMap.put(comment.getId(), comment);
     }
     return commentMap;
+  }
+
+  private static GerritComment patchSetComment(String id, String message) {
+    GerritComment comment = new GerritComment();
+    comment.setId(id);
+    comment.setFilename(GERRIT_PATCH_SET_FILENAME);
+    comment.setPatchSet(1);
+    comment.setDate("2026-06-23 10:00:00.000000000");
+    comment.setUpdated("2026-06-23 10:00:00.000000000");
+    comment.setMessage(message);
+    GerritComment.Author author = new GerritComment.Author();
+    author.setAccountId(1001);
+    author.setName("Alice");
+    comment.setAuthor(author);
+    return comment;
   }
 
   private static class AiHistoryFixture {

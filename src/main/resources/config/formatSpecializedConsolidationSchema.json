@@ -1,7 +1,7 @@
 {
-  "name": "format_specialized_replies",
-  "description": "Provide Level 2 specialized review concerns.",
-  "strict": false,
+  "name": "format_specialized_consolidation",
+  "description": "Consolidate Level 2 specialized concerns.",
+  "strict": true,
   "schema": {
     "type": "object",
     "properties": {
@@ -10,18 +10,15 @@
         "items": {
           "type": "object",
           "properties": {
-            "type": {
-              "type": "string"
+            "id": { "type": "string" },
+            "merged_concern_ids": {
+              "type": "array",
+              "items": { "type": "string" }
             },
-            "description": {
-              "type": "string"
-            },
-            "reasoning": {
-              "type": "string"
-            },
-            "preexisting": {
-              "type": "boolean"
-            },
+            "type": { "type": "string" },
+            "description": { "type": "string" },
+            "reasoning": { "type": "string" },
+            "preexisting": { "type": "boolean" },
             "locations": {
               "type": "array",
               "items": {
@@ -35,7 +32,15 @@
               }
             }
           },
-          "required": ["type", "description", "reasoning", "preexisting", "locations"]
+          "required": [
+            "id",
+            "merged_concern_ids",
+            "type",
+            "description",
+            "reasoning",
+            "preexisting",
+            "locations"
+          ]
         }
       },
       "dismissed_concerns": {
