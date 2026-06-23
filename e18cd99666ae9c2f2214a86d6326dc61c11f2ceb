@@ -35,6 +35,24 @@
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "4e7d8987_c7dd812b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-06-23T10:23:20Z",
+      "side": 1,
+      "message": "Thanks, and sorry for the overlap 😊. I ended up implementing it in another commit https://gerrithub.io/c/amarula/chatgpt-code-review-gerrit-plugin/+/1240079 because it was quicker on my side, but your commit was very helpful in spotting the issue.",
+      "parentUuid": "b1bb67cb_976c47a1",
+      "revId": "e18cd99666ae9c2f2214a86d6326dc61c11f2ceb",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "df5136b8_e6126337",
