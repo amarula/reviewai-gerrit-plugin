@@ -18,6 +18,23 @@
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b1bb67cb_976c47a1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1039647
+      },
+      "writtenOn": "2026-06-23T10:09:39Z",
+      "side": 1,
+      "message": "is it OK if I take another stab taking into account the comments or should I just leave it to the experts 🙂",
+      "revId": "e18cd99666ae9c2f2214a86d6326dc61c11f2ceb",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "df5136b8_e6126337",
