@@ -1,0 +1,67 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "42525d06_b782a7d9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-06-23T08:07:53Z",
+      "side": 1,
+      "message": "This fallback seems too late and too implicit for ZDR deployments. It only retries after toolExecutor.execute(...) fails with an existing conversation ID, but conversation resolution/creation happens earlier in resolveConversation(). If ZDR rejects conversation creation or resolution, this path will still fail before reaching the retry logic.\n\nSince ZDR support is typically known from deployment or configuration, it would be preferable to provide an explicit configuration option to disable OpenAI conversations rather than relying on a failed request per Change Set.",
+      "revId": "e18cd99666ae9c2f2214a86d6326dc61c11f2ceb",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "df5136b8_e6126337",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/langchain/provider/openai/OpenAiConversation.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-06-23T08:07:53Z",
+      "side": 1,
+      "message": "This looks like it reinvents the local-memory workflow for OpenAI/ZDR instead of reusing the existing provider flow used when conversations are not available. If OpenAI conversations are disabled or unsupported, the request should follow the same persisted LangChain memory path as the other providers, not introduce a separate conversationDisabled state inside OpenAiConversation.",
+      "range": {
+        "startLine": 37,
+        "startChar": 58,
+        "endLine": 37,
+        "endChar": 78
+      },
+      "revId": "e18cd99666ae9c2f2214a86d6326dc61c11f2ceb",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2e8807cd_9c98fdf8",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/data/ReviewAiDb.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-06-23T08:07:53Z",
+      "side": 1,
+      "message": "This changes ReviewAI DB access from a managed H2 TCP server to a direct embedded file connection with AUTO_SERVER\u003dFALSE. We have already hit concurrent access issues with direct H2 file connections. H2 embedded mode supports multiple connections only within the same JVM/classloader, while server/mixed mode is the safe path when another JVM, classloader, reload, or tool may access the same DB. Please keep the managed TCP server path, or provide a concurrency/plugin-reload test proving this embedded URL is safe in Gerrit’s runtime. This DB access change also looks unrelated to the OpenAI ZDR conversation fallback and should be split out if still needed.",
+      "range": {
+        "startLine": 57,
+        "startChar": 12,
+        "endLine": 57,
+        "endChar": 38
+      },
+      "revId": "e18cd99666ae9c2f2214a86d6326dc61c11f2ceb",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
