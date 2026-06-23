@@ -294,6 +294,8 @@ directive = End each reply with \"Hope this helps!\"
       tree, searching references, and reading file content.
     - **NONE**: Does not expose repository context tools. Reviews and interactions rely on the formatted patch and
       Gerrit discussion history only.
+- `aiMaxMemoryTokens`: Maximum number of tokens retained in LangChain memory per Change, Patch Set, and review scope.
+  The default value is 16K.
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
   This applies when ON_DEMAND code context tools are enabled and defaults to 3.
 
@@ -315,11 +317,11 @@ directive = End each reply with \"Hope this helps!\"
   **NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
   costs.
 
-### Optional Parameters Specific to LangChain Provider Routes
+### Optional Parameters Specific to OpenAI Provider
 
-- `aiMaxMemoryTokens`: Maximum number of tokens retained in LangChain memory per Change, Patch Set, and review scope.
-  The default value is 16K. OpenAI uses durable Responses API conversations plus transient local memory; Gemini,
-  MoonShot, and Ollama use the plugin's local LangChain memory store.
+- `aiProviderZdr`: Enables Zero Data Retention (ZDR) mode for the OpenAI provider. When set to `true`, the plugin uses
+  the generic LangChain chat workflow with local plugin memory instead of OpenAI Responses API conversations, so
+  conversation state is not stored by OpenAI. The default value is `false`.
 
 ### Optional Parameters Specific to Ollama
 
@@ -598,9 +600,10 @@ aiFullFileReview: true
 aiMaxMemoryTokens: 16384
 aiMaxToolResponseRounds: 3
 aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.5, OpenAI/gpt-5.2, OpenAI/gpt-4.1, Gemini/gemini-3.1-pro, ...]
-aiModelsDefault: 
+aiModelsDefault:
 aiPollingInterval: 1000
 aiPollingTimeout: 180
+aiProviderZdr: false
 aiProviders:
     OpenAI
     Gemini

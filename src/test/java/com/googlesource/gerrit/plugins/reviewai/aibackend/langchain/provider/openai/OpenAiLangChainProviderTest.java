@@ -25,6 +25,7 @@ import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import java.io.IOException;
 import java.io.InputStream;
@@ -152,6 +153,22 @@ public class OpenAiLangChainProviderTest {
 
     assertTrue(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
     assertFalse(langChainProvider.getModel().getClass().getName().contains("OpenAiChatModel"));
+  }
+
+  @Test
+  public void usesLangChainOpenAiChatModelWhenAiProviderZdrIsEnabled() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+
+    LangChainProvider langChainProvider =
+        provider.buildChatModel(config, 0.0, "conv_test", "review instructions");
+
+    assertTrue(langChainProvider.getModel() instanceof OpenAiChatModel);
+    assertFalse(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
   }
 
   @Test

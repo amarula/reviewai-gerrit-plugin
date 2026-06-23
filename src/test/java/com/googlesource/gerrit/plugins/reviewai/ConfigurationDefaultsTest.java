@@ -421,6 +421,24 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldDefaultAiProviderZdrToDisabled() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(false, configuration.getAiProviderZdr());
+  }
+
+  @Test
+  public void shouldReadConfiguredAiProviderZdr() {
+    Config cfg = new Config();
+    cfg.setBoolean("plugin", PLUGIN_NAME, "aiProviderZdr", true);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(true, configuration.getAiProviderZdr());
+  }
+
+  @Test
   public void shouldDefaultAgentSpecializationLevelToSingleAgent() {
     Configuration configuration = createConfiguration();
 

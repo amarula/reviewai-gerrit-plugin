@@ -112,6 +112,17 @@ public class SpecializedReviewCollectorsTest {
   }
 
   @Test
+  public void openAiZdrRepetitionCollectorUsesExplicitHistory() throws Exception {
+    RecordingCollectorClient client =
+        new RecordingCollectorClient(config(AiProviderType.OPENAI, true));
+    client.history = List.of(historyEntry());
+
+    client.askCollector(new ChangeSetData(1, -1, 1), change(), sourceReplies());
+
+    assertEquals(1, client.repetitionHistorySize);
+  }
+
+  @Test
   public void failsWholeReviewWhenOneCollectorFails() {
     RecordingCollectorClient client = new RecordingCollectorClient(config(AiProviderType.OPENAI));
     client.failingStage = ReviewAssistantStage.REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR;
@@ -168,8 +179,13 @@ public class SpecializedReviewCollectorsTest {
   }
 
   private static Configuration config(AiProviderType providerType) {
+    return config(providerType, false);
+  }
+
+  private static Configuration config(AiProviderType providerType, boolean aiProviderZdr) {
     Configuration config = mock(Configuration.class);
     when(config.getAiProviderType()).thenReturn(providerType);
+    when(config.getAiProviderZdr()).thenReturn(aiProviderZdr);
     return config;
   }
 

@@ -48,7 +48,7 @@ class LangChainReviewContextChecker {
     if (config == null) {
       return false;
     }
-    if (config.getAiProviderType() == AiProviderType.OPENAI) {
+    if (config.getAiProviderType() == AiProviderType.OPENAI && !config.getAiProviderZdr()) {
       return hasExistingOpenAiReviewContext(changeSetData);
     }
     return hasAssistantHistory(changeSetData.getAiDataPrompt());

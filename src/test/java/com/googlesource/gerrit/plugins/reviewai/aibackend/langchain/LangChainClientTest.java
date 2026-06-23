@@ -267,6 +267,19 @@ public class LangChainClientTest {
     LangChainClient client = new LangChainClient(config, null, null, null);
 
     assertNotNull(getToolExecutorStructuredResponseFormat(client));
+    assertEquals(true, getToolExecutorRequireInitialToolUse(client));
+  }
+
+  @Test
+  public void openAiZdrDoesNotRequireInitialOnDemandToolUse() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.getAiProviderZdr()).thenReturn(true);
+
+    LangChainClient client = new LangChainClient(config, null, null, null);
+
+    assertEquals(false, getToolExecutorRequireInitialToolUse(client));
   }
 
   @Test
@@ -303,6 +316,26 @@ public class LangChainClientTest {
             changeSetData);
 
     assertEquals("conv_langchain_openai", conversationId);
+  }
+
+  @Test
+  public void skipsOpenAiConversationWhenAiProviderZdrIsEnabled() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
+        .thenReturn("conv_langchain_openai");
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+
+    String conversationId =
+        resolveConversationId(
+            new LangChainClient(config, null, null, null, pluginDataHandlerProvider),
+            AiProviderType.OPENAI,
+            new ChangeSetData(1, -1, 1));
+
+    assertEquals(null, conversationId);
+    verify(changeDataHandler, never()).getValue(OpenAiConversation.KEY_CONVERSATION_ID);
   }
 
   @Test
@@ -459,6 +492,21 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void openAiZdrKeepsPatchEvenWhenConversationExists() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    TestableLangChainClient client = new TestableLangChainClient(config);
+
+    assertEquals(
+        false,
+        client.omitRequestContext(
+            AiProviderType.OPENAI, true, changeSetData, change));
+  }
+
+  @Test
   public void automaticReviewKeepsPatchEvenWhenOpenAiConversationExists() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     GerritChange change = Mockito.mock(GerritChange.class);
@@ -494,6 +542,13 @@ public class LangChainClientTest {
     Field toolsField = executor.getClass().getDeclaredField("onDemandTools");
     toolsField.setAccessible(true);
     return (java.util.List<?>) toolsField.get(executor);
+  }
+
+  private boolean getToolExecutorRequireInitialToolUse(LangChainClient client) throws Exception {
+    Object executor = getToolExecutor(client);
+    Field field = executor.getClass().getDeclaredField("requireInitialToolUse");
+    field.setAccessible(true);
+    return (boolean) field.get(executor);
   }
 
   private Object getToolExecutor(LangChainClient client) throws Exception {

@@ -95,6 +95,8 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
   }
 
   protected boolean shouldUseNonAiConversationHistory() {
-    return config != null && config.getAiProviderType() == AiProviderType.OPENAI;
+    return config != null
+        && config.getAiProviderType() == AiProviderType.OPENAI
+        && !config.getAiProviderZdr();
   }
 }

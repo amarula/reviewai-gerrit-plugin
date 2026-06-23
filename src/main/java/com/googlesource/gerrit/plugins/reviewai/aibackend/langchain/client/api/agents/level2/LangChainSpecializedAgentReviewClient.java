@@ -40,7 +40,6 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.ArrayList;
@@ -255,10 +254,9 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       GerritChange change,
       List<SpecializedReviewAgentReplies> specializedReplies)
       throws Exception {
+    boolean useOpenAiResponses = shouldUseOpenAiResponses(config.getAiProviderType());
     List<AiReviewHistoryInfo.Entry> pastReplies =
-        config.getAiProviderType() == AiProviderType.OPENAI
-            ? List.of()
-            : collectPastReviewReplies(changeSetData, change);
+        useOpenAiResponses ? List.of() : collectPastReviewReplies(changeSetData, change);
     Map<ReviewAssistantStage, CompletableFuture<AiResponseContent>> responseFutures =
         new LinkedHashMap<>();
     for (SpecializedReviewCollectorAgent collector : COLLECTORS) {
@@ -268,7 +266,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
               changeSetData,
               change,
               specializedReplies,
-              collector.selectHistory(config.getAiProviderType(), pastReplies),
+              collector.selectHistory(useOpenAiResponses, pastReplies),
               collector.stage()));
     }
     try {
@@ -280,7 +278,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       setRequestBody(
           buildCollectorInput(
               specializedReplies,
-              COLLECTORS.get(0).selectHistory(config.getAiProviderType(), pastReplies)));
+              COLLECTORS.get(0).selectHistory(useOpenAiResponses, pastReplies)));
       return response;
     } catch (CompletionException e) {
       if (e.getCause() instanceof Exception exception) {

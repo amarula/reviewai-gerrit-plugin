@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.List;
 
@@ -26,7 +25,7 @@ abstract class SpecializedReviewCollectorAgent {
   abstract ReviewAssistantStage stage();
 
   List<AiReviewHistoryInfo.Entry> selectHistory(
-      AiProviderType providerType, List<AiReviewHistoryInfo.Entry> pastReplies) {
+      boolean useOpenAiResponses, List<AiReviewHistoryInfo.Entry> pastReplies) {
     return List.of();
   }
 

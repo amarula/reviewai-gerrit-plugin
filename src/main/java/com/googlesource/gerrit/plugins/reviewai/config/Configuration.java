@@ -97,6 +97,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
+  private static final boolean DEFAULT_AI_PROVIDER_ZDR = false;
   private static final int DEFAULT_OLLAMA_CONTEXT_WINDOW = 16384;
   private static final int DEFAULT_OLLAMA_RESPONSE_LENGTH = -1;
   private static final boolean DEFAULT_OLLAMA_THINK = false;
@@ -155,6 +156,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
   private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
+  private static final String KEY_AI_PROVIDER_ZDR = "aiProviderZdr";
   private static final String KEY_OLLAMA_CONTEXT_WINDOW = "ollamaContextWindow";
   private static final String KEY_OLLAMA_DOMAIN = "ollamaDomain";
   private static final String KEY_OLLAMA_RESPONSE_LENGTH = "ollamaResponseLength";
@@ -411,6 +413,10 @@ public class Configuration extends ConfigCore {
   public int getAiMaxToolResponseRounds() {
     return Math.max(
         1, getInt(KEY_AI_MAX_TOOL_RESPONSE_ROUNDS, DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS));
+  }
+
+  public boolean getAiProviderZdr() {
+    return getBoolean(KEY_AI_PROVIDER_ZDR, DEFAULT_AI_PROVIDER_ZDR);
   }
 
   public int getOllamaContextWindow() {

@@ -267,13 +267,12 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         new LangChainMemoryId(
             change.getFullChangeId(), LangChainMemoryId.getPatchSetNumber(change), ROUTER_SCOPE);
     AiProviderType providerType = config.getAiProviderType();
+    boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
     ChatMemory memory =
-        providerType == AiProviderType.OPENAI
-            ? buildTransientMemory(routerMemoryId)
-            : buildMemory(routerMemoryId);
+        useOpenAiResponses ? buildTransientMemory(routerMemoryId) : buildMemory(routerMemoryId);
     AiPromptReviewAgentRouter routerPrompt = new AiPromptReviewAgentRouter(config);
     String routerInstructions = routerPrompt.getDefaultAiAssistantInstructions();
-    if (providerType != AiProviderType.OPENAI) {
+    if (!useOpenAiResponses) {
       memory.add(LangChainChatMessages.systemMessage(routerInstructions));
     }
     String requestData =

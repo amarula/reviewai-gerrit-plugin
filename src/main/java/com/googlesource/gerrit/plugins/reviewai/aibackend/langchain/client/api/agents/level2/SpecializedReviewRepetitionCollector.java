@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.List;
 
@@ -30,8 +29,8 @@ final class SpecializedReviewRepetitionCollector extends SpecializedReviewCollec
 
   @Override
   List<AiReviewHistoryInfo.Entry> selectHistory(
-      AiProviderType providerType, List<AiReviewHistoryInfo.Entry> pastReplies) {
-    return providerType == AiProviderType.OPENAI ? List.of() : pastReplies;
+      boolean useOpenAiResponses, List<AiReviewHistoryInfo.Entry> pastReplies) {
+    return useOpenAiResponses ? List.of() : pastReplies;
   }
 
   @Override
