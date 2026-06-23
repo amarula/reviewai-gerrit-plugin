@@ -38,6 +38,7 @@ import java.util.stream.Stream;
 @Slf4j
 public class AiHistory extends AiComment {
   private final Set<String> messagesExcludedFromHistory;
+  private final AiHistoryMessageFilter messageFilter;
   @Getter private final HashMap<String, GerritComment> commentMap;
   private final HashMap<String, GerritComment> patchSetCommentMap;
   private final Set<String> patchSetCommentAdded;
@@ -59,6 +60,7 @@ public class AiHistory extends AiComment {
     CommentData commentData = gerritClientData.getCommentData();
     messagesExcludedFromHistory =
         Set.of(Settings.GERRIT_DEFAULT_MESSAGE_DONE, localizer.getText("message.empty.review"));
+    messageFilter = new AiHistoryMessageFilter();
     commentMap = commentData.getCommentMap();
     patchSetCommentMap = commentData.getPatchSetCommentMap();
     patchSetComments = retrievePatchSetComments(gerritClientData);
@@ -237,6 +239,7 @@ public class AiHistory extends AiComment {
     boolean shouldNotProcessComment =
         messageContent.isEmpty()
             || messagesExcludedFromHistory.contains(messageContent)
+            || !messageFilter.shouldIncludeMessage(messageContent)
             || patchSetCommentAdded.contains(messageContent)
             || isBeforeOrAtForgetThreadCutoff(comment)
             || filterActive && isInactiveComment(comment);

@@ -30,9 +30,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.AiPromptReviewReiterated;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedDuplicationCollector;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedRelevanceCollector;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedRepetitionCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedConflictResolution;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedConsolidation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedHistoricalRepetition;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedVerification;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import lombok.extern.slf4j.Slf4j;
 
@@ -65,6 +66,11 @@ public class AiPromptFactory {
             yield new AiPromptReviewCode(config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_COMMIT_MESSAGE -> {
+            if (changeSetData.getSpecializedAgentReview()) {
+              log.info("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
+              yield new AiPromptSpecializedReviewAgent(
+                  config, changeSetData, change, codeContextPolicy);
+            }
             log.info("AiPromptFactory: Return AiPromptReviewCommitMessage");
             yield new AiPromptReviewCommitMessage(
                 config, changeSetData, change, codeContextPolicy);
@@ -84,19 +90,24 @@ public class AiPromptFactory {
             yield new AiPromptSpecializedReviewAgent(
                 config, changeSetData, change, codeContextPolicy);
           }
-          case REVIEW_SPECIALIZED_REPETITION_COLLECTOR -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedRepetitionCollector");
-            yield new AiPromptSpecializedRepetitionCollector(
+          case REVIEW_SPECIALIZED_CONSOLIDATION -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedConsolidation");
+            yield new AiPromptSpecializedConsolidation(
                 config, changeSetData, change, codeContextPolicy);
           }
-          case REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedDuplicationCollector");
-            yield new AiPromptSpecializedDuplicationCollector(
+          case REVIEW_SPECIALIZED_HISTORICAL_REPETITION -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedHistoricalRepetition");
+            yield new AiPromptSpecializedHistoricalRepetition(
                 config, changeSetData, change, codeContextPolicy);
           }
-          case REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedRelevanceCollector");
-            yield new AiPromptSpecializedRelevanceCollector(
+          case REVIEW_SPECIALIZED_CONFLICT_RESOLUTION -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedConflictResolution");
+            yield new AiPromptSpecializedConflictResolution(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_SPECIALIZED_VERIFICATION -> {
+            log.info("AiPromptFactory: Return AiPromptSpecializedVerification");
+            yield new AiPromptSpecializedVerification(
                 config, changeSetData, change, codeContextPolicy);
           }
         };

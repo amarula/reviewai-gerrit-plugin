@@ -97,7 +97,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void shouldLoadSpecializedStructuredResponseFormatWithoutCollectorFields()
+  public void shouldLoadSpecializedStructuredResponseFormatForFindings()
       throws Exception {
     LangChainClient client = new LangChainClient(null, null, null, null);
 
@@ -112,27 +112,23 @@ public class LangChainClientTest {
     assertTrue(jsonSchema.rootElement() instanceof JsonObjectSchema);
 
     JsonObjectSchema root = (JsonObjectSchema) jsonSchema.rootElement();
-    assertTrue(root.properties().containsKey("replies"));
+    assertTrue(root.properties().containsKey("concerns"));
+    assertTrue(root.properties().containsKey("dismissed_concerns"));
+    assertFalse(root.properties().containsKey("replies"));
     assertFalse(root.properties().containsKey("changeId"));
 
-    JsonArraySchema repliesSchema = (JsonArraySchema) root.properties().get("replies");
-    assertNotNull(repliesSchema.items());
-    assertTrue(repliesSchema.items() instanceof JsonObjectSchema);
-    JsonObjectSchema replyItemSchema = (JsonObjectSchema) repliesSchema.items();
-    assertTrue(replyItemSchema.properties().containsKey("reply"));
-    assertTrue(replyItemSchema.properties().containsKey("score"));
-    assertTrue(replyItemSchema.properties().containsKey("filename"));
-    assertTrue(replyItemSchema.properties().containsKey("lineNumber"));
-    assertTrue(replyItemSchema.properties().containsKey("codeSnippet"));
-    assertFalse(replyItemSchema.properties().containsKey("relevance"));
-    assertFalse(replyItemSchema.properties().containsKey("duplicated"));
-    assertFalse(replyItemSchema.properties().containsKey("repeated"));
-    assertFalse(replyItemSchema.properties().containsKey("conflicting"));
-    assertFalse(replyItemSchema.properties().containsKey("source_agent"));
-    assertFalse(replyItemSchema.properties().containsKey("repetition_reply_id"));
-    assertFalse(replyItemSchema.properties().containsKey("duplicated_reason"));
-    assertFalse(replyItemSchema.properties().containsKey("repeated_reason"));
-    assertFalse(replyItemSchema.properties().containsKey("conflicting_reason"));
+    JsonArraySchema concernsSchema = (JsonArraySchema) root.properties().get("concerns");
+    assertNotNull(concernsSchema.items());
+    assertTrue(concernsSchema.items() instanceof JsonObjectSchema);
+    JsonObjectSchema concernItemSchema = (JsonObjectSchema) concernsSchema.items();
+    assertTrue(concernItemSchema.properties().containsKey("type"));
+    assertTrue(concernItemSchema.properties().containsKey("description"));
+    assertTrue(concernItemSchema.properties().containsKey("reasoning"));
+    assertTrue(concernItemSchema.properties().containsKey("preexisting"));
+    assertTrue(concernItemSchema.properties().containsKey("locations"));
+    assertFalse(concernItemSchema.properties().containsKey("reply"));
+    assertFalse(concernItemSchema.properties().containsKey("score"));
+    assertFalse(concernItemSchema.properties().containsKey("relevance"));
   }
 
   @Test
@@ -150,16 +146,20 @@ public class LangChainClientTest {
 
     assertCollectorExecutor(
         client,
-        ReviewAssistantStage.REVIEW_SPECIALIZED_REPETITION_COLLECTOR,
-        "specializedRepetitionToolExecutor");
+        ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION,
+        "specializedConsolidationToolExecutor");
     assertCollectorExecutor(
         client,
-        ReviewAssistantStage.REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR,
-        "specializedDuplicationToolExecutor");
+        ReviewAssistantStage.REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
+        "specializedHistoricalRepetitionToolExecutor");
     assertCollectorExecutor(
         client,
-        ReviewAssistantStage.REVIEW_SPECIALIZED_RELEVANCE_COLLECTOR,
-        "specializedRelevanceToolExecutor");
+        ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
+        "specializedConflictResolutionToolExecutor");
+    assertCollectorExecutor(
+        client,
+        ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION,
+        "specializedVerificationToolExecutor");
   }
 
   @Test

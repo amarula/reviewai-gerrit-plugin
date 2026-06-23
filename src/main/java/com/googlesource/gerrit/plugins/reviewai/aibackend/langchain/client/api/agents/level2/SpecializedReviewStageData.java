@@ -16,17 +16,16 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 
-final class SpecializedReviewDuplicationCollector extends SpecializedReviewCollectorAgent {
-  @Override
-  ReviewAssistantStage stage() {
-    return ReviewAssistantStage.REVIEW_SPECIALIZED_DUPLICATION_COLLECTOR;
-  }
+final class SpecializedReviewStageData {
+  private SpecializedReviewStageData() {}
 
-  @Override
-  void merge(AiReplyItem target, AiReplyItem collectorResult) {
-    target.setDuplicated(collectorResult.isDuplicated());
+  static ChangeSetData staged(ChangeSetData changeSetData, ReviewAssistantStage stage) {
+    ChangeSetData stagedData = changeSetData.copy();
+    stagedData.setReviewAssistantStage(stage);
+    stagedData.setForcedStagedReview(true);
+    return stagedData;
   }
 }

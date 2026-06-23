@@ -21,14 +21,14 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 
-public class AiPromptSpecializedDuplicationCollector extends AiPromptSpecializedReviewCollector {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RULES;
+public class AiPromptSpecializedHistoricalRepetition extends AiPromptSpecializedReviewCollector {
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES;
   public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_DUPLICATION_COLLECTOR;
+      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT;
+  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION;
 
-  public AiPromptSpecializedDuplicationCollector(
+  public AiPromptSpecializedHistoricalRepetition(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
@@ -38,26 +38,26 @@ public class AiPromptSpecializedDuplicationCollector extends AiPromptSpecialized
         changeSetData,
         change,
         codeContextPolicy,
-        "agents/level2/collector/duplication/prompts");
+        "agents/level2/stages/historical-repetition/prompts");
   }
 
   @Override
   protected String getCollectorRole() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION;
   }
 
   @Override
   protected String getCollectorRules() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RULES;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES;
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_DUPLICATION_COLLECTOR_RESPONSE_FORMAT;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT;
   }
 
   @Override
   protected String getCollectorMessage() {
-    return DEFAULT_AI_MESSAGE_SPECIALIZED_DUPLICATION_COLLECTOR;
+    return DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION;
   }
 }

@@ -39,7 +39,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -180,12 +179,12 @@ public class LangChainSpecializedAgentReviewClientTest {
 
     String userMessage = prompt.getDefaultAiThreadReviewMessage("selected context");
 
-    assertTrue(userMessage.startsWith("Review the following patchset selection:"));
+    assertTrue(userMessage.startsWith("Analyze the following patchset selection"));
     assertFalse(userMessage.startsWith("Review the following Commit Message:"));
   }
 
   @Test
-  public void specializedPatchsetAgentFieldDefinitionsIncludeOnlySpecialistFields() {
+  public void specializedPatchsetAgentFieldDefinitionsDescribeConcernFields() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
     changeSetData.setSpecializedAgentName("TESTABILITY");
@@ -197,20 +196,19 @@ public class LangChainSpecializedAgentReviewClientTest {
         extractSection(prompt.getDefaultAiAssistantInstructions(), "Field Definitions");
 
     assertTrue(fieldDefinitions.contains("# Field Definitions"));
-    assertTrue(fieldDefinitions.contains("`reply`"));
-    assertTrue(fieldDefinitions.contains("`score`"));
+    assertTrue(fieldDefinitions.contains("`concerns`"));
+    assertTrue(fieldDefinitions.contains("`dismissed_concerns`"));
+    assertTrue(fieldDefinitions.contains("`type`"));
+    assertTrue(fieldDefinitions.contains("`description`"));
+    assertTrue(fieldDefinitions.contains("`reasoning`"));
+    assertTrue(fieldDefinitions.contains("`preexisting`"));
+    assertTrue(fieldDefinitions.contains("`locations`"));
     assertTrue(fieldDefinitions.contains("`filename`"));
     assertTrue(fieldDefinitions.contains("`lineNumber`"));
     assertTrue(fieldDefinitions.contains("`codeSnippet`"));
+    assertTrue(fieldDefinitions.contains("must not include `reply`, `score`"));
     assertFalse(fieldDefinitions.contains("`changeId`"));
-    assertFalse(fieldDefinitions.contains("`relevance`"));
-    assertFalse(fieldDefinitions.contains("`duplicated`"));
-    assertFalse(fieldDefinitions.contains("`repeated`"));
-    assertFalse(fieldDefinitions.contains("`conflicting`"));
-    assertFalse(fieldDefinitions.contains("`source_agent`"));
-    assertFalse(fieldDefinitions.contains("`duplicated_reason`"));
-    assertFalse(fieldDefinitions.contains("`repeated_reason`"));
-    assertFalse(fieldDefinitions.contains("`conflicting_reason`"));
+    assertTrue(fieldDefinitions.contains("`relevance`, `duplicated`, `repeated`"));
   }
 
   @Test
@@ -224,13 +222,11 @@ public class LangChainSpecializedAgentReviewClientTest {
         extractSection(prompt.getDefaultAiAssistantInstructions(), "Field Definitions");
 
     assertTrue(fieldDefinitions.contains("# Field Definitions"));
-    assertTrue(fieldDefinitions.contains("`reply`"));
-    assertTrue(fieldDefinitions.contains("`score`"));
-    assertFalse(fieldDefinitions.contains("`filename`"));
-    assertFalse(fieldDefinitions.contains("`lineNumber`"));
-    assertFalse(fieldDefinitions.contains("`codeSnippet`"));
+    assertTrue(fieldDefinitions.contains("`concerns`"));
+    assertTrue(fieldDefinitions.contains("`dismissed_concerns`"));
+    assertTrue(fieldDefinitions.contains("empty array for commit-message concerns"));
     assertFalse(fieldDefinitions.contains("`changeId`"));
-    assertFalse(fieldDefinitions.contains("`relevance`"));
+    assertTrue(fieldDefinitions.contains("must not include `reply`, `score`"));
   }
 
   @Test
@@ -270,83 +266,37 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void collectorInputIncludesOnlySpecializedReplyFields() {
+  public void consolidationInputIncludesSpecializedFindings() {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    AiReplyItem reply =
-        AiReplyItem.builder()
-            .reply("Review issue")
-            .score(-1.0)
-            .relevance(1.0)
-            .repeated(true)
-            .duplicated(true)
-            .conflicting(true)
-            .sourceAgent("SECURITY")
-            .repeatedReason("History repeat")
-            .duplicatedReason("Same issue")
-            .conflictingReason("Conflict")
-            .filename("src/Test.java")
-            .lineNumber(42)
-            .codeSnippet("return value;")
-            .build();
+    SpecializedReviewFindings findings = finding("Correctness", "Review issue");
 
-    String collectorInput =
-        client.buildCollectorInput(
-            List.of(SpecializedReviewAgentReplies.from("CORRECTNESS", List.of(reply))));
+    String consolidationInput =
+        client.buildConsolidationInput(
+            List.of(SpecializedReviewFindings.AgentFindings.from("CORRECTNESS", findings)));
 
-    assertTrue(collectorInput.contains("\"new_replies\""));
-    assertTrue(collectorInput.contains("\"past_replies\":[]"));
-    assertTrue(collectorInput.contains("\"reply\":\"Review issue\""));
-    assertTrue(collectorInput.contains("\"score\":-1.0"));
-    assertTrue(collectorInput.contains("\"filename\":\"src/Test.java\""));
-    assertTrue(collectorInput.contains("\"lineNumber\":42"));
-    assertTrue(collectorInput.contains("\"codeSnippet\":\"return value;\""));
-    assertFalse(collectorInput.contains("relevance"));
-    assertFalse(collectorInput.contains("repeated"));
-    assertFalse(collectorInput.contains("duplicated"));
-    assertFalse(collectorInput.contains("conflicting"));
-    assertFalse(collectorInput.contains("source_agent"));
-    assertFalse(collectorInput.contains("_reason"));
+    assertTrue(consolidationInput.contains("\"specialized_findings\""));
+    assertTrue(consolidationInput.contains("\"agent\":\"CORRECTNESS\""));
+    assertTrue(consolidationInput.contains("\"description\":\"Review issue\""));
+    assertTrue(consolidationInput.contains("\"filename\":\"src/Test.java\""));
+    assertTrue(consolidationInput.contains("\"lineNumber\":42"));
+    assertTrue(consolidationInput.contains("\"codeSnippet\":\"return value;\""));
+    assertFalse(consolidationInput.contains("new_replies"));
+    assertFalse(consolidationInput.contains("past_replies"));
+    assertFalse(consolidationInput.contains("\"reply\""));
+    assertFalse(consolidationInput.contains("\"score\""));
   }
 
   @Test
-  public void collectorInputIncludesStableIdsForPastReplies() {
+  public void verificationInputIncludesPatchsetAndConflictResolvedFindings() {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    AiReviewHistoryInfo.Entry commentReply =
-        historyEntry("comment-id", "change-message-id", "First past reply");
-    AiReviewHistoryInfo.Entry changeMessageReply =
-        historyEntry(null, "fallback-change-message-id", "Second past reply");
-    AiReviewHistoryInfo.Entry unidentifiedReply =
-        historyEntry(null, null, "Unidentified past reply");
+    String verificationInput = client.buildVerificationInput("Patch body", finding("Correctness", "Issue"));
 
-    String collectorInput =
-        client.buildCollectorInput(
-            List.of(), List.of(commentReply, changeMessageReply, unidentifiedReply));
-
-    JsonObject input = JsonParser.parseString(collectorInput).getAsJsonObject();
-    JsonArray pastReplies = input.getAsJsonArray("past_replies");
-    assertEquals(2, pastReplies.size());
-    assertEquals("comment-id", pastReplies.get(0).getAsJsonObject().get("id").getAsString());
-    assertEquals(
-        "fallback-change-message-id",
-        pastReplies.get(1).getAsJsonObject().get("id").getAsString());
-    assertEquals(
-        "Second past reply", pastReplies.get(1).getAsJsonObject().get("reply").getAsString());
-  }
-
-  private static AiReviewHistoryInfo.Entry historyEntry(
-      String id, String changeMessageId, String message) {
-    return new AiReviewHistoryInfo.Entry(
-        id,
-        changeMessageId,
-        "assistant",
-        false,
-        "ReviewAI",
-        "2026-06-22T10:00:00Z",
-        1,
-        "src/Test.java",
-        42,
-        null,
-        message);
+    JsonObject input = JsonParser.parseString(verificationInput).getAsJsonObject();
+    assertEquals("Patch body", input.get("patchset").getAsString());
+    JsonArray concerns =
+        input.getAsJsonObject("conflict_resolved_findings").getAsJsonArray("concerns");
+    assertEquals(1, concerns.size());
+    assertEquals("Issue", concerns.get(0).getAsJsonObject().get("description").getAsString());
   }
 
   private static SpecializedReviewTriage triage(SpecializedReviewTriage.AgentPlan... plans) {
@@ -412,24 +362,22 @@ public class LangChainSpecializedAgentReviewClientTest {
     }
 
     @Override
-    protected AiResponseContent askSpecializedAgent(
+    protected SpecializedReviewFindings askSpecializedAgent(
         ChangeSetData changeSetData,
         GerritChange change,
         String patchSet,
         SpecializedReviewTriage.AgentPlan plan) {
       recordedAgents.add(plan.getAgent());
-      AiResponseContent response = new AiResponseContent("");
-      response.setReplies(
-          List.of(AiReplyItem.builder().reply(plan.getAgent()).score(-1.0).build()));
-      return response;
+      return finding(plan.getAgent(), plan.getAgent());
     }
 
     @Override
     protected AiResponseContent askCollector(
         ChangeSetData changeSetData,
         GerritChange change,
-        List<SpecializedReviewAgentReplies> specializedReplies) {
-      specializedReplies.forEach(reply -> collectorAgents.add(reply.getAgent()));
+        String patchSet,
+        List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
+      specializedFindings.forEach(finding -> collectorAgents.add(finding.getAgent()));
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(
           List.of(
@@ -454,6 +402,23 @@ public class LangChainSpecializedAgentReviewClientTest {
         }
       };
     }
+  }
+
+  private static SpecializedReviewFindings finding(String type, String description) {
+    SpecializedReviewFindings findings = new SpecializedReviewFindings();
+    SpecializedReviewFindings.Concern concern = new SpecializedReviewFindings.Concern();
+    concern.setType(type);
+    concern.setDescription(description);
+    concern.setReasoning("Reasoning");
+    concern.setPreexisting(false);
+    SpecializedReviewFindings.Location location = new SpecializedReviewFindings.Location();
+    location.setFilename("src/Test.java");
+    location.setLineNumber(42);
+    location.setCodeSnippet("return value;");
+    concern.setLocations(List.of(location));
+    findings.setConcerns(List.of(concern));
+    findings.setDismissedConcerns(List.of());
+    return findings;
   }
 
   private static class TestableTriagePrompt extends AiPromptSpecializedReviewTriage {

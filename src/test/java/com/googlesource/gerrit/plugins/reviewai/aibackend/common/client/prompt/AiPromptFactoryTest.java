@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
@@ -99,6 +100,25 @@ public class AiPromptFactoryTest {
             mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptSuggest);
+  }
+
+  @Test
+  public void specializedCommitMessageReviewUsesSpecializedPrompt() {
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setSpecializedAgentReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
+    Configuration config = mock(Configuration.class);
+    when(config.getMultiAgentMode()).thenReturn(true);
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
+
+    assertTrue(prompt instanceof AiPromptSpecializedReviewAgent);
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("`concerns`: array of candidate issues"));
+    assertFalse(instructions.contains("The answer object includes"));
   }
 
   @Test

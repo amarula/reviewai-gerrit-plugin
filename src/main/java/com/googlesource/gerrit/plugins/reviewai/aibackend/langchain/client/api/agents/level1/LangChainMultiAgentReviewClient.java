@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistoryMessageFilter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -45,7 +46,6 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
-import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import dev.langchain4j.data.message.AiMessage;
@@ -77,6 +77,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
   private final GerritClient gerritClient;
   private final Localizer localizer;
   private final GerritAiReviewHistoryCollector aiReviewHistoryCollector;
+  private final AiHistoryMessageFilter aiHistoryMessageFilter;
   private final ReviewAgentConversationStore conversationStore;
 
   @Inject
@@ -168,6 +169,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     this.gerritClient = gerritClient;
     this.localizer = localizer;
     this.aiReviewHistoryCollector = new GerritAiReviewHistoryCollector();
+    this.aiHistoryMessageFilter = new AiHistoryMessageFilter();
     this.conversationStore = conversationStore;
     log.debug("Initialized LangChainMultiAgentReviewClient.");
   }
@@ -423,8 +425,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
           .collect(config, localizer, changeSetData.getAiAccountId(), gerritClientData)
           .getEntries()
           .stream()
-          .filter(entry -> Settings.OPENAI_ROLE_ASSISTANT.equals(entry.getRole()))
-          .filter(entry -> !entry.isSystemMessage())
+          .filter(aiHistoryMessageFilter::shouldIncludeReviewComment)
           .map(AiReviewHistoryInfo.Entry::getMessage)
           .map(String::trim)
           .filter(message -> !message.isBlank())

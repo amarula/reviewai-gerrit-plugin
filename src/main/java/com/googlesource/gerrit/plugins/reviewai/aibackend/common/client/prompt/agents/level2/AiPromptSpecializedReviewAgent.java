@@ -122,14 +122,18 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
   }
 
   private String getSpecializedReplyFieldDefinitions(boolean includeInlineLocationFields) {
-    updateScoreDescription();
-    List<String> attributes = new ArrayList<>(List.of(ATTRIBUTE_REPLY, ATTRIBUTE_SCORE));
-    if (includeInlineLocationFields) {
-      attributes.add(ATTRIBUTE_FILENAME);
-      attributes.add(ATTRIBUTE_LINE_NUMBER);
-      attributes.add(ATTRIBUTE_CODE_SNIPPET);
-    }
-    return buildFieldSpecifications(attributes);
+    String locations =
+        includeInlineLocationFields
+            ? "`locations`: array of precise objects with `filename`, `lineNumber`, and `codeSnippet`; "
+            : "`locations`: empty array for commit-message concerns; ";
+    return "`concerns`: array of candidate issues that may deserve a final review comment; "
+        + "`dismissed_concerns`: array of investigated candidate issues that do not apply; "
+        + "`type`: concise category such as Correctness, Testability, Code Quality, Documentation, Security, or Commit Message; "
+        + "`description`: precise statement of the candidate issue; "
+        + "`reasoning`: evidence, triggering condition, and why the issue matters; "
+        + "`preexisting`: true only when the concern existed before this patch; "
+        + locations
+        + "Specialized agents must not write final Gerrit comments and must not include `reply`, `score`, `relevance`, `duplicated`, `repeated`, `conflicting`, or `source_agent` fields.";
   }
 
   @Override

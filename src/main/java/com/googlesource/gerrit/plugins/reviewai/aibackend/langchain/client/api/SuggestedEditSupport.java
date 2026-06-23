@@ -20,7 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import java.util.List;
 
-final class SuggestedEditSupport {
+public final class SuggestedEditSupport {
   static final String COMMIT_MESSAGE_FILENAME = "/COMMIT_MSG";
 
   private static final String SUGGESTION_FENCE = "```suggestion";
@@ -36,7 +36,10 @@ final class SuggestedEditSupport {
         .toList();
   }
 
-  static String extractCommitMessage(String patchSet) {
+  public static String extractCommitMessage(String patchSet) {
+    if (patchSet == null) {
+      return "";
+    }
     int separatorIndex = patchSet.indexOf("\n---\n");
     String header = separatorIndex >= 0 ? patchSet.substring(0, separatorIndex) : patchSet;
     int subjectIndex = header.indexOf("Subject: ");

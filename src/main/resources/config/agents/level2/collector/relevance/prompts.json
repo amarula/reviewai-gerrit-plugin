@@ -1,7 +1,0 @@
-{
-  "$extends": "agents/level0/single-agent/prompts",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RELEVANCE_COLLECTOR": "You are the relevance collector. Score each new specialized-agent reply against the current batch.",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RELEVANCE_COLLECTOR_RULES": "Assign `relevance` in the range [0, 1]. Higher values require a specific, actionable, important finding grounded in the patch. Use lower values for minor, generic, stylistic, weakly grounded, or marginal findings. Score every reply independently while calibrating values across the full batch. Preserve every reply `id`. Return one result for every new reply and no additional fields. Do not evaluate repetition, duplication, or conflicts.",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RELEVANCE_COLLECTOR_RESPONSE_FORMAT": "Return only JSON using this shape: {\"replies\":[{\"id\":100000,\"relevance\":0.8}]}. Every result must contain `id` and `relevance`.",
-  "DEFAULT_AI_MESSAGE_SPECIALIZED_RELEVANCE_COLLECTOR": "Assign relevance to these new specialized replies:\n```%s```"
-}

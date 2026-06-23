@@ -312,10 +312,14 @@ directive = End each reply with \"Hope this helps!\"
     * `SCOPED_AGENTS`: Splits the review between dedicated Patch Set and Commit-Message agents. This is equivalent to
       `multiAgentMode=true`.
     * `SPECIALIZED_AGENTS`: Uses dedicated Patch Set review agents for correctness, testability, code quality,
-      documentation, and security.
+      documentation, and security, based on prompts and workflow patterns imported from the Sashiko project
+      (https://github.com/sashiko-dev/sashiko).
 
-  **NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
-  costs.
+      When SPECIALIZED_AGENTS is selected, the Sashiko prompts override custom prompts, including those set through
+      `aiRelevanceRules`, `aiSystemPromptInstructions`, `ai-instructions.md`, and prompts imported from Gerrit.
+
+**NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
+costs.
 
 ### Optional Parameters Specific to OpenAI Provider
 
