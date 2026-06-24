@@ -36,7 +36,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 public class LangChainSuggestClient {
-  private final LangChainClient client;
+  protected final LangChainClient client;
 
   public LangChainSuggestClient(LangChainClient client) {
     this.client = client;
@@ -44,8 +44,9 @@ public class LangChainSuggestClient {
 
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
-    if (client.hasExistingReviewContext(LangChainSuggestData.review(changeSetData))) {
-      return new LangChainDirectSuggestClient(client).ask(changeSetData, change, patchSet);
+    ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
+    if (hasExistingReviewContext(reviewData, changeSetData, change)) {
+      return askExistingReviewContext(changeSetData, change, patchSet);
     }
     List<AiReplyItem> negativeReplies = askReview(changeSetData, change, patchSet);
     List<AiReplyItem> suggestions =
@@ -55,6 +56,22 @@ public class LangChainSuggestClient {
     AiResponseContent response = new AiResponseContent("");
     response.setReplies(suggestions);
     return response;
+  }
+
+  protected boolean hasExistingReviewContext(
+      ChangeSetData reviewData, ChangeSetData changeSetData, GerritChange change) {
+    return client.hasExistingReviewContext(reviewData);
+  }
+
+  protected AiResponseContent askExistingReviewContext(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    return askExistingReviewContext(client, changeSetData, change, patchSet);
+  }
+
+  protected AiResponseContent askExistingReviewContext(
+      LangChainClient directClient, ChangeSetData changeSetData, GerritChange change, String patchSet)
+      throws Exception {
+    return new LangChainDirectSuggestClient(directClient).ask(changeSetData, change, patchSet);
   }
 
   private List<AiReplyItem> askReview(

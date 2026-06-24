@@ -134,14 +134,26 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
   @Override
   protected LangChainSuggestClient getSuggestClient() {
-    return new LangChainSuggestClient(
+    LangChainClient reviewClient =
         new LangChainClient(
             config,
             codeContextPolicy,
             gerritClient,
             localizer,
             pluginDataHandlerProvider,
-            chatMemoryStore));
+            chatMemoryStore);
+    LangChainClient suggestContextClient =
+        new SpecializedSuggestLangChainClient(
+            config,
+            codeContextPolicy,
+            gerritClient,
+            localizer,
+            pluginDataHandlerProvider,
+            chatMemoryStore);
+    return new LangChainSpecializedSuggestClient(
+        reviewClient,
+        suggestContextClient,
+        new SpecializedSuggestReviewContext(config));
   }
 
   @Override

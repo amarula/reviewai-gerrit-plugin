@@ -20,6 +20,7 @@ import com.openai.client.OpenAIClient;
 import com.openai.core.http.HttpResponseFor;
 import com.openai.models.conversations.Conversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.model.OpenAiResponse;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -36,6 +37,7 @@ public class OpenAiConversation {
   public static final String KEY_CONVERSATION_ID = "conversationId";
   private static final String SPECIALIZED_AGENT_CONVERSATION_KEY_PREFIX =
       KEY_CONVERSATION_ID + ".review_specialized_agent.";
+  private static final String SUGGEST_CONVERSATION_KEY_PREFIX = KEY_CONVERSATION_ID + ".suggest";
 
   private final Configuration config;
   private final PluginDataHandler changeDataHandler;
@@ -64,6 +66,12 @@ public class OpenAiConversation {
     String normalizedAgentName =
         agentName == null ? "" : agentName.trim().toLowerCase(Locale.ROOT).replace(' ', '_');
     return SPECIALIZED_AGENT_CONVERSATION_KEY_PREFIX + normalizedAgentName;
+  }
+
+  public static String getSuggestConversationKey(ReviewScope reviewScope) {
+    String scope =
+        reviewScope == null ? "full" : reviewScope.name().toLowerCase(Locale.ROOT);
+    return SUGGEST_CONVERSATION_KEY_PREFIX + "." + scope;
   }
 
   public String resolveConversationId() throws AiConnectionFailException {
@@ -122,6 +130,9 @@ public class OpenAiConversation {
     }
     changeDataHandler.getAllValues().keySet().stream()
         .filter(key -> key.startsWith(SPECIALIZED_AGENT_CONVERSATION_KEY_PREFIX))
+        .forEach(changeDataHandler::removeValue);
+    changeDataHandler.getAllValues().keySet().stream()
+        .filter(key -> key.startsWith(SUGGEST_CONVERSATION_KEY_PREFIX))
         .forEach(changeDataHandler::removeValue);
   }
 }
