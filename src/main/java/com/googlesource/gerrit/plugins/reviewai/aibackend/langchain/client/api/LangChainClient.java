@@ -31,7 +31,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -129,6 +128,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected record ConversationResolution(String conversationId, boolean existingConversation) {}
+
+  protected ConversationResolution conversationResolution(
+      String conversationId, boolean existingConversation) {
+    return new ConversationResolution(conversationId, existingConversation);
+  }
 
   @Inject
   public LangChainClient(

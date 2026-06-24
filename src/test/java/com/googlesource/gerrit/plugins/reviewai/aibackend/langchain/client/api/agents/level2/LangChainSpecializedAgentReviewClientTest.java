@@ -27,7 +27,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
@@ -39,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,6 +55,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/specializedTriageWrappedResponse.json";
   private static final String SELECTED_PATCHSET_CONTEXT_RESOURCE =
       "__files/langchain/specializedSelectedPatchsetContext.txt";
+  private static final String SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE =
+      "__files/langchain/suggestPreviousReviewContextAfterForget.json";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -105,6 +107,33 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(client.suggestClientCalled);
     assertFalse(client.triageCalled);
     assertEquals("suggestion", response.getReplies().getFirst().getReply());
+  }
+
+  @Test
+  public void openAiNonZdrSuggestUsesPreviousReviewContextAfterForgetThread() throws Exception {
+    Configuration config = config();
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.getAiProviderZdr()).thenReturn(false);
+    SpecializedSuggestReviewContext suggestContext = new SpecializedSuggestReviewContext(config);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setAiDataPrompt(readTestResource(SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE));
+
+    assertTrue(suggestContext.shouldUsePreviousReviewsAsSuggestContext(changeSetData));
+    String context = suggestContext.appendPreviousReviewsContext(changeSetData, "patch");
+    assertTrue(context.contains("New review reply"));
+    assertFalse(context.contains("Old review reply"));
+  }
+
+  @Test
+  public void openAiZdrSuggestDoesNotUsePreviousReviewContext() throws Exception {
+    Configuration config = config();
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    SpecializedSuggestReviewContext suggestContext = new SpecializedSuggestReviewContext(config);
+    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    changeSetData.setAiDataPrompt(readTestResource(SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE));
+
+    assertFalse(suggestContext.shouldUsePreviousReviewsAsSuggestContext(changeSetData));
   }
 
   @Test
@@ -328,6 +357,10 @@ public class LangChainSpecializedAgentReviewClientTest {
     Configuration config = mock(Configuration.class);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getAiReviewPatchSet()).thenReturn(true);
+    when(config.getGerritUserName()).thenReturn("reviewai");
+    when(config.getGerritUserEmail()).thenReturn("");
+    when(config.getIgnoreResolvedAiComments()).thenReturn(false);
+    when(config.getIgnoreOutdatedInlineComments()).thenReturn(false);
     return config;
   }
 

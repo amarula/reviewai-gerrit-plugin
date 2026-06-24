@@ -1,0 +1,16 @@
+[
+  {
+    "request": "Can you suggest fixes for the remaining review replies?",
+    "id": 0,
+    "history": [
+      {
+        "role": "user",
+        "content": "Please review the current patch set."
+      },
+      {
+        "role": "assistant",
+        "content": "New review reply"
+      }
+    ]
+  }
+]

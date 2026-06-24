@@ -16,8 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages;
 
+import com.google.gson.JsonSyntaxException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -34,6 +36,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 public final class LangChainChatMessages {
   private LangChainChatMessages() {}
@@ -53,6 +57,29 @@ public final class LangChainChatMessages {
   public static List<ChatMessage> fromRequestMessages(List<AiRequestMessage> source) {
     List<ChatMessage> messages = new ArrayList<>();
     appendMessages(messages, source);
+    return messages;
+  }
+
+  public static List<ChatMessage> fromRequestData(String requestData) throws JsonSyntaxException {
+    if (requestData == null || requestData.isBlank()) {
+      return List.of();
+    }
+
+    AiMessageItem[] messageItems = getGson().fromJson(requestData, AiMessageItem[].class);
+    if (messageItems == null) {
+      return List.of();
+    }
+    List<ChatMessage> messages = new ArrayList<>();
+    for (AiMessageItem messageItem : messageItems) {
+      if (messageItem == null) {
+        continue;
+      }
+      messages.addAll(fromRequestMessages(messageItem.getHistory()));
+      String request = messageItem.getRequest();
+      if (request != null && !request.isBlank()) {
+        messages.add(userMessage(request));
+      }
+    }
     return messages;
   }
 

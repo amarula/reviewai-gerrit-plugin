@@ -26,7 +26,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistoryMessageFilter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -63,8 +62,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 @Singleton
@@ -346,27 +343,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
 
   @VisibleForTesting
   protected List<ChatMessage> buildRoutingHistoryMessages(String requestData) {
-    if (requestData == null || requestData.isBlank()) {
-      return List.of();
-    }
-
     try {
-      AiMessageItem[] messageItems = getGson().fromJson(requestData, AiMessageItem[].class);
-      if (messageItems == null) {
-        return List.of();
-      }
-      List<ChatMessage> messages = new ArrayList<>();
-      for (AiMessageItem messageItem : messageItems) {
-        if (messageItem == null) {
-          continue;
-        }
-        messages.addAll(LangChainChatMessages.fromRequestMessages(messageItem.getHistory()));
-        String request = messageItem.getRequest();
-        if (request != null && !request.isBlank()) {
-          messages.add(LangChainChatMessages.userMessage(request));
-        }
-      }
-      return messages;
+      return LangChainChatMessages.fromRequestData(requestData);
     } catch (JsonSyntaxException e) {
       log.debug("Unable to parse router request data as message history", e);
       return List.of();
