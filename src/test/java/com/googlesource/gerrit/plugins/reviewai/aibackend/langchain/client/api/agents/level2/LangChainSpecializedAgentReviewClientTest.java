@@ -53,8 +53,6 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/specializedTriageResponse.json";
   private static final String WRAPPED_TRIAGE_RESPONSE_RESOURCE =
       "__files/langchain/specializedTriageWrappedResponse.json";
-  private static final String SELECTED_PATCHSET_CONTEXT_RESOURCE =
-      "__files/langchain/specializedSelectedPatchsetContext.txt";
   private static final String SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE =
       "__files/langchain/suggestPreviousReviewContextAfterForget.json";
 
@@ -191,24 +189,22 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(instructions.contains("# Available Specialized Agents"));
     assertTrue(instructions.contains("CORRECTNESS: Checks"));
     assertTrue(instructions.contains("SECURITY: Checks"));
-    assertTrue(instructions.contains("copy only relevant complete original hunks"));
-    assertTrue(instructions.contains("write each filepath once"));
-    assertTrue(instructions.contains("omit `diff --git`, `index`, `---`, and `+++`"));
-    assertTrue(instructions.contains("never use prose summaries"));
-    assertTrue(instructions.contains("For the `COMMIT_MESSAGE` agent only"));
+    assertTrue(instructions.contains("Select which specialized review agents"));
+    assertTrue(instructions.contains("Do not split, summarize, copy, rewrite"));
+    assertFalse(instructions.contains("patchset_context"));
   }
 
   @Test
-  public void specializedPatchsetAgentPromptReviewsPatchsetSelection() {
+  public void specializedPatchsetAgentPromptReviewsFullPatchset() {
     ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
     changeSetData.setSpecializedAgentName("TESTABILITY");
     AiPromptSpecializedReviewAgent prompt =
         new AiPromptSpecializedReviewAgent(config(), changeSetData, change(false), null);
 
-    String userMessage = prompt.getDefaultAiThreadReviewMessage("selected context");
+    String userMessage = prompt.getDefaultAiThreadReviewMessage("full patchset");
 
-    assertTrue(userMessage.startsWith("Analyze the following patchset selection"));
+    assertTrue(userMessage.startsWith("Analyze the following full patchset"));
     assertFalse(userMessage.startsWith("Review the following Commit Message:"));
   }
 
@@ -259,39 +255,39 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void specializedInputIncludesTriageSelectedOriginalHunks() throws Exception {
+  public void specializedInputIncludesWholePatchset() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     SpecializedReviewTriage.AgentPlan plan = plan("TESTABILITY", true);
-    plan.setPatchsetContext(readTestResource(SELECTED_PATCHSET_CONTEXT_RESOURCE));
 
     String specializedInput =
         client.buildSpecializedInput(readTestResource(PATCH_SET_RESOURCE), plan);
 
     assertFalse(specializedInput.contains("# Triage decision"));
-    assertTrue(specializedInput.contains("# Selected patchset hunks"));
+    assertTrue(specializedInput.contains("# Patchset"));
+    assertTrue(specializedInput.contains("Subject: Fix parsing"));
     assertTrue(specializedInput.contains("a.py\n"));
     assertTrue(specializedInput.contains("@@ -1,3 +1,3 @@"));
     assertTrue(specializedInput.contains("-    return value.strip()"));
     assertTrue(specializedInput.contains("+    return value.strip().lower()"));
-    assertFalse(specializedInput.contains("diff --git"));
-    assertFalse(specializedInput.contains("index 1111111..2222222"));
-    assertFalse(specializedInput.contains("--- a/a.py"));
-    assertFalse(specializedInput.contains("+++ b/a.py"));
+    assertTrue(specializedInput.contains("diff --git"));
+    assertTrue(specializedInput.contains("index 1111111..2222222"));
+    assertTrue(specializedInput.contains("--- a/a.py"));
+    assertTrue(specializedInput.contains("+++ b/a.py"));
   }
 
   @Test
-  public void commitMessageSpecialistReceivesTriagePatchsetSummary() throws Exception {
+  public void commitMessageSpecialistReceivesWholePatchset() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     SpecializedReviewTriage.AgentPlan plan = plan("COMMIT_MESSAGE", true);
-    plan.setPatchsetContext("Changes parsing to normalize values to lowercase.");
 
     String specializedInput =
         client.buildSpecializedInput(readTestResource(PATCH_SET_RESOURCE), plan);
 
-    assertTrue(specializedInput.contains("# Patchset summary"));
-    assertTrue(specializedInput.contains("Changes parsing to normalize values to lowercase."));
+    assertTrue(specializedInput.contains("# Patchset"));
+    assertTrue(specializedInput.contains("Subject: Fix parsing"));
+    assertTrue(specializedInput.contains("diff --git"));
+    assertFalse(specializedInput.contains("# Patchset summary"));
     assertFalse(specializedInput.contains("# Selected patchset hunks"));
-    assertFalse(specializedInput.contains("diff --git"));
   }
 
   @Test
@@ -340,7 +336,6 @@ public class LangChainSpecializedAgentReviewClientTest {
     plan.setAgent(agent);
     plan.setEnabled(enabled);
     plan.setReason(agent + " reason");
-    plan.setPatchsetContext(agent + " patchset context");
     plan.setHistoryContext(agent + " history context");
     plan.setCustomInstructions(agent + " custom instructions");
     return plan;
