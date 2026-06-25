@@ -19,9 +19,6 @@
             "reason": {
               "type": "string"
             },
-            "patchset_context": {
-              "type": "string"
-            },
             "history_context": {
               "type": "string"
             },
@@ -33,7 +30,6 @@
             "agent",
             "enabled",
             "reason",
-            "patchset_context",
             "history_context",
             "custom_instructions"
           ]

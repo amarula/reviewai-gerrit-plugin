@@ -29,8 +29,6 @@ class SpecializedReviewTriage {
     private String agent;
     private boolean enabled;
     private String reason;
-    @SerializedName("patchset_context")
-    private String patchsetContext;
     @SerializedName("history_context")
     private String historyContext;
     @SerializedName("custom_instructions")

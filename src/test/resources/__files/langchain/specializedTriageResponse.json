@@ -4,7 +4,6 @@
       "agent": "CORRECTNESS",
       "enabled": true,
       "reason": "The patch changes runtime logic.",
-      "patchset_context": "selected correctness hunks",
       "history_context": "relevant correctness history",
       "custom_instructions": "correctness instructions"
     },
@@ -12,7 +11,6 @@
       "agent": "SECURITY",
       "enabled": false,
       "reason": "No security-sensitive paths changed.",
-      "patchset_context": "",
       "history_context": "",
       "custom_instructions": ""
     }
