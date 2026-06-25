@@ -31,7 +31,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.SuggestedEditSupport;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
@@ -504,11 +503,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   String buildSpecializedInput(
       String patchSet, SpecializedReviewTriage.AgentPlan plan) {
     List<String> sections = new ArrayList<>();
-    sections.add("# Commit message\n" + SuggestedEditSupport.extractCommitMessage(patchSet));
-    AiPromptSections.addSection(
-        sections,
-        isCommitMessageAgent(plan.getAgent()) ? "Patchset summary" : "Selected patchset hunks",
-        plan.getPatchsetContext());
+    sections.add("# Patchset\n" + patchSet);
     AiPromptSections.addSection(
         sections, "Filtered history context", plan.getHistoryContext());
     return String.join("\n\n", sections);

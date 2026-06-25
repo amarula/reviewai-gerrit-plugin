@@ -188,7 +188,7 @@ public class LangChainClientTest {
     assertTrue(agentItemSchema.properties().containsKey("agent"));
     assertTrue(agentItemSchema.properties().containsKey("enabled"));
     assertTrue(agentItemSchema.properties().containsKey("reason"));
-    assertTrue(agentItemSchema.properties().containsKey("patchset_context"));
+    assertFalse(agentItemSchema.properties().containsKey("patchset_context"));
     assertTrue(agentItemSchema.properties().containsKey("history_context"));
     assertTrue(agentItemSchema.properties().containsKey("custom_instructions"));
   }
