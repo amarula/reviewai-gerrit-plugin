@@ -230,6 +230,10 @@ public class Configuration extends ConfigCore {
         responseText, getAiModels(), getAiModelsDefault());
   }
 
+  public boolean isSelectedMockAiModelRoute() {
+    return mockAiConfiguration.isSelectedMockAiModelRoute(getSelectedAiModelRoute());
+  }
+
   public <T> T withAiModelRoute(AiModelRoute route, Callable<T> callable) throws Exception {
     AiModelRoute previousRoute = aiModelRouteOverride.get();
     aiModelRouteOverride.set(route);

@@ -256,6 +256,38 @@ public class SpecializedReviewCollectorsTest {
     assertEquals(List.of(currentRawId), fallback.getConcerns().getFirst().getMergedConcernIds());
   }
 
+  @Test
+  public void staleHistoricalRepetitionIdsFallBackToCurrentRawConcerns() {
+    SpecializedReviewFindings.HistoricalRepetitionResult result =
+        SpecializedReviewPayloads.currentRunHistoricalRepetitionOrFallback(
+            historicalRepetitionResult(annotation("raw-old-r1", true, "p10", "Same.")),
+            Set.of("raw-current-r1"));
+
+    SpecializedReviewFindings.HistoricalRepetitionAnnotation annotation =
+        result.getAnnotations().getFirst();
+    assertEquals(
+        List.of("raw-current-r1"),
+        result.getAnnotations().stream()
+            .map(SpecializedReviewFindings.HistoricalRepetitionAnnotation::getConcernId)
+            .toList());
+    assertFalse(annotation.isRepeated());
+    assertEquals("", annotation.getPastCommentId());
+    assertEquals("", annotation.getReason());
+  }
+
+  @Test
+  public void staleHistoricalRepetitionIdsFailStrictValidation() {
+    IllegalStateException thrown =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                SpecializedReviewPayloads.validateHistoricalRepetitionResult(
+                    historicalRepetitionResult(annotation("raw-old-r1", true, "p10", "Same.")),
+                    Set.of("raw-current-r1")));
+
+    assertEquals("Invalid historical repetition concern ID", thrown.getMessage());
+  }
+
   private static String collectorInstructions(ReviewAssistantStage stage) {
     ChangeSetData data = new ChangeSetData(1, -1, 1);
     data.setReviewAssistantStage(stage);
