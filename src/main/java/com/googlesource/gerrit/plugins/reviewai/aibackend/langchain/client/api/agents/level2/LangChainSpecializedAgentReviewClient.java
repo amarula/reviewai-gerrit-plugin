@@ -325,6 +325,10 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     }
     SpecializedReviewFindings.HistoricalRepetitionResult repetitionResult =
         parseHistoricalRepetitionResponse(result.getResponseText());
+    if (config != null && config.isSelectedMockAiModelRoute()) {
+      return SpecializedReviewPayloads.currentRunHistoricalRepetitionOrFallback(
+          repetitionResult, expectedConcernIds);
+    }
     SpecializedReviewPayloads.validateHistoricalRepetitionResult(
         repetitionResult, expectedConcernIds);
     return repetitionResult;
