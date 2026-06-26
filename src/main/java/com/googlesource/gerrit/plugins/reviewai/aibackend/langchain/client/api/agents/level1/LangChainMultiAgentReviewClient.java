@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.AiModelRequestLimiter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -297,7 +298,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     logRoutingAgentPrompt(routerMemoryId, routerInstructions, routerUserPrompt, memory.messages());
 
     try {
-      ChatResponse response = model.chat(memory.messages());
+      ChatResponse response = AiModelRequestLimiter.chat(config, model, memory.messages());
       AiMessage aiMessage = response == null ? null : response.aiMessage();
       if (aiMessage != null) {
         memory.add(aiMessage);
