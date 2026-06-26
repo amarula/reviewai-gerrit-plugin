@@ -57,7 +57,7 @@ class LangChainExecutor {
     ChatRequest initialRequest = buildChatRequest(memory.messages(), getInitialToolChoice());
     log.debug("Sending initial LangChain chat request: {}",
         LogArg.truncated(initialRequest));
-    ChatResponse response = model.chat(initialRequest);
+    ChatResponse response = AiModelRequestLimiter.chat(config, model, initialRequest);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
     logAiMessageToolRequests("initial", aiMessage);
     int maxToolResponseRounds = config.getAiMaxToolResponseRounds();
@@ -89,7 +89,9 @@ class LangChainExecutor {
           "Sending LangChain continuation request after tool round {} with {} memory messages",
           iteration,
           memory.messages().size());
-      response = model.chat(buildChatRequest(memory.messages(), ToolChoice.AUTO));
+      response =
+          AiModelRequestLimiter.chat(
+              config, model, buildChatRequest(memory.messages(), ToolChoice.AUTO));
       aiMessage = response != null ? response.aiMessage() : null;
       logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);
     }
