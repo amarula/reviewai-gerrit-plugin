@@ -45,7 +45,7 @@ public class AiPromptFactoryTest {
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
             mock(Configuration.class),
-            new ChangeSetData(1, -1, 1),
+            new ChangeSetData(1),
             commentEventChange(),
             mock(ICodeContextPolicy.class));
 
@@ -54,7 +54,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void routedCommentEventUsesStageAwareRequestPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
 
@@ -70,7 +70,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void routedReviewAgentInstructionsAreLoadedIntoReviewPromptFields() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     new AiPromptRoutedReviewAgentRequest(
         mock(Configuration.class),
@@ -88,7 +88,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void suggestModeUsesSuggestPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setSuggestMode(true);
 
@@ -104,7 +104,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void specializedCommitMessageReviewUsesSpecializedPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setSpecializedAgentReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
@@ -123,7 +123,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void suggestPromptsAreLoadedFromResources() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setSuggestMode(true);
     AiPromptSuggest prompt =
@@ -150,7 +150,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void suggestPatchsetScopeUsesOnlyPatchsetTaskPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
@@ -174,7 +174,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void suggestCommitMessageScopeUsesOnlyCommitMessageTaskPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
@@ -198,7 +198,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void suggestMultiAgentUsesReviewStageTaskPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
@@ -222,7 +222,7 @@ public class AiPromptFactoryTest {
 
   @Test
   public void routedReviewAgentInstructionsReplaceDefaultSystemPrompt() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
     changeSetData.setCommentPropertiesSize(1);
     Configuration config = mock(Configuration.class);
@@ -242,7 +242,7 @@ public class AiPromptFactoryTest {
   public void patchsetAgentPromptsAreLoadedFromResource() {
     new AiPromptReviewCode(
         mock(Configuration.class),
-        new ChangeSetData(1, -1, 1),
+        new ChangeSetData(1),
         patchSetEventChange(),
         mock(ICodeContextPolicy.class));
     Map<String, Object> prompts =

@@ -35,25 +35,19 @@ public class ChangeSetDataHandler {
       ChangeSetData changeSetData,
       Localizer localizer) {
     GerritClientData gerritClientData = gerritClient.getClientData(change);
+    if (config.isVotingEnabled() && !change.getIsCommentEvent()) {
+      GerritPermittedVotingRange permittedVotingRange =
+          gerritClient.getPermittedVotingRange(change);
+      if (permittedVotingRange != null) {
+        log.debug("Permitted AI voting range set to {}", permittedVotingRange);
+        changeSetData.setPermittedVotingRange(permittedVotingRange);
+      }
+    }
     AiDataPrompt aiDataPrompt =
         new AiDataPrompt(config, changeSetData, change, gerritClientData, localizer);
 
     changeSetData.setCommentPropertiesSize(gerritClientData.getCommentProperties().size());
     changeSetData.setAiDataPrompt(aiDataPrompt.buildPrompt());
-    if (config.isVotingEnabled() && !change.getIsCommentEvent()) {
-      GerritPermittedVotingRange permittedVotingRange =
-          gerritClient.getPermittedVotingRange(change);
-      if (permittedVotingRange != null) {
-        if (permittedVotingRange.getMin() > config.getVotingMinScore()) {
-          log.debug("Minimum AI voting score set to {}", permittedVotingRange.getMin());
-          changeSetData.setVotingMinScore(permittedVotingRange.getMin());
-        }
-        if (permittedVotingRange.getMax() < config.getVotingMaxScore()) {
-          log.debug("Maximum AI voting score set to {}", permittedVotingRange.getMax());
-          changeSetData.setVotingMaxScore(permittedVotingRange.getMax());
-        }
-      }
-    }
     log.debug("ChangeSetData updated: {}", changeSetData);
   }
 }

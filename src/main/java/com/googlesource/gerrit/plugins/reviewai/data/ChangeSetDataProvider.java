@@ -46,11 +46,7 @@ public class ChangeSetDataProvider implements Provider<ChangeSetData> {
 
   @Override
   public ChangeSetData get() {
-    log.debug(
-        "Providing ChangeSetData with accountId: {}, minScore: {}, maxScore: {}",
-        aiAccountId,
-        config.getVotingMinScore(),
-        config.getVotingMaxScore());
-    return new ChangeSetData(aiAccountId, config.getVotingMinScore(), config.getVotingMaxScore());
+    log.debug("Providing ChangeSetData with accountId: {}", aiAccountId);
+    return new ChangeSetData(aiAccountId);
   }
 }

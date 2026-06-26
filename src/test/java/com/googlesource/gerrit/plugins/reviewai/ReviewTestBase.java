@@ -357,9 +357,7 @@ public class ReviewTestBase extends TestBase {
   }
 
   protected void initTest() {
-    changeSetData =
-        new ChangeSetData(
-            AI_USER_ACCOUNT_ID, config.getVotingMinScore(), config.getVotingMaxScore());
+    changeSetData = new ChangeSetData(AI_USER_ACCOUNT_ID);
     when(changeSetDataProvider.get()).thenReturn(changeSetData);
 
     localizer = new Localizer(config);

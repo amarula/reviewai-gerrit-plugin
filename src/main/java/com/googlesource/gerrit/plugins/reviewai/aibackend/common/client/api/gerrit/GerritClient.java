@@ -48,10 +48,6 @@ public class GerritClient {
     return gerritClientFacade.isDisabledUser(authorUsername);
   }
 
-  public boolean isDisabledTopic(String topic) {
-    return gerritClientFacade.isDisabledTopic(topic);
-  }
-
   public boolean isWorkInProgress(GerritChange change) {
     return gerritClientFacade.isWorkInProgress(change);
   }

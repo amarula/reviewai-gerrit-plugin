@@ -46,7 +46,7 @@ public class ClientCommandExecutorTest {
 
   @Test
   public void forgetThreadClearsLangChainMemoryForCurrentChangeAndPatchSet() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
     when(changeDataHandler.getValue("conversationId")).thenReturn("conv-1");
     when(change.getFullChangeId()).thenReturn("change~1");
