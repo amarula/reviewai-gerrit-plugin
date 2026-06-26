@@ -70,6 +70,18 @@ public class JsonUtils extends TextUtils {
         || JSON_DELIMITED.matcher(normalizedText).matches();
   }
 
+  public static JsonObject parseJsonObjectFromText(String text) {
+    String jsonObjectText = extractJsonObjectText(text);
+    if (jsonObjectText == null) {
+      return null;
+    }
+    JsonElement jsonElement = parseJsonWithDeSlash(jsonObjectText);
+    if (jsonElement == null || !jsonElement.isJsonObject()) {
+      return null;
+    }
+    return jsonElement.getAsJsonObject();
+  }
+
   private static String normalizeJsonText(String text) {
     return text == null ? "" : text.strip();
   }
@@ -107,6 +119,11 @@ public class JsonUtils extends TextUtils {
       return null;
     }
     return element.getAsJsonPrimitive().getAsString();
+  }
+
+  public static String getNonBlankString(JsonObject object, String memberName) {
+    String value = getString(object, memberName);
+    return value == null || value.isBlank() ? null : value;
   }
 
   public static JsonObject getObject(JsonObject object, String memberName) {
@@ -174,6 +191,16 @@ public class JsonUtils extends TextUtils {
       log.debug("String is not a valid JSON: {}", str);
       return null;
     }
+  }
+
+  private static String extractJsonObjectText(String text) {
+    String normalizedText = normalizeJsonText(text);
+    int start = normalizedText.indexOf('{');
+    int end = normalizedText.lastIndexOf('}');
+    if (start < 0 || end <= start) {
+      return null;
+    }
+    return normalizedText.substring(start, end + 1);
   }
 
   private static String formatJsonObject(JsonObject jsonObject, String indent) {

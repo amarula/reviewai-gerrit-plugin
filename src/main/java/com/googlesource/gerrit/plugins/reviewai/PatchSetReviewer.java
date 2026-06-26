@@ -119,8 +119,8 @@ public class PatchSetReviewer {
           e.getMessage(),
           e);
       changeSetData.setReviewSystemMessage(
-          SystemMessageFormatter.getLocalizedErrorMessage(
-              localizer, "message.openai.connection.error"));
+          SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+              localizer, "message.openai.connection.error", e));
     }
     if (reviewReply != null) {
       retrieveReviewBatches(reviewReply, change);

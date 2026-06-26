@@ -16,7 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.localization;
 
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +32,7 @@ public final class SystemMessageFormatter {
   private static final String ERROR_MESSAGE_LABEL_KEY = "plugin.error.label";
   private static final String UNKNOWN_ENUM_CONFIG_WARNING_KEY =
       "message.config.unknown.enum.warning";
+  private static final String ERROR_REASON_LABEL_KEY = "message.error.reason";
 
   private SystemMessageFormatter() {}
 
@@ -40,6 +43,13 @@ public final class SystemMessageFormatter {
   public static String getLocalizedErrorMessage(
       Localizer localizer, String messageKey, Object... args) {
     return getPrefixedErrorMessage(localizer, getLocalizedMessage(localizer, messageKey, args));
+  }
+
+  public static String getLocalizedErrorMessageWithReason(
+      Localizer localizer, String messageKey, Throwable cause, Object... args) {
+    return getPrefixedErrorMessage(
+        localizer,
+        appendFailureReason(localizer, getLocalizedMessage(localizer, messageKey, args), cause));
   }
 
   public static String getLocalizedWarningMessage(
@@ -128,5 +138,43 @@ public final class SystemMessageFormatter {
       return message;
     }
     return String.format(message, args);
+  }
+
+  private static String appendFailureReason(Localizer localizer, String message, Throwable cause) {
+    String reason = getFailureReason(cause);
+    if (message == null || reason == null || reason.isEmpty()) {
+      return message;
+    }
+    return message + ".\n\n" + localizer.getText(ERROR_REASON_LABEL_KEY) + ": " + reason;
+  }
+
+  private static String getFailureReason(Throwable cause) {
+    Throwable reasonCause = getMostSpecificCause(cause);
+    if (reasonCause == null
+        || reasonCause.getMessage() == null
+        || reasonCause.getMessage().isBlank()) {
+      return null;
+    }
+    String rawReason = reasonCause.toString().replaceAll("\\s+", " ").trim();
+    return getJsonErrorMessage(rawReason).orElse(rawReason);
+  }
+
+  private static Throwable getMostSpecificCause(Throwable cause) {
+    Throwable reasonCause = cause;
+    while (reasonCause != null && reasonCause.getCause() != null) {
+      reasonCause = reasonCause.getCause();
+    }
+    return reasonCause;
+  }
+
+  private static Optional<String> getJsonErrorMessage(String reason) {
+    JsonObject root = JsonUtils.parseJsonObjectFromText(reason);
+    if (root == null) {
+      return Optional.empty();
+    }
+    JsonObject error = JsonUtils.getObject(root, "error");
+    return Optional.ofNullable(JsonUtils.getNonBlankString(error, "message"))
+        .or(() -> Optional.ofNullable(JsonUtils.getNonBlankString(root, "message")))
+        .or(() -> Optional.ofNullable(JsonUtils.getNonBlankString(root, "error_description")));
   }
 }

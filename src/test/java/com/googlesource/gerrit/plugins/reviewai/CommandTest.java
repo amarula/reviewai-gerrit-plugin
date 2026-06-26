@@ -420,7 +420,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
     Assert.assertEquals(
-        "ReviewAI **ERROR**: Unable to connect to AI server", status.responseText);
+        "ReviewAI **ERROR**: Unable to connect to AI server.\n\nReason: "
+            + "com.openai.errors.BadRequestException: 400: null",
+        status.responseText);
   }
 
   @Test
