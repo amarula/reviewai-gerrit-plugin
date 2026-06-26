@@ -189,9 +189,7 @@ class ReviewAgentResponseService {
     if (resource.getChange().currentPatchSetId() != null) {
       change.setPatchSetNumber(resource.getChange().currentPatchSetId().get());
     }
-    ChangeSetData changeSetData =
-        new ChangeSetData(
-            getAiAccountId(config), config.getVotingMinScore(), config.getVotingMaxScore());
+    ChangeSetData changeSetData = new ChangeSetData(getAiAccountId(config));
     Localizer localizer = new Localizer(config);
     PluginDataHandlerProvider pluginDataHandlerProvider =
         new PluginDataHandlerProvider(pluginDataPath, change, db);

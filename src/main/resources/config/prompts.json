@@ -12,7 +12,7 @@
   "DEFAULT_AI_REPLIES_ATTRIBUTES": {
     "reply": "contains the text of the insight",
     "id": "corresponds to the `id` value from the related request in the request JSON array",
-    "score": "represents a rating (a floating-point number from %d to %d, decimals allowed) attributed to the change being addressed in your reply, based on the reply content",
+    "score": "represents a rating (a floating-point number%s, decimals allowed) attributed to the change being addressed in your reply, based on the reply content",
     "filename": "is the exact path of the file where the issue appears, matching the patchset path",
     "lineNumber": "is the exact changed-line number where the issue should be attached",
     "codeSnippet": "is the smallest relevant code excerpt from the changed file that supports the reply",

@@ -134,7 +134,7 @@ public class LangChainClientTest {
   @Test
   public void usesSpecializedExecutorForSpecializedAgentRequests() throws Exception {
     LangChainClient client = new LangChainClient(null, null, null, null);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSpecializedAgentReview(true);
 
     assertSame(getSpecializedRepliesToolExecutor(client), getToolExecutor(client, changeSetData));
@@ -196,7 +196,7 @@ public class LangChainClientTest {
   @Test
   public void usesSpecializedTriageExecutorForTriageRequests() throws Exception {
     LangChainClient client = new LangChainClient(null, null, null, null);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE);
 
     assertSame(getSpecializedTriageToolExecutor(client), getToolExecutor(client, changeSetData));
@@ -304,7 +304,7 @@ public class LangChainClientTest {
         .thenReturn("conv_langchain_openai");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setReviewAssistantStage(null);
 
@@ -332,7 +332,7 @@ public class LangChainClientTest {
         resolveConversationId(
             new LangChainClient(config, null, null, null, pluginDataHandlerProvider),
             AiProviderType.OPENAI,
-            new ChangeSetData(1, -1, 1));
+            new ChangeSetData(1));
 
     assertEquals(null, conversationId);
     verify(changeDataHandler, never()).getValue(OpenAiConversation.KEY_CONVERSATION_ID);
@@ -345,7 +345,7 @@ public class LangChainClientTest {
         .thenReturn("conv_follow_up");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(null);
 
     String conversationId =
@@ -366,7 +366,7 @@ public class LangChainClientTest {
     when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_review_code");
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CODE);
 
@@ -389,7 +389,7 @@ public class LangChainClientTest {
       String conversationKey = OpenAiConversation.getSpecializedAgentConversationKey(agent);
       when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_" + agent);
 
-      ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+      ChangeSetData changeSetData = new ChangeSetData(1);
       changeSetData.setForcedReview(true);
       changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
       changeSetData.setSpecializedAgentName(agent);
@@ -407,7 +407,7 @@ public class LangChainClientTest {
 
   @Test
   public void omitsConversationForNonOpenAiLangChainProvider() throws Exception {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
 
     String conversationId =
         resolveConversationId(
@@ -466,7 +466,7 @@ public class LangChainClientTest {
 
   @Test
   public void omitsRequestContextOnlyForNormalCommentFollowUps() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     TestableLangChainClient client = new TestableLangChainClient();
@@ -479,7 +479,7 @@ public class LangChainClientTest {
 
   @Test
   public void forcedReviewKeepsPatchEvenWhenOpenAiConversationExists() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
@@ -493,7 +493,7 @@ public class LangChainClientTest {
 
   @Test
   public void openAiZdrKeepsPatchEvenWhenConversationExists() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     Configuration config = Mockito.mock(Configuration.class);
@@ -508,7 +508,7 @@ public class LangChainClientTest {
 
   @Test
   public void automaticReviewKeepsPatchEvenWhenOpenAiConversationExists() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(false);
     TestableLangChainClient client = new TestableLangChainClient();
@@ -567,7 +567,7 @@ public class LangChainClientTest {
   private void assertCollectorExecutor(
       LangChainClient client, ReviewAssistantStage stage, String executorFieldName)
       throws Exception {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(stage);
     Field field = LangChainClient.class.getDeclaredField(executorFieldName);
     field.setAccessible(true);

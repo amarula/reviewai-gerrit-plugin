@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -42,8 +43,7 @@ public class ChangeSetData {
   private String specializedAgentInstructions;
   private String specializedAgentCustomInstructions;
   private Boolean specializedAgentReview = false;
-  @NonNull private Integer votingMinScore;
-  @NonNull private Integer votingMaxScore;
+  private GerritPermittedVotingRange permittedVotingRange;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -108,7 +108,7 @@ public class ChangeSetData {
   }
 
   public ChangeSetData copy() {
-    ChangeSetData copy = new ChangeSetData(aiAccountId, votingMinScore, votingMaxScore);
+    ChangeSetData copy = new ChangeSetData(aiAccountId);
     copy.setAiDataPrompt(aiDataPrompt);
     copy.setCommentPropertiesSize(commentPropertiesSize);
     copy.setReviewAssistantStage(reviewAssistantStage);
@@ -120,6 +120,7 @@ public class ChangeSetData {
     copy.setSpecializedAgentInstructions(specializedAgentInstructions);
     copy.setSpecializedAgentCustomInstructions(specializedAgentCustomInstructions);
     copy.setSpecializedAgentReview(specializedAgentReview);
+    copy.setPermittedVotingRange(permittedVotingRange);
     copy.setForcedReview(forcedReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);

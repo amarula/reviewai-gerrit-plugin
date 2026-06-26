@@ -28,8 +28,6 @@ public interface IGerritClientPatchSet {
 
   boolean isDisabledUser(String authorUsername);
 
-  boolean isDisabledTopic(String topic);
-
   void retrieveRevisionBase(GerritChange change);
 
   HashMap<String, FileDiffProcessed> getFileDiffsProcessed();

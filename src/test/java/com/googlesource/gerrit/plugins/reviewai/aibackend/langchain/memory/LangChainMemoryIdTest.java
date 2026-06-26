@@ -27,7 +27,7 @@ public class LangChainMemoryIdTest {
 
   @Test
   public void commentEventsUseRequestsScope() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = new GerritChange("change~1");
     change.setIsCommentEvent(true);
 
@@ -38,7 +38,7 @@ public class LangChainMemoryIdTest {
 
   @Test
   public void routedCommentEventsUseReviewStageScope() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     GerritChange change = new GerritChange("change~1");
@@ -51,7 +51,7 @@ public class LangChainMemoryIdTest {
 
   @Test
   public void reviewEventsKeepReviewStageScope() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = new GerritChange("change~1");
 
     LangChainMemoryId memoryId = LangChainMemoryId.from(changeSetData, change);

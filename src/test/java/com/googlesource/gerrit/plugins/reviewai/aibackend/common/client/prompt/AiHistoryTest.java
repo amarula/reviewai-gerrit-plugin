@@ -55,7 +55,7 @@ public class AiHistoryTest {
     AiHistory aiHistory =
         new AiHistory(
             config(),
-            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
                 null,
                 List.of(),
@@ -83,7 +83,7 @@ public class AiHistoryTest {
     AiHistory aiHistory =
         new AiHistory(
             config(),
-            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
                 null,
                 List.of(),
@@ -108,7 +108,7 @@ public class AiHistoryTest {
     AiHistory aiHistory =
         new AiHistory(
             config(),
-            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
                 null,
                 List.of(),
@@ -137,7 +137,7 @@ public class AiHistoryTest {
     AiHistory aiHistory =
         new AiHistory(
             config(),
-            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
                 null,
                 List.of(),
@@ -167,7 +167,7 @@ public class AiHistoryTest {
     AiDataPromptRequests dataPrompt =
         new AiDataPromptRequests(
             config,
-            new ChangeSetData(AI_ACCOUNT_ID, -2, 2),
+            new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
                 patchSet,
                 List.of(),

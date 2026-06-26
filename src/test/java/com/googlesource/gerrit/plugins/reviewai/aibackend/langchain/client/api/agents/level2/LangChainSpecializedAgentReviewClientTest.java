@@ -63,7 +63,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         triage(
             plan("CORRECTNESS", true),
             plan("SECURITY", false));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = change(false);
 
     AiResponseContent response =
@@ -82,7 +82,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         triage(
             plan("COMMIT_MESSAGE", true),
             plan("CORRECTNESS", true));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
     GerritChange change = change(false);
 
@@ -95,7 +95,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   public void suggestModeUsesSuggestClientWithoutRunningSpecializedReview() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     client.triage = triage(plan("CORRECTNESS", true));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     GerritChange change = change(true);
 
@@ -113,7 +113,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
     when(config.getAiProviderZdr()).thenReturn(false);
     SpecializedSuggestReviewContext suggestContext = new SpecializedSuggestReviewContext(config);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setAiDataPrompt(readTestResource(SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE));
 
     assertTrue(suggestContext.shouldUsePreviousReviewsAsSuggestContext(changeSetData));
@@ -128,7 +128,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
     when(config.getAiProviderZdr()).thenReturn(true);
     SpecializedSuggestReviewContext suggestContext = new SpecializedSuggestReviewContext(config);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setAiDataPrompt(readTestResource(SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE));
 
     assertFalse(suggestContext.shouldUsePreviousReviewsAsSuggestContext(changeSetData));
@@ -182,7 +182,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void triageInstructionsIncludeAvailableSpecializedAgents() {
     TestableTriagePrompt prompt =
-        new TestableTriagePrompt(config(), new ChangeSetData(1, -1, 1), change(false));
+        new TestableTriagePrompt(config(), new ChangeSetData(1), change(false));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
@@ -196,7 +196,7 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   @Test
   public void specializedPatchsetAgentPromptReviewsFullPatchset() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
     changeSetData.setSpecializedAgentName("TESTABILITY");
     AiPromptSpecializedReviewAgent prompt =
@@ -210,7 +210,7 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   @Test
   public void specializedPatchsetAgentFieldDefinitionsDescribeConcernFields() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
     changeSetData.setSpecializedAgentName("TESTABILITY");
     changeSetData.setSpecializedAgentInstructions("Review testability only.");
@@ -238,7 +238,7 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   @Test
   public void commitMessageSpecialistFieldDefinitionsExcludePatchsetLocationFields() {
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     AiPromptSpecializedReviewAgent prompt =
         new TestableSpecializedPrompt(config(), changeSetData, change(false));
