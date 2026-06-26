@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
 import com.google.gson.reflect.TypeToken;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import lombok.Setter;
@@ -137,10 +138,15 @@ public class AiPrompt {
   }
 
   protected static String buildFieldSpecifications(List<String> filterFields) {
+    return buildFieldSpecifications(filterFields, DEFAULT_AI_REPLIES_ATTRIBUTES);
+  }
+
+  protected static String buildFieldSpecifications(
+      List<String> filterFields, Map<String, String> replyAttributes) {
     log.debug("Building field specifications for filter fields: {}", filterFields);
     Set<String> orderedFilterFields = new LinkedHashSet<>(filterFields);
     Map<String, String> attributes =
-        DEFAULT_AI_REPLIES_ATTRIBUTES.entrySet().stream()
+        replyAttributes.entrySet().stream()
             .filter(entry -> orderedFilterFields.contains(entry.getKey()))
             .collect(
                 Collectors.toMap(
@@ -162,13 +168,13 @@ public class AiPrompt {
   public String getPatchSetReviewPromptInstructions() {
     log.debug("Getting patch set review prompt instructions.");
     List<String> attributes = new ArrayList<>(PATCH_SET_REVIEW_REPLY_ATTRIBUTES);
-    if (config.isVotingEnabled() || config.getFilterNegativeComments()) {
-      updateScoreDescription();
-    } else {
+    if (!config.isVotingEnabled()) {
       attributes.remove(ATTRIBUTE_SCORE);
     }
-    updateRelevanceDescription();
-    return buildFieldSpecifications(attributes);
+    Map<String, String> replyAttributes = new LinkedHashMap<>(DEFAULT_AI_REPLIES_ATTRIBUTES);
+    updateScoreDescription(replyAttributes);
+    updateRelevanceDescription(replyAttributes);
+    return buildFieldSpecifications(attributes, replyAttributes);
   }
 
   public String getPatchSetReviewPrompt() {
@@ -176,25 +182,32 @@ public class AiPrompt {
     return getPatchSetReviewPromptInstructions() + SPACE + DEFAULT_AI_REPLIES_PROMPT_INLINE;
   }
 
-  protected void updateScoreDescription() {
+  private void updateScoreDescription(Map<String, String> replyAttributes) {
     log.debug("Updating score description.");
-    String scoreDescription = DEFAULT_AI_REPLIES_ATTRIBUTES.get(ATTRIBUTE_SCORE);
-    if (scoreDescription.contains("%d")) {
-      scoreDescription =
-          String.format(scoreDescription, config.getVotingMinScore(), config.getVotingMaxScore());
-      DEFAULT_AI_REPLIES_ATTRIBUTES.put(ATTRIBUTE_SCORE, scoreDescription);
+    String scoreDescription = replyAttributes.get(ATTRIBUTE_SCORE);
+    if (scoreDescription.contains("%s")) {
+      String votingRangeDescription =
+          getPermittedVotingRange()
+              .map(range -> String.format(" from %d to %d", range.getMin(), range.getMax()))
+              .orElse("");
+      scoreDescription = String.format(scoreDescription, votingRangeDescription);
+      replyAttributes.put(ATTRIBUTE_SCORE, scoreDescription);
       log.debug("Updated score description to: {}", scoreDescription);
     }
   }
 
-  private void updateRelevanceDescription() {
+  protected Optional<GerritPermittedVotingRange> getPermittedVotingRange() {
+    return Optional.empty();
+  }
+
+  private void updateRelevanceDescription(Map<String, String> replyAttributes) {
     log.debug("Updating relevance description.");
-    String relevanceDescription = DEFAULT_AI_REPLIES_ATTRIBUTES.get(ATTRIBUTE_RELEVANCE);
+    String relevanceDescription = replyAttributes.get(ATTRIBUTE_RELEVANCE);
     if (relevanceDescription.contains("%s")) {
       String defaultAiRelevanceRules =
           config.getString(Configuration.KEY_AI_RELEVANCE_RULES, DEFAULT_AI_RELEVANCE_RULES);
       relevanceDescription = String.format(relevanceDescription, defaultAiRelevanceRules);
-      DEFAULT_AI_REPLIES_ATTRIBUTES.put(ATTRIBUTE_RELEVANCE, relevanceDescription);
+      replyAttributes.put(ATTRIBUTE_RELEVANCE, relevanceDescription);
       log.debug("Updated relevance description to: {}", relevanceDescription);
     }
   }

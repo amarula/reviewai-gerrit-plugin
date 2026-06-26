@@ -22,7 +22,6 @@ import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.data.AccountAttribute;
-import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Inject;
@@ -187,12 +186,6 @@ public class EventHandlerTask implements Runnable {
       return false;
     }
 
-    String topic = getTopic(change).orElse("");
-    log.debug("PatchSet Topic retrieved: '{}'", topic);
-    if (gerritClient.isDisabledTopic(topic)) {
-      log.info("Review disabled for topic: '{}'", topic);
-      return false;
-    }
     return true;
   }
 
@@ -226,13 +219,4 @@ public class EventHandlerTask implements Runnable {
     }
   }
 
-  private Optional<String> getTopic(GerritChange change) {
-    try {
-      ChangeAttribute changeAttribute = change.getPatchSetEvent().change.get();
-      return Optional.ofNullable(changeAttribute.topic);
-    } catch (NullPointerException e) {
-      log.debug("Failed to retrieve topic for change ID: {}", change.getFullChangeId());
-      return Optional.empty();
-    }
-  }
 }

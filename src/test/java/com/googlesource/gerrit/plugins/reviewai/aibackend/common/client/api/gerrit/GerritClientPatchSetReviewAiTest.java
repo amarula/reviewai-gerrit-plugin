@@ -76,7 +76,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
     GerritClientPatchSetReviewAi client =
         new GerritClientPatchSetReviewAi(config, repositoryManager);
-    String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
+    String patchSet = client.getPatchSet(new ChangeSetData(1), getGerritChange());
 
     Assert.assertTrue(patchSet.contains("diff --git a/old_name.py b/new_name.py"));
     Assert.assertTrue(patchSet.contains("similarity index 100%"));
@@ -94,7 +94,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
     GerritClientPatchSetReviewAi client =
         new GerritClientPatchSetReviewAi(config, repositoryManager);
-    String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
+    String patchSet = client.getPatchSet(new ChangeSetData(1), getGerritChange());
 
     String[] originalLines = getContextPatchOriginal().split("\\R");
     String[] modifiedLines = getContextPatchModified().split("\\R");
@@ -122,7 +122,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(fileApi.diff(0)).thenReturn(diffInfo);
 
     GerritClientPatchSetReviewAi client = new GerritClientPatchSetReviewAi(config);
-    String patchSet = client.getPatchSet(new ChangeSetData(1, -1, 1), getGerritChange());
+    String patchSet = client.getPatchSet(new ChangeSetData(1), getGerritChange());
 
     Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
     Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));

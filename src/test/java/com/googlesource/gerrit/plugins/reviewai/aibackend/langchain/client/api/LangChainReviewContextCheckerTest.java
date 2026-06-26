@@ -49,7 +49,7 @@ public class LangChainReviewContextCheckerTest {
 
     boolean existing =
         new LangChainReviewContextChecker(config, pluginDataHandlerProvider, false)
-            .hasExistingReviewContext(new ChangeSetData(1, -1, 1));
+            .hasExistingReviewContext(new ChangeSetData(1));
 
     assertTrue(existing);
   }
@@ -67,7 +67,7 @@ public class LangChainReviewContextCheckerTest {
 
     boolean existing =
         new LangChainReviewContextChecker(config, pluginDataHandlerProvider, true)
-            .hasExistingReviewContext(new ChangeSetData(1, -1, 1));
+            .hasExistingReviewContext(new ChangeSetData(1));
 
     assertFalse(existing);
   }
@@ -76,7 +76,7 @@ public class LangChainReviewContextCheckerTest {
   public void detectsExistingReviewInNonOpenAiContextHistory() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getAiProviderType()).thenReturn(AiProviderType.GEMINI);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setAiDataPrompt(Files.readString(REVIEW_HISTORY_RESOURCE));
 
     boolean existing =

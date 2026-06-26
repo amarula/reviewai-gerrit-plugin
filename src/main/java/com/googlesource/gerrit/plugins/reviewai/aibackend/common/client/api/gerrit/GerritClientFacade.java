@@ -57,10 +57,6 @@ public class GerritClientFacade {
     return gerritClientPatchSet.isDisabledUser(authorUsername);
   }
 
-  public boolean isDisabledTopic(String topic) {
-    return gerritClientPatchSet.isDisabledTopic(topic);
-  }
-
   public boolean isWorkInProgress(GerritChange change) {
     return gerritClientDetail.isWorkInProgress(change);
   }
