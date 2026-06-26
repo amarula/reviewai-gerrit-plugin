@@ -60,12 +60,13 @@ public class EventHandlerTypePatchSetReviewTest {
     when(change.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
 
     EventHandlerTypePatchSetReview handler =
-        new EventHandlerTypePatchSetReview(config, changeSetData, change, reviewer, gerritClient);
+        new EventHandlerTypePatchSetReview(
+            config, changeSetData, change, reviewer, gerritClient, true);
 
     assertEquals(PreprocessResult.OK, handler.preprocessEvent());
     handler.processEvent();
 
     verify(gerritClient).retrievePatchSetInfo(change);
-    verify(reviewer).review(change);
+    verify(reviewer).review(change, true);
   }
 }

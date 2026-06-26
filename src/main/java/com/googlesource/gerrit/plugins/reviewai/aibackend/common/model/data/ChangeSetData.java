@@ -53,9 +53,15 @@ public class ChangeSetData {
   private Boolean hideDynamicConfigMessage = false;
   private Boolean showDynamicConfigMessage = false;
   private String reviewSystemMessage;
+  private String reviewStatusMessage;
   private String reviewNoticeMessage;
   private Set<String> parsedCommands = new HashSet<>();
   private Map<String, Map<String, String>> parsedCommandOptions = new HashMap<>();
+
+  public void setReviewSystemMessage(String reviewSystemMessage) {
+    this.reviewSystemMessage = reviewSystemMessage;
+    this.reviewStatusMessage = null;
+  }
 
   public void clearParsedCommands() {
     parsedCommands.clear();
@@ -121,6 +127,7 @@ public class ChangeSetData {
     copy.setHideDynamicConfigMessage(hideDynamicConfigMessage);
     copy.setShowDynamicConfigMessage(showDynamicConfigMessage);
     copy.setReviewSystemMessage(reviewSystemMessage);
+    copy.setReviewStatusMessage(reviewStatusMessage);
     copy.setReviewNoticeMessage(reviewNoticeMessage);
     copy.setParsedCommands(new HashSet<>(parsedCommands));
     Map<String, Map<String, String>> copiedParsedCommandOptions = new HashMap<>();

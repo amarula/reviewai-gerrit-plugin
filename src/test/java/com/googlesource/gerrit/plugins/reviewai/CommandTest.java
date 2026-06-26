@@ -23,6 +23,8 @@ import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gerrit.server.permissions.GlobalPermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
@@ -411,9 +413,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         new ReviewAgentRequestStatusStore(getChangeDataHandler());
     statusStore.pending("request-1", "/review");
     setupCommandComment("/review");
-    WireMock.stubFor(
-        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
-            .willReturn(WireMock.aResponse().withStatus(400)));
+    stubOpenAiBadRequest();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -421,6 +421,38 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
     Assert.assertEquals(
         "ReviewAI **ERROR**: Unable to connect to AI server", status.responseText);
+  }
+
+  @Test
+  public void commandReviewShowsOpenAiConnectionErrorReasonForAdministrators()
+      throws Exception {
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review");
+    setupCommandComment("/review");
+    PermissionBackend.WithUser permissionBackendWithUser =
+        Mockito.mock(PermissionBackend.WithUser.class);
+    when(permissionBackend.user(eventUser)).thenReturn(permissionBackendWithUser);
+    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+    stubOpenAiBadRequest();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server.\n\nReason: "
+            + "com.openai.errors.BadRequestException: 400: null",
+        status.responseText);
+    Assert.assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server",
+        changeSetData.getReviewSystemMessage());
+  }
+
+  private void stubOpenAiBadRequest() {
+    WireMock.stubFor(
+        WireMock.post(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri()))
+            .willReturn(WireMock.aResponse().withStatus(400)));
   }
 
   @Test

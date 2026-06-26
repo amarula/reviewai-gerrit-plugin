@@ -103,9 +103,12 @@ class ReviewAgentEventRequestStatusUpdater {
         complete(null);
         return;
       }
+      String responseText =
+          Optional.ofNullable(changeSetData.getReviewStatusMessage())
+              .orElse(changeSetData.getReviewSystemMessage());
       complete(
           SystemMessageFormatter.getPrefixedSystemMessage(
-              localizer, changeSetData.getReviewSystemMessage()));
+              localizer, responseText));
     }
 
     void fail(String responseText) {
