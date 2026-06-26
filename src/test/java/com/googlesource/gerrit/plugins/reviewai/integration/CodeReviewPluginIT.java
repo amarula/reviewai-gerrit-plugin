@@ -61,8 +61,7 @@ public class CodeReviewPluginIT {
 
   @Test
   public void setReview() throws Exception {
-    ChangeSetData changeSetData =
-        new ChangeSetData(1, config.getVotingMinScore(), config.getVotingMaxScore());
+    ChangeSetData changeSetData = new ChangeSetData(1);
     Localizer localizer = new Localizer(config);
     when(config.getGerritUserName()).thenReturn("Your Gerrit username");
 

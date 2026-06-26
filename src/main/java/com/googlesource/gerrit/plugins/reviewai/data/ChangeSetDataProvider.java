@@ -29,11 +29,9 @@ import java.util.Optional;
 @Slf4j
 public class ChangeSetDataProvider implements Provider<ChangeSetData> {
   private final int aiAccountId;
-  private final Configuration config;
 
   @Inject
   ChangeSetDataProvider(Configuration config, AccountCache accountCache) {
-    this.config = config;
     Optional<AccountState> accountState = accountCache.getByUsername(config.getGerritUserName());
     if (accountState.isPresent()) {
       aiAccountId = accountState.get().account().id().get();
@@ -46,11 +44,7 @@ public class ChangeSetDataProvider implements Provider<ChangeSetData> {
 
   @Override
   public ChangeSetData get() {
-    log.debug(
-        "Providing ChangeSetData with accountId: {}, minScore: {}, maxScore: {}",
-        aiAccountId,
-        config.getVotingMinScore(),
-        config.getVotingMaxScore());
-    return new ChangeSetData(aiAccountId, config.getVotingMinScore(), config.getVotingMaxScore());
+    log.debug("Providing ChangeSetData with accountId: {}", aiAccountId);
+    return new ChangeSetData(aiAccountId);
   }
 }

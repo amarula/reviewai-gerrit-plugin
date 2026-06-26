@@ -16,15 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
@@ -65,6 +67,11 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   public abstract void addAiAssistantInstructions(List<String> instructions);
 
   public abstract String getAiRequestDataPrompt();
+
+  @Override
+  protected Optional<GerritPermittedVotingRange> getPermittedVotingRange() {
+    return Optional.ofNullable(changeSetData.getPermittedVotingRange());
+  }
 
   protected void addCommonAiAssistantInstructions(
       List<String> instructions, boolean includeSystemPromptInstructions) {

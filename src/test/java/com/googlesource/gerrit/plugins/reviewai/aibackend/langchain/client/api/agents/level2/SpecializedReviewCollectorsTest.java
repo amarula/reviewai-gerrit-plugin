@@ -80,7 +80,7 @@ public class SpecializedReviewCollectorsTest {
     RecordingCollectorClient client = new RecordingCollectorClient(config());
 
     AiResponseContent response =
-        client.askCollector(new ChangeSetData(1, -1, 1), change(), "Patch", sourceFindings());
+        client.askCollector(new ChangeSetData(1), change(), "Patch", sourceFindings());
 
     assertEquals(
         List.of(
@@ -106,7 +106,7 @@ public class SpecializedReviewCollectorsTest {
 
     assertThrows(
         IllegalStateException.class,
-        () -> client.askCollector(new ChangeSetData(1, -1, 1), change(), "Patch", sourceFindings()));
+        () -> client.askCollector(new ChangeSetData(1), change(), "Patch", sourceFindings()));
   }
 
   @Test
@@ -115,7 +115,7 @@ public class SpecializedReviewCollectorsTest {
     client.historicalRepeated = true;
 
     AiResponseContent response =
-        client.askCollector(new ChangeSetData(1, -1, 1), change(), "Patch", sourceFindings());
+        client.askCollector(new ChangeSetData(1), change(), "Patch", sourceFindings());
 
     assertEquals(1, response.getReplies().size());
     assertTrue(response.getReplies().getFirst().isRepeated());
@@ -136,12 +136,12 @@ public class SpecializedReviewCollectorsTest {
   public void rawConcernIdsAreUniqueAcrossCollectorRuns() throws Exception {
     RecordingCollectorClient client = new RecordingCollectorClient(config());
 
-    client.askCollector(new ChangeSetData(1, -1, 1), change(), "Patch", sourceFindings());
+    client.askCollector(new ChangeSetData(1), change(), "Patch", sourceFindings());
     String firstRunConcernId = firstRawConcernId(client.inputs.get(0));
     client.stages.clear();
     client.inputs.clear();
 
-    client.askCollector(new ChangeSetData(1, -1, 1), change(), "Patch", sourceFindings());
+    client.askCollector(new ChangeSetData(1), change(), "Patch", sourceFindings());
     String secondRunConcernId = firstRawConcernId(client.inputs.get(0));
 
     assertTrue(firstRunConcernId.startsWith("raw-"));
@@ -289,7 +289,7 @@ public class SpecializedReviewCollectorsTest {
   }
 
   private static String collectorInstructions(ReviewAssistantStage stage) {
-    ChangeSetData data = new ChangeSetData(1, -1, 1);
+    ChangeSetData data = new ChangeSetData(1);
     data.setReviewAssistantStage(stage);
     AiPromptSpecializedReviewCollector prompt =
         switch (stage) {

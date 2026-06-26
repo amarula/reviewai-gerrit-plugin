@@ -37,7 +37,6 @@ import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.c
 public class Configuration extends ConfigCore {
   // Config Constants
   public static final String DEFAULT_EMPTY_SETTING = "";
-  public static final String ENABLED_TOPICS_ALL = "ALL";
 
   // Default Config values
   public static final String OPENAI_DOMAIN = AiProviderConfiguration.OPENAI_DOMAIN;
@@ -65,8 +64,6 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_REVIEW_COMMIT_MESSAGES = true;
   private static final boolean DEFAULT_FULL_FILE_REVIEW = true;
   private static final String DEFAULT_CODE_CONTEXT_POLICY = "ON_DEMAND";
-  private static final String DEFAULT_DISABLED_TOPIC_FILTER = "";
-  private static final String DEFAULT_ENABLED_TOPIC_FILTER = ENABLED_TOPICS_ALL;
   private static final String DEFAULT_ENABLED_FILE_EXTENSIONS =
       String.join(
           ",",
@@ -80,12 +77,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_PATCH_CONTEXT_LINES = 3;
   private static final boolean DEFAULT_ENABLED_VOTING = false;
   private static final boolean DEFAULT_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE = true;
-  private static final boolean DEFAULT_FILTER_NEGATIVE_COMMENTS = true;
-  private static final int DEFAULT_FILTER_COMMENTS_BELOW_SCORE = 0;
-  private static final boolean DEFAULT_FILTER_RELEVANT_COMMENTS = true;
   private static final double DEFAULT_FILTER_COMMENTS_RELEVANCE_THRESHOLD = 0.6;
-  private static final int DEFAULT_VOTING_MIN_SCORE = -1;
-  private static final int DEFAULT_VOTING_MAX_SCORE = 1;
   private static final boolean DEFAULT_INLINE_COMMENTS_AS_RESOLVED = false;
   private static final boolean DEFAULT_PATCH_SET_COMMENTS_AS_RESOLVED = false;
   private static final boolean DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS = false;
@@ -111,8 +103,6 @@ public class Configuration extends ConfigCore {
   public static final String KEY_AI_REVIEW_TEMPERATURE = "aiReviewTemperature";
   public static final String KEY_AI_COMMENT_TEMPERATURE = "aiCommentTemperature";
   public static final String KEY_DIRECTIVES = "directive";
-  public static final String KEY_VOTING_MIN_SCORE = "votingMinScore";
-  public static final String KEY_VOTING_MAX_SCORE = "votingMaxScore";
   public static final String KEY_GERRIT_USERNAME = "gerritUserName";
   public static final String KEY_SELECTIVE_LOG_LEVEL_OVERRIDE = "selectiveLogLevelOverride";
   public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
@@ -131,17 +121,12 @@ public class Configuration extends ConfigCore {
   private static final String KEY_REVIEW_PATCH_SET = "aiReviewPatchSet";
   private static final String KEY_FULL_FILE_REVIEW = "aiFullFileReview";
   private static final String KEY_CODE_CONTEXT_POLICY = "codeContextPolicy";
-  private static final String KEY_DISABLED_TOPIC_FILTER = "disabledTopicFilter";
-  private static final String KEY_ENABLED_TOPIC_FILTER = "enabledTopicFilter";
   private static final String KEY_MAX_REVIEW_LINES = "maxReviewLines";
   private static final String KEY_PATCH_CONTEXT_LINES = "patchContextLines";
   private static final String KEY_ENABLED_FILE_EXTENSIONS = "enabledFileExtensions";
   private static final String KEY_ENABLED_VOTING = "enabledVoting";
   private static final String KEY_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE =
       "convertNeutralReviewScoreToPositive";
-  private static final String KEY_FILTER_NEGATIVE_COMMENTS = "filterNegativeComments";
-  private static final String KEY_FILTER_COMMENTS_BELOW_SCORE = "filterCommentsBelowScore";
-  private static final String KEY_FILTER_RELEVANT_COMMENTS = "filterRelevantComments";
   private static final String KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD =
       "filterCommentsRelevanceThreshold";
   private static final String KEY_AI_MODELS_DEFAULT = AiProviderConfiguration.KEY_AI_MODELS_DEFAULT;
@@ -292,14 +277,6 @@ public class Configuration extends ConfigCore {
     return getEnum(KEY_CODE_CONTEXT_POLICY, DEFAULT_CODE_CONTEXT_POLICY, CodeContextPolicies.class);
   }
 
-  public List<String> getDisabledTopicFilter() {
-    return splitConfig(getString(KEY_DISABLED_TOPIC_FILTER, DEFAULT_DISABLED_TOPIC_FILTER));
-  }
-
-  public List<String> getEnabledTopicFilter() {
-    return splitConfig(getString(KEY_ENABLED_TOPIC_FILTER, DEFAULT_ENABLED_TOPIC_FILTER));
-  }
-
   public int getMaxReviewLines() {
     return getInt(KEY_MAX_REVIEW_LINES, DEFAULT_MAX_REVIEW_LINES);
   }
@@ -330,18 +307,6 @@ public class Configuration extends ConfigCore {
         DEFAULT_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE);
   }
 
-  public boolean getFilterNegativeComments() {
-    return getBoolean(KEY_FILTER_NEGATIVE_COMMENTS, DEFAULT_FILTER_NEGATIVE_COMMENTS);
-  }
-
-  public int getFilterCommentsBelowScore() {
-    return getInt(KEY_FILTER_COMMENTS_BELOW_SCORE, DEFAULT_FILTER_COMMENTS_BELOW_SCORE);
-  }
-
-  public boolean getFilterRelevantComments() {
-    return getBoolean(KEY_FILTER_RELEVANT_COMMENTS, DEFAULT_FILTER_RELEVANT_COMMENTS);
-  }
-
   public double getFilterCommentsRelevanceThreshold() {
     return getDouble(
         KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD, DEFAULT_FILTER_COMMENTS_RELEVANCE_THRESHOLD);
@@ -357,14 +322,6 @@ public class Configuration extends ConfigCore {
 
   public String getAiCommentTemperature() {
     return getString(KEY_AI_COMMENT_TEMPERATURE, String.valueOf(DEFAULT_AI_COMMENT_TEMPERATURE));
-  }
-
-  public int getVotingMinScore() {
-    return getInt(KEY_VOTING_MIN_SCORE, DEFAULT_VOTING_MIN_SCORE);
-  }
-
-  public int getVotingMaxScore() {
-    return getInt(KEY_VOTING_MAX_SCORE, DEFAULT_VOTING_MAX_SCORE);
   }
 
   public boolean getInlineCommentsAsResolved() {

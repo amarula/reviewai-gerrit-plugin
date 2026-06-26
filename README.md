@@ -226,11 +226,6 @@ matches a configured or default model for a token-backed provider that has a tok
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
-- `enabledTopicFilter`: Specifies a list of keywords that trigger AI reviews based on the topic of the Patch Set.
-  When this setting is active, only Patch Sets and their associated comments containing at least one of these keywords
-  in the topic are reviewed.
-- `disabledTopicFilter`: Works in contrast to enabledTopicFilter, excluding Patch Sets and comments from review if their
-  topics contain specified keywords.
 - `directive`: Directives are mandatory instructions written in plain English that AI must adhere to during its reviews.
   You can provide a single directive or multiple directives.
 
@@ -251,18 +246,8 @@ directive = End each reply with \"Hope this helps!\"
   assigning a score.
 - `convertNeutralReviewScoreToPositive`: Enabled by default (true). When enabled, a neutral final review score (`0`)
   is submitted as `+1` when the permitted voting range allows it. Set it to false to keep neutral reviews at `0`.
-- `votingMinScore`: The lowest possible score that can be given to a Patch Set (Default value: -1).
-- `votingMaxScore`: The highest possible score that can be given to a Patch Set (Default value: +1).
-- `filterNegativeComments`: Activated by default (true), ensuring only negative review comments (scored below the
-  `filterCommentsBelowScore` threshold outlined further) are displayed. Disabling this setting (false) will
-  also show positive and neutral comments.
-- `filterCommentsBelowScore`: With `filterNegativeComments` active, review comments with a score at or above this
-  setting's value will not be shown (default is 0).
-- `filterRelevantComments`: This setting is enabled by default (true) to display only those review comments considered
-  relevant by AI, which means they have a relevance index at or above the `filterCommentsRelevanceThreshold` specified
-  below. Turning off this option (false) allows the display of comments AI marks as irrelevant.
-- `filterCommentsRelevanceThreshold`: When `filterRelevantComments` is enabled, any review comment assigned a relevance
-  score by AI below this threshold will not be shown. The default threshold is set at 0.6.
+- `filterCommentsRelevanceThreshold`: Any review comment assigned a relevance score by AI below this threshold will not
+  be shown. The default threshold is set at 0.6.
 - `aiRelevanceRules`: This option allows customization of the rules AI uses to determine the relevance of a task.
 - `patchSetCommentsAsResolved`: Initially set to false, this option leaves AI's Patch Set comments as unresolved,
   inviting further discussion. If activated, it marks AI's Patch Set comments as resolved.
@@ -625,19 +610,13 @@ convertNeutralReviewScoreToPositive: true
 directive:
     First directive
     Second directive
-disabledTopicFilter:
 enableMessageDebugging: true
 enabledFileExtensions:
     py
     java
     js
     (...)
-enabledTopicFilter:
-    ALL
-filterCommentsBelowScore: 0
 filterCommentsRelevanceThreshold: 0.6
-filterNegativeComments: true
-filterRelevantComments: true
 gerritUserName: gpt
 ignoreOutdatedInlineComments: false
 ignoreResolvedAiComments: true
@@ -652,8 +631,6 @@ ollamaThink: true
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
-votingMaxScore: 1
-votingMinScore: -1
 ```
 
 ### Traditional Gerrit Comments

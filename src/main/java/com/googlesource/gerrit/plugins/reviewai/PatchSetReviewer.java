@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
@@ -181,14 +182,12 @@ public class PatchSetReviewer {
     for (AiReplyItem replyItem : reviewReply.getReplies()) {
       String reply = replyItem.getReply();
       Double score = replyItem.getScore();
-      boolean isNotNegative = isNotNegativeReply(score);
       boolean isIrrelevant = isIrrelevantReply(replyItem);
       boolean isHidden =
           replyItem.isRepeated()
               || replyItem.isDuplicated()
               || replyItem.isConflicting()
-              || isIrrelevant
-              || isNotNegative;
+              || isIrrelevant;
       if (!replyItem.isDuplicated()
           && !replyItem.isConflicting()
           && !isIrrelevant
@@ -243,7 +242,7 @@ public class PatchSetReviewer {
           reviewScores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(reviewScores));
       if (reviewScore == 0
           && config.getConvertNeutralReviewScoreToPositive()
-          && changeSetData.getVotingMaxScore() >= 1) {
+          && canVotePositive()) {
         reviewScore = 1;
       }
       if (reviewScore > 0 && isPartialReview()) {
@@ -263,21 +262,23 @@ public class PatchSetReviewer {
   }
 
   private int normalizeReviewScore(double score) {
-    // Gerrit labels are integers. Keep decimal scores for filtering, but normalize the
-    // aggregated vote to the configured integer range at submission time.
-    return Math.clamp((int) Math.floor(score),
-        changeSetData.getVotingMinScore(), changeSetData.getVotingMaxScore());
+    // Gerrit labels are integers. Keep decimal scores in replies, but normalize the aggregated
+    // vote to the permitted Gerrit range at submission time when it is available.
+    int normalizedScore = (int) Math.floor(score);
+    GerritPermittedVotingRange permittedVotingRange = changeSetData.getPermittedVotingRange();
+    if (permittedVotingRange == null) {
+      return normalizedScore;
+    }
+    return Math.clamp(normalizedScore, permittedVotingRange.getMin(), permittedVotingRange.getMax());
   }
 
-  private boolean isNotNegativeReply(Double score) {
-    return score != null
-        && config.getFilterNegativeComments()
-        && score >= config.getFilterCommentsBelowScore();
+  private boolean canVotePositive() {
+    GerritPermittedVotingRange permittedVotingRange = changeSetData.getPermittedVotingRange();
+    return permittedVotingRange == null || permittedVotingRange.getMax() >= 1;
   }
 
   private boolean isIrrelevantReply(AiReplyItem replyItem) {
-    return config.getFilterRelevantComments()
-        && replyItem.getRelevance() != null
+    return replyItem.getRelevance() != null
         && replyItem.getRelevance() < config.getFilterCommentsRelevanceThreshold();
   }
 }

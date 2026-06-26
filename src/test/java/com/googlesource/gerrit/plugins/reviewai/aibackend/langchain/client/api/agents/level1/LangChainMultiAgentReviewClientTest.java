@@ -72,7 +72,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(false);
     when(change.getFullChangeId()).thenReturn("change~1");
@@ -91,7 +91,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void forcedScopedReviewBypassesParallelSplit() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     GerritChange change = mock(GerritChange.class);
@@ -110,7 +110,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void forcedReviewCommentUsesPatchsetAndCommitMessageAgents() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
@@ -130,7 +130,7 @@ public class LangChainMultiAgentReviewClientTest {
   public void messageUsesRoutingAgentToSelectCommitMessageAgent() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     client.routedStage = ReviewAssistantStage.REVIEW_COMMIT_MESSAGE;
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     when(change.getFullChangeId()).thenReturn("change~1");
@@ -148,7 +148,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void suggestWithoutScopeSingleAgentUsesOneUnifiedReviewRequest() throws Exception {
     RecordingLangChainClient client = new RecordingLangChainClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
@@ -188,7 +188,7 @@ public class LangChainMultiAgentReviewClientTest {
                 "b.py",
                 4,
                 "return fallback"));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
     GerritChange change = mock(GerritChange.class);
@@ -226,7 +226,7 @@ public class LangChainMultiAgentReviewClientTest {
   public void suggestPatchsetScopeUsesExistingReviewContextWithoutInitialReview() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     client.existingReviewContext = true;
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
     GerritChange change = mock(GerritChange.class);
@@ -251,7 +251,7 @@ public class LangChainMultiAgentReviewClientTest {
         reviewReply("Repeated but still negative", "a.py", 2, "return value");
     repeatedNegative.setRepeated(true);
     client.reviewReplies = List.of(repeatedNegative);
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
     GerritChange change = mock(GerritChange.class);
@@ -273,7 +273,7 @@ public class LangChainMultiAgentReviewClientTest {
         List.of(
             codeSuggestionReply(0, "```suggestion\nfirst replacement\n```"),
             codeSuggestionReply(0, "```suggestion\nsecond replacement\n```"));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
     GerritChange change = mock(GerritChange.class);
@@ -296,7 +296,7 @@ public class LangChainMultiAgentReviewClientTest {
                 .id(0)
                 .reply(readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE))
                 .build());
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
     GerritChange change = mock(GerritChange.class);
@@ -312,7 +312,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void suggestCommitMessageUsesCommitMessageInlineLocation() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
     GerritChange change = mock(GerritChange.class);
@@ -344,7 +344,7 @@ public class LangChainMultiAgentReviewClientTest {
         List.of(
             commitMessageSuggestionReply(0, firstSuggestion),
             commitMessageSuggestionReply(1, "```suggestion\nSecond commit message\n```"));
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
     GerritChange change = mock(GerritChange.class);
@@ -367,7 +367,7 @@ public class LangChainMultiAgentReviewClientTest {
   @Test
   public void suggestWithoutScopeProcessesPatchsetAndCommitMessage() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
-    ChangeSetData changeSetData = new ChangeSetData(1, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
@@ -425,7 +425,7 @@ public class LangChainMultiAgentReviewClientTest {
     Localizer localizer = localizer();
     TestableLangChainMultiAgentReviewClient client =
         new TestableLangChainMultiAgentReviewClient(config, gerritClient, localizer);
-    ChangeSetData changeSetData = new ChangeSetData(7, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(7);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     when(gerritClient.getClientData(change))
@@ -453,7 +453,7 @@ public class LangChainMultiAgentReviewClientTest {
     TestableLangChainMultiAgentReviewClient client =
         new TestableLangChainMultiAgentReviewClient(
             config, gerritClient, localizer, conversationStore);
-    ChangeSetData changeSetData = new ChangeSetData(7, -1, 1);
+    ChangeSetData changeSetData = new ChangeSetData(7);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     when(change.getFullChangeId()).thenReturn("change~1");
