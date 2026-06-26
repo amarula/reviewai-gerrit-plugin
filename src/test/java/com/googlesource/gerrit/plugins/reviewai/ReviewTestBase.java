@@ -36,6 +36,7 @@ import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.*;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -135,6 +136,7 @@ public class ReviewTestBase extends TestBase {
   @Mock protected ReviewAgentConversationStore reviewAgentConversationStore;
   @Mock protected IdentifiedUser.GenericFactory identifiedUserFactory;
   @Mock protected IdentifiedUser eventUser;
+  @Mock protected PermissionBackend permissionBackend;
 
   protected PluginConfig globalConfig;
   protected PluginConfig projectConfig;
@@ -331,6 +333,7 @@ public class ReviewTestBase extends TestBase {
                     bind(AiReviewPermission.class).toInstance(aiReviewPermission);
                     bind(IdentifiedUser.GenericFactory.class).toInstance(identifiedUserFactory);
                     bind(AccountCache.class).toInstance(accountCacheMock);
+                    bind(PermissionBackend.class).toInstance(permissionBackend);
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(Path.class)
                         .annotatedWith(PluginData.class)

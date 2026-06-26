@@ -29,16 +29,19 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   private final GerritChange change;
   private final PatchSetReviewer reviewer;
   private final GerritClient gerritClient;
+  private final boolean administratorUser;
 
   EventHandlerTypeCommentAdded(
       ChangeSetData changeSetData,
       GerritChange change,
       PatchSetReviewer reviewer,
-      GerritClient gerritClient) {
+      GerritClient gerritClient,
+      boolean administratorUser) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
     this.gerritClient = gerritClient;
+    this.administratorUser = administratorUser;
     log.debug(
         "Initialized EventHandlerTypeCommentAdded for full change ID: {}",
         change.getFullChangeId());
@@ -76,7 +79,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   public void processEvent() throws Exception {
     log.debug(
         "Processing event to review comments on full change ID: {}", change.getFullChangeId());
-    reviewer.review(change);
+    reviewer.review(change, administratorUser);
     log.debug(
         "Completed processing event for reviewing comments on full change ID: {}",
         change.getFullChangeId());

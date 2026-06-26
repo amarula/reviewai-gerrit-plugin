@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -77,6 +78,57 @@ public class SystemMessageFormatterTest {
   }
 
   @Test
+  public void formatsLocalizedErrorMessageWithReason() {
+    Localizer localizer = localizer();
+    SocketTimeoutException timeout = new SocketTimeoutException("Read timed out");
+    RuntimeException wrapper = new RuntimeException("AI request failed", timeout);
+
+    assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server.\n\nReason: "
+            + "java.net.SocketTimeoutException: Read timed out",
+        SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+            localizer, "message.openai.connection.error", wrapper));
+  }
+
+  @Test
+  public void formatsLocalizedErrorMessageWithJsonErrorMessageReason() {
+    Localizer localizer = localizer();
+    RuntimeException httpException =
+        new RuntimeException(
+            "{\"error\":{\"message\":\"Not found the model kimi-k2-thinking-turbo or "
+                + "Permission denied\",\"type\":\"resource_not_found_error\"}}");
+
+    assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server.\n\nReason: "
+            + "Not found the model kimi-k2-thinking-turbo or Permission denied",
+        SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+            localizer, "message.openai.connection.error", httpException));
+  }
+
+  @Test
+  public void formatsLocalizedErrorMessageWithDirectJsonMessageReason() {
+    Localizer localizer = localizer();
+    RuntimeException modelException =
+        new RuntimeException("{\"message\":\"Unsupported parameter: temperature\"}");
+
+    assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server.\n\nReason: "
+            + "Unsupported parameter: temperature",
+        SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+            localizer, "message.openai.connection.error", modelException));
+  }
+
+  @Test
+  public void formatsLocalizedErrorMessageWithoutBlankReason() {
+    Localizer localizer = localizer();
+
+    assertEquals(
+        "ReviewAI **ERROR**: Unable to connect to AI server",
+        SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+            localizer, "message.openai.connection.error", new RuntimeException("")));
+  }
+
+  @Test
   public void appendsConfigurationWarningMessages() {
     Localizer localizer = localizer();
     Configuration config = mock(Configuration.class);
@@ -98,6 +150,7 @@ public class SystemMessageFormatterTest {
     when(localizer.getText("plugin.message.label")).thenReturn("Message");
     when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
     when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
+    when(localizer.getText("message.error.reason")).thenReturn("Reason");
     when(localizer.getText("message.config.unknown.enum.warning"))
         .thenReturn(
             "Unrecognized value for configuration setting `%s`. Default value will be applied.");
