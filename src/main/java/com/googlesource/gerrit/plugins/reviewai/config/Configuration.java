@@ -87,6 +87,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
   private static final int DEFAULT_AI_CONNECTION_MAX_RETRY_ATTEMPTS = 2;
   private static final int DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB = 5;
+  private static final int DEFAULT_AI_MAX_CONCURRENT_REQUESTS = 0;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
   private static final boolean DEFAULT_AI_PROVIDER_ZDR = false;
@@ -140,6 +141,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
   private static final String KEY_AI_CONNECTION_MAX_RETRY_ATTEMPTS = "aiConnectionMaxRetryAttempts";
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
+  private static final String KEY_AI_MAX_CONCURRENT_REQUESTS = "aiMaxConcurrentRequests";
   private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
   private static final String KEY_AI_PROVIDER_ZDR = "aiProviderZdr";
   private static final String KEY_OLLAMA_CONTEXT_WINDOW = "ollamaContextWindow";
@@ -369,6 +371,12 @@ public class Configuration extends ConfigCore {
 
   public int getAiUploadedChunkSizeMb() {
     return getInt(KEY_AI_UPLOADED_CHUNK_SIZE_MB, DEFAULT_AI_UPLOADED_CHUNK_SIZE_MB);
+  }
+
+  public int getAiMaxConcurrentRequests() {
+    return Math.max(
+        0, getIntAllowingProjectZero(
+            KEY_AI_MAX_CONCURRENT_REQUESTS, DEFAULT_AI_MAX_CONCURRENT_REQUESTS));
   }
 
   public int getAiMaxToolResponseRounds() {
