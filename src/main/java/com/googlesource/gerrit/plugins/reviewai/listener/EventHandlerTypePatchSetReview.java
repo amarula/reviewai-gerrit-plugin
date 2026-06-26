@@ -35,18 +35,21 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   private final GerritChange change;
   private final PatchSetReviewer reviewer;
   private final GerritClient gerritClient;
+  private final boolean includeAiFailureDetails;
 
   EventHandlerTypePatchSetReview(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       PatchSetReviewer reviewer,
-      GerritClient gerritClient) {
+      GerritClient gerritClient,
+      boolean includeAiFailureDetails) {
     this.config = config;
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
     this.gerritClient = gerritClient;
+    this.includeAiFailureDetails = includeAiFailureDetails;
     log.debug(
         "Initialized EventHandlerTypePatchSetReview for full change ID: {}",
         change.getFullChangeId());
@@ -70,7 +73,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   @Override
   public void processEvent() throws Exception {
     log.debug("Starting patch set review for change ID: {}", change.getFullChangeId());
-    reviewer.review(change);
+    reviewer.review(change, includeAiFailureDetails);
     log.debug("Completed patch set review for change ID: {}", change.getFullChangeId());
   }
 

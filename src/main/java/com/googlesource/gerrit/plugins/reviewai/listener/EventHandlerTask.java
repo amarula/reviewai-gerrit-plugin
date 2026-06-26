@@ -25,6 +25,8 @@ import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
+import com.google.gerrit.server.permissions.GlobalPermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -70,10 +72,12 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewPermission aiReviewPermission;
   private final IdentifiedUser.GenericFactory identifiedUserFactory;
   private final AccountCache accountCache;
+  private final PermissionBackend permissionBackend;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
+  private CurrentUser eventUser;
 
   @Inject
   EventHandlerTask(
@@ -85,6 +89,7 @@ public class EventHandlerTask implements Runnable {
       AiReviewPermission aiReviewPermission,
       IdentifiedUser.GenericFactory identifiedUserFactory,
       AccountCache accountCache,
+      PermissionBackend permissionBackend,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater) {
     this.changeSetData = changeSetData;
     this.change = change;
@@ -94,6 +99,7 @@ public class EventHandlerTask implements Runnable {
     this.aiReviewPermission = aiReviewPermission;
     this.identifiedUserFactory = identifiedUserFactory;
     this.accountCache = accountCache;
+    this.permissionBackend = permissionBackend;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
@@ -140,6 +146,7 @@ public class EventHandlerTask implements Runnable {
       log.debug("Event type not supported: {}", eventType);
       return false;
     }
+    eventUser = getEventUser();
 
     if (!isReviewEnabled(change)) {
       log.debug("Review not enabled for event type: {}", eventType);
@@ -167,16 +174,31 @@ public class EventHandlerTask implements Runnable {
   }
 
   private IEventHandlerType getEventHandlerType() {
+    boolean includeAiFailureDetails = canViewAiFailureDetails(eventUser);
     return switch (processing_event_type) {
       case PATCH_SET_CREATED ->
-          new EventHandlerTypePatchSetReview(config, changeSetData, change, reviewer, gerritClient);
+          new EventHandlerTypePatchSetReview(
+              config, changeSetData, change, reviewer, gerritClient, includeAiFailureDetails);
       case COMMENT_ADDED ->
-          new EventHandlerTypeCommentAdded(changeSetData, change, reviewer, gerritClient);
+          new EventHandlerTypeCommentAdded(
+              changeSetData, change, reviewer, gerritClient, includeAiFailureDetails);
     };
   }
 
+  private boolean canViewAiFailureDetails(CurrentUser user) {
+    try {
+      return user != null
+          && permissionBackend.user(user).test(GlobalPermission.ADMINISTRATE_SERVER);
+    } catch (Exception e) {
+      log.debug(
+          "Failed to inspect event user administrative permission for change {}",
+          change.getFullChangeId(),
+          e);
+      return false;
+    }
+  }
+
   private boolean isReviewEnabled(GerritChange change) {
-    CurrentUser eventUser = getEventUser();
     if (eventUser != null
         && aiReviewPermission.isAiReviewExplicitlyDisallowed(
             change.getProjectNameKey(), change.getBranchNameKey().branch(), eventUser)) {

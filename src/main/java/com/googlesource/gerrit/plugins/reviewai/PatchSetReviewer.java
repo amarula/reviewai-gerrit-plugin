@@ -20,7 +20,6 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
@@ -83,6 +82,10 @@ public class PatchSetReviewer {
   }
 
   public void review(GerritChange change) throws Exception {
+    review(change, false);
+  }
+
+  public void review(GerritChange change, boolean includeAiFailureDetails) throws Exception {
     log.debug("Starting review process for change: {}", change.getFullChangeId());
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
@@ -109,7 +112,7 @@ public class PatchSetReviewer {
     try {
       reviewReply = getReviewReply(change, patchSet);
       log.debug("AI final response: {}", reviewReply);
-    } catch (AiConnectionFailException e) {
+    } catch (Exception e) {
       log.error(
           "AI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
           change.getFullChangeId(),
@@ -119,8 +122,11 @@ public class PatchSetReviewer {
           e.getMessage(),
           e);
       changeSetData.setReviewSystemMessage(
-          SystemMessageFormatter.getLocalizedErrorMessage(
-              localizer, "message.openai.connection.error"));
+          includeAiFailureDetails
+              ? SystemMessageFormatter.getLocalizedErrorMessageWithReason(
+                  localizer, "message.openai.connection.error", e)
+              : SystemMessageFormatter.getLocalizedErrorMessage(
+                  localizer, "message.openai.connection.error"));
     }
     if (reviewReply != null) {
       retrieveReviewBatches(reviewReply, change);
