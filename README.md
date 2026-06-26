@@ -279,6 +279,8 @@ directive = End each reply with \"Hope this helps!\"
       tree, searching references, and reading file content.
     - **NONE**: Does not expose repository context tools. Reviews and interactions rely on the formatted patch and
       Gerrit discussion history only.
+- `aiMaxConcurrentRequests`: Maximum number of concurrent requests sent to AI models across review workflows. The
+  default value is `0`, which means unlimited.
 - `aiMaxMemoryTokens`: Maximum number of tokens retained in LangChain memory per Change, Patch Set, and review scope.
   The default value is 16K.
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
@@ -586,6 +588,7 @@ aiConnectionMaxRetryAttempts: 2
 aiConnectionTimeout: 180
 aiDomain: https://api.openai.com
 aiFullFileReview: true
+aiMaxConcurrentRequests: 0
 aiMaxMemoryTokens: 16384
 aiMaxToolResponseRounds: 3
 aiModels: [OpenAI/gpt-5.4, OpenAI/gpt-5.5, OpenAI/gpt-5.2, OpenAI/gpt-4.1, Gemini/gemini-3.1-pro, ...]

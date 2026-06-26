@@ -520,6 +520,38 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldDefaultAiMaxConcurrentRequestsToUnlimited() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(0, configuration.getAiMaxConcurrentRequests());
+  }
+
+  @Test
+  public void shouldReadConfiguredAiMaxConcurrentRequests() {
+    Config cfg = new Config();
+    cfg.setInt("plugin", PLUGIN_NAME, "aiMaxConcurrentRequests", 2);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals(2, configuration.getAiMaxConcurrentRequests());
+  }
+
+  @Test
+  public void shouldAllowProjectAiMaxConcurrentRequestsOverrideToZero() {
+    Config globalCfg = new Config();
+    globalCfg.setInt("plugin", PLUGIN_NAME, "aiMaxConcurrentRequests", 2);
+    Config projectCfg = new Config();
+    projectCfg.setInt("plugin", PLUGIN_NAME, "aiMaxConcurrentRequests", 0);
+    Configuration configuration =
+        createConfiguration(
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, globalCfg),
+            PluginConfig.createFromGerritConfig(PLUGIN_NAME, projectCfg));
+
+    assertEquals(0, configuration.getAiMaxConcurrentRequests());
+  }
+
+  @Test
   public void shouldDefaultOllamaContextWindowAndResponseLength() {
     Configuration configuration = createConfiguration();
 
