@@ -26,9 +26,13 @@ pipeline {
         }
       }
     }
-    stage('Static Analysis') {
+    stage('Static Analysis & Testing') {
       steps {
         script {
+          if (isGerritReview) {
+             gerritCheck checks: [[name: 'Testing & Analysis', status: 'RUNNING']]
+          }
+
           docker.withRegistry('', '') {
             docker.image('maven:3.9.9-eclipse-temurin-21').inside('-v $HOME/.m2:/var/maven/.m2 -v $HOME/.npm:/.npm') {
               sh '''
@@ -61,6 +65,28 @@ pipeline {
               ],
               qualityGates: []
             )
+          }
+        }
+        success {
+          script {
+            if (isGerritReview) {
+              gerritCheck checks: [[
+                name: 'Testing & Analysis',
+                status: 'SUCCESSFUL',
+                message: 'All tests and static analysis passed.'
+              ]]
+            }
+          }
+        }
+        failure {
+          script {
+            if (isGerritReview) {
+              gerritCheck checks: [[
+                name: 'Testing & Analysis',
+                status: 'FAILED',
+                message: "Testing failed. Check Jenkins build logs: ${env.BUILD_URL}"
+              ]]
+            }
           }
         }
       }
