@@ -24,6 +24,7 @@ import com.google.gerrit.server.data.PatchSetAttribute;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -70,6 +71,7 @@ public class ClientCommandExecutorTest {
         ClientCommandBase.CommandSet.FORGET_THREAD, Map.of(), Map.of(), "");
 
     verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 1);
+    verify(changeDataHandler).removeValue(OpenAiConversation.getMessagesConversationKey());
     assertEquals("forgot", changeSetData.getReviewSystemMessage());
   }
 }
