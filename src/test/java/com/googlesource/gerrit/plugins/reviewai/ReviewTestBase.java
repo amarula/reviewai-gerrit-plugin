@@ -381,7 +381,8 @@ public class ReviewTestBase extends TestBase {
                 new GerritClientReview(config, pluginDataHandlerProvider, localizer)),
             getOpenAIClient(),
             localizer,
-            new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore));
+            new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
+            "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);
   }
 
