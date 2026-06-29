@@ -1,7 +1,7 @@
 {
   "replies": [
     {
-      "reply": "{\"agents\":[{\"agent\":\"COMMIT_MESSAGE\",\"enabled\":true,\"reason\":\"The commit message should match the refactor.\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"commit message instructions\"},{\"agent\":\"CORRECTNESS\",\"enabled\":true,\"reason\":\"The patch changes API usage.\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"correctness instructions\"},{\"agent\":\"SECURITY\",\"enabled\":false,\"reason\":\"No security-sensitive paths changed.\",\"history_context\":\"\",\"custom_instructions\":\"\"}]}",
+      "reply": "{\"agents\":[{\"agent\":\"COMMIT_MESSAGE\",\"enabled\":true,\"reason\":\"The commit message should match the refactor.\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"commit message instructions\"},{\"agent\":\"CORRECTNESS\",\"enabled\":true,\"reason\":\"The patch changes API usage.\",\"history_context\":\"No prior review history provided.\",\"custom_instructions\":\"correctness instructions\"},{\"agent\":\"SECURITY\",\"enabled\":false,\"reason\":\"No security-sensitive paths changed.\",\"history_context\":\"\",\"custom_instructions\":\"\"}],\"consolidation_context\":\"No shared consolidation context.\"}",
       "score": null,
       "relevance": null,
       "repeated": false,

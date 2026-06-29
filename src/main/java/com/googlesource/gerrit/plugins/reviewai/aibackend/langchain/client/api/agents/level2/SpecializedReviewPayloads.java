@@ -41,8 +41,11 @@ final class SpecializedReviewPayloads {
   private SpecializedReviewPayloads() {}
 
   static String buildConsolidationInput(
-      List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
-    return getGson().toJson(SpecializedReviewFindings.ConsolidationInput.from(specializedFindings));
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings, String triageContext) {
+    return getGson()
+        .toJson(
+            SpecializedReviewFindings.ConsolidationInput.from(
+                specializedFindings, triageContext));
   }
 
   static String buildHistoricalRepetitionInput(

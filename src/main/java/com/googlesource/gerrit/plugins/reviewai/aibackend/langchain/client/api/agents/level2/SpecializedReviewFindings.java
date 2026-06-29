@@ -99,8 +99,11 @@ class SpecializedReviewFindings {
     @SerializedName("specialized_findings")
     private final List<AgentFindings> specializedFindings;
 
-    static ConsolidationInput from(List<AgentFindings> specializedFindings) {
-      return new ConsolidationInput(specializedFindings);
+    @SerializedName("triage_context")
+    private final String triageContext;
+
+    static ConsolidationInput from(List<AgentFindings> specializedFindings, String triageContext) {
+      return new ConsolidationInput(specializedFindings, triageContext);
     }
   }
 
