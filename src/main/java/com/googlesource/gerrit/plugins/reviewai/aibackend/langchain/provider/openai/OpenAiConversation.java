@@ -35,6 +35,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 @Slf4j
 public class OpenAiConversation {
   public static final String KEY_CONVERSATION_ID = "conversationId";
+  private static final String MESSAGES_CONVERSATION_KEY = KEY_CONVERSATION_ID + ".messages";
   private static final String SPECIALIZED_AGENT_CONVERSATION_KEY_PREFIX =
       KEY_CONVERSATION_ID + ".review_specialized_agent.";
   private static final String SUGGEST_CONVERSATION_KEY_PREFIX = KEY_CONVERSATION_ID + ".suggest";
@@ -60,6 +61,10 @@ public class OpenAiConversation {
 
   public static String getMultiAgentConversationKey(ReviewAssistantStage assistantStage) {
     return KEY_CONVERSATION_ID + "." + assistantStage.name().toLowerCase(Locale.ROOT);
+  }
+
+  public static String getMessagesConversationKey() {
+    return MESSAGES_CONVERSATION_KEY;
   }
 
   public static String getSpecializedAgentConversationKey(String agentName) {
@@ -125,6 +130,7 @@ public class OpenAiConversation {
 
   public void clear() {
     changeDataHandler.removeValue(KEY_CONVERSATION_ID);
+    changeDataHandler.removeValue(MESSAGES_CONVERSATION_KEY);
     for (ReviewAssistantStage assistantStage : ReviewAssistantStage.values()) {
       changeDataHandler.removeValue(getMultiAgentConversationKey(assistantStage));
     }
