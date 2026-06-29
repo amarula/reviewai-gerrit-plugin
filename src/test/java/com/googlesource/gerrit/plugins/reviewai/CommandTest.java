@@ -43,6 +43,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +90,28 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     mockGerritChangeCommentsApiCall(comments);
   }
 
+  private void setupCommandCommentWithPastAiComments(String command) throws RestApiException {
+    Map<String, List<CommentInfo>> comments =
+        new HashMap<>(readTestFileToType("__files/gerritPatchSetComments.json", COMMENTS_GERRIT_TYPE));
+    mergeComments(
+        comments, readTestFileToType("__files/commands/pastAiPatchSetComment.json", COMMENTS_GERRIT_TYPE));
+    String commentJson =
+        renderTemplate(
+            readTestFile("__files/commands/commandCommentTemplate.json"),
+            Map.of("command", command));
+    Map<String, List<CommentInfo>> commandComments =
+        readContentToType(commentJson, COMMENTS_GERRIT_TYPE);
+    mergeComments(comments, commandComments);
+    mockGerritChangeCommentsApiCall(comments);
+  }
+
+  private void mergeComments(
+      Map<String, List<CommentInfo>> comments, Map<String, List<CommentInfo>> commentsToMerge) {
+    commentsToMerge.forEach(
+        (file, fileComments) ->
+            comments.computeIfAbsent(file, key -> new ArrayList<>()).addAll(fileComments));
+  }
+
   private void enableMessageDebugging() {
     when(config.getEnableMessageDebugging()).thenReturn(true);
   }
@@ -122,7 +145,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean()))
         .thenReturn(true);
 
-    setupCommandComment("/review");
+    setupCommandCommentWithPastAiComments("/review");
     String reviewMessage = readTestFile("__files/commands/review.json");
     setupMockRequestCreateResponse("openAiResponseRequest.json");
 
@@ -137,7 +160,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewDoesNotStoreAutomaticPatchSetConversationTurn()
       throws RestApiException {
-    setupCommandComment("/review");
+    setupCommandCommentWithPastAiComments("/review");
     setupMockRequestCreateResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -149,6 +172,61 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             Mockito.anyString(),
             Mockito.any(),
             Mockito.any());
+  }
+
+  @Test
+  public void commandReviewShowsRepeatedCommentReferenceWhenAllRepliesAreFiltered()
+      throws Exception {
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review");
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiRepeatedReviewResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    String expectedMessage =
+        readTestFile("__files/commands/repeatedReviewSystemMessage.txt").stripTrailing();
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(expectedMessage, captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertEquals(expectedMessage, status.responseText);
+  }
+
+  @Test
+  public void commandReviewShowsRepeatedCommentReferenceWithVisibleReplies() throws Exception {
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiRepeatedAndVisibleReviewResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/repeatedReviewSystemMessage.txt").stripTrailing(),
+        captor.getValue().message);
+    Assert.assertEquals(
+        1,
+        captor.getValue().comments.values().stream().mapToInt(List::size).sum());
+    Assert.assertTrue(
+        captor.getValue().comments.values().stream()
+            .flatMap(List::stream)
+            .anyMatch(comment -> "Visible review comment.".equals(comment.message)));
+  }
+
+  @Test
+  public void commandReviewShowsMultipleRepeatedCommentReferencesAsList() throws Exception {
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiMultipleRepeatedReviewResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/multipleRepeatedReviewSystemMessage.txt").stripTrailing(),
+        captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
   }
 
   @Test
