@@ -159,7 +159,9 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   protected AiResponseContent askReview(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
-      return super.askReview(changeSetData, change, patchSet);
+      ReviewRequestResult reviewRequestResult = askSingleRequest(changeSetData, change, patchSet);
+      setRequestBody(reviewRequestResult == null ? null : reviewRequestResult.getRequestBody());
+      return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
     }
     if (changeSetData.getForcedStagedReview()) {
       return super.askReview(changeSetData, change, patchSet);

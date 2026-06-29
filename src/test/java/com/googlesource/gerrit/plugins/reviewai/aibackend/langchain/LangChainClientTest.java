@@ -359,6 +359,29 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void resolvesDedicatedOpenAiConversationForCommentMessage() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    when(changeDataHandler.getValue(OpenAiConversation.getMessagesConversationKey()))
+        .thenReturn("conv_message");
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+
+    String conversationId =
+        resolveConversationId(
+            new LangChainClient(
+                Mockito.mock(Configuration.class), null, null, null, pluginDataHandlerProvider),
+            AiProviderType.OPENAI,
+            changeSetData,
+            change);
+
+    assertEquals("conv_message", conversationId);
+    verify(changeDataHandler, never()).getValue(OpenAiConversation.KEY_CONVERSATION_ID);
+  }
+
+  @Test
   public void resolvesStageConversationForLangChainOpenAiMultiAgentProvider() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =
@@ -527,6 +550,22 @@ public class LangChainClientTest {
             "resolveConversationId", AiProviderType.class, ChangeSetData.class);
     method.setAccessible(true);
     return (String) method.invoke(client, providerType, changeSetData);
+  }
+
+  private String resolveConversationId(
+      LangChainClient client,
+      AiProviderType providerType,
+      ChangeSetData changeSetData,
+      GerritChange change)
+      throws Exception {
+    Method method =
+        LangChainClient.class.getDeclaredMethod(
+            "resolveConversation", AiProviderType.class, ChangeSetData.class, GerritChange.class);
+    method.setAccessible(true);
+    Object conversationResolution = method.invoke(client, providerType, changeSetData, change);
+    Method conversationIdMethod = conversationResolution.getClass().getDeclaredMethod("conversationId");
+    conversationIdMethod.setAccessible(true);
+    return (String) conversationIdMethod.invoke(conversationResolution);
   }
 
   private ResponseFormat getToolExecutorStructuredResponseFormat(LangChainClient client)

@@ -326,7 +326,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String systemInstructions = prompt.getDefaultAiAssistantInstructions();
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
       ConversationResolution conversationResolution =
-          resolveConversation(providerType, changeSetData);
+          resolveConversation(providerType, changeSetData, change);
       boolean omitRequestContext =
           shouldOmitRequestContext(
               useOpenAiResponses,
@@ -452,12 +452,20 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected ConversationResolution resolveConversation(
       AiProviderType providerType, ChangeSetData changeSetData) throws AiConnectionFailException {
+    return resolveConversation(providerType, changeSetData, null);
+  }
+
+  protected ConversationResolution resolveConversation(
+      AiProviderType providerType, ChangeSetData changeSetData, GerritChange change)
+      throws AiConnectionFailException {
     if (!shouldUseOpenAiResponses(providerType) || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
     OpenAiConversation conversation =
         new OpenAiConversation(
-            config, pluginDataHandlerProvider, LangChainOpenAiConversationKey.from(changeSetData));
+            config,
+            pluginDataHandlerProvider,
+            LangChainOpenAiConversationKey.from(changeSetData, change));
     boolean existingConversation = conversation.hasExistingConversation();
     return new ConversationResolution(
         conversation.resolveConversationId(), existingConversation);
