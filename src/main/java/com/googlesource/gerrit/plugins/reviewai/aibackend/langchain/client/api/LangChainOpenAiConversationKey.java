@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 
@@ -23,6 +24,13 @@ final class LangChainOpenAiConversationKey {
   private LangChainOpenAiConversationKey() {}
 
   static String from(ChangeSetData changeSetData) {
+    return from(changeSetData, null);
+  }
+
+  static String from(ChangeSetData changeSetData, GerritChange change) {
+    if (isMessageInteraction(changeSetData, change)) {
+      return OpenAiConversation.getMessagesConversationKey();
+    }
     if (changeSetData.getReviewAssistantStage() == null) {
       return OpenAiConversation.KEY_CONVERSATION_ID;
     }
@@ -40,5 +48,11 @@ final class LangChainOpenAiConversationKey {
           OpenAiConversation.getMultiAgentConversationKey(changeSetData.getReviewAssistantStage());
       default -> OpenAiConversation.KEY_CONVERSATION_ID;
     };
+  }
+
+  private static boolean isMessageInteraction(ChangeSetData changeSetData, GerritChange change) {
+    return change != null
+        && Boolean.TRUE.equals(change.getIsCommentEvent())
+        && !Boolean.TRUE.equals(changeSetData.getForcedReview());
   }
 }
