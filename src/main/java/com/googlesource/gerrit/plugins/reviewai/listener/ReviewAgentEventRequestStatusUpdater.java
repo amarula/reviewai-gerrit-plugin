@@ -99,6 +99,12 @@ class ReviewAgentEventRequestStatusUpdater {
       if (requestId.isEmpty()) {
         return;
       }
+      if (changeSetData.getReviewRepeatedCommentsMessage() != null) {
+        complete(
+            SystemMessageFormatter.getPrefixedSystemMessage(
+                localizer, changeSetData.getReviewRepeatedCommentsMessage()));
+        return;
+      }
       if (changeSetData.getReviewSystemMessage() == null) {
         complete(null);
         return;

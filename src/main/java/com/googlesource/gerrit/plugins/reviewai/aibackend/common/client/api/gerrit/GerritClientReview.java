@@ -146,7 +146,12 @@ public class GerritClientReview extends GerritClientAccount {
           SystemMessageFormatter.getPrefixedSystemMessage(
               localizer, changeSetData.getReviewNoticeMessage()));
     }
-    if (emptyComments) {
+    if (changeSetData.getReviewRepeatedCommentsMessage() != null) {
+      messages.add(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewRepeatedCommentsMessage()));
+    }
+    if (emptyComments && changeSetData.getReviewRepeatedCommentsMessage() == null) {
       messages.add(SystemMessageFormatter.getPrefixedSystemMessage(localizer, systemMessage));
     }
     SystemMessageFormatter.appendConfigurationWarningMessages(config, localizer, messages);
@@ -158,7 +163,9 @@ public class GerritClientReview extends GerritClientAccount {
   }
 
   private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
-    if (reviewScore == null || changeSetData.getReviewSystemMessage() != null) {
+    if (reviewScore == null
+        || changeSetData.getReviewSystemMessage() != null
+        || changeSetData.getReviewRepeatedCommentsMessage() != null) {
       return false;
     }
     Integer existingReviewScore = getCurrentCodeReviewValue(changeSetData);
