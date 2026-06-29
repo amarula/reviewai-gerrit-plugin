@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_REPEATED_AND_VISIBLE_REVIEW",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_REPEATED_AND_VISIBLE_REVIEW",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"reply\":\"This was already raised before.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"raw-previous-r1\",\"conflicting\":false,\"filename\":\"test_file.py\",\"lineNumber\":5,\"codeSnippet\":\"message from gpt\"},{\"reply\":\"Visible review comment.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":false,\"conflicting\":false,\"filename\":\"test_file_1.py\",\"lineNumber\":18,\"codeSnippet\":\"module_name, class_name = module_name.rsplit('.', 2)\"}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}
