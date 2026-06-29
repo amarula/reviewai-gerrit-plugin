@@ -34,10 +34,14 @@
             "custom_instructions"
           ]
         }
+      },
+      "consolidation_context": {
+        "type": "string"
       }
     },
     "required": [
-      "agents"
+      "agents",
+      "consolidation_context"
     ]
   }
 }

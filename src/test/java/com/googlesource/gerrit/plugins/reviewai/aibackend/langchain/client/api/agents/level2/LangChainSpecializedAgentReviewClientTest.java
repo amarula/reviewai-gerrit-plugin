@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -27,22 +28,28 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import org.junit.Test;
 
@@ -53,6 +60,10 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/specializedTriageResponse.json";
   private static final String WRAPPED_TRIAGE_RESPONSE_RESOURCE =
       "__files/langchain/specializedTriageWrappedResponse.json";
+  private static final String ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE =
+      "__files/langchain/routerAiDataPromptWithHistoryExpectedMessages.txt";
+  private static final String PATCH_SET_FORGET_THREAD_RESOURCE =
+      "__files/aibackend/common/client/prompt/patchSetHistoryStartsAfterLatestForgetThreadCommand.json";
   private static final String SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE =
       "__files/langchain/suggestPreviousReviewContextAfterForget.json";
   private static final String MESSAGE_RESPONSE_RESOURCE =
@@ -165,6 +176,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(triage.getAgents().getFirst().isEnabled());
     assertEquals("SECURITY", triage.getAgents().get(1).getAgent());
     assertFalse(triage.getAgents().get(1).isEnabled());
+    assertEquals(
+        "Consolidate with prior reviewer concern about parsing behavior.",
+        triage.getConsolidationContext());
   }
 
   @Test
@@ -181,6 +195,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(triage.getAgents().get(1).isEnabled());
     assertEquals("SECURITY", triage.getAgents().get(2).getAgent());
     assertFalse(triage.getAgents().get(2).isEnabled());
+    assertEquals("No shared consolidation context.", triage.getConsolidationContext());
   }
 
   @Test
@@ -295,6 +310,66 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
+  public void triageInputIncludesPatchsetAndMessageThread() throws Exception {
+    AiHistoryFixture fixture = readAiHistoryFixture(PATCH_SET_FORGET_THREAD_RESOURCE);
+    GerritClient gerritClient = mock(GerritClient.class);
+    Localizer localizer = localizer();
+    RecordingSpecializedClient client =
+        new RecordingSpecializedClient(config(), gerritClient, localizer);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    GerritChange change = change(false);
+    when(gerritClient.getClientData(change))
+        .thenReturn(
+            new GerritClientData(
+                null,
+                List.of(),
+                new CommentData(List.of(), new HashMap<>(), mapById(fixture.patchSetComments)),
+                0));
+
+    String triageInput =
+        client.buildTriageInput(changeSetData, change, readTestResource(PATCH_SET_RESOURCE));
+
+    assertTrue(triageInput.contains("# Patchset"));
+    assertTrue(triageInput.contains("Subject: Fix parsing"));
+    assertTrue(triageInput.contains("# Message thread"));
+    assertFalse(triageInput.contains("first question"));
+    assertFalse(triageInput.contains("first answer"));
+    assertFalse(triageInput.contains("/forget_thread"));
+    assertTrue(triageInput.contains("second question"));
+    assertTrue(triageInput.contains("second answer"));
+  }
+
+  @Test
+  public void triageInputOmitsMessageThreadWhenForgetThreadIsRequested() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    RecordingSpecializedClient client =
+        new RecordingSpecializedClient(config(), gerritClient, localizer());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.addParsedCommand("forget_thread", Map.of());
+    GerritChange change = change(false);
+
+    String triageInput =
+        client.buildTriageInput(changeSetData, change, readTestResource(PATCH_SET_RESOURCE));
+
+    assertTrue(triageInput.contains("# Patchset"));
+    assertFalse(triageInput.contains("# Message thread"));
+    verify(gerritClient, never()).getClientData(change);
+  }
+
+  @Test
+  public void forgetThreadSkipsPastReviewComments() {
+    GerritClient gerritClient = mock(GerritClient.class);
+    RecordingSpecializedClient client =
+        new RecordingSpecializedClient(config(), gerritClient, localizer());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.addParsedCommand("forget_thread", Map.of());
+    GerritChange change = change(false);
+
+    assertTrue(client.collectPastReviewComments(changeSetData, change).isEmpty());
+    verify(gerritClient, never()).getClientData(change);
+  }
+
+  @Test
   public void commitMessageSpecialistReceivesWholePatchset() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     SpecializedReviewTriage.AgentPlan plan = plan("COMMIT_MESSAGE", true);
@@ -310,15 +385,18 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void consolidationInputIncludesSpecializedFindings() {
+  public void consolidationInputIncludesSpecializedFindings() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     SpecializedReviewFindings findings = finding("Correctness", "Review issue");
 
     String consolidationInput =
         client.buildConsolidationInput(
-            List.of(SpecializedReviewFindings.AgentFindings.from("CORRECTNESS", findings)));
+            List.of(SpecializedReviewFindings.AgentFindings.from("CORRECTNESS", findings)),
+            String.join("\n", readTestResourceLines(ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE)));
 
     assertTrue(consolidationInput.contains("\"specialized_findings\""));
+    assertTrue(consolidationInput.contains("\"triage_context\""));
+    assertTrue(consolidationInput.contains("Can you improve the commit title?"));
     assertTrue(consolidationInput.contains("\"agent\":\"CORRECTNESS\""));
     assertTrue(consolidationInput.contains("\"description\":\"Review issue\""));
     assertTrue(consolidationInput.contains("\"filename\":\"src/Test.java\""));
@@ -382,6 +460,32 @@ public class LangChainSpecializedAgentReviewClientTest {
     return Files.readString(TEST_RESOURCES_PATH.resolve(resourceName));
   }
 
+  private static AiHistoryFixture readAiHistoryFixture(String resourceName) throws Exception {
+    return getGson().fromJson(readTestResource(resourceName), AiHistoryFixture.class);
+  }
+
+  private static List<String> readTestResourceLines(String resourceName) throws Exception {
+    return Files.readAllLines(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  private static HashMap<String, GerritComment> mapById(List<GerritComment> comments) {
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    for (GerritComment comment : comments) {
+      commentsById.put(comment.getId(), comment);
+    }
+    return commentsById;
+  }
+
+  private static Localizer localizer() {
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
+    when(localizer.getText("plugin.message.label")).thenReturn("Message");
+    when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
+    when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
+    when(localizer.getText("message.empty.review")).thenReturn("");
+    return localizer;
+  }
+
   private static String extractSection(String instructions, String title) {
     String marker = "# " + title;
     int start = instructions.indexOf(marker);
@@ -400,6 +504,11 @@ public class LangChainSpecializedAgentReviewClientTest {
 
     RecordingSpecializedClient(Configuration config) {
       super(config, null, null, null, Runnable::run);
+    }
+
+    RecordingSpecializedClient(
+        Configuration config, GerritClient gerritClient, Localizer localizer) {
+      super(config, null, gerritClient, localizer, Runnable::run);
     }
 
     @Override
@@ -431,7 +540,8 @@ public class LangChainSpecializedAgentReviewClientTest {
         ChangeSetData changeSetData,
         GerritChange change,
         String patchSet,
-        List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
+        List<SpecializedReviewFindings.AgentFindings> specializedFindings,
+        String triageContext) {
       specializedFindings.forEach(finding -> collectorAgents.add(finding.getAgent()));
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(
@@ -508,5 +618,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     protected String getAiAssistantInstructionsReviewWithoutDirectives(boolean... ruleFilter) {
       return "";
     }
+  }
+
+  private static class AiHistoryFixture {
+    private List<GerritComment> patchSetComments = List.of();
   }
 }
