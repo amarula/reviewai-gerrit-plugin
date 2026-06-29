@@ -24,6 +24,9 @@ import lombok.Data;
 class SpecializedReviewTriage {
   private List<AgentPlan> agents;
 
+  @SerializedName("consolidation_context")
+  private String consolidationContext;
+
   @Data
   static class AgentPlan {
     private String agent;

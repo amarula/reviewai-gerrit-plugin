@@ -178,6 +178,7 @@ public class LangChainClientTest {
 
     JsonObjectSchema root = (JsonObjectSchema) jsonSchema.rootElement();
     assertTrue(root.properties().containsKey("agents"));
+    assertTrue(root.properties().containsKey("consolidation_context"));
     assertFalse(root.properties().containsKey("replies"));
     assertFalse(root.properties().containsKey("changeId"));
 
