@@ -21,24 +21,28 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
+import dev.langchain4j.data.message.ChatMessage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +50,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
@@ -178,13 +183,15 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     List<SpecializedReviewFindings.AgentFindings> specializedFindings =
         askSpecializedAgents(changeSetData, change, patchSet, enabledPlans);
     AiResponseContent collectorResponse =
-        askCollector(changeSetData, change, patchSet, specializedFindings);
+        askCollector(
+            changeSetData, change, patchSet, specializedFindings, triage.getConsolidationContext());
     return collectorResponse == null ? new AiResponseContent("") : collectorResponse;
   }
 
   @Override
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return !isSpecializedAgentStage(changeSetData.getReviewAssistantStage());
+    return changeSetData.getReviewAssistantStage() != ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE
+        && !isSpecializedAgentStage(changeSetData.getReviewAssistantStage());
   }
 
   SpecializedReviewTriage askTriage(
@@ -192,7 +199,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     ChangeSetData triageData =
         SpecializedReviewStageData.staged(
             changeSetData, ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE);
-    RawReviewRequestResult result = askSingleRawRequest(triageData, change, patchSet);
+    RawReviewRequestResult result =
+        askSingleRawRequest(triageData, change, buildTriageInput(changeSetData, change, patchSet));
     setRequestBody(result == null ? null : result.getRequestBody());
     return result == null
         ? new SpecializedReviewTriage()
@@ -268,6 +276,16 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       String patchSet,
       List<SpecializedReviewFindings.AgentFindings> specializedFindings)
       throws Exception {
+    return askCollector(changeSetData, change, patchSet, specializedFindings, null);
+  }
+
+  AiResponseContent askCollector(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings,
+      String triageContext)
+      throws Exception {
     SpecializedReviewConcernIds.assignRawConcernIds(specializedFindings);
     Set<String> expectedConcernIds = SpecializedReviewConcernIds.rawConcernIds(specializedFindings);
     CompletableFuture<SpecializedReviewFindings> consolidationFuture =
@@ -276,7 +294,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
                 askFindingsStage(
                     changeSetData,
                     change,
-                    buildConsolidationInput(specializedFindings),
+                    buildConsolidationInput(specializedFindings, triageContext),
                     CONSOLIDATION_STAGE));
     CompletableFuture<SpecializedReviewFindings.HistoricalRepetitionResult>
         historicalRepetitionFuture =
@@ -364,8 +382,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
   @VisibleForTesting
   String buildConsolidationInput(
-      List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
-    return SpecializedReviewPayloads.buildConsolidationInput(specializedFindings);
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings, String triageContext) {
+    return SpecializedReviewPayloads.buildConsolidationInput(specializedFindings, triageContext);
   }
 
   @VisibleForTesting
@@ -509,6 +527,40 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     AiPromptSections.addSection(
         sections, "Filtered history context", plan.getHistoryContext());
     return String.join("\n\n", sections);
+  }
+
+  @VisibleForTesting
+  String buildTriageInput(ChangeSetData changeSetData, GerritChange change, String patchSet) {
+    List<String> sections = new ArrayList<>();
+    sections.add("# Patchset\n" + patchSet);
+    AiPromptSections.addSection(
+        sections, "Message thread", buildMessageThreadContext(changeSetData, change));
+    return String.join("\n\n", sections);
+  }
+
+  private String buildMessageThreadContext(ChangeSetData changeSetData, GerritChange change) {
+    if (gerritClient == null || localizer == null || changeSetData == null || change == null) {
+      return "";
+    }
+    try {
+      GerritClientData gerritClientData = gerritClient.getClientData(change);
+      if (gerritClientData == null) {
+        return "";
+      }
+      AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+      return LangChainChatMessages.build(aiHistory, gerritClientData, change).stream()
+          .map(LangChainChatMessages::trimmed)
+          .map(this::formatThreadMessage)
+          .filter(message -> !message.isBlank())
+          .collect(Collectors.joining("\n\n"));
+    } catch (Exception e) {
+      log.debug("Unable to add Gerrit message thread to specialized triage context", e);
+      return "";
+    }
+  }
+
+  private String formatThreadMessage(ChatMessage message) {
+    return message.type() + ":\n" + LangChainChatMessages.content(message).trim();
   }
 
   private boolean isSpecializedAgentStage(ReviewAssistantStage stage) {
