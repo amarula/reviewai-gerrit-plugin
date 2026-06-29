@@ -55,6 +55,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/specializedTriageWrappedResponse.json";
   private static final String SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE =
       "__files/langchain/suggestPreviousReviewContextAfterForget.json";
+  private static final String MESSAGE_RESPONSE_RESOURCE =
+      "__files/langchain/messageResponse.json";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -105,6 +107,23 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(client.suggestClientCalled);
     assertFalse(client.triageCalled);
     assertEquals("suggestion", response.getReplies().getFirst().getReply());
+  }
+
+  @Test
+  public void commentMessageUsesDedicatedMessageRequestWithoutSpecializedRouting() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage = triage(plan("CORRECTNESS", true));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    GerritChange change = change(true);
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(PATCH_SET_RESOURCE));
+
+    assertTrue(client.messageRequestCalled);
+    assertFalse(client.triageCalled);
+    assertEquals(List.of(), client.recordedAgents);
+    assertEquals("Message response", response.getReplies().getFirst().getReply());
+    assertEquals("message request", client.getRequestBody());
   }
 
   @Test
@@ -377,6 +396,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     private SpecializedReviewTriage triage = triage();
     private boolean triageCalled;
     private boolean suggestClientCalled;
+    private boolean messageRequestCalled;
 
     RecordingSpecializedClient(Configuration config) {
       super(config, null, null, null, Runnable::run);
@@ -387,6 +407,13 @@ public class LangChainSpecializedAgentReviewClientTest {
         ChangeSetData changeSetData, GerritChange change, String patchSet) {
       triageCalled = true;
       return triage;
+    }
+
+    @Override
+    protected RawReviewRequestResult askSingleRawRequest(
+        ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+      messageRequestCalled = true;
+      return rawReviewRequestResult(readTestResource(MESSAGE_RESPONSE_RESOURCE), "message request");
     }
 
     @Override
