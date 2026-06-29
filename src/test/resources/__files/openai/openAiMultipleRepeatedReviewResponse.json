@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_MULTIPLE_REPEATED_REVIEW",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_MULTIPLE_REPEATED_REVIEW",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"reply\":\"This was already raised before.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"raw-previous-r1\",\"conflicting\":false,\"filename\":\"test_file.py\",\"lineNumber\":5,\"codeSnippet\":\"message from gpt\"},{\"reply\":\"This patch set concern was already raised before.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"ai_patchset_123\",\"conflicting\":false}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}

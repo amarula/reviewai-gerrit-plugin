@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import com.google.gerrit.server.config.CanonicalWebUrl;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
@@ -27,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.review.RepeatedCommentReferenceFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.comment.GerritCommentRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.filename.FilenameSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
@@ -41,6 +43,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
+import javax.annotation.Nullable;
 
 @Slf4j
 public class PatchSetReviewer {
@@ -56,6 +59,7 @@ public class PatchSetReviewer {
   private final Localizer localizer;
   private final DebugCodeBlocksReview debugCodeBlocksReview;
   private final PatchSetReviewConversationRecorder conversationRecorder;
+  private final RepeatedCommentReferenceFormatter repeatedCommentReferenceFormatter;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -70,7 +74,8 @@ public class PatchSetReviewer {
       Provider<GerritClientReview> clientReviewProvider,
       IAiClient openAiClient,
       Localizer localizer,
-      PatchSetReviewConversationRecorder conversationRecorder) {
+      PatchSetReviewConversationRecorder conversationRecorder,
+      @CanonicalWebUrl @Nullable String canonicalWebUrl) {
     this.config = config;
     this.gerritClient = gerritClient;
     this.changeSetData = changeSetData;
@@ -78,6 +83,9 @@ public class PatchSetReviewer {
     this.openAiClient = openAiClient;
     this.localizer = localizer;
     this.conversationRecorder = conversationRecorder;
+    this.repeatedCommentReferenceFormatter =
+        new RepeatedCommentReferenceFormatter(
+            gerritClient, changeSetData, localizer, canonicalWebUrl);
     debugCodeBlocksReview = new DebugCodeBlocksReview(localizer);
     log.debug("PatchSetReviewer initialized.");
   }
@@ -90,6 +98,7 @@ public class PatchSetReviewer {
     log.debug("Starting review process for change: {}", change.getFullChangeId());
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
+    changeSetData.setReviewRepeatedCommentsMessage(null);
     if (!changeSetData.shouldRequestAiReview()) {
       log.debug("Skipping patch retrieval and AI request because only a system response is needed.");
       clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
@@ -176,6 +185,7 @@ public class PatchSetReviewer {
 
   private void retrieveReviewBatches(AiResponseContent reviewReply, GerritChange change) {
     FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
+    List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
     if (reviewReply.getMessageContent() != null && !reviewReply.getMessageContent().isEmpty()) {
       reviewBatches.add(new ReviewBatch(reviewReply.getMessageContent()));
@@ -191,6 +201,11 @@ public class PatchSetReviewer {
               || replyItem.isDuplicated()
               || replyItem.isConflicting()
               || isIrrelevant;
+      boolean hiddenByReplyFilter =
+          !change.getIsCommentEvent() && changeSetData.getReplyFilterEnabled() && isHidden;
+      if (hiddenByReplyFilter && replyItem.isRepeated()) {
+        filteredRepeatedReplyItems.add(replyItem);
+      }
       if (!replyItem.isDuplicated()
           && !replyItem.isConflicting()
           && !isIrrelevant
@@ -199,7 +214,7 @@ public class PatchSetReviewer {
         reviewScores.add(score);
       }
       if (reply == null
-          || !change.getIsCommentEvent() && changeSetData.getReplyFilterEnabled() && isHidden) {
+          || hiddenByReplyFilter) {
         continue;
       }
       if (changeSetData.getDebugReviewMode()) {
@@ -215,6 +230,14 @@ public class PatchSetReviewer {
       reviewBatches.add(batchMap);
       log.debug("Added review batch from reply item: {}", batchMap);
     }
+    setRepeatedCommentsMessage(filteredRepeatedReplyItems, change);
+  }
+
+  private void setRepeatedCommentsMessage(
+      List<AiReplyItem> filteredRepeatedReplyItems, GerritChange change) {
+    repeatedCommentReferenceFormatter
+        .format(filteredRepeatedReplyItems, change)
+        .ifPresent(changeSetData::setReviewRepeatedCommentsMessage);
   }
 
   private AiResponseContent getReviewReply(GerritChange change, String patchSet)
