@@ -77,6 +77,11 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   @Override
   public void processEvent() throws Exception {
     log.debug("Starting patch set review for change ID: {}", change.getFullChangeId());
+    if (changeSetData.getForcedTopicReview()) {
+      processForcedTopicReview();
+      log.debug("Completed patch set review for change ID: {}", change.getFullChangeId());
+      return;
+    }
     Optional<List<GerritChange>> topicBatch =
         topicPatchSetReviewCoordinator.awaitBatch(change, config.getTopicPatchSetWaitMs());
     if (topicBatch.isEmpty()) {
@@ -102,6 +107,26 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
       reviewer.reviewTopic(reviewableTopicChanges, administratorUser);
     }
     log.debug("Completed patch set review for change ID: {}", change.getFullChangeId());
+  }
+
+  private void processForcedTopicReview() throws Exception {
+    List<GerritChange> topicChanges = gerritClient.getTopicChanges(change);
+    if (topicChanges.isEmpty()) {
+      log.info(
+          "No topic changes found for forced topic review on change ID: {}",
+          change.getFullChangeId());
+      reviewer.review(change, administratorUser);
+      return;
+    }
+    List<GerritChange> reviewableTopicChanges =
+        topicChanges.stream().filter(this::prepareTopicChangeForReview).toList();
+    if (reviewableTopicChanges.size() < 2) {
+      reviewer.review(
+          reviewableTopicChanges.isEmpty() ? change : reviewableTopicChanges.getFirst(),
+          administratorUser);
+      return;
+    }
+    reviewer.reviewTopic(reviewableTopicChanges, administratorUser);
   }
 
   private boolean prepareTopicChangeForReview(GerritChange topicChange) {
@@ -136,8 +161,9 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
           change.getFullChangeId());
       return false;
     }
-    String authorUsername = patchSetAttribute.author.username;
-    if (gerritClient.isDisabledUser(authorUsername)) {
+    String authorUsername =
+        patchSetAttribute.author == null ? null : patchSetAttribute.author.username;
+    if (authorUsername != null && gerritClient.isDisabledUser(authorUsername)) {
       log.info(
           "Patch set review is disabled for user '{}', change ID: {}",
           authorUsername,

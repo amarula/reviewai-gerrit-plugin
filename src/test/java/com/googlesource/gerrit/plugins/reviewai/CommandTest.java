@@ -28,6 +28,7 @@ import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -157,6 +158,25 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
 
     Gson gson = OutputFormat.JSON_COMPACT.newGson();
     Assert.assertEquals(reviewMessage, gson.toJson(captor.getAllValues().get(0)));
+  }
+
+  @Test
+  public void commandReviewTopicSetsForcedTopicReview() {
+    ClientCommandParser parser =
+        new ClientCommandParser(
+            config,
+            changeSetData,
+            getGerritChange(),
+            getCodeContextPolicy(),
+            pluginDataHandlerProvider,
+            localizer,
+            () -> "",
+            null);
+
+    Assert.assertTrue(parser.parseCommands("/review --topic"));
+
+    Assert.assertTrue(changeSetData.getForcedReview());
+    Assert.assertTrue(changeSetData.getForcedTopicReview());
   }
 
   @Test
@@ -303,7 +323,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertTrue(systemMessage.contains("`/message <text>`"));
     Assert.assertTrue(
         systemMessage.contains(
-            "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
+            "`/review [--topic] [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(
         systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
     Assert.assertTrue(
@@ -332,7 +352,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertTrue(systemMessage.contains("HELP FOR `/review`"));
     Assert.assertTrue(
         systemMessage.contains(
-            "`/review [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
+            "`/review [--topic] [--scope=patchset|commit_message] [--filter=true|false] [--debug]`"));
     Assert.assertTrue(systemMessage.contains("Triggers a review of the full Change Set"));
   }
 

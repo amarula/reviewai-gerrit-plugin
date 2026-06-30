@@ -23,6 +23,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -76,5 +77,9 @@ public class GerritClientFacade {
         gerritClientDetail.getMessages(change),
         gerritClientComments.getCommentData(),
         gerritClientPatchSet.getRevisionBase());
+  }
+
+  public List<GerritChange> getTopicChanges(GerritChange change) {
+    return gerritClientDetail.getTopicChanges(change);
   }
 }
