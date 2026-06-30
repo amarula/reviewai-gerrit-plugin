@@ -53,7 +53,9 @@ public class AiPromptSpecializedVerification extends AiPromptSpecializedReviewCo
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION_RESPONSE_FORMAT;
+    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION_RESPONSE_FORMAT
+        + "\n\n"
+        + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION;
   }
 
   @Override

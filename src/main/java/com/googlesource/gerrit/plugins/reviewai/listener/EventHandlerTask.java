@@ -73,6 +73,7 @@ public class EventHandlerTask implements Runnable {
   private final AccountCache accountCache;
   private final PermissionBackend permissionBackend;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
+  private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -89,7 +90,8 @@ public class EventHandlerTask implements Runnable {
       IdentifiedUser.GenericFactory identifiedUserFactory,
       AccountCache accountCache,
       PermissionBackend permissionBackend,
-      ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater) {
+      ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
+      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -100,6 +102,7 @@ public class EventHandlerTask implements Runnable {
     this.accountCache = accountCache;
     this.permissionBackend = permissionBackend;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
+    this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -177,7 +180,13 @@ public class EventHandlerTask implements Runnable {
     return switch (processing_event_type) {
       case PATCH_SET_CREATED ->
           new EventHandlerTypePatchSetReview(
-              config, changeSetData, change, reviewer, gerritClient, includeAiFailureDetails);
+              config,
+              changeSetData,
+              change,
+              reviewer,
+              gerritClient,
+              topicPatchSetReviewCoordinator,
+              includeAiFailureDetails);
       case COMMENT_ADDED ->
           new EventHandlerTypeCommentAdded(
               changeSetData, change, reviewer, gerritClient, includeAiFailureDetails);

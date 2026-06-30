@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -36,6 +37,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   private final PatchSetReviewer reviewer;
   private final GerritClient gerritClient;
   private final boolean includeAiFailureDetails;
+  private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
 
   EventHandlerTypePatchSetReview(
       Configuration config,
@@ -43,6 +45,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
       GerritChange change,
       PatchSetReviewer reviewer,
       GerritClient gerritClient,
+      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
       boolean includeAiFailureDetails) {
     this.config = config;
     this.changeSetData = changeSetData;
@@ -50,6 +53,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
     this.reviewer = reviewer;
     this.gerritClient = gerritClient;
     this.includeAiFailureDetails = includeAiFailureDetails;
+    this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     log.debug(
         "Initialized EventHandlerTypePatchSetReview for full change ID: {}",
         change.getFullChangeId());
@@ -73,8 +77,39 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   @Override
   public void processEvent() throws Exception {
     log.debug("Starting patch set review for change ID: {}", change.getFullChangeId());
-    reviewer.review(change, includeAiFailureDetails);
+    Optional<List<GerritChange>> topicBatch =
+        topicPatchSetReviewCoordinator.awaitBatch(change, config.getTopicPatchSetWaitMs());
+    if (topicBatch.isEmpty()) {
+      reviewer.review(change, includeAiFailureDetails);
+      log.debug("Completed patch set review for change ID: {}", change.getFullChangeId());
+      return;
+    }
+
+    List<GerritChange> topicChanges = topicBatch.get();
+    if (topicChanges.isEmpty()) {
+      log.debug(
+          "Topic patch set review already claimed for change ID: {}", change.getFullChangeId());
+      return;
+    }
+    List<GerritChange> reviewableTopicChanges =
+        topicChanges.stream().filter(this::prepareTopicChangeForReview).toList();
+    if (reviewableTopicChanges.isEmpty()) {
+      return;
+    }
+    if (reviewableTopicChanges.size() == 1) {
+      reviewer.review(reviewableTopicChanges.getFirst(), includeAiFailureDetails);
+    } else {
+      reviewer.reviewTopic(reviewableTopicChanges, includeAiFailureDetails);
+    }
     log.debug("Completed patch set review for change ID: {}", change.getFullChangeId());
+  }
+
+  private boolean prepareTopicChangeForReview(GerritChange topicChange) {
+    if (!isPatchSetReviewEnabled(topicChange)) {
+      return false;
+    }
+    gerritClient.retrievePatchSetInfo(topicChange);
+    return true;
   }
 
   private boolean isPatchSetReviewEnabled(GerritChange change) {
