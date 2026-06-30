@@ -374,6 +374,7 @@ this section.
   "true" to apply filters.
 - `--scope=[patchset/commit_message]`: Limits the review scope. `patchset` reviews only the PatchSet code changes, and
   `commit_message` reviews only the commit message. If omitted, both are reviewed.
+- `--topic`: Extends the review to all open changes with the same topic, using a single AI request.
 - `--debug`: When paired with `/review`, this option displays useful debug information in each AI reply, showing all
   replies as though the filter setting were disabled.
 

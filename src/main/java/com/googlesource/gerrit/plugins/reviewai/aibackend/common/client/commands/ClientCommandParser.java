@@ -38,21 +38,26 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceC
 @Slf4j
 public class ClientCommandParser extends ClientCommandBase {
   private static final Map<String, BaseOptionSet> BASE_OPTION_MAP =
-      Map.of(
-          "filter", BaseOptionSet.FILTER,
-          "debug", BaseOptionSet.DEBUG,
-          "scope", BaseOptionSet.SCOPE,
-          "reset", BaseOptionSet.RESET,
-          "remove", BaseOptionSet.REMOVE,
-          "config", BaseOptionSet.CONFIG,
-          "local_data", BaseOptionSet.LOCAL_DATA,
-          "prompts", BaseOptionSet.PROMPTS,
-          "instructions", BaseOptionSet.INSTRUCTIONS,
-          "mode", BaseOptionSet.MODE);
+      Map.ofEntries(
+          Map.entry("filter", BaseOptionSet.FILTER),
+          Map.entry("debug", BaseOptionSet.DEBUG),
+          Map.entry("scope", BaseOptionSet.SCOPE),
+          Map.entry("reset", BaseOptionSet.RESET),
+          Map.entry("remove", BaseOptionSet.REMOVE),
+          Map.entry("config", BaseOptionSet.CONFIG),
+          Map.entry("local_data", BaseOptionSet.LOCAL_DATA),
+          Map.entry("prompts", BaseOptionSet.PROMPTS),
+          Map.entry("instructions", BaseOptionSet.INSTRUCTIONS),
+          Map.entry("mode", BaseOptionSet.MODE),
+          Map.entry("topic", BaseOptionSet.TOPIC));
   private static final Map<CommandSet, List<BaseOptionSet>> COMMAND_VALID_OPTIONS_MAP =
       Map.of(
           CommandSet.REVIEW,
-              List.of(BaseOptionSet.FILTER, BaseOptionSet.DEBUG, BaseOptionSet.SCOPE),
+              List.of(
+                  BaseOptionSet.FILTER,
+                  BaseOptionSet.DEBUG,
+                  BaseOptionSet.SCOPE,
+                  BaseOptionSet.TOPIC),
           CommandSet.SUGGEST, List.of(BaseOptionSet.SCOPE),
           CommandSet.CONFIGURE, List.of(BaseOptionSet.RESET, BaseOptionSet.CONFIGURATION_OPTION),
           CommandSet.DIRECTIVES, List.of(BaseOptionSet.RESET, BaseOptionSet.REMOVE),
