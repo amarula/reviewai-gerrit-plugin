@@ -41,6 +41,7 @@ public class GerritChange {
   private BranchNameKey branchNameKey;
   private Change.Key changeKey;
   private String fullChangeId;
+  @Setter private String topic;
   @Setter private Integer patchSetNumber;
   // "Boolean" is used instead of "boolean" to have "getIsCommentEvent" instead of "isCommentEvent"
   // as getter method
@@ -95,6 +96,9 @@ public class GerritChange {
   }
 
   public Optional<String> getTopic() {
+    if (topic != null && !topic.isBlank()) {
+      return Optional.of(topic);
+    }
     try {
       return Optional.ofNullable(patchSetEvent.change.get())
           .map(change -> change.topic)

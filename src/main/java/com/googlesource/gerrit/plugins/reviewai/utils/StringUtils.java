@@ -37,6 +37,10 @@ public class StringUtils {
     return body.replace("\"", "\\\"");
   }
 
+  public static String backslashBackslashesAndDoubleQuotes(String body) {
+    return body.replace("\\", "\\\\").replace("\"", "\\\"");
+  }
+
   public static String doubleBackslashDoubleQuotes(String body) {
     return body.replace("\"", "\\\\\"");
   }

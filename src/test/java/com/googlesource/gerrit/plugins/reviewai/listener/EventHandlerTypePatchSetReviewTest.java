@@ -104,4 +104,36 @@ public class EventHandlerTypePatchSetReviewTest {
 
     verify(reviewer).reviewTopic(topicChanges, true);
   }
+
+  @Test
+  public void forcedTopicReviewQueriesTopicChanges() throws Exception {
+    Configuration config = mock(Configuration.class);
+    ChangeSetData changeSetData = mock(ChangeSetData.class);
+    GerritChange change = mock(GerritChange.class);
+    GerritChange relatedChange = mock(GerritChange.class);
+    PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
+    GerritClient gerritClient = mock(GerritClient.class);
+    TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
+    PatchSetAttribute patchSet = new PatchSetAttribute();
+    patchSet.kind = ChangeKind.REWORK;
+    patchSet.author = new AccountAttribute();
+    patchSet.author.username = "author";
+    List<GerritChange> topicChanges = List.of(change, relatedChange);
+
+    when(config.getAiReviewPatchSet()).thenReturn(true);
+    when(changeSetData.getForcedTopicReview()).thenReturn(true);
+    when(change.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
+    when(relatedChange.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
+    when(gerritClient.getTopicChanges(change)).thenReturn(topicChanges);
+
+    EventHandlerTypePatchSetReview handler =
+        new EventHandlerTypePatchSetReview(
+            config, changeSetData, change, reviewer, gerritClient, coordinator, false);
+
+    assertEquals(PreprocessResult.OK, handler.preprocessEvent());
+    handler.processEvent();
+
+    verify(gerritClient).getTopicChanges(change);
+    verify(reviewer).reviewTopic(topicChanges, false);
+  }
 }
