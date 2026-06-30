@@ -56,6 +56,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -345,6 +346,25 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void forgetThreadClearsExistingOpenAiConversationAndCreatesFreshConversation()
+      throws Exception {
+    FakeOpenAiConversation conversation =
+        new FakeOpenAiConversation("conv_fresh_langchain_openai", true);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.addParsedCommand("forget_thread", Map.of());
+
+    String conversationId =
+        resolveConversationId(
+            new OpenAiConversationTestLangChainClient(conversation),
+            AiProviderType.OPENAI,
+            changeSetData);
+
+    assertEquals("conv_fresh_langchain_openai", conversationId);
+    assertTrue(conversation.clearCurrentConversationCalled);
+    assertFalse(conversation.hasExistingConversationCalled);
+  }
+
+  @Test
   public void resolvesOpenAiConversationForNormalFollowUpMessage() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
@@ -577,6 +597,14 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void forgetThreadSkipsInitialHistory() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.addParsedCommand("forget_thread", Map.of());
+
+    assertFalse(new TestableLangChainClient().includeInitialHistory(changeSetData));
+  }
+
+  @Test
   public void staleStoredSystemInstructionsResetPersistentMemory() {
     TestableLangChainClient client = new TestableLangChainClient();
     ChatMemory memory = chatMemory("review");
@@ -710,6 +738,64 @@ public class LangChainClientTest {
     return Files.readString(Paths.get(resource.toURI()));
   }
 
+  private static class OpenAiConversationTestLangChainClient extends LangChainClient {
+    private final OpenAiConversation conversation;
+
+    private OpenAiConversationTestLangChainClient(OpenAiConversation conversation) {
+      super(
+          Mockito.mock(Configuration.class),
+          null,
+          null,
+          null,
+          Mockito.mock(PluginDataHandlerProvider.class));
+      this.conversation = conversation;
+    }
+
+    @Override
+    protected OpenAiConversation openAiConversation(
+        ChangeSetData changeSetData, GerritChange change) {
+      return conversation;
+    }
+  }
+
+  private static class FakeOpenAiConversation extends OpenAiConversation {
+    private final String conversationId;
+    private boolean existingConversation;
+    private boolean clearCurrentConversationCalled;
+    private boolean hasExistingConversationCalled;
+
+    private FakeOpenAiConversation(String conversationId, boolean existingConversation) {
+      super(Mockito.mock(Configuration.class), pluginDataHandlerProvider());
+      this.conversationId = conversationId;
+      this.existingConversation = existingConversation;
+    }
+
+    @Override
+    public void clearCurrentConversation() {
+      clearCurrentConversationCalled = true;
+      existingConversation = false;
+    }
+
+    @Override
+    public boolean hasExistingConversation() {
+      hasExistingConversationCalled = true;
+      return existingConversation;
+    }
+
+    @Override
+    public String resolveConversationId() {
+      return conversationId;
+    }
+
+    private static PluginDataHandlerProvider pluginDataHandlerProvider() {
+      PluginDataHandlerProvider pluginDataHandlerProvider =
+          Mockito.mock(PluginDataHandlerProvider.class);
+      when(pluginDataHandlerProvider.getChangeScope())
+          .thenReturn(Mockito.mock(PluginDataHandler.class));
+      return pluginDataHandlerProvider;
+    }
+  }
+
   private static class TestableLangChainClient extends LangChainClient {
     private TestableLangChainClient() {
       super(null, null, null, null);
@@ -738,6 +824,10 @@ public class LangChainClientTest {
           existingConversation,
           changeSetData,
           change);
+    }
+
+    private boolean includeInitialHistory(ChangeSetData changeSetData) {
+      return shouldIncludeInitialHistory(changeSetData);
     }
 
     private boolean prepareMemory(

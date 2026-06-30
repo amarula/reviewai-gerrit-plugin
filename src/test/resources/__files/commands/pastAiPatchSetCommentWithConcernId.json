@@ -1,0 +1,20 @@
+{
+  "/PATCHSET_LEVEL": [
+    {
+      "author": {
+        "_account_id": 1000000,
+        "name": "OpenAI",
+        "display_name": "OpenAI",
+        "email": "gpt@amarulasolutions.com",
+        "username": "gpt"
+      },
+      "change_message_id": "old-ai-patchset-message",
+      "unresolved": true,
+      "patch_set": 1,
+      "id": "ai_patchset_123",
+      "updated": "2023-11-06 11:40:51.000000000",
+      "message": "raw-previous-r1: The commit message should mention the behavioral change.",
+      "commit_id": "f5433ac8b8650225de6d2912032689089e5d9f40"
+    }
+  ]
+}
