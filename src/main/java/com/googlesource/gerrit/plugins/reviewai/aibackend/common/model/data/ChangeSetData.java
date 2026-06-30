@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import lombok.Data;
 import lombok.NonNull;
@@ -78,6 +80,10 @@ public class ChangeSetData {
 
   public Boolean hasParsedCommand(String command) {
     return parsedCommands.contains(command);
+  }
+
+  public Boolean hasParsedCommand(CommandSet command) {
+    return hasParsedCommand(ClientCommandBase.commandName(command));
   }
 
   public Boolean hasParsedCommandOption(String command, String option, String value) {
