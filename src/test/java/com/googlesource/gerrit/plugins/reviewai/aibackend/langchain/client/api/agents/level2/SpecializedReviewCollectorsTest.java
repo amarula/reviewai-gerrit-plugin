@@ -72,6 +72,10 @@ public class SpecializedReviewCollectorsTest {
     assertTrue(verification.contains("This plugin requires final Gerrit replies"));
     assertTrue(verification.contains("including concerns with `repeated`: true"));
     assertTrue(verification.contains("repetition_reply_id"));
+    assertTrue(verification.contains("Every commit-message reply MUST identify"));
+    assertTrue(verification.contains("/COMMIT_MSG"));
+    assertTrue(verification.contains("reviewai-topic-change-1/COMMIT_MSG"));
+    assertFalse(verification.contains("For commit-message findings, omit filename"));
     assertFalse(verification.contains("Assign `relevance`"));
   }
 

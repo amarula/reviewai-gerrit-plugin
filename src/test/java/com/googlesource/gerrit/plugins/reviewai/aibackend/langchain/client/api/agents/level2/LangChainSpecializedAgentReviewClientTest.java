@@ -265,27 +265,38 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(fieldDefinitions.contains("`filename`"));
     assertTrue(fieldDefinitions.contains("`lineNumber`"));
     assertTrue(fieldDefinitions.contains("`codeSnippet`"));
+    assertTrue(fieldDefinitions.contains("Every commit-message reply MUST identify"));
+    assertTrue(fieldDefinitions.contains("/COMMIT_MSG"));
+    assertTrue(fieldDefinitions.contains("reviewai-topic-change-1/COMMIT_MSG"));
     assertTrue(fieldDefinitions.contains("must not include `reply`, `score`"));
     assertFalse(fieldDefinitions.contains("`changeId`"));
     assertTrue(fieldDefinitions.contains("`relevance`, `duplicated`, `repeated`"));
   }
 
   @Test
-  public void commitMessageSpecialistFieldDefinitionsExcludePatchsetLocationFields() {
+  public void commitMessageSpecialistFieldDefinitionsRequireCommitMessageLocation() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     AiPromptSpecializedReviewAgent prompt =
         new TestableSpecializedPrompt(config(), changeSetData, change(false));
 
+    String instructions = prompt.getDefaultAiAssistantInstructions();
     String fieldDefinitions =
-        extractSection(prompt.getDefaultAiAssistantInstructions(), "Field Definitions");
+        extractSection(instructions, "Field Definitions");
 
     assertTrue(fieldDefinitions.contains("# Field Definitions"));
     assertTrue(fieldDefinitions.contains("`concerns`"));
     assertTrue(fieldDefinitions.contains("`dismissed_concerns`"));
-    assertTrue(fieldDefinitions.contains("empty array for commit-message concerns"));
+    assertTrue(fieldDefinitions.contains("exact commit-message filename"));
+    assertTrue(fieldDefinitions.contains("Every commit-message reply MUST identify"));
+    assertTrue(fieldDefinitions.contains("/COMMIT_MSG"));
+    assertTrue(fieldDefinitions.contains("reviewai-topic-change-1/COMMIT_MSG"));
+    assertTrue(fieldDefinitions.contains("Omit `lineNumber` and `codeSnippet`"));
     assertFalse(fieldDefinitions.contains("`changeId`"));
     assertTrue(fieldDefinitions.contains("must not include `reply`, `score`"));
+    assertTrue(instructions.contains("\"filename\":\"/COMMIT_MSG\""));
+    assertTrue(instructions.contains("\"filename\":\"reviewai-topic-change-1/COMMIT_MSG\""));
+    assertFalse(instructions.contains("empty array for commit-message concerns"));
   }
 
   @Test

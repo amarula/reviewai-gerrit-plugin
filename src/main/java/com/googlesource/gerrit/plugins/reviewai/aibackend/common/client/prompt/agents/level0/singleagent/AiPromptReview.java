@@ -54,6 +54,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
   public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
+  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION;
 
   private final ICodeContextPolicy codeContextPolicy;
 
@@ -88,6 +89,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     addReviewInstructions(instructions);
     if (includeCommitMessageReviewRequirement()) {
       instructions.add(getReviewPromptCommitMessages());
+      instructions.add(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION);
     }
     log.debug("AI Assistant Review Instructions added: {}", instructions);
   }
@@ -130,7 +132,9 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS, getPatchSetReviewPrompt()));
+            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            getPatchSetReviewPrompt()
+                + getCommitMessageLocationInstructionsIfNeeded()));
     if (includeCommitMessageReviewRequirement()) {
       sections.add(
           buildSection(
@@ -141,6 +145,13 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     String compiledInstructions = joinWithDoubleNewLine(sections);
     log.debug("Compiled AI Assistant Review Instructions: {}", compiledInstructions);
     return compiledInstructions;
+  }
+
+  private String getCommitMessageLocationInstructionsIfNeeded() {
+    if (!includeCommitMessageReviewRequirement()) {
+      return "";
+    }
+    return "\n\n" + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION;
   }
 
   protected boolean includeCommitMessageReviewRequirement() {

@@ -106,6 +106,7 @@ public class GerritClientComments extends GerritClientAccount {
   }
 
   public boolean retrieveLastComments(GerritChange change) {
+    clearCommentData();
     CommentAddedEvent commentAddedEvent = (CommentAddedEvent) change.getEvent();
     AccountAttribute author = commentAddedEvent.author.get();
     authorUsername = author.username;
@@ -125,11 +126,18 @@ public class GerritClientComments extends GerritClientAccount {
   }
 
   public void retrieveAllComments(GerritChange change) {
+    clearCommentData();
     try {
       retrieveComments(change);
     } catch (Exception e) {
       log.error("Error while retrieving all comments for change: {}", change.getFullChangeId(), e);
     }
+  }
+
+  private void clearCommentData() {
+    commentProperties.clear();
+    commentMap.clear();
+    patchSetCommentMap.clear();
   }
 
   private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
