@@ -50,12 +50,14 @@ import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -340,11 +342,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
       ChatMemory memory =
           useOpenAiResponses ? buildTransientMemory(memoryId) : buildMemory(memoryId);
-      boolean hasStoredMemory = !memory.messages().isEmpty();
-
-      if (!hasStoredMemory && !useOpenAiResponses) {
-        memory.add(LangChainChatMessages.systemMessage(systemInstructions));
-      }
+      boolean hasStoredMemory =
+          prepareMemoryForRequest(memory, useOpenAiResponses, systemInstructions);
 
       if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData)) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
@@ -411,6 +410,32 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
     return true;
+  }
+
+  @VisibleForTesting
+  protected boolean prepareMemoryForRequest(
+      ChatMemory memory, boolean useOpenAiResponses, String systemInstructions) {
+    List<ChatMessage> messages = memory.messages();
+    if (useOpenAiResponses) {
+      return !messages.isEmpty();
+    }
+    if (!messages.isEmpty()
+        && hasCurrentSystemInstructions(messages.getFirst(), systemInstructions)) {
+      return true;
+    }
+    if (!messages.isEmpty()) {
+      log.info(
+          "Clearing LangChain memory {} because stored system instructions are stale",
+          memory.id());
+      memory.clear();
+    }
+    memory.add(LangChainChatMessages.systemMessage(systemInstructions));
+    return false;
+  }
+
+  private boolean hasCurrentSystemInstructions(ChatMessage message, String systemInstructions) {
+    return message instanceof SystemMessage
+        && Objects.equals(LangChainChatMessages.content(message), systemInstructions);
   }
 
   protected boolean shouldOmitRequestContext(

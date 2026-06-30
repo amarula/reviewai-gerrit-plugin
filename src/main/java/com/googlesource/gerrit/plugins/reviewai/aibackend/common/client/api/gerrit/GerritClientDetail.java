@@ -36,6 +36,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -47,7 +48,7 @@ import java.util.TimeZone;
 public class GerritClientDetail {
   private static final SimpleDateFormat DATE_FORMAT = newFormat();
 
-  private GerritPatchSetDetail gerritPatchSetDetail;
+  private final Map<String, GerritPatchSetDetail> gerritPatchSetDetails = new HashMap<>();
   private final int aiAccountId;
   private final Configuration config;
 
@@ -58,20 +59,24 @@ public class GerritClientDetail {
   }
 
   public List<GerritComment> getMessages(GerritChange change) {
-    loadPatchSetDetail(change);
+    GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
     log.debug("Retrieving messages for change ID: {}", change.getFullChangeId());
-    return gerritPatchSetDetail.getMessages();
+    return Optional.ofNullable(gerritPatchSetDetail.getMessages()).orElse(emptyList());
   }
 
   public boolean isWorkInProgress(GerritChange change) {
-    loadPatchSetDetail(change);
+    GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
     log.debug("Checking if change ID: {} is work in progress", change.getFullChangeId());
     return gerritPatchSetDetail.getWorkInProgress() != null
         && gerritPatchSetDetail.getWorkInProgress();
   }
 
   public GerritPermittedVotingRange getPermittedVotingRange(GerritChange change) {
-    loadPatchSetDetail(change);
+    GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
+    if (gerritPatchSetDetail.getLabels() == null
+        || gerritPatchSetDetail.getLabels().getCodeReview() == null) {
+      return null;
+    }
     List<GerritPatchSetDetail.Permission> permissions =
         gerritPatchSetDetail.getLabels().getCodeReview().getAll();
     if (permissions == null) {
@@ -92,7 +97,7 @@ public class GerritClientDetail {
   }
 
   public Integer getCodeReviewValue(GerritChange change) {
-    loadPatchSetDetail(change);
+    GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
     if (gerritPatchSetDetail == null
         || gerritPatchSetDetail.getLabels() == null
         || gerritPatchSetDetail.getLabels().getCodeReview() == null
@@ -108,15 +113,21 @@ public class GerritClientDetail {
     return null;
   }
 
-  private void loadPatchSetDetail(GerritChange change) {
-    if (gerritPatchSetDetail != null) {
-      return;
+  private GerritPatchSetDetail loadPatchSetDetail(GerritChange change) {
+    String changeKey = change.getFullChangeId();
+    if (gerritPatchSetDetails.containsKey(changeKey)) {
+      return gerritPatchSetDetails.get(changeKey);
     }
     log.debug("Loading patch set detail for change ID: {}", change.getFullChangeId());
     try {
-      gerritPatchSetDetail = getReviewDetail(change);
+      GerritPatchSetDetail gerritPatchSetDetail = getReviewDetail(change);
+      gerritPatchSetDetails.put(changeKey, gerritPatchSetDetail);
+      return gerritPatchSetDetail;
     } catch (Exception e) {
       log.error("Error retrieving PatchSet details for change ID: {}", change.getFullChangeId(), e);
+      GerritPatchSetDetail emptyDetail = new GerritPatchSetDetail();
+      gerritPatchSetDetails.put(changeKey, emptyDetail);
+      return emptyDetail;
     }
   }
 

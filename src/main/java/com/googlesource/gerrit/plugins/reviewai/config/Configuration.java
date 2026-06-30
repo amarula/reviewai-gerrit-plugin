@@ -90,6 +90,7 @@ public class Configuration extends ConfigCore {
   private static final int DEFAULT_AI_MAX_CONCURRENT_REQUESTS = 0;
   private static final int DEFAULT_AI_MAX_MEMORY_TOKENS = 16384;
   private static final int DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS = 3;
+  private static final int DEFAULT_TOPIC_PATCH_SET_WAIT_MS = 3000;
   private static final boolean DEFAULT_AI_PROVIDER_ZDR = false;
   private static final int DEFAULT_OLLAMA_CONTEXT_WINDOW = 16384;
   private static final int DEFAULT_OLLAMA_RESPONSE_LENGTH = -1;
@@ -143,6 +144,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_UPLOADED_CHUNK_SIZE_MB = "aiUploadedChunkSizeMb";
   private static final String KEY_AI_MAX_CONCURRENT_REQUESTS = "aiMaxConcurrentRequests";
   private static final String KEY_AI_MAX_TOOL_RESPONSE_ROUNDS = "aiMaxToolResponseRounds";
+  private static final String KEY_TOPIC_PATCH_SET_WAIT_MS = "topicPatchSetWaitMs";
   private static final String KEY_AI_PROVIDER_ZDR = "aiProviderZdr";
   private static final String KEY_OLLAMA_CONTEXT_WINDOW = "ollamaContextWindow";
   private static final String KEY_OLLAMA_DOMAIN = "ollamaDomain";
@@ -382,6 +384,10 @@ public class Configuration extends ConfigCore {
   public int getAiMaxToolResponseRounds() {
     return Math.max(
         1, getInt(KEY_AI_MAX_TOOL_RESPONSE_ROUNDS, DEFAULT_AI_MAX_TOOL_RESPONSE_ROUNDS));
+  }
+
+  public int getTopicPatchSetWaitMs() {
+    return Math.max(0, getInt(KEY_TOPIC_PATCH_SET_WAIT_MS, DEFAULT_TOPIC_PATCH_SET_WAIT_MS));
   }
 
   public boolean getAiProviderZdr() {

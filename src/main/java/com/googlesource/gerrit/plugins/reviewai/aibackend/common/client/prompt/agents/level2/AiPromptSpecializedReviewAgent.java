@@ -125,7 +125,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     String locations =
         includeInlineLocationFields
             ? "`locations`: array of precise objects with `filename`, `lineNumber`, and `codeSnippet`; "
-            : "`locations`: empty array for commit-message concerns; ";
+            : "`locations`: array with the exact commit-message filename from the patch input; ";
     return "`concerns`: array of candidate issues that may deserve a final review comment; "
         + "`dismissed_concerns`: array of investigated candidate issues that do not apply; "
         + "`type`: concise category such as Correctness, Testability, Code Quality, Documentation, Security, or Commit Message; "
@@ -133,6 +133,8 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         + "`reasoning`: evidence, triggering condition, and why the issue matters; "
         + "`preexisting`: true only when the concern existed before this patch; "
         + locations
+        + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION
+        + " "
         + "Specialized agents must not write final Gerrit comments and must not include `reply`, `score`, `relevance`, `duplicated`, `repeated`, `conflicting`, or `source_agent` fields.";
   }
 

@@ -24,6 +24,7 @@ import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetEvent;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.Getter;
 import lombok.Setter;
@@ -91,6 +92,27 @@ public class GerritChange {
     } catch (NullPointerException e) {
       return Optional.empty();
     }
+  }
+
+  public Optional<String> getTopic() {
+    try {
+      return Optional.ofNullable(patchSetEvent.change.get())
+          .map(change -> change.topic)
+          .filter(topic -> !topic.isBlank());
+    } catch (NullPointerException e) {
+      return Optional.empty();
+    }
+  }
+
+  public String getPatchSetEventKey() {
+    String patchSet =
+        getPatchSetAttribute().map(attribute -> String.valueOf(attribute.number)).orElse("");
+    return String.join(
+        ":",
+        Objects.toString(projectName, ""),
+        branchNameKey == null ? "" : branchNameKey.shortName(),
+        changeKey == null ? "" : changeKey.get(),
+        patchSet);
   }
 
   /**

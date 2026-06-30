@@ -39,6 +39,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.topic.TopicReviewReplyMapper;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -60,6 +61,8 @@ public class PatchSetReviewer {
   private final DebugCodeBlocksReview debugCodeBlocksReview;
   private final PatchSetReviewConversationRecorder conversationRecorder;
   private final RepeatedCommentReferenceFormatter repeatedCommentReferenceFormatter;
+  private final TopicPatchSetReviewer topicPatchSetReviewer;
+  private final TopicReviewReplyMapper topicReviewReplyMapper;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -86,6 +89,14 @@ public class PatchSetReviewer {
     this.repeatedCommentReferenceFormatter =
         new RepeatedCommentReferenceFormatter(
             gerritClient, changeSetData, localizer, canonicalWebUrl);
+    this.topicReviewReplyMapper = new TopicReviewReplyMapper();
+    this.topicPatchSetReviewer =
+        new TopicPatchSetReviewer(
+            config,
+            gerritClient,
+            changeSetData,
+            localizer,
+            this);
     debugCodeBlocksReview = new DebugCodeBlocksReview(localizer);
     log.debug("PatchSetReviewer initialized.");
   }
@@ -142,20 +153,44 @@ public class PatchSetReviewer {
               : publicErrorMessage);
     }
     if (reviewReply != null) {
-      retrieveReviewBatches(reviewReply, change);
+      reviewBatches = retrieveReviewBatches(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change);
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
-  private boolean shouldSkipAiReviewForEmptyPatchSet(GerritChange change) {
+  public void reviewTopic(List<GerritChange> changes, boolean includeAiFailureDetails)
+      throws Exception {
+    topicPatchSetReviewer.review(changes, includeAiFailureDetails);
+  }
+
+  boolean shouldSkipAiReviewForEmptyPatchSet(GerritChange change) {
     if (changeSetData.getReviewScope() == ReviewScope.COMMIT_MESSAGE) {
       return false;
     }
     List<String> patchSetFiles =
         gerritClient.getClientData(change).getGerritClientPatchSet().getPatchSetFiles();
     return patchSetFiles == null || patchSetFiles.isEmpty();
+  }
+
+  void publishTopicReviewPart(
+      AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix)
+      throws Exception {
+    reviewBatches = new ArrayList<>();
+    reviewScores = new ArrayList<>();
+    changeSetData.setReviewNoticeMessage(null);
+    changeSetData.setReviewRepeatedCommentsMessage(null);
+    gerritClient.getPatchSet(change);
+    commentProperties = gerritClient.getClientData(change).getCommentProperties();
+    gerritCommentRange = new GerritCommentRange(gerritClient, change);
+    ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
+    if (reviewReply != null) {
+      reviewBatches = retrieveReviewBatches(reviewReply, change, topicFilenamePrefix);
+    }
+    Integer reviewScore = getReviewScore(change);
+    clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
+    conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
   private void setCommentBatchMap(ReviewBatch batchMap, Integer batchID) {
@@ -183,16 +218,25 @@ public class PatchSetReviewer {
     }
   }
 
-  private void retrieveReviewBatches(AiResponseContent reviewReply, GerritChange change) {
+  private List<ReviewBatch> retrieveReviewBatches(AiResponseContent reviewReply, GerritChange change) {
+    return retrieveReviewBatches(reviewReply, change, null);
+  }
+
+  private List<ReviewBatch> retrieveReviewBatches(
+      AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix) {
+    List<ReviewBatch> batches = new ArrayList<>();
     FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
     if (reviewReply.getMessageContent() != null && !reviewReply.getMessageContent().isEmpty()) {
-      reviewBatches.add(new ReviewBatch(reviewReply.getMessageContent()));
+      batches.add(new ReviewBatch(reviewReply.getMessageContent()));
       log.debug("Added single message content to review batches.");
-      return;
+      return batches;
     }
     for (AiReplyItem replyItem : reviewReply.getReplies()) {
+      if (!topicReviewReplyMapper.prepareReplyForChange(replyItem, topicFilenamePrefix)) {
+        continue;
+      }
       String reply = replyItem.getReply();
       Double score = replyItem.getScore();
       boolean isIrrelevant = isIrrelevantReply(replyItem);
@@ -227,10 +271,11 @@ public class PatchSetReviewer {
         filenameSanitizer.sanitizeFilename(replyItem);
         setPatchSetReviewBatchMap(batchMap, replyItem);
       }
-      reviewBatches.add(batchMap);
+      batches.add(batchMap);
       log.debug("Added review batch from reply item: {}", batchMap);
     }
     setRepeatedCommentsMessage(filteredRepeatedReplyItems, change);
+    return batches;
   }
 
   private void setRepeatedCommentsMessage(
@@ -240,7 +285,7 @@ public class PatchSetReviewer {
         .ifPresent(changeSetData::setReviewRepeatedCommentsMessage);
   }
 
-  private AiResponseContent getReviewReply(GerritChange change, String patchSet)
+  AiResponseContent getReviewReply(GerritChange change, String patchSet)
       throws Exception {
     log.debug("Generating review reply for patch set.");
     List<String> patchLines = Arrays.asList(patchSet.split("\n"));

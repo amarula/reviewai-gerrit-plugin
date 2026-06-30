@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
@@ -40,6 +41,10 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.TokenWindowChatMemory;
+import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
@@ -543,6 +548,34 @@ public class LangChainClientTest {
             AiProviderType.OPENAI, true, changeSetData, change));
   }
 
+  @Test
+  public void staleStoredSystemInstructionsResetPersistentMemory() {
+    TestableLangChainClient client = new TestableLangChainClient();
+    ChatMemory memory = chatMemory("review");
+    memory.add(LangChainChatMessages.systemMessage("old instructions"));
+    memory.add(LangChainChatMessages.userMessage("old request"));
+
+    boolean hasStoredMemory = client.prepareMemory(memory, false, "new instructions");
+
+    assertFalse(hasStoredMemory);
+    assertEquals(1, memory.messages().size());
+    assertEquals("new instructions", LangChainChatMessages.content(memory.messages().getFirst()));
+  }
+
+  @Test
+  public void currentStoredSystemInstructionsKeepPersistentMemory() {
+    TestableLangChainClient client = new TestableLangChainClient();
+    ChatMemory memory = chatMemory("review");
+    memory.add(LangChainChatMessages.systemMessage("current instructions"));
+    memory.add(LangChainChatMessages.userMessage("previous request"));
+
+    boolean hasStoredMemory = client.prepareMemory(memory, false, "current instructions");
+
+    assertTrue(hasStoredMemory);
+    assertEquals(2, memory.messages().size());
+    assertEquals("previous request", LangChainChatMessages.content(memory.messages().get(1)));
+  }
+
   private String resolveConversationId(
       LangChainClient client, AiProviderType providerType, ChangeSetData changeSetData)
       throws Exception {
@@ -677,6 +710,39 @@ public class LangChainClientTest {
           existingConversation,
           changeSetData,
           change);
+    }
+
+    private boolean prepareMemory(
+        ChatMemory memory, boolean useOpenAiResponses, String systemInstructions) {
+      return prepareMemoryForRequest(memory, useOpenAiResponses, systemInstructions);
+    }
+  }
+
+  private static ChatMemory chatMemory(String id) {
+    return TokenWindowChatMemory.builder()
+        .id(id)
+        .maxTokens(1000, new TestTokenCountEstimator())
+        .build();
+  }
+
+  private static class TestTokenCountEstimator implements TokenCountEstimator {
+    @Override
+    public int estimateTokenCountInText(String text) {
+      return text == null ? 0 : Math.max(1, text.length() / 4);
+    }
+
+    @Override
+    public int estimateTokenCountInMessage(ChatMessage message) {
+      return estimateTokenCountInText(LangChainChatMessages.content(message));
+    }
+
+    @Override
+    public int estimateTokenCountInMessages(Iterable<ChatMessage> messages) {
+      int count = 0;
+      for (ChatMessage message : messages) {
+        count += estimateTokenCountInMessage(message);
+      }
+      return count;
     }
   }
 
