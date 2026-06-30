@@ -47,6 +47,7 @@ public class ChangeSetData {
 
   // Command variables
   private Boolean forcedReview = false;
+  private Boolean forcedTopicReview = false;
   private Boolean replyFilterEnabled = true;
   private Boolean debugReviewMode = false;
   private Boolean hideAiReview = false;
@@ -123,6 +124,7 @@ public class ChangeSetData {
     copy.setSpecializedAgentReview(specializedAgentReview);
     copy.setPermittedVotingRange(permittedVotingRange);
     copy.setForcedReview(forcedReview);
+    copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
     copy.setDebugReviewMode(debugReviewMode);
     copy.setHideAiReview(hideAiReview);

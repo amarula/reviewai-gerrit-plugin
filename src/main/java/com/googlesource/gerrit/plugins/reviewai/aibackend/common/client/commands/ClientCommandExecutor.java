@@ -230,6 +230,10 @@ public class ClientCommandExecutor extends ClientCommandBase {
     changeSetData.setHideAiReview(false);
     changeSetData.setReviewSystemMessage(null);
     log.info("Forced review command applied to the entire Change Set");
+    if (baseOptions.containsKey(BaseOptionSet.TOPIC)) {
+      changeSetData.setForcedTopicReview(true);
+      log.info("Forced review command applied to the current topic");
+    }
     applyReviewScopeOption();
     if (baseOptions.containsKey(BaseOptionSet.FILTER)) {
       boolean value = Boolean.parseBoolean(baseOptions.get(BaseOptionSet.FILTER));
