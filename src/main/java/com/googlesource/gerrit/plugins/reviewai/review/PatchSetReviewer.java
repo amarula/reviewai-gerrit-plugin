@@ -178,6 +178,7 @@ public class PatchSetReviewer {
     reviewScores = new ArrayList<>();
     changeSetData.setReviewNoticeMessage(null);
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    gerritClient.retrievePatchSetInfo(change);
     gerritClient.getPatchSet(change);
     commentProperties = gerritClient.getClientData(change).getCommentProperties();
     gerritCommentRange = new GerritCommentRange(gerritClient, change);
@@ -231,9 +232,12 @@ public class PatchSetReviewer {
       return batches;
     }
     for (AiReplyItem replyItem : reviewReply.getReplies()) {
-      if (!topicReviewReplyMapper.prepareReplyForChange(replyItem, topicFilenamePrefix)) {
+      Optional<AiReplyItem> topicReplyItem =
+          topicReviewReplyMapper.replyForChange(replyItem, topicFilenamePrefix);
+      if (topicReplyItem.isEmpty()) {
         continue;
       }
+      replyItem = topicReplyItem.get();
       String reply = replyItem.getReply();
       Double score = replyItem.getScore();
       boolean isIrrelevant = isIrrelevantReply(replyItem);

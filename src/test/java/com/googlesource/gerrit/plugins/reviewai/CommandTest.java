@@ -94,10 +94,15 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   private void setupCommandCommentWithPastAiComments(String command) throws RestApiException {
+    setupCommandCommentWithPastAiComments(command, "__files/commands/pastAiPatchSetComment.json");
+  }
+
+  private void setupCommandCommentWithPastAiComments(String command, String pastAiCommentsResource)
+      throws RestApiException {
     Map<String, List<CommentInfo>> comments =
         new HashMap<>(readTestFileToType("__files/gerritPatchSetComments.json", COMMENTS_GERRIT_TYPE));
     mergeComments(
-        comments, readTestFileToType("__files/commands/pastAiPatchSetComment.json", COMMENTS_GERRIT_TYPE));
+        comments, readTestFileToType(pastAiCommentsResource, COMMENTS_GERRIT_TYPE));
     String commentJson =
         renderTemplate(
             readTestFile("__files/commands/commandCommentTemplate.json"),
@@ -215,6 +220,23 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
     Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
     Assert.assertEquals(expectedMessage, status.responseText);
+  }
+
+  @Test
+  public void commandReviewResolvesRepeatedCommentReferenceFromConcernIdInPastComment()
+      throws Exception {
+    setupCommandCommentWithPastAiComments(
+        "/review", "__files/commands/pastAiPatchSetCommentWithConcernId.json");
+    setupMockRequestCreateResponse("openAiRepeatedCommitMessageReviewResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/repeatedCommitMessageConcernIdSystemMessage.txt")
+            .stripTrailing(),
+        captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
   }
 
   @Test

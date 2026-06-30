@@ -22,6 +22,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.gson.JsonArray;
@@ -51,6 +53,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public class LangChainSpecializedAgentReviewClientTest {
@@ -348,6 +351,19 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertFalse(triageInput.contains("/forget_thread"));
     assertTrue(triageInput.contains("second question"));
     assertTrue(triageInput.contains("second answer"));
+  }
+
+  @Test
+  public void forgetThreadSkipsPastReviewComments() {
+    GerritClient gerritClient = mock(GerritClient.class);
+    RecordingSpecializedClient client =
+        new RecordingSpecializedClient(config(), gerritClient, localizer());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.addParsedCommand("forget_thread", Map.of());
+    GerritChange change = change(false);
+
+    assertTrue(client.collectPastReviewComments(changeSetData, change).isEmpty());
+    verify(gerritClient, never()).getClientData(change);
   }
 
   @Test
