@@ -23,9 +23,15 @@ final class SpecializedReviewStageData {
   private SpecializedReviewStageData() {}
 
   static ChangeSetData staged(ChangeSetData changeSetData, ReviewAssistantStage stage) {
+    return staged(changeSetData, stage, null);
+  }
+
+  static ChangeSetData staged(
+      ChangeSetData changeSetData, ReviewAssistantStage stage, String conversationSuffix) {
     ChangeSetData stagedData = changeSetData.copy();
     stagedData.setReviewAssistantStage(stage);
     stagedData.setForcedStagedReview(true);
+    stagedData.setReviewAssistantStageConversationSuffix(conversationSuffix);
     return stagedData;
   }
 }
