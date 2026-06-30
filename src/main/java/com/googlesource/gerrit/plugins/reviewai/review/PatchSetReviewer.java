@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai;
+package com.googlesource.gerrit.plugins.reviewai.review;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -39,7 +39,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
-import com.googlesource.gerrit.plugins.reviewai.topic.TopicReviewReplyMapper;
+import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewReplyMapper;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,7 +70,7 @@ public class PatchSetReviewer {
   private List<Double> reviewScores;
 
   @Inject
-  PatchSetReviewer(
+  public PatchSetReviewer(
       GerritClient gerritClient,
       Configuration config,
       ChangeSetData changeSetData,

@@ -16,7 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
-import com.googlesource.gerrit.plugins.reviewai.PatchSetReviewer;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;

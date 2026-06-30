@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.extensions.client.ChangeKind;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
-import com.googlesource.gerrit.plugins.reviewai.PatchSetReviewer;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
