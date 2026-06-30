@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai;
+package com.googlesource.gerrit.plugins.reviewai.review;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -31,12 +31,12 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-class PatchSetReviewConversationRecorder {
+public class PatchSetReviewConversationRecorder {
   private final ChangeSetData changeSetData;
   private final ReviewAgentConversationStore conversationStore;
 
   @Inject
-  PatchSetReviewConversationRecorder(
+  public PatchSetReviewConversationRecorder(
       ChangeSetData changeSetData, ReviewAgentConversationStore conversationStore) {
     this.changeSetData = changeSetData;
     this.conversationStore = conversationStore;
