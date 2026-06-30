@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -327,6 +328,10 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
       String systemInstructions = prompt.getDefaultAiAssistantInstructions();
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
+      boolean forgetThreadRequested = isForgetThreadRequested(changeSetData);
+      if (forgetThreadRequested && chatMemoryStore != null) {
+        chatMemoryStore.deleteMessages(memoryId);
+      }
       ConversationResolution conversationResolution =
           resolveConversation(providerType, changeSetData, change);
       boolean omitRequestContext =
@@ -409,7 +414,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return true;
+    return !isForgetThreadRequested(changeSetData);
+  }
+
+  protected boolean isForgetThreadRequested(ChangeSetData changeSetData) {
+    return changeSetData != null
+        && Boolean.TRUE.equals(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
   }
 
   @VisibleForTesting
@@ -486,14 +496,23 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (!shouldUseOpenAiResponses(providerType) || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
-    OpenAiConversation conversation =
-        new OpenAiConversation(
-            config,
-            pluginDataHandlerProvider,
-            LangChainOpenAiConversationKey.from(changeSetData, change));
-    boolean existingConversation = conversation.hasExistingConversation();
+    OpenAiConversation conversation = openAiConversation(changeSetData, change);
+    boolean forgetThreadRequested = isForgetThreadRequested(changeSetData);
+    if (forgetThreadRequested) {
+      conversation.clearCurrentConversation();
+    }
+    boolean existingConversation =
+        !forgetThreadRequested && conversation.hasExistingConversation();
     return new ConversationResolution(
         conversation.resolveConversationId(), existingConversation);
+  }
+
+  @VisibleForTesting
+  protected OpenAiConversation openAiConversation(ChangeSetData changeSetData, GerritChange change) {
+    return new OpenAiConversation(
+        config,
+        pluginDataHandlerProvider,
+        LangChainOpenAiConversationKey.from(changeSetData, change));
   }
 
   protected boolean hasExistingReviewContext(ChangeSetData changeSetData) {

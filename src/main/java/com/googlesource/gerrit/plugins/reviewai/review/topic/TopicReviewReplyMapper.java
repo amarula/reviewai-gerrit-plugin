@@ -17,20 +17,40 @@
 package com.googlesource.gerrit.plugins.reviewai.review.topic;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import java.util.Optional;
 
 public class TopicReviewReplyMapper {
-  public boolean prepareReplyForChange(AiReplyItem replyItem, String topicFilenamePrefix) {
+  public Optional<AiReplyItem> replyForChange(AiReplyItem replyItem, String topicFilenamePrefix) {
     if (topicFilenamePrefix == null) {
-      return true;
+      return Optional.of(replyItem);
     }
     String filename = replyItem.getFilename();
     if (filename == null || filename.isBlank()) {
-      return true;
+      return Optional.of(copyWithFilename(replyItem, filename));
     }
     if (!filename.startsWith(topicFilenamePrefix)) {
-      return false;
+      return Optional.empty();
     }
-    replyItem.setFilename(filename.substring(topicFilenamePrefix.length()));
-    return true;
+    return Optional.of(copyWithFilename(replyItem, filename.substring(topicFilenamePrefix.length())));
+  }
+
+  private AiReplyItem copyWithFilename(AiReplyItem replyItem, String filename) {
+    return AiReplyItem.builder()
+        .id(replyItem.getId())
+        .filename(filename)
+        .lineNumber(replyItem.getLineNumber())
+        .codeSnippet(replyItem.getCodeSnippet())
+        .reply(replyItem.getReply())
+        .score(replyItem.getScore())
+        .relevance(replyItem.getRelevance())
+        .repeated(replyItem.isRepeated())
+        .duplicated(replyItem.isDuplicated())
+        .conflicting(replyItem.isConflicting())
+        .sourceAgent(replyItem.getSourceAgent())
+        .repetitionReplyId(replyItem.getRepetitionReplyId())
+        .repeatedReason(replyItem.getRepeatedReason())
+        .duplicatedReason(replyItem.getDuplicatedReason())
+        .conflictingReason(replyItem.getConflictingReason())
+        .build();
   }
 }

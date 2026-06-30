@@ -103,6 +103,10 @@ public class OpenAiConversation {
     return getExistingConversationId() != null;
   }
 
+  public void clearCurrentConversation() {
+    changeDataHandler.removeValue(conversationKey);
+  }
+
   private String getExistingConversationId() {
     return changeDataHandler.getValue(conversationKey);
   }

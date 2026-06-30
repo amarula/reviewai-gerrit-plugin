@@ -190,12 +190,13 @@ public class GerritClientDetail {
     }
   }
 
-  private static GerritChange toGerritChange(ChangeInfo changeInfo) {
+  static GerritChange toGerritChange(ChangeInfo changeInfo) {
     GerritChange change =
         new GerritChange(
             Project.nameKey(changeInfo.project),
             BranchNameKey.create(Project.nameKey(changeInfo.project), changeInfo.branch),
             Change.key(changeInfo.changeId));
+    change.setChangeNumber(changeInfo._number);
     change.setPatchSetNumber(changeInfo.currentRevisionNumber);
     change.setTopic(changeInfo.topic);
     return change;
