@@ -57,6 +57,8 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai;
+package com.googlesource.gerrit.plugins.reviewai.review;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -24,8 +24,8 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.topic.TopicPatchSetReviewMerger;
-import com.googlesource.gerrit.plugins.reviewai.topic.TopicReviewPatchSet;
+import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicPatchSetReviewMerger;
+import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewPatchSet;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -109,12 +109,15 @@ class TopicPatchSetReviewer {
           config.getAiModel(),
           e.getMessage(),
           e);
-      changeSetData.setReviewSystemMessage(
+      String publicErrorMessage =
+          SystemMessageFormatter.getLocalizedErrorMessage(
+              localizer, "message.openai.connection.error");
+      changeSetData.setReviewSystemMessage(publicErrorMessage);
+      changeSetData.setReviewStatusMessage(
           includeAiFailureDetails
               ? SystemMessageFormatter.getLocalizedErrorMessageWithReason(
                   localizer, "message.openai.connection.error", e)
-              : SystemMessageFormatter.getLocalizedErrorMessage(
-                  localizer, "message.openai.connection.error"));
+              : publicErrorMessage);
     }
 
     for (TopicReviewPatchSet patchSet : patchSets) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.topic;
+package com.googlesource.gerrit.plugins.reviewai.review.topic;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import java.util.ArrayList;
