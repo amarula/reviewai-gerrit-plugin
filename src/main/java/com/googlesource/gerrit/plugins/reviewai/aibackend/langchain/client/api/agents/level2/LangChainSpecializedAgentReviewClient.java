@@ -50,6 +50,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,6 +70,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION;
   private static final ReviewAssistantStage VERIFICATION_STAGE =
       ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION;
+  private static final Pattern TOPIC_PATCH_ORIGIN_PATTERN =
+      Pattern.compile("(?m)^ReviewAI origin: (reviewai-topic-change-\\d+/)\\R");
 
   private final SpecializedReviewStageExecutor stageExecutor;
   private final SpecializedReviewPastCommentsCollector pastCommentsCollector;
@@ -322,11 +326,54 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     conflictResolvedFindings =
         currentRunConflictResolutionOrFallback(conflictResolvedFindings, annotatedFindings);
     copyRepeatedAnnotations(conflictResolvedFindings, annotatedFindings);
-    String verificationInput = buildVerificationInput(patchSet, conflictResolvedFindings);
-    AiResponseContent response = askVerificationStage(changeSetData, change, verificationInput);
+    VerificationStageResult verification =
+        askVerificationStages(changeSetData, change, patchSet, conflictResolvedFindings);
+    AiResponseContent response = verification.response();
     inheritRepeatedAnnotations(response, conflictResolvedFindings);
-    setRequestBody(verificationInput);
+    setRequestBody(verification.requestBody());
     return response;
+  }
+
+  private VerificationStageResult askVerificationStages(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      SpecializedReviewFindings conflictResolvedFindings)
+      throws Exception {
+    List<TopicVerificationPatch> topicPatches = topicVerificationPatches(patchSet);
+    if (topicPatches.size() < 2) {
+      String verificationInput = buildVerificationInput(patchSet, conflictResolvedFindings);
+      ChangeSetData verificationData =
+          SpecializedReviewStageData.staged(changeSetData, VERIFICATION_STAGE);
+      return new VerificationStageResult(
+          askVerificationStage(verificationData, change, verificationInput), verificationInput);
+    }
+
+    List<CompletableFuture<VerificationStageResult>> futures = new ArrayList<>();
+    for (TopicVerificationPatch topicPatch : topicPatches) {
+      SpecializedReviewFindings findings =
+          findingsForTopicPrefix(conflictResolvedFindings, topicPatch.prefix());
+      String verificationInput = buildVerificationInput(topicPatch.patchSet(), findings);
+      ChangeSetData verificationData =
+          SpecializedReviewStageData.staged(
+              changeSetData, VERIFICATION_STAGE, verificationConversationSuffix(topicPatch));
+      futures.add(
+          stageExecutor.supplyAsync(
+              () ->
+                  new VerificationStageResult(
+                      askVerificationStage(verificationData, change, verificationInput),
+                      verificationInput)));
+    }
+
+    List<AiResponseContent> responses = new ArrayList<>();
+    List<String> requestBodies = new ArrayList<>();
+    for (CompletableFuture<VerificationStageResult> future : futures) {
+      VerificationStageResult result = stageExecutor.join(future);
+      responses.add(result.response());
+      requestBodies.add(result.requestBody());
+    }
+    return new VerificationStageResult(
+        combinedVerificationResponse(responses), String.join("\n\n", requestBodies));
   }
 
   @VisibleForTesting
@@ -371,9 +418,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   @VisibleForTesting
   AiResponseContent askVerificationStage(
       ChangeSetData changeSetData, GerritChange change, String input) throws Exception {
-    ChangeSetData verificationData =
-        SpecializedReviewStageData.staged(changeSetData, VERIFICATION_STAGE);
-    ReviewRequestResult result = askSingleRequest(verificationData, change, input);
+    ReviewRequestResult result = askSingleRequest(changeSetData, change, input);
     if (result == null || result.getResponseContent() == null) {
       throw new IllegalStateException("No response from " + VERIFICATION_STAGE);
     }
@@ -403,6 +448,79 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   @VisibleForTesting
   String buildVerificationInput(String patchSet, SpecializedReviewFindings findings) {
     return SpecializedReviewPayloads.buildVerificationInput(patchSet, findings);
+  }
+
+  private List<TopicVerificationPatch> topicVerificationPatches(String patchSet) {
+    if (patchSet == null || patchSet.isBlank()) {
+      return List.of();
+    }
+    Matcher matcher = TOPIC_PATCH_ORIGIN_PATTERN.matcher(patchSet);
+    List<TopicPatchOrigin> origins = new ArrayList<>();
+    while (matcher.find()) {
+      origins.add(new TopicPatchOrigin(matcher.start(), matcher.group(1)));
+    }
+    if (origins.size() < 2) {
+      return List.of();
+    }
+
+    String topicHeader = patchSet.substring(0, origins.getFirst().start()).strip();
+    List<TopicVerificationPatch> topicPatches = new ArrayList<>();
+    for (int index = 0; index < origins.size(); index++) {
+      TopicPatchOrigin origin = origins.get(index);
+      int end = index + 1 < origins.size() ? origins.get(index + 1).start() : patchSet.length();
+      String patchSection = patchSet.substring(origin.start(), end).strip();
+      if (!topicHeader.isEmpty()) {
+        patchSection = topicHeader + "\n\n" + patchSection;
+      }
+      topicPatches.add(new TopicVerificationPatch(origin.prefix(), patchSection));
+    }
+    return topicPatches;
+  }
+
+  private String verificationConversationSuffix(TopicVerificationPatch topicPatch) {
+    return topicPatch.prefix().replaceAll("[^A-Za-z0-9._-]+", "_").replaceAll("_+$", "");
+  }
+
+  private SpecializedReviewFindings findingsForTopicPrefix(
+      SpecializedReviewFindings findings, String prefix) {
+    findings.normalize();
+    SpecializedReviewFindings filtered = new SpecializedReviewFindings();
+    filtered.setConcerns(
+        findings.getConcerns().stream()
+            .filter(concern -> concernBelongsToTopicPrefix(concern, prefix))
+            .map(SpecializedReviewConcernIds::copyConcern)
+            .toList());
+    filtered.setDismissedConcerns(
+        findings.getDismissedConcerns().stream()
+            .filter(concern -> concernBelongsToTopicPrefix(concern, prefix))
+            .map(SpecializedReviewConcernIds::copyConcern)
+            .toList());
+    return filtered;
+  }
+
+  private boolean concernBelongsToTopicPrefix(
+      SpecializedReviewFindings.Concern concern, String prefix) {
+    concern.normalize();
+    if (concern.getLocations().isEmpty()) {
+      return true;
+    }
+    return concern.getLocations().stream()
+        .map(SpecializedReviewFindings.Location::getFilename)
+        .anyMatch(filename -> filename == null || filename.isBlank() || filename.startsWith(prefix));
+  }
+
+  private AiResponseContent combinedVerificationResponse(List<AiResponseContent> responses) {
+    AiResponseContent combined = new AiResponseContent("");
+    combined.setReplies(
+        responses.stream()
+            .filter(response -> response != null && response.getReplies() != null)
+            .flatMap(response -> response.getReplies().stream())
+            .toList());
+    responses.stream()
+        .filter(response -> response != null && response.getChangeId() != null)
+        .findFirst()
+        .ifPresent(response -> combined.setChangeId(response.getChangeId()));
+    return combined;
   }
 
   private List<SpecializedReviewTriage.AgentPlan> enabledPlans(
@@ -576,4 +694,9 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return SpecializedReviewAgentDefinition.normalizeName(agent);
   }
 
+  private record TopicPatchOrigin(int start, String prefix) {}
+
+  private record TopicVerificationPatch(String prefix, String patchSet) {}
+
+  private record VerificationStageResult(AiResponseContent response, String requestBody) {}
 }
