@@ -43,6 +43,7 @@ public class ChangeSetData {
   private String specializedAgentInstructions;
   private String specializedAgentCustomInstructions;
   private Boolean specializedAgentReview = false;
+  private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
 
   // Command variables
@@ -122,6 +123,7 @@ public class ChangeSetData {
     copy.setSpecializedAgentInstructions(specializedAgentInstructions);
     copy.setSpecializedAgentCustomInstructions(specializedAgentCustomInstructions);
     copy.setSpecializedAgentReview(specializedAgentReview);
+    copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);

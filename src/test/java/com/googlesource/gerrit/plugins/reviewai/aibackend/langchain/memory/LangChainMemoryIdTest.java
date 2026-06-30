@@ -58,4 +58,17 @@ public class LangChainMemoryIdTest {
 
     assertEquals("review_code", memoryId.getScope());
   }
+
+  @Test
+  public void stagedReviewsCanUseSuffixedScope() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION);
+    changeSetData.setReviewAssistantStageConversationSuffix("reviewai-topic-change-1");
+    GerritChange change = new GerritChange("change~1");
+
+    LangChainMemoryId memoryId = LangChainMemoryId.from(changeSetData, change);
+
+    assertEquals(
+        "review_specialized_verification.reviewai-topic-change-1", memoryId.getScope());
+  }
 }

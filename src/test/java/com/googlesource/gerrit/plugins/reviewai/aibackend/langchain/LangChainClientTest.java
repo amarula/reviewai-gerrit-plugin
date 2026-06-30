@@ -410,6 +410,34 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void resolvesSeparateOpenAiConversationForSuffixedStage() throws Exception {
+    PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
+    String conversationKey =
+        OpenAiConversation.getMultiAgentConversationKey(
+            ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION, "reviewai-topic-change-1");
+    when(changeDataHandler.getValue(conversationKey)).thenReturn("conv_verification_topic_1");
+    PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION);
+    changeSetData.setReviewAssistantStageConversationSuffix("reviewai-topic-change-1");
+
+    String conversationId =
+        resolveConversationId(
+            new LangChainClient(
+                Mockito.mock(Configuration.class), null, null, null, pluginDataHandlerProvider),
+            AiProviderType.OPENAI,
+            changeSetData);
+
+    assertEquals("conv_verification_topic_1", conversationId);
+    verify(changeDataHandler, never())
+        .getValue(
+            OpenAiConversation.getMultiAgentConversationKey(
+                ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION));
+  }
+
+  @Test
   public void resolvesSeparateOpenAiConversationForEachSpecializedAgent() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     PluginDataHandlerProvider pluginDataHandlerProvider = Mockito.mock(PluginDataHandlerProvider.class);
