@@ -45,7 +45,9 @@ final class LangChainOpenAiConversationKey {
           REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
           REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
           REVIEW_SPECIALIZED_VERIFICATION ->
-          OpenAiConversation.getMultiAgentConversationKey(changeSetData.getReviewAssistantStage());
+          OpenAiConversation.getMultiAgentConversationKey(
+              changeSetData.getReviewAssistantStage(),
+              changeSetData.getReviewAssistantStageConversationSuffix());
       default -> OpenAiConversation.KEY_CONVERSATION_ID;
     };
   }

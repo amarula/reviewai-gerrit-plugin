@@ -76,7 +76,12 @@ public final class LangChainMemoryId {
           + SpecializedReviewAgentDefinition.normalizeName(changeSetData.getSpecializedAgentName())
               .toLowerCase(Locale.ROOT);
     }
-    return assistantStage.name().toLowerCase(Locale.ROOT);
+    String scope = assistantStage.name().toLowerCase(Locale.ROOT);
+    String conversationSuffix = changeSetData.getReviewAssistantStageConversationSuffix();
+    if (conversationSuffix == null || conversationSuffix.isBlank()) {
+      return scope;
+    }
+    return scope + "." + conversationSuffix.trim().toLowerCase(Locale.ROOT);
   }
 
   @Override
