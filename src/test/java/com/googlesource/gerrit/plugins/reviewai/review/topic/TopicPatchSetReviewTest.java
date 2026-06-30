@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.topic;
+package com.googlesource.gerrit.plugins.reviewai.review.topic;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
