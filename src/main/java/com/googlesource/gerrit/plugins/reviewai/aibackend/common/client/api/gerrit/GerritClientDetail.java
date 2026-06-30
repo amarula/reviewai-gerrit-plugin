@@ -17,6 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import com.google.gerrit.entities.LabelId;
+import com.google.gerrit.entities.BranchNameKey;
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.Project;
 import com.google.gerrit.extensions.common.AccountInfo;
 import com.google.gerrit.extensions.common.ApprovalInfo;
 import com.google.gerrit.extensions.common.ChangeInfo;
@@ -113,6 +116,28 @@ public class GerritClientDetail {
     return null;
   }
 
+  public List<GerritChange> getTopicChanges(GerritChange change) {
+    Optional<String> topic = change.getTopic();
+    if (topic.isEmpty()) {
+      log.info("No topic available for change {}", change.getFullChangeId());
+      return emptyList();
+    }
+    String query =
+        String.format(
+            "project:%s branch:%s topic:\"%s\" status:open",
+            change.getProjectName(),
+            change.getBranchNameKey().shortName(),
+            escapeQueryValue(topic.get()));
+    try (ManualRequestContext ignored = config.openRequestContext()) {
+      return config.getGerritApi().changes().query(query).withNoLimit().get().stream()
+          .map(GerritClientDetail::toGerritChange)
+          .toList();
+    } catch (Exception e) {
+      log.error("Error querying topic changes for change {}", change.getFullChangeId(), e);
+      return emptyList();
+    }
+  }
+
   private GerritPatchSetDetail loadPatchSetDetail(GerritChange change) {
     String changeKey = change.getFullChangeId();
     if (gerritPatchSetDetails.containsKey(changeKey)) {
@@ -162,6 +187,21 @@ public class GerritClientDetail {
 
       return detail;
     }
+  }
+
+  private static GerritChange toGerritChange(ChangeInfo changeInfo) {
+    GerritChange change =
+        new GerritChange(
+            Project.nameKey(changeInfo.project),
+            BranchNameKey.create(Project.nameKey(changeInfo.project), changeInfo.branch),
+            Change.key(changeInfo.changeId));
+    change.setPatchSetNumber(changeInfo.currentRevisionNumber);
+    change.setTopic(changeInfo.topic);
+    return change;
+  }
+
+  private static String escapeQueryValue(String value) {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
   private static GerritPatchSetDetail.Labels toLabels(Entry<String, LabelInfo> label) {

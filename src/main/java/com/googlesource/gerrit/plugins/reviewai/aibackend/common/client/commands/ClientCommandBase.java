@@ -52,7 +52,8 @@ public abstract class ClientCommandBase extends ClientBase {
     LOCAL_DATA,
     PROMPTS,
     INSTRUCTIONS,
-    MODE
+    MODE,
+    TOPIC
   }
 
   protected static final String SHOW_MODE_SUGGEST = "suggest";
