@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
@@ -119,6 +120,45 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertTrue(instructions.contains("`concerns`: array of candidate issues"));
     assertFalse(instructions.contains("The answer object includes"));
+  }
+
+  @Test
+  public void scopedCommitMessageReviewRequiresCommitMessageFilename() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
+    AiPromptReviewCommitMessage prompt =
+        new AiPromptReviewCommitMessage(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertTrue(instructions.contains("Every commit-message reply MUST identify"));
+    assertTrue(instructions.contains("`filename`"));
+    assertTrue(instructions.contains("/COMMIT_MSG"));
+    assertTrue(instructions.contains("reviewai-topic-change-1/COMMIT_MSG"));
+    assertTrue(instructions.contains("\"filename\": \"/COMMIT_MSG\""));
+  }
+
+  @Test
+  public void singleAgentCommitMessageReviewRequiresCommitMessageFilename() {
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    AiPromptReview prompt =
+        new AiPromptReview(
+            config,
+            new ChangeSetData(1),
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertTrue(instructions.contains("Every commit-message reply MUST identify"));
+    assertTrue(instructions.contains("`filename`"));
+    assertTrue(instructions.contains("/COMMIT_MSG"));
+    assertTrue(instructions.contains("reviewai-topic-change-1/COMMIT_MSG"));
   }
 
   @Test

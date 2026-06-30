@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.extensions.annotations.PluginName;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.gerrit.server.events.Event;
+import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -33,14 +34,17 @@ import java.util.concurrent.ScheduledExecutorService;
 public class EventHandlerExecutor {
   private final Injector injector;
   private final ScheduledExecutorService executor;
+  private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
 
   @Inject
   EventHandlerExecutor(
       Injector injector,
       WorkQueue workQueue,
       @PluginName String pluginName,
-      PluginConfigFactory pluginConfigFactory) {
+      PluginConfigFactory pluginConfigFactory,
+      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator) {
     this.injector = injector;
+    this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     int maximumPoolSize =
         pluginConfigFactory.getFromGerritConfig(pluginName).getInt("maximumPoolSize", 2);
     this.executor = workQueue.createQueue(maximumPoolSize, "AI request executor");
@@ -49,6 +53,9 @@ public class EventHandlerExecutor {
 
   public void execute(Configuration config, Event event) {
     log.debug("Executing event handler for event: {}", event);
+    if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
+      topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
+    }
     GerritEventContextModule contextModule = new GerritEventContextModule(config, event);
     EventHandlerTask task =
         injector.createChildInjector(contextModule).getInstance(EventHandlerTask.class);

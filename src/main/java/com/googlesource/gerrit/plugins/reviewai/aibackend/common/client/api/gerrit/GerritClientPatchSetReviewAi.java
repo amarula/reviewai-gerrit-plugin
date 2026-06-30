@@ -70,6 +70,8 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
   public String getPatchSet(ChangeSetData changeSetData, GerritChange change) throws Exception {
     this.change = change;
     this.changeSetData = changeSetData;
+    fileDiffsProcessed.clear();
+    diffs.clear();
     if (change.getIsCommentEvent()) {
       retrieveRevisionBase(change);
     }
