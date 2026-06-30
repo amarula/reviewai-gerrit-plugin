@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistoryMessageFilter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -46,6 +47,10 @@ final class SpecializedReviewPastCommentsCollector {
 
   List<SpecializedReviewFindings.PastComment> collect(
       ChangeSetData changeSetData, GerritChange change) {
+    if (changeSetData != null
+        && Boolean.TRUE.equals(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD))) {
+      return List.of();
+    }
     if (gerritClient == null || localizer == null) {
       return List.of();
     }
