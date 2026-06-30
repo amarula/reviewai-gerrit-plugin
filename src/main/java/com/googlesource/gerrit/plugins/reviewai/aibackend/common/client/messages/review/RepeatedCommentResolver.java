@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 final class RepeatedCommentResolver {
   private static final String SAFE_COMMENT_ID_PATTERN = "[A-Za-z0-9._:-]+";
@@ -53,6 +54,11 @@ final class RepeatedCommentResolver {
     if (commentById.isPresent()) {
       return commentById;
     }
+    Optional<GerritComment> commentByConcernId =
+        getCommentByReferencedConcernId(comments, replyItem.getRepetitionReplyId());
+    if (commentByConcernId.isPresent()) {
+      return commentByConcernId;
+    }
     Optional<GerritComment> commentByLocation =
         comments.stream().filter(comment -> matchesLocation(replyItem, comment)).findFirst();
     if (commentByLocation.isPresent()) {
@@ -71,6 +77,29 @@ final class RepeatedCommentResolver {
     }
     String id = commentId.trim();
     return comments.stream().filter(comment -> id.equals(comment.getId())).findFirst();
+  }
+
+  private Optional<GerritComment> getCommentByReferencedConcernId(
+      List<GerritComment> comments, String commentId) {
+    if (commentId == null || !commentId.trim().matches(SAFE_COMMENT_ID_PATTERN)) {
+      return Optional.empty();
+    }
+    String id = commentId.trim();
+    Pattern idPattern =
+        Pattern.compile(
+            "(^|[^" + idBoundaryCharacters(id) + "])"
+                + Pattern.quote(id)
+                + "([^"
+                + idBoundaryCharacters(id)
+                + "]|$)");
+    return comments.stream()
+        .filter(
+            comment -> comment.getMessage() != null && idPattern.matcher(comment.getMessage()).find())
+        .findFirst();
+  }
+
+  private String idBoundaryCharacters(String id) {
+    return id.contains(":") ? "A-Za-z0-9._:-" : "A-Za-z0-9._-";
   }
 
   private boolean matchesLocation(AiReplyItem replyItem, GerritComment comment) {
