@@ -322,11 +322,59 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     conflictResolvedFindings =
         currentRunConflictResolutionOrFallback(conflictResolvedFindings, annotatedFindings);
     copyRepeatedAnnotations(conflictResolvedFindings, annotatedFindings);
-    String verificationInput = buildVerificationInput(patchSet, conflictResolvedFindings);
-    AiResponseContent response = askVerificationStage(changeSetData, change, verificationInput);
+    VerificationStageResult verification =
+        askVerificationStages(changeSetData, change, patchSet, conflictResolvedFindings);
+    AiResponseContent response = verification.response();
     inheritRepeatedAnnotations(response, conflictResolvedFindings);
-    setRequestBody(verificationInput);
+    setRequestBody(verification.requestBody());
     return response;
+  }
+
+  private VerificationStageResult askVerificationStages(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      SpecializedReviewFindings conflictResolvedFindings)
+      throws Exception {
+    List<SpecializedReviewTopicVerification.TopicVerificationPatch> topicPatches =
+        SpecializedReviewTopicVerification.topicVerificationPatches(patchSet);
+    if (topicPatches.size() < 2) {
+      String verificationInput = buildVerificationInput(patchSet, conflictResolvedFindings);
+      ChangeSetData verificationData =
+          SpecializedReviewStageData.staged(changeSetData, VERIFICATION_STAGE);
+      return new VerificationStageResult(
+          askVerificationStage(verificationData, change, verificationInput), verificationInput);
+    }
+
+    List<CompletableFuture<VerificationStageResult>> futures = new ArrayList<>();
+    for (SpecializedReviewTopicVerification.TopicVerificationPatch topicPatch : topicPatches) {
+      SpecializedReviewFindings findings =
+          SpecializedReviewTopicVerification.findingsForTopicPrefix(
+              conflictResolvedFindings, topicPatch.prefix());
+      String verificationInput = buildVerificationInput(topicPatch.patchSet(), findings);
+      ChangeSetData verificationData =
+          SpecializedReviewStageData.staged(
+              changeSetData,
+              VERIFICATION_STAGE,
+              SpecializedReviewTopicVerification.verificationConversationSuffix(topicPatch));
+      futures.add(
+          stageExecutor.supplyAsync(
+              () ->
+                  new VerificationStageResult(
+                      askVerificationStage(verificationData, change, verificationInput),
+                      verificationInput)));
+    }
+
+    List<AiResponseContent> responses = new ArrayList<>();
+    List<String> requestBodies = new ArrayList<>();
+    for (CompletableFuture<VerificationStageResult> future : futures) {
+      VerificationStageResult result = stageExecutor.join(future);
+      responses.add(result.response());
+      requestBodies.add(result.requestBody());
+    }
+    return new VerificationStageResult(
+        SpecializedReviewTopicVerification.combinedVerificationResponse(responses),
+        String.join("\n\n", requestBodies));
   }
 
   @VisibleForTesting
@@ -371,9 +419,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   @VisibleForTesting
   AiResponseContent askVerificationStage(
       ChangeSetData changeSetData, GerritChange change, String input) throws Exception {
-    ChangeSetData verificationData =
-        SpecializedReviewStageData.staged(changeSetData, VERIFICATION_STAGE);
-    ReviewRequestResult result = askSingleRequest(verificationData, change, input);
+    ReviewRequestResult result = askSingleRequest(changeSetData, change, input);
     if (result == null || result.getResponseContent() == null) {
       throw new IllegalStateException("No response from " + VERIFICATION_STAGE);
     }
@@ -576,4 +622,5 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return SpecializedReviewAgentDefinition.normalizeName(agent);
   }
 
+  private record VerificationStageResult(AiResponseContent response, String requestBody) {}
 }

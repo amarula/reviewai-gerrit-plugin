@@ -63,6 +63,15 @@ public class OpenAiConversation {
     return KEY_CONVERSATION_ID + "." + assistantStage.name().toLowerCase(Locale.ROOT);
   }
 
+  public static String getMultiAgentConversationKey(
+      ReviewAssistantStage assistantStage, String conversationSuffix) {
+    String conversationKey = getMultiAgentConversationKey(assistantStage);
+    if (conversationSuffix == null || conversationSuffix.isBlank()) {
+      return conversationKey;
+    }
+    return conversationKey + "." + conversationSuffix.trim().toLowerCase(Locale.ROOT);
+  }
+
   public static String getMessagesConversationKey() {
     return MESSAGES_CONVERSATION_KEY;
   }
@@ -131,9 +140,9 @@ public class OpenAiConversation {
   public void clear() {
     changeDataHandler.removeValue(KEY_CONVERSATION_ID);
     changeDataHandler.removeValue(MESSAGES_CONVERSATION_KEY);
-    for (ReviewAssistantStage assistantStage : ReviewAssistantStage.values()) {
-      changeDataHandler.removeValue(getMultiAgentConversationKey(assistantStage));
-    }
+    changeDataHandler.getAllValues().keySet().stream()
+        .filter(key -> key.startsWith(KEY_CONVERSATION_ID + ".review_"))
+        .forEach(changeDataHandler::removeValue);
     changeDataHandler.getAllValues().keySet().stream()
         .filter(key -> key.startsWith(SPECIALIZED_AGENT_CONVERSATION_KEY_PREFIX))
         .forEach(changeDataHandler::removeValue);

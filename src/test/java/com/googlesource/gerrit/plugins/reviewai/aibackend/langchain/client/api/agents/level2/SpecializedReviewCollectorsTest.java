@@ -43,6 +43,12 @@ import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 
 public class SpecializedReviewCollectorsTest {
@@ -101,6 +107,83 @@ public class SpecializedReviewCollectorsTest {
     assertTrue(client.inputs.get(2).contains("consolidated_findings"));
     assertTrue(client.verificationInput.contains("conflict_resolved_findings"));
     assertTrue(client.verificationInput.contains("Patch"));
+  }
+
+  @Test
+  public void topicCollectorRunsOneVerificationForEachPatchSet() throws Exception {
+    RecordingCollectorClient client = new RecordingCollectorClient(config());
+    client.consolidationOverride =
+        findings(
+            List.of(
+                concern(
+                    "c-r1",
+                    List.of("r1"),
+                    "First issue",
+                    "reviewai-topic-change-1/src/One.java"),
+                concern(
+                    "c-r2",
+                    List.of("r2"),
+                    "Second issue",
+                    "reviewai-topic-change-2/src/Two.java")));
+
+    AiResponseContent response =
+        client.askCollector(new ChangeSetData(1), change(), topicPatchSet(), topicSourceFindings());
+
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION),
+        client.stages);
+    assertEquals(2, client.verificationInputs.size());
+    assertTrue(client.verificationInputs.get(0).contains("reviewai-topic-change-1/"));
+    assertFalse(
+        client.verificationInputs.get(0).contains("ReviewAI origin: reviewai-topic-change-2/"));
+    assertTrue(client.verificationInputs.get(0).contains("First issue"));
+    assertFalse(client.verificationInputs.get(0).contains("Second issue"));
+    assertTrue(client.verificationInputs.get(1).contains("reviewai-topic-change-2/"));
+    assertFalse(
+        client.verificationInputs.get(1).contains("ReviewAI origin: reviewai-topic-change-1/"));
+    assertTrue(client.verificationInputs.get(1).contains("Second issue"));
+    assertFalse(client.verificationInputs.get(1).contains("First issue"));
+    assertEquals(
+        List.of("reviewai-topic-change-1", "reviewai-topic-change-2"),
+        client.verificationConversationSuffixes);
+    assertEquals(2, response.getReplies().size());
+    assertEquals(
+        "reviewai-topic-change-1/src/Test.java", response.getReplies().get(0).getFilename());
+    assertEquals(
+        "reviewai-topic-change-2/src/Test.java", response.getReplies().get(1).getFilename());
+  }
+
+  @Test
+  public void topicCollectorRunsVerificationStagesInParallel() throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      RecordingCollectorClient client = new RecordingCollectorClient(config(), executor);
+      client.consolidationOverride =
+          findings(
+              List.of(
+                  concern(
+                      "c-r1",
+                      List.of("r1"),
+                      "First issue",
+                      "reviewai-topic-change-1/src/One.java"),
+                  concern(
+                      "c-r2",
+                      List.of("r2"),
+                      "Second issue",
+                      "reviewai-topic-change-2/src/Two.java")));
+      client.verificationStarted = new CountDownLatch(2);
+
+      client.askCollector(new ChangeSetData(1), change(), topicPatchSet(), topicSourceFindings());
+
+      assertTrue(client.verificationOverlapped.get());
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test
@@ -314,6 +397,41 @@ public class SpecializedReviewCollectorsTest {
     return List.of(SpecializedReviewFindings.AgentFindings.from("CORRECTNESS", findings("Issue")));
   }
 
+  private static List<SpecializedReviewFindings.AgentFindings> topicSourceFindings() {
+    return List.of(
+        SpecializedReviewFindings.AgentFindings.from(
+            "CORRECTNESS",
+            findings(
+                List.of(
+                    concern(
+                        "r1", List.of(), "First issue", "reviewai-topic-change-1/src/One.java"),
+                    concern(
+                        "r2",
+                        List.of(),
+                        "Second issue",
+                        "reviewai-topic-change-2/src/Two.java")))));
+  }
+
+  private static String topicPatchSet() {
+    return String.join(
+        "\n\n",
+        "Review these Gerrit patch sets as one topic push. Each diff filename is prefixed.",
+        String.join(
+            "\n",
+            "ReviewAI origin: reviewai-topic-change-1/",
+            "Gerrit change: change~1",
+            "Patch set: 1",
+            "diff --git a/reviewai-topic-change-1/src/One.java "
+                + "b/reviewai-topic-change-1/src/One.java"),
+        String.join(
+            "\n",
+            "ReviewAI origin: reviewai-topic-change-2/",
+            "Gerrit change: change~2",
+            "Patch set: 1",
+            "diff --git a/reviewai-topic-change-2/src/Two.java "
+                + "b/reviewai-topic-change-2/src/Two.java"));
+  }
+
   private static String firstRawConcernId(String consolidationInput) {
     return JsonParser.parseString(consolidationInput)
         .getAsJsonObject()
@@ -353,7 +471,19 @@ public class SpecializedReviewCollectorsTest {
 
   private static SpecializedReviewFindings findings(
       String id, List<String> mergedConcernIds, String description) {
+    return findings(List.of(concern(id, mergedConcernIds, description, "src/Test.java")));
+  }
+
+  private static SpecializedReviewFindings findings(
+      List<SpecializedReviewFindings.Concern> concerns) {
     SpecializedReviewFindings findings = new SpecializedReviewFindings();
+    findings.setConcerns(concerns);
+    findings.setDismissedConcerns(List.of());
+    return findings;
+  }
+
+  private static SpecializedReviewFindings.Concern concern(
+      String id, List<String> mergedConcernIds, String description, String filename) {
     SpecializedReviewFindings.Concern concern = new SpecializedReviewFindings.Concern();
     concern.setId(id);
     concern.setMergedConcernIds(mergedConcernIds);
@@ -362,13 +492,11 @@ public class SpecializedReviewCollectorsTest {
     concern.setReasoning("Reasoning");
     concern.setPreexisting(false);
     SpecializedReviewFindings.Location location = new SpecializedReviewFindings.Location();
-    location.setFilename("src/Test.java");
+    location.setFilename(filename);
     location.setLineNumber(42);
     location.setCodeSnippet("return value;");
     concern.setLocations(List.of(location));
-    findings.setConcerns(List.of(concern));
-    findings.setDismissedConcerns(List.of());
-    return findings;
+    return concern;
   }
 
   private static SpecializedReviewFindings.HistoricalRepetitionResult historicalRepetitionResult(
@@ -405,12 +533,21 @@ public class SpecializedReviewCollectorsTest {
   private static class RecordingCollectorClient extends LangChainSpecializedAgentReviewClient {
     private final List<ReviewAssistantStage> stages = new ArrayList<>();
     private final List<String> inputs = new ArrayList<>();
+    private final List<String> verificationInputs = new ArrayList<>();
+    private final List<String> verificationConversationSuffixes = new ArrayList<>();
     private String verificationInput;
     private ReviewAssistantStage failingStage;
     private boolean historicalRepeated;
+    private SpecializedReviewFindings consolidationOverride;
+    private CountDownLatch verificationStarted;
+    private final AtomicBoolean verificationOverlapped = new AtomicBoolean(true);
 
     RecordingCollectorClient(Configuration config) {
       super(config, null, null, null, Runnable::run);
+    }
+
+    RecordingCollectorClient(Configuration config, Executor executor) {
+      super(config, null, null, null, executor);
     }
 
     @Override
@@ -425,6 +562,9 @@ public class SpecializedReviewCollectorsTest {
         throw new IllegalStateException("collector failed");
       }
       if (stage == ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION) {
+        if (consolidationOverride != null) {
+          return consolidationOverride;
+        }
         return consolidatedConcern("c1", List.of(firstRawConcernId(input)));
       }
       if (stage == ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION) {
@@ -463,12 +603,42 @@ public class SpecializedReviewCollectorsTest {
         ChangeSetData changeSetData, GerritChange change, String input) {
       stages.add(ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION);
       verificationInput = input;
+      verificationInputs.add(input);
+      verificationConversationSuffixes.add(changeSetData.getReviewAssistantStageConversationSuffix());
+      if (verificationStarted != null) {
+        verificationStarted.countDown();
+        try {
+          if (!verificationStarted.await(2, TimeUnit.SECONDS)) {
+            verificationOverlapped.set(false);
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("Interrupted waiting for parallel verification", e);
+        }
+      }
       if (ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION == failingStage) {
         throw new IllegalStateException("verification failed");
       }
       AiResponseContent response = new AiResponseContent("");
-      response.setReplies(List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
+      response.setReplies(
+          List.of(
+              AiReplyItem.builder()
+                  .reply("Verified review")
+                  .filename(replyFilename(input))
+                  .lineNumber(42)
+                  .score(-1.0)
+                  .build()));
       return response;
+    }
+
+    private String replyFilename(String input) {
+      if (input.contains("reviewai-topic-change-1/")) {
+        return "reviewai-topic-change-1/src/Test.java";
+      }
+      if (input.contains("reviewai-topic-change-2/")) {
+        return "reviewai-topic-change-2/src/Test.java";
+      }
+      return "src/Test.java";
     }
   }
 }
