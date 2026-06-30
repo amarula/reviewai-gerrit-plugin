@@ -31,6 +31,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType.PreprocessResult;
 import java.util.Optional;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -51,22 +52,56 @@ public class EventHandlerTypePatchSetReviewTest {
     GerritChange change = mock(GerritChange.class);
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
+    TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = changeKind;
     patchSet.author = new AccountAttribute();
     patchSet.author.username = "author";
 
     when(config.getAiReviewPatchSet()).thenReturn(true);
+    when(config.getTopicPatchSetWaitMs()).thenReturn(0);
     when(change.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
+    when(coordinator.awaitBatch(change, 0)).thenReturn(Optional.empty());
 
     EventHandlerTypePatchSetReview handler =
         new EventHandlerTypePatchSetReview(
-            config, changeSetData, change, reviewer, gerritClient, true);
+            config, changeSetData, change, reviewer, gerritClient, coordinator, true);
 
     assertEquals(PreprocessResult.OK, handler.preprocessEvent());
     handler.processEvent();
 
     verify(gerritClient).retrievePatchSetInfo(change);
     verify(reviewer).review(change, true);
+  }
+
+  @Test
+  public void reviewsTopicBatchAsMergedReview() throws Exception {
+    Configuration config = mock(Configuration.class);
+    ChangeSetData changeSetData = mock(ChangeSetData.class);
+    GerritChange change = mock(GerritChange.class);
+    GerritChange relatedChange = mock(GerritChange.class);
+    PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
+    GerritClient gerritClient = mock(GerritClient.class);
+    TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
+    PatchSetAttribute patchSet = new PatchSetAttribute();
+    patchSet.kind = ChangeKind.REWORK;
+    patchSet.author = new AccountAttribute();
+    patchSet.author.username = "author";
+    List<GerritChange> topicChanges = List.of(change, relatedChange);
+
+    when(config.getAiReviewPatchSet()).thenReturn(true);
+    when(config.getTopicPatchSetWaitMs()).thenReturn(0);
+    when(change.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
+    when(relatedChange.getPatchSetAttribute()).thenReturn(Optional.of(patchSet));
+    when(coordinator.awaitBatch(change, 0)).thenReturn(Optional.of(topicChanges));
+
+    EventHandlerTypePatchSetReview handler =
+        new EventHandlerTypePatchSetReview(
+            config, changeSetData, change, reviewer, gerritClient, coordinator, true);
+
+    assertEquals(PreprocessResult.OK, handler.preprocessEvent());
+    handler.processEvent();
+
+    verify(reviewer).reviewTopic(topicChanges, true);
   }
 }

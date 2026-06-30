@@ -58,6 +58,7 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
                         getAiAssistantInstructionsReview(false, true, false),
                         DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES))),
             DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES,
+            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION,
             getPatchSetReviewPromptInstructions(),
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES,
             DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT,
@@ -89,7 +90,9 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
-            getPatchSetReviewPromptInstructions()));
+            getPatchSetReviewPromptInstructions()
+                + "\n\n"
+                + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION));
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,

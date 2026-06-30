@@ -285,6 +285,9 @@ directive = End each reply with \"Hope this helps!\"
   The default value is 16K.
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
   This applies when ON_DEMAND code context tools are enabled and defaults to 3.
+- `topicPatchSetWaitMs`: Time, in milliseconds, to wait when handling a Patch Set event for a change with a topic. This
+  gives the plugin time to group related Patch Sets from the same topic and run an overall AI review. The default value
+  is `3000` milliseconds.
 
 ### Optional Parameters Specific to Review Processing
 
