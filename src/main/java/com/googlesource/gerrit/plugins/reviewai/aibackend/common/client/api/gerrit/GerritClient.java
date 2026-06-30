@@ -20,6 +20,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
 @Singleton
@@ -62,5 +63,9 @@ public class GerritClient {
 
   public GerritClientData getClientData(GerritChange change) {
     return gerritClientFacade.getClientData(change);
+  }
+
+  public List<GerritChange> getTopicChanges(GerritChange change) {
+    return gerritClientFacade.getTopicChanges(change);
   }
 }
