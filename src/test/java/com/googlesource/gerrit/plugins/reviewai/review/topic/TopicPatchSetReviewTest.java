@@ -56,15 +56,24 @@ public class TopicPatchSetReviewTest {
   public void topicReplyMapperFiltersOtherPatchSetsAndStripsOwnPrefix() {
     TopicReviewReplyMapper mapper = new TopicReviewReplyMapper();
     AiReplyItem ownReply =
-        AiReplyItem.builder().filename("reviewai-topic-change-1/src/Test.java").build();
+        AiReplyItem.builder()
+            .filename("reviewai-topic-change-1/src/Test.java")
+            .repeated(true)
+            .repetitionReplyId("raw-previous-r1")
+            .build();
     AiReplyItem otherReply =
         AiReplyItem.builder().filename("reviewai-topic-change-2/src/Test.java").build();
     AiReplyItem messageReply = AiReplyItem.builder().build();
 
-    assertTrue(mapper.prepareReplyForChange(ownReply, "reviewai-topic-change-1/"));
-    assertEquals("src/Test.java", ownReply.getFilename());
-    assertFalse(mapper.prepareReplyForChange(otherReply, "reviewai-topic-change-1/"));
-    assertTrue(mapper.prepareReplyForChange(messageReply, "reviewai-topic-change-1/"));
+    Optional<AiReplyItem> mappedReply = mapper.replyForChange(ownReply, "reviewai-topic-change-1/");
+
+    assertTrue(mappedReply.isPresent());
+    assertEquals("src/Test.java", mappedReply.get().getFilename());
+    assertEquals("reviewai-topic-change-1/src/Test.java", ownReply.getFilename());
+    assertTrue(mappedReply.get().isRepeated());
+    assertEquals("raw-previous-r1", mappedReply.get().getRepetitionReplyId());
+    assertFalse(mapper.replyForChange(otherReply, "reviewai-topic-change-1/").isPresent());
+    assertTrue(mapper.replyForChange(messageReply, "reviewai-topic-change-1/").isPresent());
   }
 
   private static GerritChange change(String fullChangeId, int patchSetNumber) {
