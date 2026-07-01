@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
@@ -37,14 +38,16 @@ class SpecializedSuggestLangChainClient extends LangChainClient {
       GerritClient gerritClient,
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      PluginChatMemoryStore chatMemoryStore) {
+      PluginChatMemoryStore chatMemoryStore,
+      GitRepoFiles gitRepoFiles) {
     super(
         config,
         codeContextPolicy,
         gerritClient,
         localizer,
         pluginDataHandlerProvider,
-        chatMemoryStore);
+        chatMemoryStore,
+        gitRepoFiles);
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
   }
 
