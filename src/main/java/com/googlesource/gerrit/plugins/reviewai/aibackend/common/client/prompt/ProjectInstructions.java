@@ -27,12 +27,13 @@ import java.util.List;
 public class ProjectInstructions {
   private static final String PROJECT_INSTRUCTIONS_FILENAME = ".gerrit/ai-instructions.md";
 
-  private final GitRepoFiles gitRepoFiles = new GitRepoFiles();
+  private final GitRepoFiles gitRepoFiles;
   private final GerritChange change;
 
-  public ProjectInstructions(GerritChange change) {
+  public ProjectInstructions(GerritChange change, GitRepoFiles gitRepoFiles) {
     log.debug("Initializing ProjectInstructions with change: {}", change.getFullChangeId());
     this.change = change;
+    this.gitRepoFiles = gitRepoFiles;
   }
 
   public void addProjectInstructions(List<String> instructions) {
@@ -47,6 +48,10 @@ public class ProjectInstructions {
 
   private String getProjectInstructions() {
     log.debug("Retrieving project instructions from {}", PROJECT_INSTRUCTIONS_FILENAME);
+    if (gitRepoFiles == null) {
+      log.debug("Skipping project instructions because GitRepoFiles is not available");
+      return null;
+    }
     try {
       String content = gitRepoFiles.getFileContent(this.change, PROJECT_INSTRUCTIONS_FILENAME);
       log.debug("Retrieved project instructions content: {}", content);
