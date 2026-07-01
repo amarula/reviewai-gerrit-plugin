@@ -46,7 +46,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   protected String defaultAiMessageReview;
 
   private final ICodeContextPolicy codeContextPolicy;
-  private final ProjectInstructions projectInstructions;
 
   public AiPromptBase(
       Configuration config,
@@ -58,7 +57,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
     this.isCommentEvent = change.getIsCommentEvent();
-    this.projectInstructions = new ProjectInstructions(change);
     loadDefaultPrompts("promptsAi");
     this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_REVIEW;
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
@@ -80,7 +78,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
           config.getAiSystemPromptInstructions(getDefaultAiSystemPromptInstructions()) + DOT);
     }
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
-    this.projectInstructions.addProjectInstructions(instructions);
   }
 
   protected String getDefaultAiSystemPromptInstructions() {
