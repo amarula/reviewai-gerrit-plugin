@@ -16,19 +16,19 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git.FileEntry;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,11 +40,20 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 public class GitRepoFiles {
-  public static final String REPO_PATTERN = "git/%s.git";
-
+  private final GitRepositoryManager repositoryManager;
   private GitFileChunkBuilder gitFileChunkBuilder;
   private List<String> enabledFileExtensions;
   private long fileSize;
+
+  @Inject
+  public GitRepoFiles(GitRepositoryManager repositoryManager) {
+    this.repositoryManager = repositoryManager;
+  }
+
+  @VisibleForTesting
+  GitRepoFiles() {
+    this.repositoryManager = null;
+  }
 
   public List<String> getGitRepoFilesAsJson(Configuration config, GerritChange change) {
     log.debug("Getting Repository files as JSON");
@@ -55,7 +64,7 @@ public class GitRepoFiles {
       return chunkedFileContent.stream()
           .map(chunk -> getGson().toJson(chunk))
           .collect(Collectors.toList());
-    } catch (IOException | GitAPIException e) {
+    } catch (IOException e) {
       throw new RuntimeException("Failed to retrieve files from change branch: ", e);
     }
   }
@@ -126,7 +135,7 @@ public class GitRepoFiles {
   }
 
   private List<Map<String, String>> listFilesWithContent(Repository repository, GerritChange change)
-      throws IOException, GitAPIException {
+      throws IOException {
     Map<String, List<FileEntry>> dirFilesMap = getDirFilesMap(repository, change, TreeFilter.ANY_DIFF);
     for (Map.Entry<String, List<FileEntry>> entry : dirFilesMap.entrySet()) {
       String dirPath = entry.getKey();
@@ -169,15 +178,10 @@ public class GitRepoFiles {
 
   private Repository openRepository(GerritChange change) throws IOException {
     log.debug("Opening repository for change: {}", change.getFullChangeId());
-    String repoPath = String.format(REPO_PATTERN, change.getProjectName());
-    log.debug("Opening repository at path: {}", repoPath);
-    FileRepositoryBuilder builder = new FileRepositoryBuilder();
-    return builder
-        .setGitDir(new File(repoPath))
-        .readEnvironment()
-        .findGitDir()
-        .setMustExist(true)
-        .build();
+    if (repositoryManager == null) {
+      throw new IOException("GitRepositoryManager is not available");
+    }
+    return repositoryManager.openRepository(change.getProjectNameKey());
   }
 
   RevTree getBranchRevTree(Repository repository, GerritChange change) throws IOException {
