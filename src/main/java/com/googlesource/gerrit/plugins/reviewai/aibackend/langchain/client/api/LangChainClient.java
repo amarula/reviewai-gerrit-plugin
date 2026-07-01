@@ -25,10 +25,12 @@ import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiClientBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructionsAppender;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -86,6 +88,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final ICodeContextPolicy codeContextPolicy;
   private final LangChainTokenEstimatorProvider tokenEstimatorProvider;
   private final GerritClient gerritClient;
+  protected final GitRepoFiles gitRepoFiles;
+  private final ProjectInstructionsAppender projectInstructionsAppender;
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
@@ -144,11 +148,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GerritClient gerritClient,
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      PluginChatMemoryStore chatMemoryStore) {
+      PluginChatMemoryStore chatMemoryStore,
+      GitRepoFiles gitRepoFiles) {
     super(config);
     this.codeContextPolicy = codeContextPolicy;
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
     this.gerritClient = gerritClient;
+    this.gitRepoFiles = gitRepoFiles;
+    this.projectInstructionsAppender = new ProjectInstructionsAppender(gitRepoFiles);
     this.localizer = localizer;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
@@ -193,43 +200,55 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         getProviderResponseFormat(config, contextTools, structuredResponseFormat);
     this.toolExecutor =
         new LangChainExecutor(
-            config, toolExecutorResponseFormat, contextTools, requireInitialToolUse);
+            config, toolExecutorResponseFormat, contextTools, requireInitialToolUse, gitRepoFiles);
     ResponseFormat specializedToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
     this.specializedRepliesToolExecutor =
         new LangChainExecutor(
-            config, specializedToolExecutorResponseFormat, contextTools, requireInitialToolUse);
+            config,
+            specializedToolExecutorResponseFormat,
+            contextTools,
+            requireInitialToolUse,
+            gitRepoFiles);
     ResponseFormat specializedTriageToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedTriageResponseFormat);
     this.specializedTriageToolExecutor =
         new LangChainExecutor(
-            config, specializedTriageToolExecutorResponseFormat, contextTools, requireInitialToolUse);
+            config,
+            specializedTriageToolExecutorResponseFormat,
+            contextTools,
+            requireInitialToolUse,
+            gitRepoFiles);
     this.specializedConsolidationToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(config, contextTools, specializedConsolidationResponseFormat),
             contextTools,
-            requireInitialToolUse);
+            requireInitialToolUse,
+            gitRepoFiles);
     this.specializedHistoricalRepetitionToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(
                 config, contextTools, specializedHistoricalRepetitionResponseFormat),
             contextTools,
-            requireInitialToolUse);
+            requireInitialToolUse,
+            gitRepoFiles);
     this.specializedConflictResolutionToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(
                 config, contextTools, specializedConflictResolutionResponseFormat),
             contextTools,
-            requireInitialToolUse);
+            requireInitialToolUse,
+            gitRepoFiles);
     this.specializedVerificationToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(config, contextTools, specializedVerificationResponseFormat),
             contextTools,
-            requireInitialToolUse);
+            requireInitialToolUse,
+            gitRepoFiles);
     log.debug("Initialized LangChainClient");
   }
 
@@ -240,7 +259,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GerritClient gerritClient,
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
-    this(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, null);
+    this(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, null, null);
   }
 
   @VisibleForTesting
@@ -249,7 +268,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
       Localizer localizer) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, null);
+    this(config, codeContextPolicy, gerritClient, localizer, null, null, null);
   }
 
   @Override
@@ -326,7 +345,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       AiProviderType providerType = config.getAiProviderType();
       boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
-      String systemInstructions = prompt.getDefaultAiAssistantInstructions();
+      String systemInstructions =
+          projectInstructionsAppender.append(
+              prompt, change, prompt.getDefaultAiAssistantInstructions());
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
       boolean forgetThreadRequested = isForgetThreadRequested(changeSetData);
       if (forgetThreadRequested && chatMemoryStore != null) {
@@ -611,7 +632,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         config,
         getProviderResponseFormat(config, contextTools, responseFormat),
         contextTools,
-        requireInitialToolUse);
+        requireInitialToolUse,
+        gitRepoFiles);
   }
 
   private ResponseFormat getProviderResponseFormat(
