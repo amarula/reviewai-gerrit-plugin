@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4d91e2ff_3bfa5058",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-07-01T05:27:09Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com as i mention we should not abuse of this interface and not send log over this interface. Those are system logs and should go in event error log. Even all this settings should and must be limited to the administrator. Even more this information that are shown should be only visible to the admisttayir chat and not recorded in general",
+      "revId": "2f3ae2b6bcf2ebc42106bb8549e58cbe999411e5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
