@@ -45,6 +45,7 @@ class LangChainExecutor {
   private final ResponseFormat structuredResponseFormat;
   private final List<ToolSpecification> onDemandTools;
   private final boolean requireInitialToolUse;
+  private final GitRepoFiles gitRepoFiles;
 
   AiMessage execute(ChatModel model, GerritChange change, ChatMemory memory) {
     log.debug(
@@ -167,7 +168,7 @@ class LangChainExecutor {
         toolName,
         arguments);
     OnDemandCodeContextTools codeContextTools =
-        new OnDemandCodeContextTools(config, change, new GitRepoFiles());
+        new OnDemandCodeContextTools(config, change, gitRepoFiles);
     String output = codeContextTools.execute(toolName, arguments);
     log.debug(
         "Executed LangChain request id={}, name={}, outputLength={}",

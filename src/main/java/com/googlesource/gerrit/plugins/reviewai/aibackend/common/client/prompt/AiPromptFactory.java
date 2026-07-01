@@ -77,8 +77,7 @@ public class AiPromptFactory {
           }
           case REVIEW_REITERATED -> {
             log.info("AiPromptFactory: Return AiPromptReviewReiterate");
-            yield new AiPromptReviewReiterated(
-                config, changeSetData, change, codeContextPolicy);
+            yield new AiPromptReviewReiterated(config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_TRIAGE -> {
             log.info("AiPromptFactory: Return AiPromptSpecializedReviewTriage");
