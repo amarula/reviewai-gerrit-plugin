@@ -33,6 +33,7 @@ import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +56,8 @@ class LangChainExecutor {
         getInitialToolChoice(),
         getToolNames(),
         structuredResponseFormat != null);
-    ChatRequest initialRequest = buildChatRequest(memory.messages(), getInitialToolChoice());
+    List<ChatMessage> requestMessages = new ArrayList<>(memory.messages());
+    ChatRequest initialRequest = buildChatRequest(requestMessages, getInitialToolChoice());
     log.debug("Sending initial LangChain chat request: {}",
         LogArg.truncated(initialRequest));
     ChatResponse response = AiModelRequestLimiter.chat(config, model, initialRequest);
@@ -67,6 +69,7 @@ class LangChainExecutor {
         && aiMessage.hasToolExecutionRequests()
         && iteration < maxToolResponseRounds) {
       iteration++;
+      requestMessages.add(aiMessage);
       memory.add(aiMessage);
       List<ToolExecutionRequest> requests = aiMessage.toolExecutionRequests();
       if (requests == null || requests.isEmpty()) {
@@ -84,15 +87,19 @@ class LangChainExecutor {
             request.id(),
             request.name(),
             output != null ? output.length() : 0);
-        memory.add(ToolExecutionResultMessage.from(request, output));
+        ToolExecutionResultMessage toolResult = ToolExecutionResultMessage.from(request, output);
+        requestMessages.add(toolResult);
+        memory.add(toolResult);
       }
       log.debug(
-          "Sending LangChain continuation request after tool round {} with {} memory messages",
+          "Sending LangChain continuation request after tool round {} with {} memory messages "
+              + "and {} request messages",
           iteration,
-          memory.messages().size());
+          memory.messages().size(),
+          requestMessages.size());
       response =
           AiModelRequestLimiter.chat(
-              config, model, buildChatRequest(memory.messages(), ToolChoice.AUTO));
+              config, model, buildChatRequest(requestMessages, ToolChoice.AUTO));
       aiMessage = response != null ? response.aiMessage() : null;
       logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);
     }
