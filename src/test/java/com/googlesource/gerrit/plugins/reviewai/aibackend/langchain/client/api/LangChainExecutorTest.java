@@ -1,0 +1,173 @@
+/*
+ * Copyright (c) 2026. The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.TokenWindowChatMemory;
+import dev.langchain4j.model.TokenCountEstimator;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.Test;
+import org.mockito.Mockito;
+
+public class LangChainExecutorTest {
+  private static final String LARGE_TOOL_OUTPUT_RESOURCE =
+      "__files/openai/gerritFormattedPatch.txt";
+
+  @Test
+  public void continuationRequestKeepsToolResultsWhenMemoryWindowTrims() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiMaxToolResponseRounds()).thenReturn(3);
+
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("project~branch~change");
+
+    String largeToolOutput = readTestResource(LARGE_TOOL_OUTPUT_RESOURCE).repeat(4);
+    GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
+    when(gitRepoFiles.getFileTree(config, change, null))
+        .thenReturn(List.of(largeToolOutput), List.of(largeToolOutput));
+
+    ToolExecutionRequest firstToolRequest = toolRequest("call_1");
+    ToolExecutionRequest secondToolRequest = toolRequest("call_2");
+    RecordingChatModel model =
+        new RecordingChatModel(
+            AiMessage.from(List.of(firstToolRequest, secondToolRequest)),
+            AiMessage.from("done"));
+    ChatMemory memory =
+        TokenWindowChatMemory.builder()
+            .id("review")
+            .maxTokens(1000, new TestTokenCountEstimator())
+            .build();
+    memory.add(UserMessage.from("review"));
+
+    AiMessage result =
+        new LangChainExecutor(
+                config,
+                null,
+                List.of(treeToolSpecification()),
+                true,
+                gitRepoFiles)
+            .execute(model, change, memory);
+
+    assertEquals("done", result.text());
+    assertEquals(2, model.requests.size());
+    List<ChatMessage> continuationMessages = model.requests.get(1).messages();
+    assertTrue(hasToolRequest(continuationMessages, "call_1"));
+    assertTrue(hasToolRequest(continuationMessages, "call_2"));
+    assertTrue(hasToolResult(continuationMessages, "call_1", largeToolOutput));
+    assertTrue(hasToolResult(continuationMessages, "call_2", largeToolOutput));
+  }
+
+  private static ToolExecutionRequest toolRequest(String id) {
+    return ToolExecutionRequest.builder().id(id).name("tree").arguments("{}").build();
+  }
+
+  private static ToolSpecification treeToolSpecification() {
+    return ToolSpecification.builder()
+        .name("tree")
+        .parameters(JsonObjectSchema.builder().build())
+        .build();
+  }
+
+  private static boolean hasToolRequest(List<ChatMessage> messages, String id) {
+    return messages.stream()
+        .filter(AiMessage.class::isInstance)
+        .map(AiMessage.class::cast)
+        .filter(AiMessage::hasToolExecutionRequests)
+        .flatMap(message -> message.toolExecutionRequests().stream())
+        .anyMatch(request -> id.equals(request.id()));
+  }
+
+  private static boolean hasToolResult(List<ChatMessage> messages, String id, String output) {
+    return messages.stream()
+        .filter(ToolExecutionResultMessage.class::isInstance)
+        .map(ToolExecutionResultMessage.class::cast)
+        .anyMatch(message -> id.equals(message.id()) && output.equals(message.text()));
+  }
+
+  private String readTestResource(String resourceName) throws Exception {
+    URL resource = getClass().getClassLoader().getResource(resourceName);
+    assertNotNull("Test resource should exist: " + resourceName, resource);
+    return Files.readString(Paths.get(resource.toURI()));
+  }
+
+  private static class RecordingChatModel implements ChatModel {
+    private final List<AiMessage> responses;
+    private final List<ChatRequest> requests = new ArrayList<>();
+
+    private RecordingChatModel(AiMessage... responses) {
+      this.responses = List.of(responses);
+    }
+
+    @Override
+    public ChatResponse chat(ChatRequest request) {
+      requests.add(request);
+      return ChatResponse.builder().aiMessage(responses.get(requests.size() - 1)).build();
+    }
+  }
+
+  private static class TestTokenCountEstimator implements TokenCountEstimator {
+    @Override
+    public int estimateTokenCountInText(String text) {
+      return text == null ? 0 : Math.max(1, text.length());
+    }
+
+    @Override
+    public int estimateTokenCountInMessage(ChatMessage message) {
+      if (message instanceof UserMessage userMessage) {
+        return estimateTokenCountInText(userMessage.singleText());
+      }
+      if (message instanceof AiMessage aiMessage) {
+        return estimateTokenCountInText(String.valueOf(aiMessage.toolExecutionRequests()));
+      }
+      if (message instanceof ToolExecutionResultMessage toolResult) {
+        return estimateTokenCountInText(toolResult.text());
+      }
+      return 1;
+    }
+
+    @Override
+    public int estimateTokenCountInMessages(Iterable<ChatMessage> messages) {
+      int count = 0;
+      for (ChatMessage message : messages) {
+        count += estimateTokenCountInMessage(message);
+      }
+      return count;
+    }
+  }
+}
