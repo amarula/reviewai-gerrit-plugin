@@ -59,8 +59,9 @@ public class GitRepoFiles {
     log.debug("Getting Repository files as JSON");
     gitFileChunkBuilder = new GitFileChunkBuilder(config);
     enabledFileExtensions = config.getEnabledFileExtensions();
-    try (Repository repository = openRepository(change)) {
-      List<Map<String, String>> chunkedFileContent = listFilesWithContent(repository, change);
+    try {
+      List<Map<String, String>> chunkedFileContent =
+          withRepositoryTree(change, this::listFilesWithContent);
       return chunkedFileContent.stream()
           .map(chunk -> getGson().toJson(chunk))
           .collect(Collectors.toList());
@@ -70,10 +71,10 @@ public class GitRepoFiles {
   }
 
   public String getFileContent(GerritChange change, String path) throws FileNotFoundException {
-    try (Repository repository = openRepository(change);
-        ObjectReader reader = repository.newObjectReader()) {
-      RevTree tree = getBranchRevTree(repository, change);
-      String content = readFileContent(reader, tree, path);
+    try {
+      String content =
+          withRepositoryTreeReader(
+              change, (repository, tree, reader) -> readFileContent(reader, tree, path));
       if (content != null) {
         return content;
       } else {
@@ -88,20 +89,9 @@ public class GitRepoFiles {
     log.debug("Getting repository file tree from subdir: {}", subdir);
     enabledFileExtensions = config.getEnabledFileExtensions();
     String normalizedSubdir = normalizePath(subdir);
-    try (Repository repository = openRepository(change)) {
-      List<String> paths = new ArrayList<>();
-      try (TreeWalk treeWalk = new TreeWalk(repository)) {
-        treeWalk.addTree(getBranchRevTree(repository, change));
-        treeWalk.setRecursive(true);
-
-        while (treeWalk.next()) {
-          String path = treeWalk.getPathString();
-          if (!isUnderSubdir(path, normalizedSubdir)) continue;
-          if (!matchesExtensionList(path, enabledFileExtensions)) continue;
-          paths.add(path);
-        }
-      }
-      return paths;
+    try {
+      return withRepositoryTree(
+          change, (repository, tree) -> listMatchingPaths(repository, tree, normalizedSubdir));
     } catch (IOException e) {
       throw new RuntimeException("Failed to retrieve file tree from " + normalizedSubdir, e);
     }
@@ -113,30 +103,19 @@ public class GitRepoFiles {
     if (searchString == null || searchString.isEmpty()) {
       return Collections.emptyList();
     }
-    try (Repository repository = openRepository(change);
-        ObjectReader reader = repository.newObjectReader()) {
-      RevTree tree = getBranchRevTree(repository, change);
-      List<String> matches = new ArrayList<>();
-      try (TreeWalk treeWalk = new TreeWalk(repository)) {
-        treeWalk.addTree(tree);
-        treeWalk.setRecursive(true);
-
-        while (treeWalk.next()) {
-          String path = treeWalk.getPathString();
-          if (!matchesExtensionList(path, enabledFileExtensions)) continue;
-          String content = getContent(reader, treeWalk);
-          addGrepMatches(matches, path, content, searchString);
-        }
-      }
-      return matches;
+    try {
+      return withRepositoryTreeReader(
+          change,
+          (repository, tree, reader) -> grepTree(repository, tree, reader, searchString));
     } catch (IOException e) {
       throw new RuntimeException("Failed to search repository", e);
     }
   }
 
-  private List<Map<String, String>> listFilesWithContent(Repository repository, GerritChange change)
+  private List<Map<String, String>> listFilesWithContent(Repository repository, RevTree tree)
       throws IOException {
-    Map<String, List<FileEntry>> dirFilesMap = getDirFilesMap(repository, change, TreeFilter.ANY_DIFF);
+    Map<String, List<FileEntry>> dirFilesMap =
+        getDirFilesMap(repository, tree, TreeFilter.ANY_DIFF);
     for (Map.Entry<String, List<FileEntry>> entry : dirFilesMap.entrySet()) {
       String dirPath = entry.getKey();
       log.debug("File from dirFilesMap processed: {}", dirPath);
@@ -147,16 +126,52 @@ public class GitRepoFiles {
     return gitFileChunkBuilder.getChunks();
   }
 
+  private List<String> listMatchingPaths(
+      Repository repository, RevTree tree, String normalizedSubdir) throws IOException {
+    return collectMatchingFiles(
+        repository,
+        tree,
+        path -> isUnderSubdir(path, normalizedSubdir),
+        (paths, path, treeWalk) -> paths.add(path));
+  }
+
+  private List<String> grepTree(
+      Repository repository, RevTree tree, ObjectReader reader, String searchString)
+      throws IOException {
+    return collectMatchingFiles(
+        repository,
+        tree,
+        path -> true,
+        (matches, path, treeWalk) -> {
+          String content = getContent(reader, treeWalk);
+          addGrepMatches(matches, path, content, searchString);
+        });
+  }
+
+  private List<String> collectMatchingFiles(
+      Repository repository,
+      RevTree tree,
+      PathMatcher pathMatcher,
+      MatchingFileCollector collector)
+      throws IOException {
+    List<String> results = new ArrayList<>();
+    try (TreeWalk treeWalk = newRecursiveTreeWalk(repository, tree)) {
+      while (treeWalk.next()) {
+        String path = treeWalk.getPathString();
+        if (!pathMatcher.matches(path)) continue;
+        if (!matchesExtensionList(path, enabledFileExtensions)) continue;
+        collector.collect(results, path, treeWalk);
+      }
+    }
+    return results;
+  }
+
   private Map<String, List<FileEntry>> getDirFilesMap(
-      Repository repository, GerritChange change, TreeFilter filter) throws IOException {
+      Repository repository, RevTree tree, TreeFilter filter) throws IOException {
     Map<String, List<FileEntry>> dirFilesMap = new LinkedHashMap<>();
 
     try (ObjectReader reader = repository.newObjectReader()) {
-      RevTree tree = getBranchRevTree(repository, change);
-
-      try (TreeWalk treeWalk = new TreeWalk(repository)) {
-        treeWalk.addTree(tree);
-        treeWalk.setRecursive(true);
+      try (TreeWalk treeWalk = newRecursiveTreeWalk(repository, tree)) {
         treeWalk.setFilter(filter);
 
         while (treeWalk.next()) {
@@ -174,6 +189,31 @@ public class GitRepoFiles {
       }
     }
     return dirFilesMap;
+  }
+
+  private <T> T withRepositoryTree(GerritChange change, RepositoryTreeCallback<T> callback)
+      throws IOException {
+    try (Repository repository = openRepository(change)) {
+      return callback.execute(repository, getBranchRevTree(repository, change));
+    }
+  }
+
+  private <T> T withRepositoryTreeReader(
+      GerritChange change, RepositoryTreeReaderCallback<T> callback) throws IOException {
+    return withRepositoryTree(
+        change,
+        (repository, tree) -> {
+          try (ObjectReader reader = repository.newObjectReader()) {
+            return callback.execute(repository, tree, reader);
+          }
+        });
+  }
+
+  private TreeWalk newRecursiveTreeWalk(Repository repository, RevTree tree) throws IOException {
+    TreeWalk treeWalk = new TreeWalk(repository);
+    treeWalk.addTree(tree);
+    treeWalk.setRecursive(true);
+    return treeWalk;
   }
 
   private Repository openRepository(GerritChange change) throws IOException {
@@ -235,5 +275,21 @@ public class GitRepoFiles {
         matches.add(String.format("%s:%d: %s", path, lineIndex + 1, lines[lineIndex]));
       }
     }
+  }
+
+  private interface RepositoryTreeCallback<T> {
+    T execute(Repository repository, RevTree tree) throws IOException;
+  }
+
+  private interface RepositoryTreeReaderCallback<T> {
+    T execute(Repository repository, RevTree tree, ObjectReader reader) throws IOException;
+  }
+
+  private interface PathMatcher {
+    boolean matches(String path);
+  }
+
+  private interface MatchingFileCollector {
+    void collect(List<String> results, String path, TreeWalk treeWalk) throws IOException;
   }
 }
