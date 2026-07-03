@@ -169,6 +169,28 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandReviewDebugShowsDebugDetailsOnlyInStatus() throws Exception {
+    grantAdministratorPrivileges();
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(getChangeDataHandler());
+    statusStore.pending("request-1", "/review --debug");
+    setupCommandCommentWithPastAiComments("/review --debug");
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertTrue(status.responseText.contains("DEBUGGING DETAILS"));
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertFalse(
+        captor.getValue().comments.values().stream()
+            .flatMap(List::stream)
+            .anyMatch(comment -> comment.message.contains("DEBUGGING DETAILS")));
+  }
+
+  @Test
   public void commandReviewTopicSetsForcedTopicReview() {
     ClientCommandParser parser =
         new ClientCommandParser(
@@ -277,7 +299,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewShowsDynamicConfigAfterChainedForgetThreadCommand() throws Exception {
+  public void commandReviewDoesNotPersistDynamicConfigAfterChainedForgetThreadCommand()
+      throws Exception {
     PluginDataHandler changeHandler = getChangeDataHandler();
     changeHandler.setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     setupCommandComment("/forget_thread /review");
@@ -286,8 +309,11 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
-    Assert.assertTrue(captor.getValue().message.contains("DYNAMIC CONFIGURATION SETTINGS"));
-    Assert.assertTrue(captor.getValue().message.contains("OpenAI/gpt-4.1"));
+    String message = captor.getValue().message;
+    if (message != null) {
+      Assert.assertFalse(message.contains("DYNAMIC CONFIGURATION SETTINGS"));
+      Assert.assertFalse(message.contains("OpenAI/gpt-4.1"));
+    }
   }
 
   @Test
@@ -704,6 +730,46 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     String dynamicChanges = changeHandler.getValue(KEY_DYNAMIC_CONFIG);
     String expectedChanges = getGson().toJson(Map.of(dynamicKey, dynamicValue));
     Assert.assertEquals(expectedChanges, dynamicChanges);
+  }
+
+  @Test
+  public void commandConfigureStatusShowsUpdatedDynamicConfig() throws Exception {
+    setupCommandComment("/configure --multiAgentMode=false");
+    grantAdministratorPrivileges();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+    changeHandler.setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("multiAgentMode", "true"));
+    ReviewAgentRequestStatusStore statusStore = new ReviewAgentRequestStatusStore(changeHandler);
+    statusStore.pending("request-1", "/configure --multiAgentMode=false");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertTrue(status.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    Assert.assertTrue(status.responseText.contains("multiAgentMode: false"));
+    Assert.assertFalse(status.responseText.contains("multiAgentMode: true"));
+    Assert.assertFalse(
+        status.responseText.contains("ReviewAI Message: Dynamic configuration modified"));
+  }
+
+  @Test
+  public void commandConfigureResetStatusShowsOnlyModifiedMessage() throws Exception {
+    setupCommandComment("/configure --reset");
+    grantAdministratorPrivileges();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+    changeHandler.setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("multiAgentMode", "true"));
+    ReviewAgentRequestStatusStore statusStore = new ReviewAgentRequestStatusStore(changeHandler);
+    statusStore.pending("request-1", "/configure --reset");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ReviewAgentRequestStatusStore.RequestStatus status = statusStore.get("request-1");
+    Assert.assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    Assert.assertEquals(
+        SystemMessageFormatter.getPrefixedSystemMessage(
+            localizer, localizer.getText("message.dump.dynamic.configuration.notify")),
+        status.responseText);
+    Assert.assertNull(changeHandler.getValue(KEY_DYNAMIC_CONFIG));
   }
 
   @Test

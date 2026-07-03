@@ -90,6 +90,7 @@ class ReviewAgentResponseService {
                 commandContext.changeSetData(),
                 commandContext.pluginDataHandlerProvider(),
                 commandContext.localizer(),
+                commandContext.administratorUser(),
                 false),
             false));
   }
@@ -115,6 +116,7 @@ class ReviewAgentResponseService {
                 commandContext.changeSetData(),
                 commandContext.pluginDataHandlerProvider(),
                 commandContext.localizer(),
+                commandContext.administratorUser(),
                 true),
             false));
   }
@@ -132,7 +134,8 @@ class ReviewAgentResponseService {
     List<String> messages = new ArrayList<>();
     Optional.ofNullable(getPartialReviewPositiveScoreMessage(commandContext))
         .ifPresent(messages::add);
-    if (!commandContext.changeSetData().getShowDynamicConfigMessage()
+    if (!commandContext.administratorUser()
+        || !commandContext.changeSetData().getShowDynamicConfigMessage()
         || commandContext
             .changeSetData()
             .hasParsedCommand(ClientCommandBase.commandName(CommandSet.CONFIGURE))) {
@@ -150,9 +153,10 @@ class ReviewAgentResponseService {
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
+      boolean administratorUser,
       boolean prefixSystemMessage) {
     List<String> messages = new ArrayList<>();
-    if (!changeSetData.getHideDynamicConfigMessage()) {
+    if (administratorUser && !changeSetData.getHideDynamicConfigMessage()) {
       Optional.ofNullable(
               getDynamicConfigurationMessage(config, pluginDataHandlerProvider, localizer))
           .ifPresent(messages::add);
@@ -200,6 +204,7 @@ class ReviewAgentResponseService {
         new PluginDataHandlerProvider(pluginDataPath, change, db);
     GerritClientPatchSetReviewAi gerritClientPatchSet =
         new GerritClientPatchSetReviewAi(config, repositoryManager);
+    boolean administratorUser = isAdministrator(resource);
     new ClientCommandParser(
             config,
             changeSetData,
@@ -209,9 +214,10 @@ class ReviewAgentResponseService {
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
-            isAdministrator(resource))
+            administratorUser)
         .parseCommands(message, executeCommands);
-    return new ReviewAgentCommandContext(changeSetData, pluginDataHandlerProvider, localizer);
+    return new ReviewAgentCommandContext(
+        changeSetData, pluginDataHandlerProvider, localizer, administratorUser);
   }
 
   private boolean isAdministrator(ChangeResource resource) {
@@ -238,7 +244,8 @@ class ReviewAgentResponseService {
   private record ReviewAgentCommandContext(
       ChangeSetData changeSetData,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {}
+      Localizer localizer,
+      boolean administratorUser) {}
 
   private int getAiAccountId(Configuration config) {
     return Optional.ofNullable(config.getUserId()).map(Account.Id::get).orElse(0);

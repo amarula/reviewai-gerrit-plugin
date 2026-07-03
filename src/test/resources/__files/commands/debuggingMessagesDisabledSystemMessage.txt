@@ -1,9 +1,1 @@
-
-
-```
-DYNAMIC CONFIGURATION SETTINGS
-
-aiModel: OpenAI/gpt-4.1
-```
-
 ReviewAI Message: Unable to execute command: Administrator privileges are required
