@@ -72,6 +72,7 @@ public class DynamicConfigManager {
     if (shouldResetDynamicConfig && !modifiedDynamicConfig) {
       log.debug("Resetting dynamic configuration without modification.");
       pluginDataHandler.removeValue(KEY_DYNAMIC_CONFIG);
+      dynamicConfig.clear();
     } else {
       if (shouldResetDynamicConfig) {
         log.debug("Resetting dynamic configuration.");

@@ -232,8 +232,8 @@ public class AiReviewMessageTest extends TestBase {
 
     assertEquals(true, output.ok);
     assertFalse(output.waitForAssistantReply);
-    assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
-    assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
+    assertFalse(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    assertFalse(output.responseText.contains("OpenAI/gpt-4.1"));
     assertTrue(
         output.responseText.contains(
             "ReviewAI Message: Unable to execute command: Administrator privileges are required"));
@@ -274,6 +274,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentReviewCommandReturnsDynamicConfigPreambleAndPostsGerritMessage()
       throws Exception {
+    grantAdministratorPrivileges();
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
@@ -306,7 +307,28 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
-  public void reviewAgentReviewCommandShowsNonDefaultSelectedModelOnlyPreamble() throws Exception {
+  public void reviewAgentReviewCommandHidesNonDefaultSelectedModelPreambleForNonAdmin()
+      throws Exception {
+    new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
+        .setJsonValue(
+            KEY_DYNAMIC_CONFIG,
+            Map.of("selectedAiModel", "MoonShot/moonshot-v1-8k"));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    assertEquals(null, output.responseText);
+    verify(revisionApi).review(any());
+  }
+
+  @Test
+  public void reviewAgentReviewCommandShowsNonDefaultSelectedModelOnlyPreambleForAdmin()
+      throws Exception {
+    grantAdministratorPrivileges();
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(
             KEY_DYNAMIC_CONFIG,
@@ -410,7 +432,7 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
-  public void reviewAgentConfigureCommandWithDebuggingWaitsForPostedCommandResponse()
+  public void reviewAgentConfigureCommandForAdminWaitsForUpdatedDynamicConfigPanel()
       throws Exception {
     grantAdministratorPrivileges();
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())

@@ -49,6 +49,51 @@
     return /\bDYNAMIC CONFIGURATION SETTINGS\b/.test((entry && entry.message) || '');
   }
 
+  function isPanelResponse(text) {
+    return /\b(?:DYNAMIC CONFIGURATION SETTINGS|DEBUGGING DETAILS)\b/.test(text || '');
+  }
+
+  function isDebugDetailsResponse(text) {
+    return /\bDEBUGGING DETAILS\b/.test(text || '');
+  }
+
+  function splitDebugDetailsPanels(text) {
+    const panels = [];
+    const panelPattern = /```\nDEBUGGING DETAILS\n[\s\S]*?\n```/g;
+    let match;
+    while ((match = panelPattern.exec(text || '')) !== null) {
+      panels.push(match[0]);
+    }
+    return panels;
+  }
+
+  function mergePanelResponseWithHistory(historyResponse, statusResponse) {
+    const historyText = String(historyResponse || '').trim();
+    const statusText = String(statusResponse || '').trim();
+    if (!statusText) {
+      return historyText;
+    }
+    if (!isDebugDetailsResponse(statusResponse)) {
+      if (isPanelResponse(statusText)) {
+        return joinAgentResponses(historyText, statusText);
+      }
+      if (!historyText || statusText.includes(historyText)) {
+        return statusText;
+      }
+      return historyText;
+    }
+    const panels = splitDebugDetailsPanels(statusText);
+    if (!panels.length) {
+      return joinAgentResponses(historyText, statusText);
+    }
+    const entries = historyText
+      .split(responseEntrySeparator)
+      .filter(Boolean);
+    const mergedEntries = entries.map((entry, index) => joinAgentResponses(entry, panels[index]));
+    const extraPanels = panels.slice(entries.length);
+    return mergedEntries.concat(extraPanels).join(responseEntrySeparator);
+  }
+
   function orderAgentEntries(entries) {
     return entries
       .map((entry, index) => ({entry, index}))
@@ -295,6 +340,8 @@
     entryKey,
     isAssistantEntry,
     isDynamicConfigurationEntry,
+    isPanelResponse,
+    mergePanelResponseWithHistory,
     isCommandPrompt,
     isDirectResponsePrompt,
     joinAgentResponses,
