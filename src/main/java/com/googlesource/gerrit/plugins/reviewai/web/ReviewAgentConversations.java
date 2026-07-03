@@ -22,6 +22,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
+import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
@@ -63,16 +64,19 @@ public class ReviewAgentConversations
     }
 
     String changeId = getFullChangeId(resource);
+    long userId = getCurrentUserId(resource);
     Map<String, ReviewAgentConversationInfo> conversations =
-        conversationStore.getConversations(changeId);
+        conversationStore.getConversations(changeId, userId);
+    Map<String, ReviewAgentConversationInfo> ownedConversations =
+        conversationStore.getOwnedConversations(changeId, userId);
 
     return switch (input.action) {
       case ACTION_LIST -> Response.ok(Output.list(toSortedList(conversations)));
       case ACTION_GET -> Response.ok(Output.conversation(getConversation(conversations, input)));
       case ACTION_APPEND ->
-          Response.ok(Output.conversation(append(changeId, conversations, input)));
+          Response.ok(Output.conversation(append(changeId, userId, ownedConversations, input)));
       case ACTION_UPSERT ->
-          Response.ok(Output.conversation(upsert(changeId, conversations, input)));
+          Response.ok(Output.conversation(upsert(changeId, userId, ownedConversations, input)));
       default -> throw new BadRequestException("unsupported action: " + input.action);
     };
   }
@@ -83,6 +87,14 @@ public class ReviewAgentConversations
             resource.getChange().getDest(),
             resource.getChange().getKey())
         .getFullChangeId();
+  }
+
+  private long getCurrentUserId(ChangeResource resource) {
+    CurrentUser user = resource.getUser();
+    if (user == null || !user.isIdentifiedUser()) {
+      return ReviewAgentConversationStore.SHARED_USER_ID;
+    }
+    return user.getAccountId().get();
   }
 
   private List<ReviewAgentConversationInfo> toSortedList(
@@ -121,6 +133,7 @@ public class ReviewAgentConversations
 
   private ReviewAgentConversationInfo upsert(
       String changeId,
+      long userId,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -138,12 +151,13 @@ public class ReviewAgentConversations
             getConversationById(conversations, incomingConversation.id), incomingConversation);
     conversations.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase(conversation.id));
     conversations.put(conversation.id, conversation);
-    conversationStore.upsertConversation(changeId, conversation);
+    conversationStore.upsertConversation(changeId, userId, conversation);
     return conversation;
   }
 
   private ReviewAgentConversationInfo append(
       String changeId,
+      long userId,
       Map<String, ReviewAgentConversationInfo> conversations,
       Input input)
       throws BadRequestException {
@@ -196,6 +210,7 @@ public class ReviewAgentConversations
     if (replaceTurn) {
       conversationStore.replaceTurn(
           changeId,
+          userId,
           conversation.id,
           conversation.title,
           input.turn,
@@ -203,7 +218,12 @@ public class ReviewAgentConversations
           turnIndex);
     } else {
       conversationStore.appendTurn(
-          changeId, conversation.id, conversation.title, input.turn, conversation.timestampMillis);
+          changeId,
+          userId,
+          conversation.id,
+          conversation.title,
+          input.turn,
+          conversation.timestampMillis);
     }
     return conversation;
   }
