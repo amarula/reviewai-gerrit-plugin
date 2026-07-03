@@ -21,6 +21,7 @@ import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.PatchSet;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.Response;
+import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -55,6 +56,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 public class ReviewAgentConversationsTest extends TestBase {
   @Mock private ChangeResource changeResource;
   @Mock private AiReviewPermission aiReviewPermission;
+  @Mock private CurrentUser currentUser;
 
   private ReviewAgentConversations view;
   private ReviewAgentConversationStore conversationStore;
@@ -65,6 +67,9 @@ public class ReviewAgentConversationsTest extends TestBase {
     Change change = new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
     change.setCurrentPatchSet(PatchSet.id(change.getId(), 1), "", "");
     when(changeResource.getChange()).thenReturn(change);
+    when(changeResource.getUser()).thenReturn(currentUser);
+    when(currentUser.isIdentifiedUser()).thenReturn(true);
+    when(currentUser.getAccountId()).thenReturn(Account.id(1000));
     jdbcUrl = "jdbc:h2:mem:" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
     conversationStore = new ReviewAgentConversationStore(jdbcUrl, tempFolder.getRoot().toPath());
     view =
@@ -90,6 +95,81 @@ public class ReviewAgentConversationsTest extends TestBase {
     assertEquals(uuidFor("conversation-1"), getResponse.value().conversation.id);
     assertEquals("First conversation", getResponse.value().conversation.title);
     assertEquals("Hello", getResponse.value().conversation.turns.get(0).get("message").getAsString());
+  }
+
+  @Test
+  public void storesConversationsWithCurrentUserId() throws Exception {
+    append("conversation-1", 0, turn("First", "First response"), 1000L);
+
+    try (var c = DriverManager.getConnection(jdbcUrl);
+        var rs =
+            c.createStatement()
+                .executeQuery(
+                    "SELECT user_id FROM review_agent_conversations "
+                        + "WHERE conversation_id = '"
+                        + uuidFor("conversation-1")
+                        + "'")) {
+      rs.next();
+      assertEquals(1000L, rs.getLong(1));
+    }
+  }
+
+  @Test
+  public void listsOnlyCurrentUsersOwnedConversationsAndSharedConversations() throws Exception {
+    append("current-user-conversation", 0, turn("Current", "Current response"), 1000L);
+    setCurrentUser(2000);
+    append("other-user-conversation", 0, turn("Other", "Other response"), 2000L);
+    conversationStore.appendTurn(
+        getGerritChange().getFullChangeId(),
+        "shared-conversation",
+        "Shared conversation",
+        turn("Patch set commit event triggered this ReviewAI request.", "Automatic response"),
+        3000L);
+
+    setCurrentUser(1000);
+    ReviewAgentConversations.Input listInput = new ReviewAgentConversations.Input();
+    listInput.action = "list";
+    List<ReviewAgentConversationInfo> conversations =
+        view.apply(changeResource, listInput).value().conversations;
+
+    assertEquals(2, conversations.size());
+    assertEquals(uuidFor("shared-conversation"), conversations.get(0).id);
+    assertEquals(uuidFor("current-user-conversation"), conversations.get(1).id);
+  }
+
+  @Test
+  public void doesNotReadAnotherUsersConversationById() throws Exception {
+    setCurrentUser(2000);
+    append("conversation-1", 0, turn("Other", "Other response"), 1000L);
+
+    setCurrentUser(1000);
+
+    assertEquals(null, get("conversation-1"));
+  }
+
+  @Test
+  public void sameConversationIdKeepsSeparateUserTurnsAndSharedTurnsVisible() throws Exception {
+    conversationStore.appendTurn(
+        getGerritChange().getFullChangeId(),
+        "conversation-1",
+        "Shared conversation",
+        turn("Patch set commit event triggered this ReviewAI request.", "Automatic response"),
+        1000L);
+    append("conversation-1", 0, turn("/review", "User 1000 response"), 2000L);
+    setCurrentUser(2000);
+    append("conversation-1", 0, turn("/message explain", "User 2000 response"), 3000L);
+
+    setCurrentUser(1000);
+    ReviewAgentConversationInfo user1000Conversation = get("conversation-1");
+    setCurrentUser(2000);
+    ReviewAgentConversationInfo user2000Conversation = get("conversation-1");
+
+    assertEquals(2, user1000Conversation.turns.size());
+    assertEquals("Automatic response", responseText(user1000Conversation.turns.get(0)));
+    assertEquals("User 1000 response", responseText(user1000Conversation.turns.get(1)));
+    assertEquals(2, user2000Conversation.turns.size());
+    assertEquals("Automatic response", responseText(user2000Conversation.turns.get(0)));
+    assertEquals("User 2000 response", responseText(user2000Conversation.turns.get(1)));
   }
 
   @Test
@@ -349,6 +429,8 @@ public class ReviewAgentConversationsTest extends TestBase {
       assertEquals(true, turnContent.getString(2).contains("First response"));
       assertFalse(hasTable(c, "LANGCHAIN_CHAT_MEMORY_MESSAGES"));
       assertFalse(hasColumn(c, "REVIEW_AGENT_CONVERSATION_TURNS", "TURN_CONTENT_JSON"));
+      assertEquals(true, hasColumn(c, "REVIEW_AGENT_CONVERSATIONS", "USER_ID"));
+      assertEquals(true, hasColumn(c, "REVIEW_AGENT_CONVERSATION_TURNS", "USER_ID"));
       assertFalse(hasResponsePartsTable(c));
     }
   }
@@ -392,6 +474,99 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   @Test
+  public void migratesExistingDbConversationRowsToSharedUserId() throws Exception {
+    String oldJdbcUrl = "jdbc:h2:mem:old-" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+    String conversationId = uuidFor("old-db-conversation");
+    try (var c = DriverManager.getConnection(oldJdbcUrl);
+        var s = c.createStatement()) {
+      s.executeUpdate(
+          """
+          CREATE TABLE review_agent_conversations (
+            change_id VARCHAR(512) NOT NULL,
+            conversation_id VARCHAR(255) NOT NULL,
+            title VARCHAR(1024),
+            timestamp_millis BIGINT,
+            updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(change_id, conversation_id)
+          )
+          """);
+      s.executeUpdate(
+          """
+          CREATE TABLE review_agent_conversation_turns (
+            change_id VARCHAR(512) NOT NULL,
+            conversation_id VARCHAR(255) NOT NULL,
+            turn_index INT NOT NULL,
+            user_message_id BIGINT,
+            turn_metadata_json CLOB NOT NULL,
+            timestamp_millis BIGINT,
+            updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(change_id, conversation_id, turn_index)
+          )
+          """);
+      try (var ps =
+          c.prepareStatement(
+              """
+              INSERT INTO review_agent_conversations
+                (change_id, conversation_id, title, timestamp_millis)
+              VALUES (?, ?, ?, ?)
+              """)) {
+        ps.setString(1, getGerritChange().getFullChangeId());
+        ps.setString(2, conversationId);
+        ps.setString(3, "Old DB conversation");
+        ps.setLong(4, 1000L);
+        ps.executeUpdate();
+      }
+      try (var ps =
+          c.prepareStatement(
+              """
+              INSERT INTO review_agent_conversation_turns
+                (change_id, conversation_id, turn_index, turn_metadata_json, timestamp_millis)
+              VALUES (?, ?, ?, ?, ?)
+              """)) {
+        ps.setString(1, getGerritChange().getFullChangeId());
+        ps.setString(2, conversationId);
+        ps.setInt(3, 0);
+        ps.setString(4, getGson().toJson(turn("Old DB", "Old DB response")));
+        ps.setLong(5, 1000L);
+        ps.executeUpdate();
+      }
+    }
+
+    ReviewAgentConversationStore oldDbStore =
+        new ReviewAgentConversationStore(oldJdbcUrl, tempFolder.getRoot().toPath());
+    ReviewAgentConversationInfo restored =
+        oldDbStore.getConversations(getGerritChange().getFullChangeId(), 1000L).get(conversationId);
+
+    assertNotNull(restored);
+    assertEquals("Old DB response", responseText(restored.turns.get(0)));
+    oldDbStore.appendTurn(
+        getGerritChange().getFullChangeId(),
+        1000L,
+        "new-user-conversation",
+        "New user conversation",
+        turn("New DB", "New DB response"),
+        2000L);
+    ReviewAgentConversationInfo appended =
+        oldDbStore
+            .getConversations(getGerritChange().getFullChangeId(), 1000L)
+            .get(uuidFor("new-user-conversation"));
+
+    assertNotNull(appended);
+    assertEquals("New DB response", responseText(appended.turns.get(0)));
+    try (var c = DriverManager.getConnection(oldJdbcUrl);
+        var rs =
+            c.createStatement()
+                .executeQuery(
+                    "SELECT user_id FROM review_agent_conversations "
+                        + "WHERE conversation_id = '"
+                        + conversationId
+                        + "'")) {
+      rs.next();
+      assertEquals(ReviewAgentConversationStore.SHARED_USER_ID, rs.getLong(1));
+    }
+  }
+
+  @Test
   public void removesActionClientDataFromAutomaticReviewTurns() throws Exception {
     JsonObject automaticReviewTurn =
         turn("Patch set commit event triggered this ReviewAI request.", "Code-Review -1");
@@ -402,7 +577,12 @@ public class ReviewAgentConversationsTest extends TestBase {
             """
             {"overridesPreviousTurn":true,"actionId":"review-change","contextItems":[],"isBackgroundRequest":true}
             """);
-    append("conversation-1", 0, automaticReviewTurn, 1000L);
+    conversationStore.appendTurn(
+        getGerritChange().getFullChangeId(),
+        "conversation-1",
+        "Shared conversation",
+        automaticReviewTurn,
+        1000L);
 
     ReviewAgentConversationInfo conversation = get("conversation-1");
 
@@ -412,9 +592,10 @@ public class ReviewAgentConversationsTest extends TestBase {
   @Test
   public void getsAutomaticReviewResponseTexts() throws Exception {
     String responseText = readTestResource("__files/review-agent/automaticReviewResponse.txt");
-    append(
+    conversationStore.appendTurn(
+        getGerritChange().getFullChangeId(),
         "conversation-1",
-        0,
+        "Shared conversation",
         turn("Patch set commit event triggered this ReviewAI request.", responseText),
         1000L);
     append("conversation-1", 1, turn("/review", "Manual review response"), 2000L);
@@ -467,6 +648,10 @@ public class ReviewAgentConversationsTest extends TestBase {
     input.action = "upsert";
     input.conversation = conversation;
     view.apply(changeResource, input);
+  }
+
+  private void setCurrentUser(int accountId) {
+    when(currentUser.getAccountId()).thenReturn(Account.id(accountId));
   }
 
   private ReviewAgentConversationInfo conversation(String id, Long timestampMillis) {
