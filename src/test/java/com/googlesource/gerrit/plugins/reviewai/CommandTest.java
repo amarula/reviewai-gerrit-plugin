@@ -120,8 +120,11 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             comments.computeIfAbsent(file, key -> new ArrayList<>()).addAll(fileComments));
   }
 
-  private void enableMessageDebugging() {
-    when(config.getEnableMessageDebugging()).thenReturn(true);
+  private void grantAdministratorPrivileges() throws Exception {
+    PermissionBackend.WithUser permissionBackendWithUser =
+        Mockito.mock(PermissionBackend.WithUser.class);
+    when(permissionBackend.user(eventUser)).thenReturn(permissionBackendWithUser);
+    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
   }
 
   private PluginDataHandler getChangeDataHandler() {
@@ -350,7 +353,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
     Assert.assertTrue(
         systemMessage.contains(
-            "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require `enableMessageDebugging=true`"));
+            "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require membership in the Gerrit Administrator group"));
   }
 
   @Test
@@ -693,7 +696,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     String dynamicKey = "aiModels";
     String dynamicValue = getGson().toJson(List.of("OpenAI/DUMMY_MODEL"));
     setupCommandComment(String.format("/configure --%s=%s", dynamicKey, dynamicValue));
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -706,7 +709,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandConfigureSelectivelyResetsListSetting() throws Exception {
     setupCommandComment("/configure --reset --" + KEY_SELECTIVE_LOG_LEVEL_OVERRIDE);
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
     changeHandler.setJsonValue(
         KEY_DYNAMIC_CONFIG,
@@ -727,7 +730,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandConfigureRejectsInvalidCodeContextPolicy() throws Exception {
     String invalidValue = "INVALID";
     setupCommandComment("/configure --codeContextPolicy=" + invalidValue);
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -747,7 +750,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandConfigureRejectsInvalidAgentSpecializationLevel() throws Exception {
     String invalidValue = "INVALID";
     setupCommandComment("/configure --agentSpecializationLevel=" + invalidValue);
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -766,7 +769,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandConfigureRejectsUnknownSettingWithWarning() throws Exception {
     setupCommandComment("/configure --unknownSetting=value");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -781,7 +784,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandConfigureRejectsMalformedListWithWarning() throws Exception {
     setupCommandComment("/configure --aiModels=not-an-array");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -798,7 +801,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     when(projectConfig.getString("codeContextPolicy")).thenReturn("INVALID");
     Assert.assertEquals(CodeContextPolicies.ON_DEMAND, config.getCodeContextPolicy());
     setupCommandComment("/configure --codeContextPolicy=NONE");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -815,7 +818,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandAddDirective() throws Exception {
     List<String> directives = List.of("DUMMY DIRECTIVE");
     setupCommandComment(String.format("/directives %s", directives.get(0)));
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
     PluginDataHandler changeHandler = getChangeDataHandler();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -828,7 +831,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandDumpStoredData() throws Exception {
     setupCommandComment("/show --local_data");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     PluginDataHandlerProvider provider =
         new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
@@ -852,7 +855,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandDumpConfig() throws Exception {
     setupCommandComment("/show --config");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -863,7 +866,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowPromptsUsesSafeMarkdownFence() throws Exception {
     setupCommandComment("/show --prompts");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -902,7 +905,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowPromptsRetrievesPatchSet() throws Exception {
     setupCommandComment("/show --prompts");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -913,7 +916,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowPromptsFullScopeIncludesOnlyFullReviewPrompt() throws Exception {
     setupCommandComment("/show --prompts --scope=" + ReviewScope.FULL.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -926,7 +929,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowPromptsPatchSetScopeIncludesOnlyPatchSetPrompt() throws Exception {
     setupCommandComment("/show --prompts --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -941,7 +944,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       throws Exception {
     setupCommandComment(
         "/show --prompts --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -954,7 +957,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowPromptsSuggestModeIncludesOnlySuggestPrompt() throws Exception {
     setupCommandComment("/show --prompts --mode=suggest");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -978,7 +981,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowInstructionsIncludesAllReviewScopes() throws Exception {
     setupCommandComment("/show --instructions");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1011,7 +1014,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       throws Exception {
     setupCommandComment(
         "/show --instructions --scope=" + ReviewScope.FULL.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1026,7 +1029,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       throws Exception {
     setupCommandComment(
         "/show --instructions --scope=" + ReviewScope.PATCHSET.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1041,7 +1044,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       throws Exception {
     setupCommandComment(
         "/show --instructions --scope=" + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1055,7 +1058,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandShowInstructionsSuggestModeIncludesAllSuggestScopes()
       throws Exception {
     setupCommandComment("/show --instructions --mode=suggest");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1086,7 +1089,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     setupCommandComment(
         "/show --instructions --mode=suggest --scope="
             + ReviewScope.FULL.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1111,7 +1114,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     setupCommandComment(
         "/show --instructions --mode=suggest --scope="
             + ReviewScope.PATCHSET.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1136,7 +1139,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     setupCommandComment(
         "/show --instructions --mode=suggest --scope="
             + ReviewScope.COMMIT_MESSAGE.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1158,7 +1161,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowScopeWithoutPromptsOrInstructionsIsRejected() throws Exception {
     setupCommandComment("/show --config --scope=" + ReviewScope.FULL.getCommandOptionValue());
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1174,7 +1177,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowModeWithoutPromptsOrInstructionsIsRejected() throws Exception {
     setupCommandComment("/show --config --mode=suggest");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1190,7 +1193,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowRejectsUnsupportedMode() throws Exception {
     setupCommandComment("/show --prompts --mode=review");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -1207,7 +1210,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandShowRejectsMissingRequiredOptionWithWarning() throws Exception {
     setupCommandComment("/show");
-    enableMessageDebugging();
+    grantAdministratorPrivileges();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
