@@ -234,6 +234,7 @@ public class PatchSetReviewer {
     List<ReviewBatch> batches = new ArrayList<>();
     FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
+    List<String> debugDetails = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
     if (reviewReply.getMessageContent() != null && !reviewReply.getMessageContent().isEmpty()) {
       batches.add(new ReviewBatch(reviewReply.getMessageContent()));
@@ -269,7 +270,7 @@ public class PatchSetReviewer {
         continue;
       }
       if (changeSetData.getDebugReviewMode()) {
-        reply += debugCodeBlocksReview.getDebugCodeBlock(replyItem, isHidden);
+        debugDetails.add(debugCodeBlocksReview.getDebugCodeBlock(replyItem, isHidden));
       }
       ReviewBatch batchMap = new ReviewBatch(reply);
       if (change.getIsCommentEvent() && replyItem.getId() != null) {
@@ -280,6 +281,9 @@ public class PatchSetReviewer {
       }
       batches.add(batchMap);
       log.debug("Added review batch from reply item: {}", batchMap);
+    }
+    if (!debugDetails.isEmpty()) {
+      changeSetData.setReviewStatusMessage(String.join("\n\n", debugDetails));
     }
     setRepeatedCommentsMessage(filteredRepeatedReplyItems, change);
     return batches;
