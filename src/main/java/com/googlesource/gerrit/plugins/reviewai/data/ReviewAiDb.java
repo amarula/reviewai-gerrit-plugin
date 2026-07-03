@@ -28,8 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Set;
 import org.h2.tools.Server;
 
 @Singleton
@@ -116,26 +119,40 @@ public class ReviewAiDb {
                 """
                 CREATE TABLE IF NOT EXISTS review_agent_conversations (
                   change_id VARCHAR(512) NOT NULL,
+                  user_id BIGINT NOT NULL DEFAULT 0,
                   conversation_id VARCHAR(255) NOT NULL,
                   title VARCHAR(1024),
                   timestamp_millis BIGINT,
                   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  PRIMARY KEY(change_id, conversation_id)
+                  PRIMARY KEY(change_id, user_id, conversation_id)
                 )
                 """);
             s.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS review_agent_conversation_turns (
                   change_id VARCHAR(512) NOT NULL,
+                  user_id BIGINT NOT NULL DEFAULT 0,
                   conversation_id VARCHAR(255) NOT NULL,
                   turn_index INT NOT NULL,
                   user_message_id BIGINT,
                   turn_metadata_json CLOB NOT NULL,
                   timestamp_millis BIGINT,
                   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  PRIMARY KEY(change_id, conversation_id, turn_index)
+                  PRIMARY KEY(change_id, user_id, conversation_id, turn_index)
                 )
                 """);
+            addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATIONS");
+            addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATION_TURNS");
+            ensurePrimaryKeyIncludesUserId(
+                c, s, "REVIEW_AGENT_CONVERSATIONS", "CHANGE_ID", "USER_ID", "CONVERSATION_ID");
+            ensurePrimaryKeyIncludesUserId(
+                c,
+                s,
+                "REVIEW_AGENT_CONVERSATION_TURNS",
+                "CHANGE_ID",
+                "USER_ID",
+                "CONVERSATION_ID",
+                "TURN_INDEX");
             if (hasColumn(c, "REVIEW_AGENT_CONVERSATION_TURNS", "TURN_CONTENT_JSON")) {
               s.executeUpdate(
                   """
@@ -152,6 +169,38 @@ public class ReviewAiDb {
           }
           return null;
         });
+  }
+
+  private void addUserIdColumnIfMissing(Connection c, Statement s, String tableName)
+      throws SQLException {
+    if (!hasColumn(c, tableName, "USER_ID")) {
+      s.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
+    }
+  }
+
+  private void ensurePrimaryKeyIncludesUserId(
+      Connection c, Statement s, String tableName, String... primaryKeyColumns)
+      throws SQLException {
+    if (primaryKeyColumns(c, tableName).contains("USER_ID")) {
+      return;
+    }
+    s.executeUpdate("ALTER TABLE " + tableName + " DROP PRIMARY KEY");
+    s.executeUpdate(
+        "ALTER TABLE "
+            + tableName
+            + " ADD PRIMARY KEY("
+            + String.join(", ", primaryKeyColumns)
+            + ")");
+  }
+
+  private Set<String> primaryKeyColumns(Connection c, String tableName) throws SQLException {
+    Set<String> columns = new HashSet<>();
+    try (ResultSet rs = c.getMetaData().getPrimaryKeys(null, null, tableName)) {
+      while (rs.next()) {
+        columns.add(rs.getString("COLUMN_NAME"));
+      }
+    }
+    return columns;
   }
 
   private void executeSchema(String... statements) throws SQLException {
