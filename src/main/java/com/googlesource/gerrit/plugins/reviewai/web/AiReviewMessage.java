@@ -26,6 +26,7 @@ import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
@@ -60,7 +61,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
       GitRepositoryManager repositoryManager,
-      @PluginData Path pluginDataPath) {
+      @PluginData Path pluginDataPath,
+      PermissionBackend permissionBackend) {
     this(
         configCreator,
         gerritApi,
@@ -69,7 +71,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         repositoryManager,
         pluginDataPath,
         null,
-        null);
+        null,
+        permissionBackend);
   }
 
   @Inject
@@ -81,13 +84,15 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
-      ReviewAiDb db) {
+      ReviewAiDb db,
+      PermissionBackend permissionBackend) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     reviewAgentResponseService =
-        new ReviewAgentResponseService(repositoryManager, pluginDataPath, chatMemoryStore, db);
+        new ReviewAgentResponseService(
+            repositoryManager, pluginDataPath, chatMemoryStore, db, permissionBackend);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 

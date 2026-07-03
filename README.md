@@ -253,9 +253,6 @@ directive = End each reply with \"Hope this helps!\"
   inviting further discussion. If activated, it marks AI's Patch Set comments as resolved.
 - `inlineCommentsAsResolved`: Initially set to false, this option leaves AI's inline comments as unresolved, inviting
   further discussion. If activated, it marks AI's inline comments as resolved.
-- `enableMessageDebugging`: This setting controls the activation of debugging functionalities through messages (default
-  value is false). When set to true, it enables commands and options like `--debug` for users as well as the Dynamic
-  Configuration commands.
 - `selectiveLogLevelOverride`: This setting allows for overriding the log level of specific messages, ensuring they are
   logged even if their level is above the current setting. This is useful for debugging without the need to set the
   overall log level to DEBUG, which could result in excessive DEBUG messages from sources like gerrit and other plugins.
@@ -378,8 +375,7 @@ this section.
 - `--debug`: When paired with `/review`, this option displays useful debug information in each AI reply, showing all
   replies as though the filter setting were disabled.
 
-  **NOTE**: The usage of `--debug` option is disabled by default. To enable it, `enableMessageDebugging` setting must be
-  set to true.
+  **NOTE**: The `--debug` option is reserved to users in the Gerrit Administrator group.
 
 ### Suggest Command
 
@@ -398,8 +394,8 @@ The `/suggest` command generates native Gerrit suggested edits for negative revi
 
 ### Dynamic Configuration
 
-You can dynamically alter the plugin configuration for the current Change Set, primarily for testing and debugging
-purposes. This feature becomes available when the `enableMessageDebugging` configuration setting is enabled.
+Users in the Gerrit Administrator group can dynamically alter the plugin configuration for the current Change Set,
+primarily for testing and debugging purposes.
 
 #### Basic Syntax
 
@@ -488,7 +484,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
 Use `--mode=suggest` to show the prompts or instructions used by `/suggest`.
 
-**NOTE**: This command is available when the `enableMessageDebugging` configuration setting is enabled.
+**NOTE**: This command is reserved to users in the Gerrit Administrator group.
 
 #### Showing Prompting Parameters
 
@@ -617,7 +613,6 @@ convertNeutralReviewScoreToPositive: true
 directive:
     First directive
     Second directive
-enableMessageDebugging: true
 enabledFileExtensions:
     py
     java
@@ -710,20 +705,9 @@ plugin when running on a Gerrit instance. These tools can be managed through bot
 modifying `gerrit.config` and `project.config`) and dynamic configurations (using the `/configure` command in a message
 addressed to the AI user).
 
-### Enabling Message Debugging Tools
-
-To enable the debugging tools, use the `enableMessageDebugging` static configuration setting. Due to its nature, this
-setting cannot be enabled dynamically through Message Debugging and must be set statically.
-
-```
-[plugin "reviewai-gerrit-plugin"]
-    ...
-    enableMessageDebugging = true
-```
-
 ### Using the Review Debug Command
 
-Once `enableMessageDebugging` is enabled, you can obtain additional useful debug information in each AI reply, such as
+Users in the Gerrit Administrator group can obtain additional useful debug information in each AI reply, such as
 relevance and scores, by using the `--debug` command option. For example:
 
 ```

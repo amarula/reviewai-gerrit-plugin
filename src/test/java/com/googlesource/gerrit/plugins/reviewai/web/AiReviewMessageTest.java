@@ -29,8 +29,11 @@ import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.BinaryResult;
+import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.GlobalPermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -72,6 +75,8 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private Configuration config;
   @Mock private GerritApi gerritApi;
   @Mock private AiReviewPermission aiReviewPermission;
+  @Mock private CurrentUser currentUser;
+  @Mock private PermissionBackend permissionBackend;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
   @Mock private GitRepositoryManager repositoryManager;
@@ -90,6 +95,7 @@ public class AiReviewMessageTest extends TestBase {
         new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
+    when(changeResource.getUser()).thenReturn(currentUser);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getGerritUserName()).thenReturn("gpt");
     when(config.getGerritApi()).thenReturn(gerritApi);
@@ -118,7 +124,15 @@ public class AiReviewMessageTest extends TestBase {
             repositoryManager,
             mockPluginDataPath,
             null,
-            getTestReviewAiDb());
+            getTestReviewAiDb(),
+            permissionBackend);
+  }
+
+  private void grantAdministratorPrivileges() throws Exception {
+    PermissionBackend.WithUser permissionBackendWithUser =
+        org.mockito.Mockito.mock(PermissionBackend.WithUser.class);
+    when(permissionBackend.user(currentUser)).thenReturn(permissionBackendWithUser);
+    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
   }
 
   @Test(expected = AuthException.class)
@@ -222,13 +236,13 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
     assertTrue(
         output.responseText.contains(
-            "Unable to execute command: Message Debugging functionalities are disabled"));
+            "ReviewAI Message: Unable to execute command: Administrator privileges are required"));
     verify(revisionApi, never()).review(any());
   }
 
   @Test
   public void reviewAgentShowPromptsReturnsRealPrompt() throws Exception {
-    when(config.getEnableMessageDebugging()).thenReturn(true);
+    grantAdministratorPrivileges();
     String patch = readTestFile("__files/openai/gerritFormattedPatch.txt");
     when(revisionApi.patch()).thenReturn(BinaryResult.create(patch));
     when(revisionApi.file("test_file_1.py")).thenReturn(fileApi);
@@ -398,7 +412,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentConfigureCommandWithDebuggingWaitsForPostedCommandResponse()
       throws Exception {
-    when(config.getEnableMessageDebugging()).thenReturn(true);
+    grantAdministratorPrivileges();
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
