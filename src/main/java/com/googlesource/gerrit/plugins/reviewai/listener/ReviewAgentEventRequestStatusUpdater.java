@@ -99,6 +99,10 @@ class ReviewAgentEventRequestStatusUpdater {
       if (requestId.isEmpty()) {
         return;
       }
+      if (changeSetData.getReviewStatusMessage() != null) {
+        complete(changeSetData.getReviewStatusMessage());
+        return;
+      }
       if (changeSetData.getReviewRepeatedCommentsMessage() != null) {
         complete(
             SystemMessageFormatter.getPrefixedSystemMessage(
@@ -109,12 +113,9 @@ class ReviewAgentEventRequestStatusUpdater {
         complete(null);
         return;
       }
-      String responseText =
-          Optional.ofNullable(changeSetData.getReviewStatusMessage())
-              .orElse(changeSetData.getReviewSystemMessage());
       complete(
           SystemMessageFormatter.getPrefixedSystemMessage(
-              localizer, responseText));
+              localizer, changeSetData.getReviewSystemMessage()));
     }
 
     void fail(String responseText) {

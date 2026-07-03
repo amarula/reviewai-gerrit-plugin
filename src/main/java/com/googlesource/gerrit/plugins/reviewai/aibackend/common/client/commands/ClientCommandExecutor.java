@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
@@ -103,7 +104,9 @@ public class ClientCommandExecutor extends ClientCommandBase {
   }
 
   public void postExecuteCommand() {
-    changeSetData.setHideDynamicConfigMessage(!DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
+    changeSetData.setHideDynamicConfigMessage(
+        !changeSetData.getShowDynamicConfigMessage()
+            && !DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
   }
 
   private void commandHelp() {
@@ -317,6 +320,11 @@ public class ClientCommandExecutor extends ClientCommandBase {
     dynamicConfigManager.updateConfiguration(modifiedDynamicConfig, shouldResetDynamicConfig);
     changeSetData.setReviewSystemMessage(
         localizer.getText("message.dump.dynamic.configuration.notify"));
+    Map<String, String> dynamicConfig = dynamicConfigManager.getDynamicConfigForDisplay(config);
+    if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
+      changeSetData.setReviewStatusMessage(
+          new DebugCodeBlocksDynamicConfiguration(localizer).getDebugCodeBlock(dynamicConfig));
+    }
   }
 
   private void commandDirectives() {
