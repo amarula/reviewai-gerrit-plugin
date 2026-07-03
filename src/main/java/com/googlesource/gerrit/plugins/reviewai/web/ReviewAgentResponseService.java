@@ -19,6 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.GlobalPermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
@@ -52,16 +54,19 @@ class ReviewAgentResponseService {
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewAiDb db;
+  private final PermissionBackend permissionBackend;
 
   ReviewAgentResponseService(
       GitRepositoryManager repositoryManager,
       Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
-      ReviewAiDb db) {
+      ReviewAiDb db,
+      PermissionBackend permissionBackend) {
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
     this.db = db;
+    this.permissionBackend = permissionBackend;
   }
 
   Optional<AiReviewMessage.Output> getDirectResponse(
@@ -203,9 +208,21 @@ class ReviewAgentResponseService {
             pluginDataHandlerProvider,
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
-            chatMemoryStore)
+            chatMemoryStore,
+            isAdministrator(resource))
         .parseCommands(message, executeCommands);
     return new ReviewAgentCommandContext(changeSetData, pluginDataHandlerProvider, localizer);
+  }
+
+  private boolean isAdministrator(ChangeResource resource) {
+    try {
+      return permissionBackend != null
+          && resource != null
+          && resource.getUser() != null
+          && permissionBackend.user(resource.getUser()).test(GlobalPermission.ADMINISTRATE_SERVER);
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   private String getDynamicConfigurationMessage(

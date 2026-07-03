@@ -105,7 +105,7 @@ public class GerritClientComments extends GerritClientAccount {
     return new CommentData(commentProperties, commentMap, patchSetCommentMap);
   }
 
-  public boolean retrieveLastComments(GerritChange change) {
+  public boolean retrieveLastComments(GerritChange change, boolean administratorUser) {
     clearCommentData();
     CommentAddedEvent commentAddedEvent = (CommentAddedEvent) change.getEvent();
     AccountAttribute author = commentAddedEvent.author.get();
@@ -120,7 +120,7 @@ public class GerritClientComments extends GerritClientAccount {
       log.info("Review of comments from user '{}' is disabled.", authorUsername);
       return false;
     }
-    addLastComments(change);
+    addLastComments(change, administratorUser);
 
     return !commentProperties.isEmpty();
   }
@@ -200,7 +200,7 @@ public class GerritClientComments extends GerritClientAccount {
     }
   }
 
-  private void addLastComments(GerritChange change) {
+  private void addLastComments(GerritChange change, boolean administratorUser) {
     log.debug("Adding last comments for change: {}", change.getFullChangeId());
     ClientMessageParser messageParser =
         new ClientMessageParser(
@@ -211,7 +211,8 @@ public class GerritClientComments extends GerritClientAccount {
             pluginDataHandlerProvider,
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
-            chatMemoryStore);
+            chatMemoryStore,
+            administratorUser);
     try {
       List<GerritComment> latestComments = retrieveComments(change);
       if (latestComments == null) {
