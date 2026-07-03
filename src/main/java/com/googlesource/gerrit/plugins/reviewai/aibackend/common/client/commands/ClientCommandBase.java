@@ -71,7 +71,7 @@ public abstract class ClientCommandBase extends ClientBase {
   private static final ImmutableBiMap<CommandSet, String> COMMAND_MAP_INVERSE =
       COMMAND_MAP.inverse();
   public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
-      Set.of(CommandSet.HELP, CommandSet.SHOW);
+      Set.of(CommandSet.HELP, CommandSet.DIRECTIVES, CommandSet.CONFIGURE, CommandSet.SHOW);
   public static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
       Set.of(CommandSet.REVIEW, CommandSet.SUGGEST, CommandSet.CONFIGURE, CommandSet.SHOW);
 

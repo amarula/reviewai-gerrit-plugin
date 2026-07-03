@@ -319,7 +319,8 @@ public class ClientCommandExecutor extends ClientCommandBase {
     }
     dynamicConfigManager.updateConfiguration(modifiedDynamicConfig, shouldResetDynamicConfig);
     changeSetData.setReviewSystemMessage(
-        localizer.getText("message.dump.dynamic.configuration.notify"));
+        SystemMessageFormatter.getPrefixedSystemMessage(
+            localizer, localizer.getText("message.dump.dynamic.configuration.notify")));
     Map<String, String> dynamicConfig = dynamicConfigManager.getDynamicConfigForDisplay(config);
     if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
       changeSetData.setReviewStatusMessage(
