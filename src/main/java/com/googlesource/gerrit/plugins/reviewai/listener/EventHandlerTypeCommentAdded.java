@@ -52,7 +52,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     log.debug(
         "Starting preprocessing event for comment added on change ID: {}",
         change.getFullChangeId());
-    if (!gerritClient.retrieveLastComments(change)) {
+    if (!gerritClient.retrieveLastComments(change, administratorUser)) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());
       if (changeSetData.getForcedReview()) {
         log.info("Forcing review due to settings for full change ID: {}", change.getFullChangeId());
