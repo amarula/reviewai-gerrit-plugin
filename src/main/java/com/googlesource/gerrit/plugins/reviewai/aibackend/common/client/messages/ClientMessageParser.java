@@ -42,6 +42,28 @@ public class ClientMessageParser extends ClientMessageBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        chatMemoryStore,
+        false);
+  }
+
+  public ClientMessageParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      boolean administratorUser) {
     super(config);
     clientCommandParser =
         new ClientCommandParser(
@@ -52,7 +74,8 @@ public class ClientMessageParser extends ClientMessageBase {
             pluginDataHandlerProvider,
             localizer,
             IPatchSetProvider,
-            chatMemoryStore);
+            chatMemoryStore,
+            administratorUser);
     log.debug("ClientMessageParser initialized with bot mention pattern: {}", botMentionPattern);
   }
 

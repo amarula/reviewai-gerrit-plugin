@@ -83,6 +83,7 @@ public class ClientCommandParser extends ClientCommandBase {
   private final ChangeSetData changeSetData;
   private final Localizer localizer;
   private final ClientCommandExecutor clientCommandExecutor;
+  private final boolean administratorUser;
 
   private Map<BaseOptionSet, String> baseOptions;
   private Map<String, String> dynamicOptions;
@@ -96,9 +97,32 @@ public class ClientCommandParser extends ClientCommandBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        chatMemoryStore,
+        false);
+  }
+
+  public ClientCommandParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      boolean administratorUser) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
+    this.administratorUser = administratorUser;
     this.clientCommandExecutor =
         new ClientCommandExecutor(
             config,
@@ -183,19 +207,18 @@ public class ClientCommandParser extends ClientCommandBase {
     if (optionsMismatch(command)) {
       return false;
     }
-    if (!config.getEnableMessageDebugging() && requiresMessageDebugging(command)) {
+    if (!administratorUser && requiresAdministrator(command)) {
       changeSetData.setReviewSystemMessage(
-          localizer.getText("message.command.debugging.messages.disabled"));
-      log.debug(
-          "Command `{}` not validated: `enableMessageDebugging` config must be set to true",
-          command);
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, localizer.getText("message.command.debugging.administrator.required")));
+      log.debug("Command `{}` not validated: administrator privileges are required", command);
       return false;
     }
     log.debug("Command `{}` validated", command);
     return true;
   }
 
-  private boolean requiresMessageDebugging(CommandSet command) {
+  private boolean requiresAdministrator(CommandSet command) {
     return DEBUG_REQUIRED_COMMANDS.contains(command)
         || REVIEW_COMMANDS.contains(command) && baseOptions.containsKey(BaseOptionSet.DEBUG);
   }
