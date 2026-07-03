@@ -54,6 +54,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Singleton
 public class ReviewAgentConversationStore {
+  static final long SHARED_USER_ID = 0L;
+
   private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
   private static final String PATCH_SET_EVENT_TRIGGER_MESSAGE =
       "Patch set commit event triggered this ReviewAI request.";
@@ -72,28 +74,54 @@ public class ReviewAgentConversationStore {
     this(new ReviewAiDb(pluginDataDir, jdbcUrl));
   }
 
-  Map<String, ReviewAgentConversationInfo> getConversations(String changeId) {
+  Map<String, ReviewAgentConversationInfo> getConversations(String changeId, long userId) {
+    return getConversations(changeId, userId, true);
+  }
+
+  Map<String, ReviewAgentConversationInfo> getOwnedConversations(String changeId, long userId) {
+    return getConversations(changeId, userId, false);
+  }
+
+  private Map<String, ReviewAgentConversationInfo> getConversations(
+      String changeId, long userId, boolean includeShared) {
     migrateLegacyConversations(changeId);
     try (Connection c = db.getConnection();
         PreparedStatement ps =
             c.prepareStatement(
                 """
-                SELECT conversation_id, title, timestamp_millis
+                SELECT conversation_id, user_id, title, timestamp_millis
                 FROM review_agent_conversations
                 WHERE change_id = ?
-                ORDER BY updated_at
+                  AND (user_id = ? OR (? AND user_id = ?))
+                ORDER BY user_id, updated_at
                 """)) {
       migrateLegacyTurnContent(c, changeId);
       migrateAutomaticReviewTurnsToPlainHistory(c, changeId);
       ps.setString(1, changeId);
+      ps.setLong(2, userId);
+      ps.setBoolean(3, includeShared && userId != SHARED_USER_ID);
+      ps.setLong(4, SHARED_USER_ID);
       try (ResultSet rs = ps.executeQuery()) {
         Map<String, ReviewAgentConversationInfo> conversations = new LinkedHashMap<>();
         while (rs.next()) {
-          ReviewAgentConversationInfo conversation = new ReviewAgentConversationInfo();
-          conversation.id = rs.getString(1);
-          conversation.title = rs.getString(2);
-          conversation.timestampMillis = rs.getObject(3, Long.class);
-          conversation.turns.addAll(getTurns(c, changeId, conversation.id));
+          String conversationId = rs.getString(1);
+          long conversationUserId = rs.getLong(2);
+          ReviewAgentConversationInfo conversation =
+              conversations.computeIfAbsent(
+                  conversationId,
+                  id -> {
+                    ReviewAgentConversationInfo newConversation = new ReviewAgentConversationInfo();
+                    newConversation.id = id;
+                    return newConversation;
+                  });
+          if (conversationUserId == userId || conversation.title == null) {
+            conversation.title = rs.getString(3);
+          }
+          Long timestampMillis = rs.getObject(4, Long.class);
+          if (conversationUserId == userId || conversation.timestampMillis == null) {
+            conversation.timestampMillis = timestampMillis;
+          }
+          conversation.turns.addAll(getTurns(c, changeId, conversation.id, conversationUserId));
           conversations.put(conversation.id, conversation);
         }
         return conversations;
@@ -106,7 +134,8 @@ public class ReviewAgentConversationStore {
 
   public List<String> getAutomaticReviewResponseTexts(String changeId) {
     List<String> responseTexts = new ArrayList<>();
-    for (ReviewAgentConversationInfo conversation : getConversations(changeId).values()) {
+    for (ReviewAgentConversationInfo conversation :
+        getConversations(changeId, SHARED_USER_ID).values()) {
       if (conversation.turns == null) {
         continue;
       }
@@ -119,9 +148,9 @@ public class ReviewAgentConversationStore {
     return responseTexts;
   }
 
-  void upsertConversation(String changeId, ReviewAgentConversationInfo conversation) {
+  void upsertConversation(String changeId, long userId, ReviewAgentConversationInfo conversation) {
     try (Connection c = db.getConnection()) {
-      upsertConversation(c, changeId, conversation);
+      upsertConversation(c, changeId, userId, conversation);
     } catch (SQLException e) {
       log.warn(
           "Failed to store review-agent conversation {} for change {}",
@@ -133,14 +162,25 @@ public class ReviewAgentConversationStore {
 
   public void appendTurn(
       String changeId, String conversationId, String title, JsonObject turn, Long timestampMillis) {
+    appendTurn(changeId, SHARED_USER_ID, conversationId, title, turn, timestampMillis);
+  }
+
+  public void appendTurn(
+      String changeId,
+      long userId,
+      String conversationId,
+      String title,
+      JsonObject turn,
+      Long timestampMillis) {
     try (Connection c = db.getConnection()) {
       String canonicalConversationId = canonicalConversationId(conversationId);
-      upsertConversationHeader(c, changeId, canonicalConversationId, title, timestampMillis);
+      upsertConversationHeader(c, changeId, userId, canonicalConversationId, title, timestampMillis);
       insertTurn(
           c,
           changeId,
+          userId,
           canonicalConversationId,
-          getNextTurnIndex(c, changeId, canonicalConversationId),
+          getNextTurnIndex(c, changeId, userId, canonicalConversationId),
           turn);
     } catch (SQLException e) {
       log.warn(
@@ -153,6 +193,7 @@ public class ReviewAgentConversationStore {
 
   public void replaceTurn(
       String changeId,
+      long userId,
       String conversationId,
       String title,
       JsonObject turn,
@@ -160,8 +201,12 @@ public class ReviewAgentConversationStore {
       int turnIndex) {
     try (Connection c = db.getConnection()) {
       String canonicalConversationId = canonicalConversationId(conversationId);
-      upsertConversationHeader(c, changeId, canonicalConversationId, title, timestampMillis);
-      updateTurn(c, changeId, canonicalConversationId, turnIndex, turn);
+      upsertConversationHeader(c, changeId, userId, canonicalConversationId, title, timestampMillis);
+      if (hasTurn(c, changeId, userId, canonicalConversationId, turnIndex)) {
+        updateTurn(c, changeId, userId, canonicalConversationId, turnIndex, turn);
+      } else {
+        insertTurn(c, changeId, userId, canonicalConversationId, turnIndex, turn);
+      }
     } catch (SQLException e) {
       log.warn(
           "Failed to replace review-agent conversation turn {} for conversation {} on change {}",
@@ -199,7 +244,7 @@ public class ReviewAgentConversationStore {
         return;
       }
       for (ReviewAgentConversationInfo conversation : conversations.values()) {
-        upsertConversation(c, changeId, conversation);
+        upsertConversation(c, changeId, SHARED_USER_ID, conversation);
       }
     } catch (Exception e) {
       log.warn("Failed to migrate review-agent conversations for change {}", changeId, e);
@@ -235,45 +280,53 @@ public class ReviewAgentConversationStore {
   }
 
   private void upsertConversation(
-      Connection c, String changeId, ReviewAgentConversationInfo conversation)
+      Connection c, String changeId, long userId, ReviewAgentConversationInfo conversation)
       throws SQLException {
     conversation.id = canonicalConversationId(conversation.id);
     upsertConversationHeader(
-        c, changeId, conversation.id, conversation.title, conversation.timestampMillis);
+        c, changeId, userId, conversation.id, conversation.title, conversation.timestampMillis);
     for (int i = 0; i < conversation.turns.size(); i++) {
-      upsertTurn(c, changeId, conversation.id, i, conversation.turns.get(i));
+      upsertTurn(c, changeId, userId, conversation.id, i, conversation.turns.get(i));
     }
   }
 
   private void upsertConversationHeader(
-      Connection c, String changeId, String conversationId, String title, Long timestampMillis)
+      Connection c,
+      String changeId,
+      long userId,
+      String conversationId,
+      String title,
+      Long timestampMillis)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """
             MERGE INTO review_agent_conversations
-            KEY(change_id, conversation_id)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+              (change_id, user_id, conversation_id, title, timestamp_millis, updated_at)
+            KEY(change_id, user_id, conversation_id)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """)) {
       ps.setString(1, changeId);
-      ps.setString(2, conversationId);
-      ps.setString(3, title);
-      setLongOrNull(ps, 4, timestampMillis);
+      ps.setLong(2, userId);
+      ps.setString(3, conversationId);
+      ps.setString(4, title);
+      setLongOrNull(ps, 5, timestampMillis);
       ps.executeUpdate();
     }
   }
 
-  private int getNextTurnIndex(Connection c, String changeId, String conversationId)
+  private int getNextTurnIndex(Connection c, String changeId, long userId, String conversationId)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """
             SELECT COALESCE(MAX(turn_index) + 1, 0)
             FROM review_agent_conversation_turns
-            WHERE change_id = ? AND conversation_id = ?
+            WHERE change_id = ? AND user_id = ? AND conversation_id = ?
             """)) {
       ps.setString(1, changeId);
-      ps.setString(2, conversationId);
+      ps.setLong(2, userId);
+      ps.setString(3, conversationId);
       try (ResultSet rs = ps.executeQuery()) {
         rs.next();
         return rs.getInt(1);
@@ -284,6 +337,7 @@ public class ReviewAgentConversationStore {
   private void insertTurn(
       Connection c,
       String changeId,
+      long userId,
       String conversationId,
       int turnIndex,
       JsonObject turn)
@@ -293,49 +347,58 @@ public class ReviewAgentConversationStore {
         c.prepareStatement(
             """
             INSERT INTO review_agent_conversation_turns
-              (change_id, conversation_id, turn_index, user_message_id,
+              (change_id, user_id, conversation_id, turn_index, user_message_id,
                turn_metadata_json, timestamp_millis, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """)) {
       ps.setString(1, changeId);
-      ps.setString(2, conversationId);
-      ps.setInt(3, turnIndex);
-      setLongOrNull(ps, 4, null);
-      ps.setString(5, turnMetadataJson);
-      setLongOrNull(ps, 6, getTimestampMillis(turn));
+      ps.setLong(2, userId);
+      ps.setString(3, conversationId);
+      ps.setInt(4, turnIndex);
+      setLongOrNull(ps, 5, null);
+      ps.setString(6, turnMetadataJson);
+      setLongOrNull(ps, 7, getTimestampMillis(turn));
       ps.executeUpdate();
     }
   }
 
   private void upsertTurn(
-      Connection c, String changeId, String conversationId, int turnIndex, JsonObject turn)
+      Connection c,
+      String changeId,
+      long userId,
+      String conversationId,
+      int turnIndex,
+      JsonObject turn)
       throws SQLException {
-    if (hasTurn(c, changeId, conversationId, turnIndex)) {
-      updateTurn(c, changeId, conversationId, turnIndex, turn);
+    if (hasTurn(c, changeId, userId, conversationId, turnIndex)) {
+      updateTurn(c, changeId, userId, conversationId, turnIndex, turn);
     } else {
-      insertTurn(c, changeId, conversationId, turnIndex, turn);
+      insertTurn(c, changeId, userId, conversationId, turnIndex, turn);
     }
   }
 
-  private boolean hasTurn(Connection c, String changeId, String conversationId, int turnIndex)
+  private boolean hasTurn(
+      Connection c, String changeId, long userId, String conversationId, int turnIndex)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """
             SELECT 1
             FROM review_agent_conversation_turns
-            WHERE change_id = ? AND conversation_id = ? AND turn_index = ?
+            WHERE change_id = ? AND user_id = ? AND conversation_id = ? AND turn_index = ?
             """)) {
       ps.setString(1, changeId);
-      ps.setString(2, conversationId);
-      ps.setInt(3, turnIndex);
+      ps.setLong(2, userId);
+      ps.setString(3, conversationId);
+      ps.setInt(4, turnIndex);
       try (ResultSet rs = ps.executeQuery()) {
         return rs.next();
       }
     }
   }
 
-  private java.util.List<JsonObject> getTurns(Connection c, String changeId, String conversationId)
+  private java.util.List<JsonObject> getTurns(
+      Connection c, String changeId, String conversationId, long userId)
       throws SQLException {
     String canonicalConversationId = canonicalConversationId(conversationId);
     try (PreparedStatement ps =
@@ -343,11 +406,12 @@ public class ReviewAgentConversationStore {
             """
             SELECT turn_metadata_json
             FROM review_agent_conversation_turns
-            WHERE change_id = ? AND conversation_id = ?
+            WHERE change_id = ? AND user_id = ? AND conversation_id = ?
             ORDER BY turn_index
             """)) {
       ps.setString(1, changeId);
-      ps.setString(2, canonicalConversationId);
+      ps.setLong(2, userId);
+      ps.setString(3, canonicalConversationId);
       try (ResultSet rs = ps.executeQuery()) {
         java.util.List<JsonObject> turns = new java.util.ArrayList<>();
         while (rs.next()) {
@@ -371,33 +435,44 @@ public class ReviewAgentConversationStore {
         while (rs.next()) {
           JsonObject turn = getGson().fromJson(rs.getString(4), JsonObject.class);
           restoreLegacyUserQuestion(c, rs.getObject(3, Long.class), turn);
-          updateTurnContent(c, changeId, rs.getString(1), rs.getInt(2), turn);
+          updateTurnContent(c, changeId, SHARED_USER_ID, rs.getString(1), rs.getInt(2), turn);
         }
       }
     }
   }
 
   private void updateTurnContent(
-      Connection c, String changeId, String conversationId, int turnIndex, JsonObject turn)
+      Connection c,
+      String changeId,
+      long userId,
+      String conversationId,
+      int turnIndex,
+      JsonObject turn)
       throws SQLException {
-    updateTurn(c, changeId, conversationId, turnIndex, turn);
+    updateTurn(c, changeId, userId, conversationId, turnIndex, turn);
   }
 
   private void updateTurn(
-      Connection c, String changeId, String conversationId, int turnIndex, JsonObject turn)
+      Connection c,
+      String changeId,
+      long userId,
+      String conversationId,
+      int turnIndex,
+      JsonObject turn)
       throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """
             UPDATE review_agent_conversation_turns
             SET turn_metadata_json = ?, user_message_id = NULL, timestamp_millis = ?
-            WHERE change_id = ? AND conversation_id = ? AND turn_index = ?
+            WHERE change_id = ? AND user_id = ? AND conversation_id = ? AND turn_index = ?
             """)) {
       ps.setString(1, getGson().toJson(turn));
       setLongOrNull(ps, 2, getTimestampMillis(turn));
       ps.setString(3, changeId);
-      ps.setString(4, conversationId);
-      ps.setInt(5, turnIndex);
+      ps.setLong(4, userId);
+      ps.setString(5, conversationId);
+      ps.setInt(6, turnIndex);
       ps.executeUpdate();
     }
   }
@@ -417,7 +492,7 @@ public class ReviewAgentConversationStore {
         while (rs.next()) {
           JsonObject turn = getGson().fromJson(rs.getString(3), JsonObject.class);
           if (removeAutomaticReviewClientData(turn)) {
-            updateTurnContent(c, changeId, rs.getString(1), rs.getInt(2), turn);
+            updateTurnContent(c, changeId, SHARED_USER_ID, rs.getString(1), rs.getInt(2), turn);
           }
         }
       }
