@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -432,7 +433,7 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
-  public void reviewAgentConfigureCommandForAdminWaitsForUpdatedDynamicConfigPanel()
+  public void reviewAgentConfigureCommandForAdminReturnsDirectResponseWithoutPostingGerritMessage()
       throws Exception {
     grantAdministratorPrivileges();
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
@@ -444,9 +445,32 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
-    assertTrue(output.waitForAssistantReply);
-    assertEquals(null, output.responseText);
-    verify(revisionApi).review(any());
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
+    assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
+    assertTrue(output.responseText.contains("ReviewAI Message: Dynamic configuration modified"));
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentDirectivesCommandForAdminReturnsDirectResponseWithoutPostingGerritMessage()
+      throws Exception {
+    grantAdministratorPrivileges();
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/directives Prefer concise comments";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("DYNAMIC DIRECTIVES"));
+    assertTrue(output.responseText.contains("Prefer concise comments"));
+    assertEquals(
+        "{\"" + KEY_DIRECTIVES + "\":\"[\\\"Prefer concise comments\\\"]\"}",
+        new PluginDataHandler(realChangeDataPath, getTestReviewAiDb()).getValue(
+            KEY_DYNAMIC_CONFIG));
+    verify(revisionApi, never()).review(any());
   }
 
   @Test
