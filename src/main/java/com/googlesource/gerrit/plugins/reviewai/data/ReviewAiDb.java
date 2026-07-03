@@ -153,18 +153,19 @@ public class ReviewAiDb {
                 "USER_ID",
                 "CONVERSATION_ID",
                 "TURN_INDEX");
-            if (hasColumn(c, "REVIEW_AGENT_CONVERSATION_TURNS", "TURN_CONTENT_JSON")) {
+            String legacyTurnContentColumn = "turn_content_json";
+            if (hasColumn(
+                c, "REVIEW_AGENT_CONVERSATION_TURNS", legacyTurnContentColumn.toUpperCase())) {
               s.executeUpdate(
-                  """
-                  UPDATE review_agent_conversation_turns
-                  SET turn_metadata_json = turn_content_json
-                  WHERE turn_content_json IS NOT NULL
-                  """);
+                  "UPDATE review_agent_conversation_turns "
+                      + "SET turn_metadata_json = "
+                      + legacyTurnContentColumn
+                      + " WHERE "
+                      + legacyTurnContentColumn
+                      + " IS NOT NULL");
               s.executeUpdate(
-                  """
-                  ALTER TABLE review_agent_conversation_turns
-                  DROP COLUMN turn_content_json
-                  """);
+                  "ALTER TABLE review_agent_conversation_turns DROP COLUMN "
+                      + legacyTurnContentColumn);
             }
           }
           return null;
