@@ -27,11 +27,9 @@ import com.google.gerrit.extensions.api.changes.ReviewResult;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import lombok.extern.slf4j.Slf4j;
@@ -47,9 +45,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 @Slf4j
 public class GerritClientReview extends GerritClientAccount {
-  private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
-  private final DebugCodeBlocksDynamicConfiguration debugCodeBlocksDynamicConfiguration;
 
   private GerritChange change;
 
@@ -60,9 +56,7 @@ public class GerritClientReview extends GerritClientAccount {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer) {
     super(config);
-    this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
-    debugCodeBlocksDynamicConfiguration = new DebugCodeBlocksDynamicConfiguration(localizer);
     log.debug("GerritClientReview initialized.");
   }
 
@@ -134,13 +128,6 @@ public class GerritClientReview extends GerritClientAccount {
       boolean emptyComments,
       String systemMessage) {
     List<String> messages = new ArrayList<>();
-    if (!change.getIsCommentEvent() && !changeSetData.getHideDynamicConfigMessage()) {
-      Map<String, String> dynamicConfig =
-          new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfigForDisplay(config);
-      if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
-        messages.add(debugCodeBlocksDynamicConfiguration.getDebugCodeBlock(dynamicConfig));
-      }
-    }
     if (changeSetData.getReviewNoticeMessage() != null) {
       messages.add(
           SystemMessageFormatter.getPrefixedSystemMessage(

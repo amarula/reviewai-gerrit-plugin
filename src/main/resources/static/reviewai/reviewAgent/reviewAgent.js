@@ -140,7 +140,7 @@
           config
         );
         if (historyResponse) {
-          return historyResponse;
+          return agentUtils.mergePanelResponseWithHistory(historyResponse, statusResponse);
         }
         return statusResponse || 'ReviewAI completed the request without a visible update.';
       }
