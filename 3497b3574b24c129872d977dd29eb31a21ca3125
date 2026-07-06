@@ -16,6 +16,24 @@
       "message": "@patrizio.gelosi@amarulasolutions.com The mock should be on testing part. Why this mock is added on this diretory?",
       "revId": "3497b3574b24c129872d977dd29eb31a21ca3125",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4734c922_5c57e066",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/config/MockAiConfiguration.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-06T07:20:12Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com This is about the mock AI server used for direct testing against a running Gerrit instance, not a mock used by the Maven test suite.\n\nThe mock AI server runs separately from Gerrit and lets us test specific plugin behaviors with deterministic AI responses, without incurring real model costs or waiting for actual model responses.\n\nThis commit supports hybrid testing scenarios, where some AI requests are mocked while others are forwarded to the real AI provider.",
+      "parentUuid": "5167051a_550298b0",
+      "revId": "3497b3574b24c129872d977dd29eb31a21ca3125",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
