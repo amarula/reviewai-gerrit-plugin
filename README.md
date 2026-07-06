@@ -116,6 +116,7 @@ as follows:
     aiModels = OpenAI/gpt-5.2
     aiModels = MoonShot/moonshot-v1-8k
     aiModelsDefault = OpenAI/gpt-5.2
+    aiAdministratorsGroup = Administrators
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
@@ -226,6 +227,9 @@ matches a configured or default model for a token-backed provider that has a tok
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
+- `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
+  administrator-only details. If this option is not set, or the configured group does not exist in Gerrit, the plugin
+  falls back to the Gerrit Administrators group.
 - `directive`: Directives are mandatory instructions written in plain English that AI must adhere to during its reviews.
   You can provide a single directive or multiple directives.
 
@@ -601,6 +605,7 @@ aiProviders:
     Gemini
     MoonShot
     Ollama
+aiAdministratorsGroup: Administrators
 aiRelevanceRules:
 aiReviewCommitMessages: true
 aiReviewPatchSet: true

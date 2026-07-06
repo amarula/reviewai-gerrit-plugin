@@ -17,7 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.entities.AccountGroup;
 import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.InternalGroup;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.Changes;
@@ -30,6 +32,8 @@ import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.server.CurrentUser;
+import com.google.gerrit.server.account.GroupCache;
+import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.permissions.GlobalPermission;
@@ -77,6 +81,7 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private GerritApi gerritApi;
   @Mock private AiReviewPermission aiReviewPermission;
   @Mock private CurrentUser currentUser;
+  @Mock private GroupCache groupCache;
   @Mock private PermissionBackend permissionBackend;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
@@ -99,6 +104,7 @@ public class AiReviewMessageTest extends TestBase {
     when(changeResource.getUser()).thenReturn(currentUser);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getGerritUserName()).thenReturn("gpt");
+    when(config.getAiAdministratorsGroup()).thenReturn("");
     when(config.getGerritApi()).thenReturn(gerritApi);
     when(config.getLocaleDefault()).thenReturn(Locale.ENGLISH);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
@@ -126,6 +132,7 @@ public class AiReviewMessageTest extends TestBase {
             mockPluginDataPath,
             null,
             getTestReviewAiDb(),
+            groupCache,
             permissionBackend);
   }
 
@@ -134,6 +141,18 @@ public class AiReviewMessageTest extends TestBase {
         org.mockito.Mockito.mock(PermissionBackend.WithUser.class);
     when(permissionBackend.user(currentUser)).thenReturn(permissionBackendWithUser);
     when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+  }
+
+  private void grantConfiguredAiAdministratorGroupPrivileges() {
+    when(config.getAiAdministratorsGroup()).thenReturn("AI Owners");
+    AccountGroup.UUID administratorGroupUuid = AccountGroup.uuid("ai-administrators");
+    InternalGroup administratorGroup = org.mockito.Mockito.mock(InternalGroup.class);
+    GroupMembership groupMembership = org.mockito.Mockito.mock(GroupMembership.class);
+    when(groupCache.get(AccountGroup.nameKey("AI Owners")))
+        .thenReturn(java.util.Optional.of(administratorGroup));
+    when(administratorGroup.getGroupUUID()).thenReturn(administratorGroupUuid);
+    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
+    when(groupMembership.contains(administratorGroupUuid)).thenReturn(true);
   }
 
   @Test(expected = AuthException.class)
@@ -269,6 +288,24 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.responseText.contains("Subject: Minor fixes"));
     assertTrue(output.responseText.contains("diff --git a/test_file_1.py b/test_file_1.py"));
     verify(revisionApi).patch();
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentShowFallsBackToGerritAdminPermissionWhenConfiguredGroupIsUnknown()
+      throws Exception {
+    when(config.getAiAdministratorsGroup()).thenReturn("Unknown AI Owners");
+    grantAdministratorPrivileges();
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/show --config";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("CONFIGURATION SETTINGS"));
+    assertFalse(output.responseText.contains("Administrator privileges are required"));
     verify(revisionApi, never()).review(any());
   }
 
@@ -455,7 +492,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentDirectivesCommandForAdminReturnsDirectResponseWithoutPostingGerritMessage()
       throws Exception {
-    grantAdministratorPrivileges();
+    grantConfiguredAiAdministratorGroupPrivileges();
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/directives Prefer concise comments";
     input.reviewAgent = true;
