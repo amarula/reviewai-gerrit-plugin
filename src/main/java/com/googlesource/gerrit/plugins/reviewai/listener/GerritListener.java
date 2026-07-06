@@ -65,7 +65,7 @@ public class GerritListener implements EventListener {
       return;
     }
 
-    log.info("Processing event: {}", event);
+    log.debug("Processing event: {}", event);
     PatchSetEvent patchSetEvent = (PatchSetEvent) event;
     Project.NameKey projectNameKey = patchSetEvent.getProjectNameKey();
     Change.Key changeKey = patchSetEvent.getChangeKey();

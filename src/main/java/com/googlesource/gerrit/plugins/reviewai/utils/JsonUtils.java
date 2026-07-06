@@ -87,7 +87,7 @@ public class JsonUtils extends TextUtils {
   }
 
   public static String prettyStringifyMap(Map<String, String> map) {
-    log.info("Starting to pretty stringify map: {}", map);
+    log.debug("Starting to pretty stringify map: {}", map);
     return joinWithNewLine(
         map.entrySet().stream().map(JsonUtils::formatEntry).collect(Collectors.toList()));
   }
