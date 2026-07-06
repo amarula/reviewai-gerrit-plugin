@@ -40,7 +40,7 @@ public class LoggingConfigurationDeployed {
     if (selectiveLogLevelOverride.isEmpty()) {
       if (originalLogLevelStr != null) {
         logger.setLevel(Level.toLevel(originalLogLevelStr));
-        log.info("Log Level restored to {}", originalLogLevelStr);
+        log.debug("Log Level restored to {}", originalLogLevelStr);
       }
       return;
     }
