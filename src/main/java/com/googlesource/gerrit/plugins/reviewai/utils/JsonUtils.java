@@ -161,7 +161,7 @@ public class JsonUtils extends TextUtils {
   private static String formatValue(String key, String value, String indent) {
     JsonElement jsonElement = parseJsonWithDeSlash(value);
     if (jsonElement != null) {
-      StringBuilder jsonString = new StringBuilder(indent + key + COLON_SPACE);
+      StringBuilder jsonString = new StringBuilder(indent + key + COLON);
       if (jsonElement.isJsonObject()) {
         log.debug("Value is a valid JSON object; formatting JSON for key={}", key);
         jsonString.append(formatJsonObject(jsonElement.getAsJsonObject(), indent + INDENT));
@@ -170,7 +170,7 @@ public class JsonUtils extends TextUtils {
         jsonString.append(formatJsonArray(jsonElement.getAsJsonArray(), indent + INDENT));
       } else if (jsonElement.isJsonPrimitive()) {
         log.debug("Value for key {} is not JSON element: `{}`", key, value);
-        jsonString.append(indent).append(jsonElement.getAsString());
+        jsonString.append(indent.isEmpty() ? SPACE : indent).append(jsonElement.getAsString());
       }
       return jsonString.toString();
     }
