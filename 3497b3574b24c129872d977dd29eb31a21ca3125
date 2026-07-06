@@ -52,6 +52,24 @@
       "parentUuid": "4734c922_5c57e066",
       "revId": "3497b3574b24c129872d977dd29eb31a21ca3125",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3935f10f_c506c990",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/config/MockAiConfiguration.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-06T07:29:54Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com I think there is a misunderstanding here. This is not test code executed by Maven or part of the plugin test suite, so placing it under `src/test` would not be correct.\n\nIt is a standalone mock server that is run as a separate process and used to exercise a real running Gerrit instance with the plugin installed. In that sense, it is a development/testing tool rather than a test fixture.",
+      "parentUuid": "75840aa9_5c07d3af",
+      "revId": "3497b3574b24c129872d977dd29eb31a21ca3125",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
