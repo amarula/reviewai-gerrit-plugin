@@ -130,9 +130,9 @@ public class EventHandlerTask implements Runnable {
     }
 
     try {
-      log.info("Processing event for change ID:: {}", change.getFullChangeId());
+      log.debug("Processing event for change ID:: {}", change.getFullChangeId());
       eventHandlerType.processEvent();
-      log.info("Finished processing event for change ID: {}", change.getFullChangeId());
+      log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
     } catch (Exception e) {
       log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);
       reviewAgentRequest.fail(e.getMessage());
