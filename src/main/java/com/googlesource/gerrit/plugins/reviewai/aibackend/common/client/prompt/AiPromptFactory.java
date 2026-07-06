@@ -47,71 +47,71 @@ public class AiPromptFactory {
       ICodeContextPolicy codeContextPolicy) {
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       if (changeSetData.getForcedStagedReview()) {
-        log.info("AiPromptFactory: Return AiPromptRoutedReviewAgentRequest");
+        log.debug("AiPromptFactory: Return AiPromptRoutedReviewAgentRequest");
         return new AiPromptRoutedReviewAgentRequest(
             config, changeSetData, change, codeContextPolicy);
       }
-      log.info("AiPromptFactory: Return AiPromptRequests");
+      log.debug("AiPromptFactory: Return AiPromptRequests");
       return new AiPromptRequests(config, changeSetData, change, codeContextPolicy);
     } else {
       if (changeSetData.getSuggestMode()) {
-        log.info("AiPromptFactory: Return AiPromptSuggest");
+        log.debug("AiPromptFactory: Return AiPromptSuggest");
         return new AiPromptSuggest(config, changeSetData, change, codeContextPolicy);
       }
       AiPromptParameters aiPromptParameters = new AiPromptParameters(config);
       if (aiPromptParameters.isMultiAgentModeEnabled() || changeSetData.getForcedStagedReview()) {
         return switch (changeSetData.getReviewAssistantStage()) {
           case REVIEW_CODE -> {
-            log.info("AiPromptFactory: Return AiPromptReviewCode");
+            log.debug("AiPromptFactory: Return AiPromptReviewCode");
             yield new AiPromptReviewCode(config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_COMMIT_MESSAGE -> {
             if (changeSetData.getSpecializedAgentReview()) {
-              log.info("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
+              log.debug("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
               yield new AiPromptSpecializedReviewAgent(
                   config, changeSetData, change, codeContextPolicy);
             }
-            log.info("AiPromptFactory: Return AiPromptReviewCommitMessage");
+            log.debug("AiPromptFactory: Return AiPromptReviewCommitMessage");
             yield new AiPromptReviewCommitMessage(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_REITERATED -> {
-            log.info("AiPromptFactory: Return AiPromptReviewReiterate");
+            log.debug("AiPromptFactory: Return AiPromptReviewReiterate");
             yield new AiPromptReviewReiterated(config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_TRIAGE -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedReviewTriage");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedReviewTriage");
             yield new AiPromptSpecializedReviewTriage(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_AGENT -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedReviewAgent");
             yield new AiPromptSpecializedReviewAgent(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_CONSOLIDATION -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedConsolidation");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedConsolidation");
             yield new AiPromptSpecializedConsolidation(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_HISTORICAL_REPETITION -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedHistoricalRepetition");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedHistoricalRepetition");
             yield new AiPromptSpecializedHistoricalRepetition(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_CONFLICT_RESOLUTION -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedConflictResolution");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedConflictResolution");
             yield new AiPromptSpecializedConflictResolution(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_SPECIALIZED_VERIFICATION -> {
-            log.info("AiPromptFactory: Return AiPromptSpecializedVerification");
+            log.debug("AiPromptFactory: Return AiPromptSpecializedVerification");
             yield new AiPromptSpecializedVerification(
                 config, changeSetData, change, codeContextPolicy);
           }
         };
       } else {
-        log.info("AiPromptFactory: Return AiPromptReview for Unified Review");
+        log.debug("AiPromptFactory: Return AiPromptReview for Unified Review");
         return new AiPromptReview(config, changeSetData, change, codeContextPolicy);
       }
     }
@@ -124,10 +124,10 @@ public class AiPromptFactory {
       GerritClientData gerritClientData,
       Localizer localizer) {
     if (change.getIsCommentEvent()) {
-      log.info("AiPromptFactory: Return ReferencedAiDataPromptRequests");
+      log.debug("AiPromptFactory: Return ReferencedAiDataPromptRequests");
       return new ReferencedAiDataPromptRequests(config, changeSetData, gerritClientData, localizer);
     } else {
-      log.info("AiPromptFactory: Return AiDataPromptReview");
+      log.debug("AiPromptFactory: Return AiDataPromptReview");
       return new AiDataPromptReview(config, changeSetData, gerritClientData, localizer);
     }
   }
