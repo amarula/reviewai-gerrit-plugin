@@ -19,10 +19,14 @@ package com.googlesource.gerrit.plugins.reviewai;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.entities.AccountGroup;
+import com.google.gerrit.entities.InternalGroup;
 import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
+import com.google.gerrit.server.account.GroupCache;
+import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.*;
 import com.google.gerrit.extensions.api.changes.ChangeApi.CommentsRequest;
@@ -36,6 +40,7 @@ import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.*;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.google.gson.Gson;
@@ -111,6 +116,8 @@ public class ReviewTestBase extends TestBase {
   protected static final String GERRIT_UI_PROMPTS_PATH = "/gerrit-prompts.ts?format=TEXT";
   protected static final String GERRIT_UI_PROMPTS_URL_PROPERTY = "reviewai.gerritUiPromptUrl";
   protected static final long TEST_TIMESTAMP = 1699270812;
+  protected static final AccountGroup.UUID AI_ADMINISTRATORS_GROUP_UUID =
+      AccountGroup.uuid("ai-administrators");
   protected static final Type COMMENTS_GERRIT_TYPE =
       new TypeLiteral<Map<String, List<CommentInfo>>>() {}.getType();
 
@@ -138,6 +145,7 @@ public class ReviewTestBase extends TestBase {
   @Mock protected ReviewAgentConversationStore reviewAgentConversationStore;
   @Mock protected IdentifiedUser.GenericFactory identifiedUserFactory;
   @Mock protected IdentifiedUser eventUser;
+  @Mock protected GroupCache groupCache;
   @Mock protected PermissionBackend permissionBackend;
 
   protected PluginConfig globalConfig;
@@ -335,6 +343,7 @@ public class ReviewTestBase extends TestBase {
                     bind(AiReviewPermission.class).toInstance(aiReviewPermission);
                     bind(IdentifiedUser.GenericFactory.class).toInstance(identifiedUserFactory);
                     bind(AccountCache.class).toInstance(accountCacheMock);
+                    bind(GroupCache.class).toInstance(groupCache);
                     bind(PermissionBackend.class).toInstance(permissionBackend);
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(Path.class)
@@ -389,6 +398,24 @@ public class ReviewTestBase extends TestBase {
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);
+  }
+
+  protected void grantAiAdministratorPrivileges() throws Exception {
+    PermissionBackend.WithUser permissionBackendWithUser = mock(PermissionBackend.WithUser.class);
+    when(permissionBackend.user(eventUser)).thenReturn(permissionBackendWithUser);
+    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+  }
+
+  protected void denyConfiguredAiAdministratorGroupPrivilegesDespiteGerritAdmin() throws Exception {
+    when(globalConfig.getString(eq("aiAdministratorsGroup"), anyString())).thenReturn("AI Owners");
+    InternalGroup administratorGroup = mock(InternalGroup.class);
+    GroupMembership groupMembership = mock(GroupMembership.class);
+    when(groupCache.get(AccountGroup.nameKey("AI Owners")))
+        .thenReturn(Optional.of(administratorGroup));
+    when(administratorGroup.getGroupUUID()).thenReturn(AI_ADMINISTRATORS_GROUP_UUID);
+    when(eventUser.getEffectiveGroups()).thenReturn(groupMembership);
+    when(groupMembership.contains(AI_ADMINISTRATORS_GROUP_UUID)).thenReturn(false);
+    grantAiAdministratorPrivileges();
   }
 
   protected ICodeContextPolicy getCodeContextPolicy() {
