@@ -61,7 +61,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
           result.add(ChatMessageDeserializer.messageFromJson(json));
         }
       }
-      log.info(
+      log.debug(
           "Loaded {} chat messages from LangChain memory store for {}",
           result.size(),
           memoryId);
@@ -86,7 +86,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
               key.patchSet(),
               key.scope(),
               messages.stream().map(ChatMessageSerializer::messageToJson).toList());
-      log.info(
+      log.debug(
           "Persisted {} new chat messages into LangChain memory store for {}",
           messagesAppended,
           memoryId);
@@ -98,7 +98,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
   @Override
   public void deleteMessages(Object memoryId) {
     MemoryKey key = MemoryKey.from(memoryId);
-    log.info("Clearing LangChain memory store for {}", memoryId);
+    log.debug("Clearing LangChain memory store for {}", memoryId);
     try {
       repository.deleteMessages(key.changeId(), key.patchSet(), key.scope());
     } catch (Exception e) {
@@ -107,7 +107,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
   }
 
   public void deleteMessagesForChangeSet(String changeId, int patchSet) {
-    log.info(
+    log.debug(
         "Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
     try {
       repository.deleteMessagesForChangeSet(changeId, patchSet);
