@@ -23,8 +23,6 @@ import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
-import com.google.gerrit.server.permissions.GlobalPermission;
-import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
@@ -121,10 +119,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   private void grantAdministratorPrivileges() throws Exception {
-    PermissionBackend.WithUser permissionBackendWithUser =
-        Mockito.mock(PermissionBackend.WithUser.class);
-    when(permissionBackend.user(eventUser)).thenReturn(permissionBackendWithUser);
-    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+    grantAiAdministratorPrivileges();
   }
 
   private PluginDataHandler getChangeDataHandler() {
@@ -579,10 +574,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         new ReviewAgentRequestStatusStore(getChangeDataHandler());
     statusStore.pending("request-1", "/review");
     setupCommandComment("/review");
-    PermissionBackend.WithUser permissionBackendWithUser =
-        Mockito.mock(PermissionBackend.WithUser.class);
-    when(permissionBackend.user(eventUser)).thenReturn(permissionBackendWithUser);
-    when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+    grantAiAdministratorPrivileges();
     stubOpenAiBadRequest();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -927,6 +919,19 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
 
     String systemMessage = readTestFile("__files/commands/dumpConfig.txt").stripTrailing();
     Assert.assertEquals(systemMessage, changeSetData.getReviewSystemMessage().stripTrailing());
+  }
+
+  @Test
+  public void commandShowConfigDeniesGerritAdminOutsideConfiguredAiAdministratorsGroup()
+      throws Exception {
+    setupCommandComment("/show --config");
+    denyConfiguredAiAdministratorGroupPrivilegesDespiteGerritAdmin();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        "ReviewAI Message: Unable to execute command: Administrator privileges are required",
+        changeSetData.getReviewSystemMessage());
   }
 
   @Test
