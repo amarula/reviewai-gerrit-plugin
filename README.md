@@ -116,6 +116,7 @@ as follows:
     aiModels = OpenAI/gpt-5.2
     aiModels = MoonShot/moonshot-v1-8k
     aiModelsDefault = OpenAI/gpt-5.2
+    aiAdministratorsGroup = Administrators
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
@@ -226,6 +227,9 @@ matches a configured or default model for a token-backed provider that has a tok
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
+- `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
+  administrator-only details. If this option is not set, or the configured group does not exist in Gerrit, the plugin
+  falls back to the Gerrit Administrators group.
 - `directive`: Directives are mandatory instructions written in plain English that AI must adhere to during its reviews.
   You can provide a single directive or multiple directives.
 
@@ -375,7 +379,7 @@ this section.
 - `--debug`: When paired with `/review`, this option displays useful debug information in each AI reply, showing all
   replies as though the filter setting were disabled.
 
-  **NOTE**: The `--debug` option is reserved to users in the Gerrit Administrator group.
+  **NOTE**: The `--debug` option is reserved to users in the ReviewAI Administrator group.
 
 ### Suggest Command
 
@@ -394,7 +398,7 @@ The `/suggest` command generates native Gerrit suggested edits for negative revi
 
 ### Dynamic Configuration
 
-Users in the Gerrit Administrator group can dynamically alter the plugin configuration for the current Change Set,
+Users in the ReviewAI Administrator group can dynamically alter the plugin configuration for the current Change Set,
 primarily for testing and debugging purposes.
 
 #### Basic Syntax
@@ -484,7 +488,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
 Use `--mode=suggest` to show the prompts or instructions used by `/suggest`.
 
-**NOTE**: This command is reserved to users in the Gerrit Administrator group.
+**NOTE**: This command is reserved to users in the ReviewAI Administrator group.
 
 #### Showing Prompting Parameters
 
@@ -601,6 +605,7 @@ aiProviders:
     Gemini
     MoonShot
     Ollama
+aiAdministratorsGroup: Administrators
 aiRelevanceRules:
 aiReviewCommitMessages: true
 aiReviewPatchSet: true
@@ -707,7 +712,7 @@ addressed to the AI user).
 
 ### Using the Review Debug Command
 
-Users in the Gerrit Administrator group can obtain additional useful debug information in each AI reply, such as
+Users in the ReviewAI Administrator group can obtain additional useful debug information in each AI reply, such as
 relevance and scores, by using the `--debug` command option. For example:
 
 ```

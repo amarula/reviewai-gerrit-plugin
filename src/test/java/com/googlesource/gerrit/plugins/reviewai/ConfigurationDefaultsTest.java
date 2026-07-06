@@ -52,6 +52,23 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldDefaultAiAdministratorsGroupToEmptyWhenUnset() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals("", configuration.getAiAdministratorsGroup());
+  }
+
+  @Test
+  public void shouldUseConfiguredAiAdministratorsGroup() {
+    Config cfg = new Config();
+    cfg.setString("plugin", PLUGIN_NAME, "aiAdministratorsGroup", "AI Owners");
+    Configuration configuration =
+        createConfiguration(PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg), emptyPluginConfig());
+
+    assertEquals("AI Owners", configuration.getAiAdministratorsGroup());
+  }
+
+  @Test
   public void shouldExposeModelsForConfiguredProviderRoutes() {
     Configuration configuration =
         createConfiguration(
