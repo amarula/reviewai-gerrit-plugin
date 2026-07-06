@@ -169,7 +169,7 @@ public class GerritClientComments extends GerritClientAccount {
       HashMap<String, List<GerritComment>> latestComments = new HashMap<>();
       for (Map.Entry<String, List<GerritComment>> entry : lastCommentEntries) {
         String filename = entry.getKey();
-        log.info("Commented filename: {}", filename);
+        log.debug("Commented filename: {}", filename);
 
         List<GerritComment> commentsArray = entry.getValue();
 
