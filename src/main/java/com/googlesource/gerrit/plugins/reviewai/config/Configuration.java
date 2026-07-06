@@ -107,6 +107,7 @@ public class Configuration extends ConfigCore {
   public static final String KEY_GERRIT_USERNAME = "gerritUserName";
   public static final String KEY_SELECTIVE_LOG_LEVEL_OVERRIDE = "selectiveLogLevelOverride";
   public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
+  public static final String KEY_AI_ADMINISTRATORS_GROUP = "aiAdministratorsGroup";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -415,6 +416,10 @@ public class Configuration extends ConfigCore {
 
   public String getMockAiAddress() {
     return getString(KEY_MOCK_AI_ADDRESS, DEFAULT_MOCK_AI_ADDRESS);
+  }
+
+  public String getAiAdministratorsGroup() {
+    return getString(KEY_AI_ADMINISTRATORS_GROUP).trim();
   }
 
   public boolean getIgnoreOutdatedInlineComments() {
