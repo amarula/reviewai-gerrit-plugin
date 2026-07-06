@@ -17,9 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
-import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
@@ -41,6 +41,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorGroup;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +55,7 @@ class ReviewAgentResponseService {
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewAiDb db;
+  private final GroupCache groupCache;
   private final PermissionBackend permissionBackend;
 
   ReviewAgentResponseService(
@@ -61,11 +63,13 @@ class ReviewAgentResponseService {
       Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
+      GroupCache groupCache,
       PermissionBackend permissionBackend) {
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
     this.db = db;
+    this.groupCache = groupCache;
     this.permissionBackend = permissionBackend;
   }
 
@@ -204,7 +208,7 @@ class ReviewAgentResponseService {
         new PluginDataHandlerProvider(pluginDataPath, change, db);
     GerritClientPatchSetReviewAi gerritClientPatchSet =
         new GerritClientPatchSetReviewAi(config, repositoryManager);
-    boolean administratorUser = isAdministrator(resource);
+    boolean administratorUser = isAdministrator(config, resource);
     new ClientCommandParser(
             config,
             changeSetData,
@@ -220,15 +224,12 @@ class ReviewAgentResponseService {
         changeSetData, pluginDataHandlerProvider, localizer, administratorUser);
   }
 
-  private boolean isAdministrator(ChangeResource resource) {
-    try {
-      return permissionBackend != null
-          && resource != null
-          && resource.getUser() != null
-          && permissionBackend.user(resource.getUser()).test(GlobalPermission.ADMINISTRATE_SERVER);
-    } catch (Exception e) {
+  private boolean isAdministrator(Configuration config, ChangeResource resource) {
+    if (resource == null) {
       return false;
     }
+    return AiAdministratorGroup.isAdministrator(
+        config, groupCache, permissionBackend, resource.getUser());
   }
 
   private String getDynamicConfigurationMessage(
