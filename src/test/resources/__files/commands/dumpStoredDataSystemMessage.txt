@@ -4,7 +4,7 @@
 DUMP OF LOCAL DATA
 
 ### Global Scope
-configKey2: 
+configKey2:
     configSubKey: configSubValue
 configKey1: configValue1
 
