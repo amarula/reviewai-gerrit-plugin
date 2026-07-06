@@ -34,8 +34,9 @@ public class TextUtils extends StringUtils {
   public static final String CODE_DELIMITER_END = "\n" + CODE_DELIMITER + "\n";
   public static final String SPACE = " ";
   public static final String DOT = ".";
+  public static final String COLON = ":";
   public static final String COMMA_SPACE = ", ";
-  public static final String COLON_SPACE = ": ";
+  public static final String COLON_SPACE = COLON + SPACE;
   public static final String SEMICOLON_SPACE = "; ";
   public static final String ITEM_COMMA_DELIMITED_REGEX = "\\s*,\\s*";
   public static final String QUOTED_ENTIRE_ITEM =
