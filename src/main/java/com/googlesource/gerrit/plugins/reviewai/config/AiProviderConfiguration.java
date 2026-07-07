@@ -126,6 +126,10 @@ final class AiProviderConfiguration {
   }
 
   List<String> getAiModels() {
+    return getAiModels(true);
+  }
+
+  List<String> getAiModels(boolean includeMockAiModels) {
     List<String> configuredModels =
         config.splitListIntoItemsWithProjectOverride(KEY_AI_MODELS, List.of());
     List<AiProviderRoute> providerRoutes = getAiProviderRoutes();
@@ -146,7 +150,9 @@ final class AiProviderConfiguration {
         .toList();
     resolvedModels =
         mockAiConfiguration.appendMockAiModelRoutes(
-            resolvedModels, providerRoutes.stream().map(AiProviderRoute::provider).toList());
+            resolvedModels,
+            providerRoutes.stream().map(AiProviderRoute::provider).toList(),
+            includeMockAiModels);
     log.debug(
         "AI model routes resolved. configuredModels={}, resolvedProviders={}, tokenProviders={}, resolvedModels={}",
         configuredModels,
