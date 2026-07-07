@@ -14,6 +14,7 @@ CLAUDE.local.md
 .idea/
 .vscode/
 /target
+/bazel-*
 /.classpath
 /.settings
 /.project
