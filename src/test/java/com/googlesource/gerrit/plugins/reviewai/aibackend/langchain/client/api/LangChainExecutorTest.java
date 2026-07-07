@@ -37,9 +37,8 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -121,9 +120,10 @@ public class LangChainExecutorTest {
   }
 
   private String readTestResource(String resourceName) throws Exception {
-    URL resource = getClass().getClassLoader().getResource(resourceName);
-    assertNotNull("Test resource should exist: " + resourceName, resource);
-    return Files.readString(Paths.get(resource.toURI()));
+    try (InputStream resource = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+      assertNotNull("Test resource should exist: " + resourceName, resource);
+      return new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   private static class RecordingChatModel implements ChatModel {
