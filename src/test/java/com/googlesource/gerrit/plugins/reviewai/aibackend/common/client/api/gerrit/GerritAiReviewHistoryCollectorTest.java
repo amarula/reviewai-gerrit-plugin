@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -444,7 +446,7 @@ public class GerritAiReviewHistoryCollectorTest {
 
   private static String readTestFile(String filename) {
     try {
-      return Files.readString(Paths.get("src/test/resources").resolve(filename));
+      return Files.readString(TestResourceLoader.getTestResourcePath().resolve(filename));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +36,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class OnDemandCodeContextToolsTest extends TestBase {
-  private static final Path BASE_PATH = Path.of("src/test/resources");
+  private static final Path BASE_PATH = TestResourceLoader.getTestResourcePath();
   private static final String CONTEXT_FILE = "__files/openai/contextPatchOriginal.py";
 
   @Mock private Configuration config;
