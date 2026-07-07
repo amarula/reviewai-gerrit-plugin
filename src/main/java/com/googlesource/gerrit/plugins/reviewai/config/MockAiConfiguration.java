@@ -55,8 +55,9 @@ public final class MockAiConfiguration {
     return isSelectedMockAiModelRoute(route) ? Optional.of(getMockAiAddress()) : Optional.empty();
   }
 
-  List<String> appendMockAiModelRoutes(List<String> modelRoutes, List<AiProviderType> providers) {
-    if (!hasMockAiAddress()) {
+  List<String> appendMockAiModelRoutes(
+      List<String> modelRoutes, List<AiProviderType> providers, boolean includeMockAiModels) {
+    if (!hasMockAiAddress() || !includeMockAiModels) {
       return modelRoutes;
     }
     List<String> modelRoutesWithMock = new ArrayList<>(modelRoutes);
