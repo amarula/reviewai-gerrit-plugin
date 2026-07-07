@@ -22,9 +22,15 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.entities.AccountGroup;
 import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.InternalGroup;
 import com.google.gerrit.extensions.restapi.Response;
+import com.google.gerrit.server.CurrentUser;
+import com.google.gerrit.server.account.GroupCache;
+import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -32,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,6 +51,9 @@ public class ReviewAgentModelTest extends TestBase {
   @Mock private ConfigCreator configCreator;
   @Mock private Configuration config;
   @Mock private AiReviewPermission aiReviewPermission;
+  @Mock private CurrentUser currentUser;
+  @Mock private GroupCache groupCache;
+  @Mock private PermissionBackend permissionBackend;
 
   private ReviewAgentModel view;
 
@@ -53,14 +63,16 @@ public class ReviewAgentModelTest extends TestBase {
         new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
+    when(changeResource.getUser()).thenReturn(currentUser);
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
+    when(config.getAiAdministratorsGroup()).thenReturn("");
     when(aiReviewPermission.canAiReview(changeResource)).thenReturn(true);
-    view = new ReviewAgentModel(configCreator, aiReviewPermission);
+    view = new ReviewAgentModel(configCreator, aiReviewPermission, groupCache, permissionBackend);
   }
 
   @Test
   public void exposesConfiguredProviderModelRoutes() throws Exception {
-    when(config.getAiModels())
+    when(config.getAiModels(false))
         .thenReturn(List.of("OpenAI/gpt-4.1", "MoonShot/moonshot-v1-8k"));
     when(config.getSelectedAiModelRoute())
         .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1"));
@@ -79,7 +91,7 @@ public class ReviewAgentModelTest extends TestBase {
 
   @Test
   public void exposesCanAiReviewFalseWhenPermissionIsDenied() throws Exception {
-    when(config.getAiModels()).thenReturn(List.of("OpenAI/gpt-4.1"));
+    when(config.getAiModels(false)).thenReturn(List.of("OpenAI/gpt-4.1"));
     when(config.getSelectedAiModelRoute())
         .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1"));
     when(aiReviewPermission.canAiReview(changeResource)).thenReturn(false);
@@ -87,5 +99,52 @@ public class ReviewAgentModelTest extends TestBase {
     Response<ReviewAgentModel.Output> response = view.apply(changeResource);
 
     assertFalse(response.value().canAiReview);
+  }
+
+  @Test
+  public void hidesMockModelRoutesFromNonAdministrators() throws Exception {
+    when(config.getAiModels(false)).thenReturn(List.of("OpenAI/gpt-4.1"));
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "mock-ai"));
+    when(config.getDefaultRealAiModelRoute())
+        .thenReturn(Optional.of(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1")));
+
+    Response<ReviewAgentModel.Output> response = view.apply(changeResource);
+
+    assertEquals(1, response.value().models.size());
+    assertEquals("OpenAI/gpt-4.1", response.value().models.get(0).modelId);
+    assertEquals("OpenAI/gpt-4.1", response.value().defaultModelId);
+  }
+
+  @Test
+  public void showsMockModelRoutesToConfiguredAiAdministrators() throws Exception {
+    grantConfiguredAiAdministratorGroupPrivileges();
+    when(config.getAiModels(true))
+        .thenReturn(List.of("OpenAI/gpt-4.1", "OpenAI/mock-ai", "MoonShot/mock-ai"));
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "mock-ai"));
+
+    Response<ReviewAgentModel.Output> response = view.apply(changeResource);
+
+    assertEquals(3, response.value().models.size());
+    assertEquals("OpenAI/mock-ai", response.value().defaultModelId);
+    assertTrue(
+        response.value().models.stream()
+            .anyMatch(model -> "OpenAI/mock-ai".equals(model.modelId)));
+    assertTrue(
+        response.value().models.stream()
+            .anyMatch(model -> "MoonShot/mock-ai".equals(model.modelId)));
+  }
+
+  private void grantConfiguredAiAdministratorGroupPrivileges() {
+    when(config.getAiAdministratorsGroup()).thenReturn("AI Owners");
+    AccountGroup.UUID administratorGroupUuid = AccountGroup.uuid("ai-administrators");
+    InternalGroup administratorGroup = org.mockito.Mockito.mock(InternalGroup.class);
+    GroupMembership groupMembership = org.mockito.Mockito.mock(GroupMembership.class);
+    when(groupCache.get(AccountGroup.nameKey("AI Owners")))
+        .thenReturn(Optional.of(administratorGroup));
+    when(administratorGroup.getGroupUUID()).thenReturn(administratorGroupUuid);
+    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
+    when(groupMembership.contains(administratorGroupUuid)).thenReturn(true);
   }
 }
