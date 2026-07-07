@@ -4,12 +4,14 @@ module(
 )
 
 bazel_dep(name = "rules_jvm_external", version = "6.7")
+bazel_dep(name = "rules_java", version = "9.6.1")
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 
 maven.install(
     name = "reviewai_plugin_deps", # MUST BE PLUGIN-SCOPED
     artifacts = [
+        "com.google.gerrit:gerrit-plugin-api:3.13.1",
         "dev.langchain4j:langchain4j:1.13.0",
         "dev.langchain4j:langchain4j-open-ai:1.13.0",
         "dev.langchain4j:langchain4j-google-ai-gemini:1.13.0",
@@ -17,6 +19,11 @@ maven.install(
         "com.openai:openai-java-client-okhttp:4.31.0",
         "com.h2database:h2:2.2.224",
         "org.apache.commons:commons-collections4:4.5.0",
+        "org.slf4j:slf4j-api:2.0.17",
+        "ch.qos.logback:logback-classic:1.5.18",
+        "ch.qos.logback:logback-core:1.5.18",
+        "junit:junit:4.13.2",
+        "org.mockito:mockito-core:5.19.0",
         "org.wiremock:wiremock-standalone:3.13.1",
         "org.projectlombok:lombok:1.18.40",
     ],
