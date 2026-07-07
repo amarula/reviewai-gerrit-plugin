@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -57,7 +59,7 @@ import java.util.Map;
 import org.junit.Test;
 
 public class LangChainSpecializedAgentReviewClientTest {
-  private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
+  private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String PATCH_SET_RESOURCE = "__files/langchain/suggestOriginalPatchSet.txt";
   private static final String TRIAGE_RESPONSE_RESOURCE =
       "__files/langchain/specializedTriageResponse.json";

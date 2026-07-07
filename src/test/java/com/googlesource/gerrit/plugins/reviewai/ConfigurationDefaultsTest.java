@@ -646,7 +646,8 @@ public class ConfigurationDefaultsTest {
 
   private PluginConfig pluginConfigFromResource(String resourcePath) throws Exception {
     Config cfg = new Config();
-    cfg.fromText(Files.readString(Path.of(resourcePath), StandardCharsets.UTF_8));
+    cfg.fromText(Files.readString(TestResourceLoader.getTestResourcePath().resolve(
+        resourcePath.replace("src/test/resources/", "")), StandardCharsets.UTF_8));
     return PluginConfig.createFromGerritConfig(PLUGIN_NAME, cfg);
   }
 

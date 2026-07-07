@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -53,7 +55,7 @@ import java.util.List;
 import org.junit.Test;
 
 public class LangChainMultiAgentReviewClientTest {
-  private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
+  private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String ROUTER_HISTORY_PROMPT_RESOURCE =
       "__files/langchain/routerAiDataPromptWithHistory.json";
   private static final String ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE =

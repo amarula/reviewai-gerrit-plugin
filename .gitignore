@@ -3,6 +3,7 @@ node/
 node_modules/
 package-lock.json
 CLAUDE.local.md
+MODULE.bazel.lock
 .claude/
 .codeiumignore
 .codex
@@ -14,6 +15,7 @@ CLAUDE.local.md
 .idea/
 .vscode/
 /target
+/bazel-*
 /.classpath
 /.settings
 /.project
