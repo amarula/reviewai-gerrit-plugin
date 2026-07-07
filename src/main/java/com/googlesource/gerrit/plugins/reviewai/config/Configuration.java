@@ -196,6 +196,10 @@ public class Configuration extends ConfigCore {
     return aiProviderConfiguration.getAiModels();
   }
 
+  public List<String> getAiModels(boolean includeMockAiModels) {
+    return aiProviderConfiguration.getAiModels(includeMockAiModels);
+  }
+
   public String getAiModelsDefault() {
     return aiProviderConfiguration.getAiModelsDefault();
   }
