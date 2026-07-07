@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -34,7 +36,7 @@ import org.junit.Test;
 
 public class LangChainReviewContextCheckerTest {
   private static final Path REVIEW_HISTORY_RESOURCE =
-      Path.of("src/test/resources/__files/langchain/routerAiDataPromptWithHistory.json");
+      TestResourceLoader.getTestResourcePath().resolve("__files/langchain/routerAiDataPromptWithHistory.json");
 
   @Test
   public void detectsExistingOpenAiReviewConversation() {

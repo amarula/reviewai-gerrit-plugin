@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review.topic;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -33,7 +35,7 @@ import org.junit.Test;
 
 public class TopicPatchSetReviewTest {
   private static final Path PATCH_SET_RESOURCE =
-      Path.of("src/test/resources/__files/langchain/suggestOriginalPatchSet.txt");
+      TestResourceLoader.getTestResourcePath().resolve("__files/langchain/suggestOriginalPatchSet.txt");
 
   @Test
   public void topicMergerPrefixesPatchFilenamesAndAddsOriginMetadata() throws Exception {

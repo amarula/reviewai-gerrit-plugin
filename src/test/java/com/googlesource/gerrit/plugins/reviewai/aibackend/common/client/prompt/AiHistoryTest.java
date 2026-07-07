@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static java.util.stream.Collectors.toList;
@@ -43,7 +45,7 @@ import org.junit.Test;
 
 public class AiHistoryTest {
   private static final int AI_ACCOUNT_ID = 7;
-  private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
+  private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String FIXTURE_PATH = "__files/aibackend/common/client/prompt/";
 
   @Test

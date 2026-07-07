@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.AccountGroup;
 import com.google.gerrit.entities.Change;
@@ -541,7 +543,7 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   private String readTestFile(String filename) throws Exception {
-    return Files.readString(Paths.get("src/test/resources").resolve(filename));
+    return Files.readString(TestResourceLoader.getTestResourcePath().resolve(filename));
   }
 
   private DiffInfo readTestFileToClass(String filename) throws Exception {
