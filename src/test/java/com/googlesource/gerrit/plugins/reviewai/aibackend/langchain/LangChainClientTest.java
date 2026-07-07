@@ -52,9 +52,8 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -733,9 +732,10 @@ public class LangChainClientTest {
   }
 
   private String readTestResource(String resourceName) throws Exception {
-    URL resource = getClass().getClassLoader().getResource(resourceName);
-    assertNotNull("Test resource should exist: " + resourceName, resource);
-    return Files.readString(Paths.get(resource.toURI()));
+    try (InputStream resource = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+      assertNotNull("Test resource should exist: " + resourceName, resource);
+      return new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   private static class OpenAiConversationTestLangChainClient extends LangChainClient {

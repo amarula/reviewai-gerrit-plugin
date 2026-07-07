@@ -1,5 +1,6 @@
 load("//tools/bzl:plugin.bzl", "gerrit_plugin")
 load("//tools/bzl:junit.bzl", "junit_tests")
+load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
@@ -11,10 +12,14 @@ gerrit_plugin(
         "Implementation-Vendor: Amarula",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
         "Implementation-Title: ChatGPT Code Review Gerrit Plugin",
+        "Implementation-Version: 4.1.0",
+        "Gerrit-ApiType: plugin",
+        "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob(["src/main/resources/**/*"]),
     deps = [
         ":lombok",
+        ":provided_deps",
         "@reviewai_plugin_deps//:com_openai_openai_java_core",
         "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
         "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
@@ -25,6 +30,58 @@ gerrit_plugin(
         "@reviewai_plugin_deps//:com_h2database_h2",
         "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
     ],
+)
+
+java_library(
+    name = "provided_deps",
+    exports = [
+        "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
+        "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
+        "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
+        "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
+    ],
+    neverlink = True,
+)
+
+TEST_DEPS = [
+    ":lombok",
+    ":provided_deps",
+    ":reviewai-gerrit-plugin_lib",
+    "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
+    "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
+    "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
+    "@reviewai_plugin_deps//:junit_junit",
+    "@reviewai_plugin_deps//:org_mockito_mockito_core",
+    "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
+    "@reviewai_plugin_deps//:org_wiremock_wiremock_standalone",
+]
+
+java_library(
+    name = "reviewai_test_support",
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = [
+            "src/test/java/**/*IT.java",
+            "src/test/java/**/*Test.java",
+        ],
+    ),
+    deps = TEST_DEPS,
+)
+
+junit_tests(
+    name = "reviewai_tests",
+    srcs = glob(["src/test/java/**/*Test.java"]),
+    data = glob(["src/test/resources/**"]),
+    resource_strip_prefix = "src/test/resources",
+    resources = glob(["src/test/resources/**"]),
+    deps = [
+        ":reviewai_test_support",
+    ] + TEST_DEPS,
 )
 
 java_plugin(

@@ -24,10 +24,10 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
-import java.net.URL;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.Rule;
@@ -137,8 +137,9 @@ public class PluginChatMemoryStoreTest {
   }
 
   private String readResource(String resourceName) throws Exception {
-    URL resource = getClass().getClassLoader().getResource(resourceName);
-    return Files.readString(Paths.get(resource.toURI())).trim();
+    try (InputStream resource = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+      return new String(resource.readAllBytes(), StandardCharsets.UTF_8).trim();
+    }
   }
 
   private ReviewAiDb newTestReviewAiDb(Path pluginDataDir) throws Exception {
