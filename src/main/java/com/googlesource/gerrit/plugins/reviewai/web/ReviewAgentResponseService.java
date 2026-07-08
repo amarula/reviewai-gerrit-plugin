@@ -17,10 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.entities.Account;
-import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
-import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
@@ -28,20 +26,19 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorGroup;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,22 +52,22 @@ class ReviewAgentResponseService {
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewAiDb db;
-  private final GroupCache groupCache;
-  private final PermissionBackend permissionBackend;
+  private final AiAdministratorAccess aiAdministratorAccess;
+  private final ClientCommandExtension commandExtension;
 
   ReviewAgentResponseService(
       GitRepositoryManager repositoryManager,
       Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
-      GroupCache groupCache,
-      PermissionBackend permissionBackend) {
+      AiAdministratorAccess aiAdministratorAccess,
+      ClientCommandExtension commandExtension) {
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
     this.db = db;
-    this.groupCache = groupCache;
-    this.permissionBackend = permissionBackend;
+    this.aiAdministratorAccess = aiAdministratorAccess;
+    this.commandExtension = commandExtension;
   }
 
   Optional<AiReviewMessage.Output> getDirectResponse(
@@ -218,7 +215,8 @@ class ReviewAgentResponseService {
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
-            administratorUser)
+            administratorUser,
+            commandExtension)
         .parseCommands(message, executeCommands);
     return new ReviewAgentCommandContext(
         changeSetData, pluginDataHandlerProvider, localizer, administratorUser);
@@ -228,18 +226,14 @@ class ReviewAgentResponseService {
     if (resource == null) {
       return false;
     }
-    return AiAdministratorGroup.isAdministrator(
-        config, groupCache, permissionBackend, resource.getUser());
+    return aiAdministratorAccess.isAdministrator(config, resource.getUser());
   }
 
   private String getDynamicConfigurationMessage(
       Configuration config, PluginDataHandlerProvider pluginDataHandlerProvider, Localizer localizer) {
-    Map<String, String> dynamicConfig =
-        new DynamicConfigManager(pluginDataHandlerProvider).getDynamicConfigForDisplay(config);
-    if (dynamicConfig == null || dynamicConfig.isEmpty()) {
-      return null;
-    }
-    return new DebugCodeBlocksDynamicConfiguration(localizer).getDebugCodeBlock(dynamicConfig);
+    return commandExtension
+        .getDynamicConfigurationMessage(config, pluginDataHandlerProvider, localizer)
+        .orElse(null);
   }
 
   private record ReviewAgentCommandContext(

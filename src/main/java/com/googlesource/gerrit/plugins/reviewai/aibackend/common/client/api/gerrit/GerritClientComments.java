@@ -23,6 +23,8 @@ import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -58,6 +60,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
   private final PluginChatMemoryStore chatMemoryStore;
+  private ClientCommandExtension commandExtension;
 
   private String authorUsername;
   @Getter private List<GerritComment> commentProperties;
@@ -77,7 +80,8 @@ public class GerritClientComments extends GerritClientAccount {
         gerritClientPatchSet,
         pluginDataHandlerProvider,
         localizer,
-        null);
+        null,
+        new DisabledClientCommandExtension());
   }
 
   @Inject
@@ -89,6 +93,26 @@ public class GerritClientComments extends GerritClientAccount {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore) {
+    this(
+        config,
+        changeSetData,
+        codeContextPolicy,
+        gerritClientPatchSet,
+        pluginDataHandlerProvider,
+        localizer,
+        chatMemoryStore,
+        new DisabledClientCommandExtension());
+  }
+
+  public GerritClientComments(
+      Configuration config,
+      ChangeSetData changeSetData,
+      ICodeContextPolicy codeContextPolicy,
+      IGerritClientPatchSet gerritClientPatchSet,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      PluginChatMemoryStore chatMemoryStore,
+      ClientCommandExtension commandExtension) {
     super(config);
     this.changeSetData = changeSetData;
     this.codeContextPolicy = codeContextPolicy;
@@ -96,9 +120,15 @@ public class GerritClientComments extends GerritClientAccount {
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
     this.chatMemoryStore = chatMemoryStore;
+    this.commandExtension = commandExtension;
     commentProperties = new ArrayList<>();
     commentMap = new HashMap<>();
     patchSetCommentMap = new HashMap<>();
+  }
+
+  @Inject(optional = true)
+  void setCommandExtension(ClientCommandExtension commandExtension) {
+    this.commandExtension = commandExtension;
   }
 
   public CommentData getCommentData() {
@@ -212,7 +242,8 @@ public class GerritClientComments extends GerritClientAccount {
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
-            administratorUser);
+            administratorUser,
+            commandExtension);
     try {
       List<GerritComment> latestComments = retrieveComments(change);
       if (latestComments == null) {
