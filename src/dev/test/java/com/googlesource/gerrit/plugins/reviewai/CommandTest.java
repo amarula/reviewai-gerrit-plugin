@@ -26,7 +26,9 @@ import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -36,6 +38,8 @@ import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -73,6 +77,16 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     super.initTest();
 
     openAiPrompt.setCommentEvent(true);
+  }
+
+  @Override
+  protected AiAdministratorAccess getAiAdministratorAccess() {
+    return new DevAiAdministratorAccess(groupCache, permissionBackend);
+  }
+
+  @Override
+  protected ClientCommandExtension getClientCommandExtension() {
+    return new DevClientCommandExtension();
   }
 
   @Override
@@ -196,7 +210,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             pluginDataHandlerProvider,
             localizer,
             () -> "",
-            null);
+            null,
+            true,
+            getClientCommandExtension());
 
     Assert.assertTrue(parser.parseCommands("/review --topic"));
 
@@ -374,7 +390,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         systemMessage.contains("`/suggest [--scope=patchset|commit_message]`"));
     Assert.assertTrue(
         systemMessage.contains(
-            "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require membership in the Gerrit Administrator group"));
+            "`/configure`, `/directives`, and `/show`, plus the `--debug` option on review commands, require the Development build and membership in the Gerrit Administrator group"));
   }
 
   @Test
