@@ -51,6 +51,8 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
@@ -62,6 +64,8 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -345,6 +349,8 @@ public class ReviewTestBase extends TestBase {
                     bind(AccountCache.class).toInstance(accountCacheMock);
                     bind(GroupCache.class).toInstance(groupCache);
                     bind(PermissionBackend.class).toInstance(permissionBackend);
+                    bind(AiAdministratorAccess.class).toInstance(getAiAdministratorAccess());
+                    bind(ClientCommandExtension.class).toInstance(getClientCommandExtension());
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(Path.class)
                         .annotatedWith(PluginData.class)
@@ -354,6 +360,14 @@ public class ReviewTestBase extends TestBase {
                 })
             .getInstance(EventHandlerTask.class);
     return task.execute();
+  }
+
+  protected AiAdministratorAccess getAiAdministratorAccess() {
+    return new NoAiAdministratorAccess();
+  }
+
+  protected ClientCommandExtension getClientCommandExtension() {
+    return new DisabledClientCommandExtension();
   }
 
   protected ArgumentCaptor<ReviewInput> testRequestSent() throws RestApiException {
@@ -384,7 +398,9 @@ public class ReviewTestBase extends TestBase {
                     getCodeContextPolicy(),
                     gerritClientPatchSet,
                     pluginDataHandlerProvider,
-                    localizer),
+                    localizer,
+                    null,
+                    getClientCommandExtension()),
                 gerritClientPatchSet));
     patchSetReviewer =
         new PatchSetReviewer(

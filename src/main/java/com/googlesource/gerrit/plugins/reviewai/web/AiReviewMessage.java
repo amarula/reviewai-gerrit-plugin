@@ -25,11 +25,10 @@ import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
 import com.google.gerrit.server.change.ChangeResource;
-import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.git.GitRepositoryManager;
-import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -38,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,8 +63,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
-      GroupCache groupCache,
-      PermissionBackend permissionBackend) {
+      AiAdministratorAccess aiAdministratorAccess,
+      ClientCommandExtension commandExtension) {
     this(
         configCreator,
         gerritApi,
@@ -74,8 +74,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         pluginDataPath,
         null,
         null,
-        groupCache,
-        permissionBackend);
+        aiAdministratorAccess,
+        commandExtension);
   }
 
   @Inject
@@ -88,15 +88,20 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       @PluginData Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
-      GroupCache groupCache,
-      PermissionBackend permissionBackend) {
+      AiAdministratorAccess aiAdministratorAccess,
+      ClientCommandExtension commandExtension) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     reviewAgentResponseService =
         new ReviewAgentResponseService(
-            repositoryManager, pluginDataPath, chatMemoryStore, db, groupCache, permissionBackend);
+            repositoryManager,
+            pluginDataPath,
+            chatMemoryStore,
+            db,
+            aiAdministratorAccess,
+            commandExtension);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 

@@ -21,13 +21,12 @@ import com.google.gerrit.entities.Account;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
-import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
-import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorGroup;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
@@ -72,8 +71,7 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewPermission aiReviewPermission;
   private final IdentifiedUser.GenericFactory identifiedUserFactory;
   private final AccountCache accountCache;
-  private final GroupCache groupCache;
-  private final PermissionBackend permissionBackend;
+  private AiAdministratorAccess aiAdministratorAccess = new NoAiAdministratorAccess();
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
 
@@ -91,8 +89,6 @@ public class EventHandlerTask implements Runnable {
       AiReviewPermission aiReviewPermission,
       IdentifiedUser.GenericFactory identifiedUserFactory,
       AccountCache accountCache,
-      GroupCache groupCache,
-      PermissionBackend permissionBackend,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator) {
     this.changeSetData = changeSetData;
@@ -103,11 +99,14 @@ public class EventHandlerTask implements Runnable {
     this.aiReviewPermission = aiReviewPermission;
     this.identifiedUserFactory = identifiedUserFactory;
     this.accountCache = accountCache;
-    this.groupCache = groupCache;
-    this.permissionBackend = permissionBackend;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
+  }
+
+  @Inject(optional = true)
+  void setAiAdministratorAccess(AiAdministratorAccess aiAdministratorAccess) {
+    this.aiAdministratorAccess = aiAdministratorAccess;
   }
 
   @Override
@@ -198,7 +197,7 @@ public class EventHandlerTask implements Runnable {
   }
 
   private boolean isAdministratorUser(CurrentUser user) {
-    return AiAdministratorGroup.isAdministrator(config, groupCache, permissionBackend, user);
+    return aiAdministratorAccess.isAdministrator(config, user);
   }
 
   private boolean isReviewEnabled(GerritChange change) {
