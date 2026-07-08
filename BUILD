@@ -31,7 +31,7 @@ PLUGIN_DEPS = [
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
-    srcs = glob(["src/main/java/**/*.java"]),
+    srcs = PRODUCTION_SRCS,
     manifest_entries = [
         "Gerrit-PluginName: reviewai-gerrit-plugin",
         "Gerrit-Module: com.googlesource.gerrit.plugins.reviewai.Module",

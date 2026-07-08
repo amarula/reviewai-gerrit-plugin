@@ -22,7 +22,9 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +53,8 @@ public class ClientMessageParser extends ClientMessageBase {
         localizer,
         IPatchSetProvider,
         chatMemoryStore,
-        false);
+        false,
+        new DisabledClientCommandExtension());
   }
 
   public ClientMessageParser(
@@ -64,6 +67,30 @@ public class ClientMessageParser extends ClientMessageBase {
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
       boolean administratorUser) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        chatMemoryStore,
+        administratorUser,
+        new DisabledClientCommandExtension());
+  }
+
+  public ClientMessageParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      boolean administratorUser,
+      ClientCommandExtension commandExtension) {
     super(config);
     clientCommandParser =
         new ClientCommandParser(
@@ -75,7 +102,8 @@ public class ClientMessageParser extends ClientMessageBase {
             localizer,
             IPatchSetProvider,
             chatMemoryStore,
-            administratorUser);
+            administratorUser,
+            commandExtension);
     log.debug("ClientMessageParser initialized with bot mention pattern: {}", botMentionPattern);
   }
 
