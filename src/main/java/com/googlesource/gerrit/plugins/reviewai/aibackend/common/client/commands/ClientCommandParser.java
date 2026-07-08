@@ -83,6 +83,7 @@ public class ClientCommandParser extends ClientCommandBase {
   private final ChangeSetData changeSetData;
   private final Localizer localizer;
   private final ClientCommandExecutor clientCommandExecutor;
+  private final ClientCommandExtension commandExtension;
   private final boolean administratorUser;
 
   private Map<BaseOptionSet, String> baseOptions;
@@ -106,7 +107,8 @@ public class ClientCommandParser extends ClientCommandBase {
         localizer,
         IPatchSetProvider,
         chatMemoryStore,
-        false);
+        false,
+        new DisabledClientCommandExtension());
   }
 
   public ClientCommandParser(
@@ -119,9 +121,34 @@ public class ClientCommandParser extends ClientCommandBase {
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
       boolean administratorUser) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        chatMemoryStore,
+        administratorUser,
+        new DisabledClientCommandExtension());
+  }
+
+  public ClientCommandParser(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      boolean administratorUser,
+      ClientCommandExtension commandExtension) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
+    this.commandExtension = commandExtension;
     this.administratorUser = administratorUser;
     this.clientCommandExecutor =
         new ClientCommandExecutor(
@@ -132,7 +159,8 @@ public class ClientCommandParser extends ClientCommandBase {
             pluginDataHandlerProvider,
             localizer,
             IPatchSetProvider,
-            chatMemoryStore);
+            chatMemoryStore,
+            commandExtension);
     log.debug("ClientCommandParser initialized.");
   }
 
@@ -207,7 +235,7 @@ public class ClientCommandParser extends ClientCommandBase {
     if (optionsMismatch(command)) {
       return false;
     }
-    if (!administratorUser && requiresAdministrator(command)) {
+    if (!administratorUser && commandExtension.requiresAdministrator(command, baseOptions)) {
       changeSetData.setReviewSystemMessage(
           SystemMessageFormatter.getPrefixedSystemMessage(
               localizer, localizer.getText("message.command.debugging.administrator.required")));
@@ -216,11 +244,6 @@ public class ClientCommandParser extends ClientCommandBase {
     }
     log.debug("Command `{}` validated", command);
     return true;
-  }
-
-  private boolean requiresAdministrator(CommandSet command) {
-    return DEBUG_REQUIRED_COMMANDS.contains(command)
-        || REVIEW_COMMANDS.contains(command) && baseOptions.containsKey(BaseOptionSet.DEBUG);
   }
 
   private boolean optionsMismatch(CommandSet command) {
@@ -249,14 +272,17 @@ public class ClientCommandParser extends ClientCommandBase {
       return true;
     }
     if (!dynamicOptions.isEmpty()) {
-      if (commandOptions == null || !commandOptions.contains(BaseOptionSet.CONFIGURATION_OPTION)) {
+      if (!commandExtension.acceptsDynamicOptions(command)
+          || commandOptions == null
+          || !commandOptions.contains(BaseOptionSet.CONFIGURATION_OPTION)) {
         log.debug("Unknown option(s) for command `{}`: {}", command, dynamicOptions);
         changeSetData.setReviewSystemMessage(
             SystemMessageFormatter.getLocalizedWarningMessage(
                 localizer, "message.command.option.unknown", command, dynamicOptions));
         return true;
       }
-      return configurationOptionsMismatch();
+      return commandExtension.dynamicOptionsMismatch(
+          config, changeSetData, localizer, baseOptions, dynamicOptions);
     }
     return false;
   }
@@ -309,49 +335,6 @@ public class ClientCommandParser extends ClientCommandBase {
           : ReviewScope.commandOptionValues();
     }
     return null;
-  }
-
-  private boolean configurationOptionsMismatch() {
-    log.debug("Checking for mismatches in configuration options");
-    for (Map.Entry<String, String> dynamicEntry : dynamicOptions.entrySet()) {
-      String key = dynamicEntry.getKey();
-      if (!config.isDefinedKey(key)) {
-        log.debug("Unknown configuration option: {}", key);
-        changeSetData.setReviewSystemMessage(
-            SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer, "message.command.option.config.unknown", key));
-        return true;
-      }
-      if (baseOptions.containsKey(BaseOptionSet.RESET) && dynamicEntry.getValue().isEmpty()) {
-        continue;
-      }
-      Optional<List<String>> validValues = config.getValidDynamicConfigValues(key);
-      if (validValues.isPresent() && !validValues.get().contains(dynamicEntry.getValue())) {
-        changeSetData.setReviewSystemMessage(
-            SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer,
-                "message.command.option.value.invalid",
-                key,
-                dynamicEntry.getValue(),
-                validValues.get()));
-        log.debug(
-            "Invalid value for configuration option `{}`: {}. Valid values are: {}",
-            key,
-            dynamicEntry.getValue(),
-            validValues.get());
-        return true;
-      }
-      validValues.ifPresent(values -> config.clearUnknownEnumSetting(key));
-      if (Configuration.LIST_TYPE_ENTRY_KEYS.contains(key)
-          && jsonArrayToList(dynamicEntry.getValue()).isEmpty()) {
-        log.debug("Value of `{}` must be formatted as a JSON array", key);
-        changeSetData.setReviewSystemMessage(
-            SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer, "message.command.option.config.array.malformed", key));
-        return true;
-      }
-    }
-    return false;
   }
 
   private void parseOptions(Matcher commandMatcher) {

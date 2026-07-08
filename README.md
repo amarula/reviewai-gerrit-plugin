@@ -13,19 +13,35 @@ command help with `/help` or `/help <command>`.
 
 ## Getting Started
 
-1. **Build:** This version requires JDK 21 and Maven. The Maven build installs the configured Node.js version and runs
-   the frontend lint step.
+1. **Build:** This version requires JDK 21 and Bazel. From the Gerrit checkout, link the plugin Bazel dependencies,
+   update the module lockfile, then build the desired plugin variant:
 
    ```bash
-   mvn -U clean package
-    ```
+   cd gerrit/plugins
+   rm external_plugin_deps.MODULE.bazel
+   ln -s reviewai-gerrit-plugin/external_plugin_deps.MODULE.bazel external_plugin_deps.MODULE.bazel
 
-   To build without running tests:
-   ```bash
-   mvn -U -DskipTests=true clean package
+   cd ..
+   bazel mod deps --lockfile_mode=update
+   bazelisk build plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin
+   bazelisk build plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin-dev
    ```
 
-2. **Install:** Upload the compiled jar file to the `$gerrit_site/plugins` directory.
+   `reviewai-gerrit-plugin.jar` is the standard build intended for production use. `reviewai-gerrit-plugin-dev.jar` is
+   the development build that includes all features restricted to ReviewAI Administrators, such as mock AI models, the
+   `/configure`, `/show`, and `/directives` commands, the `/review --debug` option, and the `selectiveLogLevelOverride`
+   configuration setting.
+
+   Run the Bazel tests with:
+
+   ```bash
+   bazelisk test plugins/reviewai-gerrit-plugin:reviewai_tests
+   bazelisk test plugins/reviewai-gerrit-plugin:reviewai_tests plugins/reviewai-gerrit-plugin:reviewai_dev_tests
+   ```
+
+   The generated JAR files are available under Gerrit's `bazel-bin/plugins/reviewai-gerrit-plugin/` directory.
+
+2. **Install:** Upload the desired jar file to the `$gerrit_site/plugins` directory.
 
 3. **Configure:** First, create an AI user in Gerrit. Then set the basic parameters in
    `$gerrit_site/etc/gerrit.config` under the section
@@ -228,8 +244,8 @@ matches a configured or default model for a token-backed provider that has a tok
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
-  administrator-only details. If this option is not set, or the configured group does not exist in Gerrit, the plugin
-  falls back to the Gerrit Administrators group.
+  administrator-only details with the Development build. If this option is not set, or the configured group does not
+  exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
 - `directive`: Directives are mandatory instructions written in plain English that AI must adhere to during its reviews.
   You can provide a single directive or multiple directives.
 

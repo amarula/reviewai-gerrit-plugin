@@ -151,7 +151,6 @@ public class Configuration extends ConfigCore {
   private static final String KEY_OLLAMA_RESPONSE_LENGTH = "ollamaResponseLength";
   private static final String KEY_OLLAMA_THINK = "ollamaThink";
   private final AiProviderConfiguration aiProviderConfiguration;
-  private final MockAiConfiguration mockAiConfiguration;
   private final ThreadLocal<AiModelRoute> aiModelRouteOverride = new ThreadLocal<>();
 
   public Configuration(
@@ -163,7 +162,6 @@ public class Configuration extends ConfigCore {
       Account.Id userId) {
     super(context, gerritApi, globalConfig, projectConfig, gerritUserEmail, userId);
     aiProviderConfiguration = new AiProviderConfiguration(this);
-    mockAiConfiguration = new MockAiConfiguration(this);
   }
 
   public enum AgentSpecializationLevel {
@@ -217,12 +215,12 @@ public class Configuration extends ConfigCore {
   }
 
   public Optional<AiModelRoute> resolveMockAiFallbackRoute(String responseText) {
-    return mockAiConfiguration.resolveFallbackRoute(
-        responseText, getAiModels(), getAiModelsDefault());
+    return DevMockAiConfigurationBridge.resolveFallbackRoute(
+        this, responseText, getAiModels(), getAiModelsDefault());
   }
 
   public boolean isSelectedMockAiModelRoute() {
-    return mockAiConfiguration.isSelectedMockAiModelRoute(getSelectedAiModelRoute());
+    return DevMockAiConfigurationBridge.isSelectedMockAiModelRoute(this, getSelectedAiModelRoute());
   }
 
   public <T> T withAiModelRoute(AiModelRoute route, Callable<T> callable) throws Exception {
