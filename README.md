@@ -13,19 +13,31 @@ command help with `/help` or `/help <command>`.
 
 ## Getting Started
 
-1. **Build:** This version requires JDK 21 and Maven. The Maven build installs the configured Node.js version and runs
-   the frontend lint step.
+1. **Build:** This version requires JDK 21 and Bazel. Two plugin builds are available:
+
+    - `reviewai-gerrit-plugin.jar`: Standard build intended for production use. Build it with:
+
+      ```bash
+      bazel build //:reviewai-gerrit-plugin
+      ```
+
+    - `reviewai-gerrit-plugin-dev.jar`: Development build that includes all features restricted to ReviewAI
+      Administrators, such as mock AI models, `/configure`, `/show`, `/directives`, `/review --debug`, and
+      `selectiveLogLevelOverride`. Build it with:
+
+      ```bash
+      bazel build //:reviewai-gerrit-plugin-dev
+      ```
+
+   To build both variants in one command:
 
    ```bash
-   mvn -U clean package
-    ```
-
-   To build without running tests:
-   ```bash
-   mvn -U -DskipTests=true clean package
+   bazel build //...
    ```
 
-2. **Install:** Upload the compiled jar file to the `$gerrit_site/plugins` directory.
+   The generated JAR files are available under `bazel-bin/`.
+
+2. **Install:** Upload the desired jar file to the `$gerrit_site/plugins` directory.
 
 3. **Configure:** First, create an AI user in Gerrit. Then set the basic parameters in
    `$gerrit_site/etc/gerrit.config` under the section
@@ -228,8 +240,8 @@ matches a configured or default model for a token-backed provider that has a tok
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
-  administrator-only details. If this option is not set, or the configured group does not exist in Gerrit, the plugin
-  falls back to the Gerrit Administrators group.
+  administrator-only details with the Development build. If this option is not set, or the configured group does not
+  exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
 - `directive`: Directives are mandatory instructions written in plain English that AI must adhere to during its reviews.
   You can provide a single directive or multiple directives.
 

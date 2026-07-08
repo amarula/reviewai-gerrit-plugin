@@ -2,9 +2,18 @@ load("//tools/bzl:plugin.bzl", "gerrit_plugin")
 load("//tools/bzl:junit.bzl", "junit_tests")
 load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
 
+PRODUCTION_SRCS = glob(
+    ["src/main/java/**/*.java"],
+    exclude = [
+        "src/main/java/**/logging/LoggerFilterDecider.java",
+        "src/main/java/**/logging/LoggerFilterDeployed.java",
+        "src/main/java/**/logging/LoggingConfigurationDeployed.java",
+    ],
+)
+
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
-    srcs = glob(["src/main/java/**/*.java"]),
+    srcs = PRODUCTION_SRCS,
     manifest_entries = [
         "Gerrit-PluginName: reviewai-gerrit-plugin",
         "Gerrit-Module: com.googlesource.gerrit.plugins.reviewai.Module",
@@ -17,6 +26,38 @@ gerrit_plugin(
         "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob(["src/main/resources/**/*"]),
+    deps = [
+        ":lombok",
+        ":provided_deps",
+        "@reviewai_plugin_deps//:com_openai_openai_java_core",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
+        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
+        "@reviewai_plugin_deps//:com_openai_openai_java_client_okhttp",
+        "@reviewai_plugin_deps//:com_h2database_h2",
+        "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
+    ],
+)
+
+gerrit_plugin(
+    name = "reviewai-gerrit-plugin-dev",
+    srcs = PRODUCTION_SRCS + glob(["src/dev/main/java/**/*.java"]),
+    manifest_entries = [
+        "Gerrit-PluginName: reviewai-gerrit-plugin",
+        "Gerrit-Module: com.googlesource.gerrit.plugins.reviewai.DevModule",
+        "Gerrit-HttpModule: com.googlesource.gerrit.plugins.reviewai.HttpModule",
+        "Implementation-Vendor: Amarula",
+        "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
+        "Implementation-Title: ChatGPT Code Review Gerrit Plugin Dev",
+        "Implementation-Version: 4.1.0-dev",
+        "Gerrit-ApiType: plugin",
+        "Gerrit-ApiVersion: 3.13.1",
+    ],
+    resources = glob([
+        "src/main/resources/**/*",
+    ]) + glob(["src/dev/main/resources/**/*"], allow_empty = True),
     deps = [
         ":lombok",
         ":provided_deps",
@@ -82,6 +123,35 @@ junit_tests(
     deps = [
         ":reviewai_test_support",
     ] + TEST_DEPS,
+)
+
+java_library(
+    name = "reviewai_dev_test_support",
+    srcs = glob(
+        ["src/dev/test/java/**/*.java"],
+        exclude = [
+            "src/dev/test/java/**/*IT.java",
+            "src/dev/test/java/**/*Test.java",
+        ],
+    ),
+    deps = [
+        ":reviewai_test_support",
+        ":reviewai-gerrit-plugin-dev_lib",
+    ] + TEST_DEPS,
+)
+
+junit_tests(
+    name = "reviewai_dev_tests",
+    srcs = glob(["src/dev/test/java/**/*Test.java"]),
+    data = glob(["src/test/resources/**"]) + glob(["src/dev/test/resources/**"], allow_empty = True),
+    resource_strip_prefix = "src/test/resources",
+    resources = glob(["src/test/resources/**"]) + glob(["src/dev/test/resources/**"], allow_empty = True),
+    deps = [
+        ":reviewai_dev_test_support",
+        ":reviewai_test_support",
+        ":reviewai-gerrit-plugin-dev_lib",
+    ] + TEST_DEPS,
+    src_prefix = "src/dev/test/java/",
 )
 
 java_plugin(
