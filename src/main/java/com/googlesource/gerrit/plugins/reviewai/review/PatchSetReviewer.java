@@ -175,7 +175,10 @@ public class PatchSetReviewer {
   }
 
   void publishTopicReviewPart(
-      AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix)
+      AiResponseContent reviewReply,
+      GerritChange change,
+      String topicFilenamePrefix,
+      List<Double> topicReviewScores)
       throws Exception {
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
@@ -189,7 +192,10 @@ public class PatchSetReviewer {
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change, topicFilenamePrefix);
     }
-    Integer reviewScore = getReviewScore(change);
+    Integer reviewScore =
+        topicReviewScores == null
+            ? getReviewScore(change)
+            : getReviewScore(change, topicReviewScores);
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
@@ -254,10 +260,7 @@ public class PatchSetReviewer {
       if (hiddenByReplyFilter && replyItem.isRepeated()) {
         filteredRepeatedReplyItems.add(replyItem);
       }
-      if (!replyItem.isDuplicated()
-          && !replyItem.isConflicting()
-          && !isIrrelevant
-          && score != null) {
+      if (isScoredReply(replyItem, isIrrelevant) && score != null) {
         log.debug("Score added: {}", score);
         reviewScores.add(score);
       }
@@ -280,6 +283,21 @@ public class PatchSetReviewer {
     }
     setRepeatedCommentsMessage(filteredRepeatedReplyItems, change);
     return batches;
+  }
+
+  List<Double> getReviewScores(AiResponseContent reviewReply) {
+    if (reviewReply == null || reviewReply.getReplies() == null) {
+      return List.of();
+    }
+    List<Double> scores = new ArrayList<>();
+    for (AiReplyItem replyItem : reviewReply.getReplies()) {
+      boolean isIrrelevant = isIrrelevantReply(replyItem);
+      Double score = replyItem.getScore();
+      if (isScoredReply(replyItem, isIrrelevant) && score != null) {
+        scores.add(score);
+      }
+    }
+    return scores;
   }
 
   private void setRepeatedCommentsMessage(
@@ -305,6 +323,10 @@ public class PatchSetReviewer {
   }
 
   private Integer getReviewScore(GerritChange change) {
+    return getReviewScore(change, reviewScores);
+  }
+
+  private Integer getReviewScore(GerritChange change, List<Double> scores) {
     log.debug("Calculating review score for change ID: {}", change.getFullChangeId());
     if (changeSetData.getSuggestMode()) {
       return null;
@@ -313,8 +335,7 @@ public class PatchSetReviewer {
       if (change.getIsCommentEvent()) {
         return null;
       }
-      int reviewScore =
-          reviewScores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(reviewScores));
+      int reviewScore = scores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(scores));
       if (reviewScore == 0
           && config.getConvertNeutralReviewScoreToPositive()
           && canVotePositive()) {
@@ -355,5 +376,9 @@ public class PatchSetReviewer {
   private boolean isIrrelevantReply(AiReplyItem replyItem) {
     return replyItem.getRelevance() != null
         && replyItem.getRelevance() < config.getFilterCommentsRelevanceThreshold();
+  }
+
+  private boolean isScoredReply(AiReplyItem replyItem, boolean isIrrelevant) {
+    return !replyItem.isDuplicated() && !replyItem.isConflicting() && !isIrrelevant;
   }
 }
