@@ -18,41 +18,34 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestReadView;
-import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.change.ChangeResource;
-import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorGroup;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.util.List;
 
 public class ReviewAgentModel implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
   private final AiReviewPermission aiReviewPermission;
-  private final GroupCache groupCache;
-  private final PermissionBackend permissionBackend;
+  private final AiAdministratorAccess aiAdministratorAccess;
 
   @Inject
   ReviewAgentModel(
       ConfigCreator configCreator,
       AiReviewPermission aiReviewPermission,
-      GroupCache groupCache,
-      PermissionBackend permissionBackend) {
+      AiAdministratorAccess aiAdministratorAccess) {
     this.configCreator = configCreator;
     this.aiReviewPermission = aiReviewPermission;
-    this.groupCache = groupCache;
-    this.permissionBackend = permissionBackend;
+    this.aiAdministratorAccess = aiAdministratorAccess;
   }
 
   @Override
   public Response<Output> apply(ChangeResource resource) throws Exception {
     Configuration config =
         configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
-    boolean administratorUser =
-        AiAdministratorGroup.isAdministrator(
-            config, groupCache, permissionBackend, resource.getUser());
+    boolean administratorUser = aiAdministratorAccess.isAdministrator(config, resource.getUser());
     List<String> models = config.getAiModels(administratorUser);
     return Response.ok(
         new Output(

@@ -26,7 +26,6 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import com.googlesource.gerrit.plugins.reviewai.logging.LoggingConfigurationDeployed;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Objects;
@@ -39,16 +38,19 @@ public class GerritListener implements EventListener {
   private final ConfigCreator configCreator;
   private final EventHandlerExecutor evenHandlerExecutor;
   private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
+  private final LoggingConfigurator loggingConfigurator;
 
   @Inject
   public GerritListener(
       ConfigCreator configCreator,
       EventHandlerExecutor evenHandlerExecutor,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      LoggingConfigurator loggingConfigurator,
       @GerritInstanceId @Nullable String myInstanceId) {
     this.configCreator = configCreator;
     this.evenHandlerExecutor = evenHandlerExecutor;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+    this.loggingConfigurator = loggingConfigurator;
     this.myInstanceId = myInstanceId;
     log.debug("GerritListener initialized with instance ID: {}", myInstanceId);
   }
@@ -73,9 +75,8 @@ public class GerritListener implements EventListener {
     try {
       log.debug("Creating configuration for project: {} and change: {}", projectNameKey, changeKey);
       Configuration config = configCreator.createConfig(projectNameKey, changeKey);
-      log.debug("Configuration created, configuring logging...");
-      LoggingConfigurationDeployed.configure(config, pluginDataHandlerBaseProvider);
-      log.debug("Configuration and logging set, executing event handler...");
+      loggingConfigurator.configure(config, pluginDataHandlerBaseProvider);
+      log.debug("Configuration created, executing event handler...");
       evenHandlerExecutor.execute(config, patchSetEvent);
     } catch (NoSuchProjectException e) {
       log.error("Project not found: {}", projectNameKey, e);
