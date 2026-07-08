@@ -17,18 +17,13 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager;
-import com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManagerDirectives;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.DynamicDirectivesModifyException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDynamicConfiguration;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDirectives;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
@@ -52,6 +47,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
   private final IPatchSetProvider IPatchSetProvider;
+  private final ClientCommandExtension commandExtension;
 
   private CommandSet command;
   private Map<BaseOptionSet, String> baseOptions;
@@ -67,6 +63,28 @@ public class ClientCommandExecutor extends ClientCommandBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore) {
+    this(
+        config,
+        changeSetData,
+        change,
+        codeContextPolicy,
+        pluginDataHandlerProvider,
+        localizer,
+        IPatchSetProvider,
+        chatMemoryStore,
+        new DisabledClientCommandExtension());
+  }
+
+  public ClientCommandExecutor(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer,
+      IPatchSetProvider IPatchSetProvider,
+      PluginChatMemoryStore chatMemoryStore,
+      ClientCommandExtension commandExtension) {
     super(config);
     this.localizer = localizer;
     this.changeSetData = changeSetData;
@@ -75,6 +93,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
     this.IPatchSetProvider = IPatchSetProvider;
+    this.commandExtension = commandExtension;
     log.debug("ClientCommandExecutor initialized.");
   }
 
@@ -97,9 +116,19 @@ public class ClientCommandExecutor extends ClientCommandBase {
       case REVIEW -> commandForceReview();
       case SUGGEST -> commandSuggest();
       case FORGET_THREAD -> commandForgetThread();
-      case CONFIGURE -> commandDynamicallyConfigure();
-      case DIRECTIVES -> commandDirectives();
-      case SHOW -> commandShow();
+      case CONFIGURE, DIRECTIVES, SHOW ->
+          commandExtension.executeCommand(
+              config,
+              changeSetData,
+              change,
+              codeContextPolicy,
+              pluginDataHandlerProvider,
+              localizer,
+              IPatchSetProvider,
+              command,
+              baseOptions,
+              dynamicOptions,
+              this.nextString);
     }
   }
 
@@ -243,9 +272,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
       log.debug("Option 'replyFilterEnabled' set to {}", value);
       changeSetData.setReplyFilterEnabled(value);
     } else if (baseOptions.containsKey(BaseOptionSet.DEBUG)) {
-      log.debug("Response Mode set to Debug");
-      changeSetData.setDebugReviewMode(true);
-      changeSetData.setReplyFilterEnabled(false);
+      commandExtension.applyReviewDebugOption(changeSetData, baseOptions);
     }
   }
 
@@ -297,70 +324,5 @@ public class ClientCommandExecutor extends ClientCommandBase {
     }
     chatMemoryStore.deleteMessagesForChangeSet(
         change.getFullChangeId(), LangChainMemoryId.getPatchSetNumber(change));
-  }
-
-  private void commandDynamicallyConfigure() {
-    boolean modifiedDynamicConfig = false;
-    boolean shouldResetDynamicConfig = false;
-    DynamicConfigManager dynamicConfigManager = new DynamicConfigManager(pluginDataHandlerProvider);
-
-    if (baseOptions.containsKey(BaseOptionSet.RESET)) {
-      shouldResetDynamicConfig = true;
-      log.debug("Resetting configuration settings");
-    }
-    if (!dynamicOptions.isEmpty()) {
-      modifiedDynamicConfig = true;
-      for (Map.Entry<String, String> dynamicOption : dynamicOptions.entrySet()) {
-        String optionKey = dynamicOption.getKey();
-        String optionValue = dynamicOption.getValue();
-        log.debug("Updating configuration setting '{}' to '{}'", optionKey, optionValue);
-        dynamicConfigManager.setConfig(optionKey, optionValue);
-      }
-    }
-    dynamicConfigManager.updateConfiguration(modifiedDynamicConfig, shouldResetDynamicConfig);
-    changeSetData.setReviewSystemMessage(
-        SystemMessageFormatter.getPrefixedSystemMessage(
-            localizer, localizer.getText("message.dump.dynamic.configuration.notify")));
-    Map<String, String> dynamicConfig = dynamicConfigManager.getDynamicConfigForDisplay(config);
-    if (dynamicConfig != null && !dynamicConfig.isEmpty()) {
-      changeSetData.setReviewStatusMessage(
-          new DebugCodeBlocksDynamicConfiguration(localizer).getDebugCodeBlock(dynamicConfig));
-    }
-  }
-
-  private void commandDirectives() {
-    DynamicConfigManagerDirectives dynamicConfigManagerDirectives =
-        new DynamicConfigManagerDirectives(pluginDataHandlerProvider);
-    DebugCodeBlocksDirectives debugCodeBlocksDirectives = new DebugCodeBlocksDirectives(localizer);
-    try {
-      if (baseOptions.containsKey(BaseOptionSet.RESET)) {
-        dynamicConfigManagerDirectives.resetDirectives();
-      } else if (baseOptions.containsKey(BaseOptionSet.REMOVE)) {
-        dynamicConfigManagerDirectives.removeDirective(nextString);
-      } else if (!nextString.isEmpty()) {
-        dynamicConfigManagerDirectives.addDirective(nextString);
-      }
-    } catch (DynamicDirectivesModifyException e) {
-      changeSetData.setReviewSystemMessage(
-          SystemMessageFormatter.getLocalizedErrorMessage(
-              localizer, "message.dump.directives.modify.error"));
-      return;
-    }
-    changeSetData.setReviewSystemMessage(
-        debugCodeBlocksDirectives.getDebugCodeBlock(
-            dynamicConfigManagerDirectives.getDirectives()));
-  }
-
-  private void commandShow() {
-    ClientCommandShowExecutor clientCommandShowExecutor =
-        new ClientCommandShowExecutor(
-            config,
-            changeSetData,
-            change,
-            codeContextPolicy,
-            pluginDataHandlerProvider,
-            localizer,
-            IPatchSetProvider);
-    clientCommandShowExecutor.executeShowCommand(baseOptions);
   }
 }
