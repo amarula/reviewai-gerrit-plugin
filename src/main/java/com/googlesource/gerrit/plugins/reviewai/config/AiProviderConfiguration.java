@@ -61,11 +61,9 @@ final class AiProviderConfiguration {
   private static final String SELECTED_AI_MODEL = "selectedAiModel";
 
   private final Configuration config;
-  private final MockAiConfiguration mockAiConfiguration;
 
   AiProviderConfiguration(Configuration config) {
     this.config = config;
-    this.mockAiConfiguration = new MockAiConfiguration(config);
   }
 
   String getAiToken() {
@@ -82,7 +80,8 @@ final class AiProviderConfiguration {
   }
 
   String getAiDomain() {
-    Optional<String> mockAiDomain = mockAiConfiguration.getMockAiDomain(getSelectedAiModelRoute());
+    Optional<String> mockAiDomain =
+        DevMockAiConfigurationBridge.getMockAiDomain(config, getSelectedAiModelRoute());
     if (mockAiDomain.isPresent()) {
       return mockAiDomain.get();
     }
@@ -149,7 +148,8 @@ final class AiProviderConfiguration {
         .distinct()
         .toList();
     resolvedModels =
-        mockAiConfiguration.appendMockAiModelRoutes(
+        DevMockAiConfigurationBridge.appendMockAiModelRoutes(
+            config,
             resolvedModels,
             providerRoutes.stream().map(AiProviderRoute::provider).toList(),
             includeMockAiModels);
@@ -199,7 +199,10 @@ final class AiProviderConfiguration {
   }
 
   Optional<AiModelRoute> getDefaultRealAiModelRoute() {
-    return mockAiConfiguration.getDefaultRealAiModelRoute(getAiModels(), getAiModelsDefault());
+    Optional<AiModelRoute> mockAwareRoute =
+        DevMockAiConfigurationBridge.getDefaultRealAiModelRoute(
+            config, getAiModels(), getAiModelsDefault());
+    return mockAwareRoute.isPresent() ? mockAwareRoute : getDefaultAiModelRoute();
   }
 
   AiProviderType getAiProviderType() {
