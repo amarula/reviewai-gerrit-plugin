@@ -26,7 +26,13 @@ import com.google.inject.Inject;
 import com.google.inject.multibindings.Multibinder;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarPluginDetector;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
+import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
+import com.googlesource.gerrit.plugins.reviewai.listener.NoLoggingConfigurator;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewHistory;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessage;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessageStatus;
@@ -47,6 +53,9 @@ public class Module extends AbstractModule {
     Multibinder<EventListener> eventListenerBinder =
         Multibinder.newSetBinder(binder(), EventListener.class);
     eventListenerBinder.addBinding().to(GerritListener.class);
+    bind(AiAdministratorAccess.class).to(aiAdministratorAccessClass());
+    bind(ClientCommandExtension.class).to(clientCommandExtensionClass());
+    bind(LoggingConfigurator.class).to(loggingConfiguratorClass());
     if (avatarPluginDetector.isAvatarsGravatarAvailable()) {
       DynamicItem.bind(binder(), AvatarProvider.class).to(ReviewAiAvatarProvider.class);
     }
@@ -64,5 +73,17 @@ public class Module extends AbstractModule {
                 .to(ReviewAgentConversations.class);
           }
         });
+  }
+
+  protected Class<? extends AiAdministratorAccess> aiAdministratorAccessClass() {
+    return NoAiAdministratorAccess.class;
+  }
+
+  protected Class<? extends ClientCommandExtension> clientCommandExtensionClass() {
+    return DisabledClientCommandExtension.class;
+  }
+
+  protected Class<? extends LoggingConfigurator> loggingConfiguratorClass() {
+    return NoLoggingConfigurator.class;
   }
 }

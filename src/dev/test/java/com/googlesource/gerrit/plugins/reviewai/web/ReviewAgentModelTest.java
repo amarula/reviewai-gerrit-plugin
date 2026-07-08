@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.time.Instant;
 import java.util.List;
@@ -67,7 +68,11 @@ public class ReviewAgentModelTest extends TestBase {
     when(configCreator.createConfig(PROJECT_NAME, CHANGE_ID)).thenReturn(config);
     when(config.getAiAdministratorsGroup()).thenReturn("");
     when(aiReviewPermission.canAiReview(changeResource)).thenReturn(true);
-    view = new ReviewAgentModel(configCreator, aiReviewPermission, groupCache, permissionBackend);
+    view =
+        new ReviewAgentModel(
+            configCreator,
+            aiReviewPermission,
+            new DevAiAdministratorAccess(groupCache, permissionBackend));
   }
 
   @Test

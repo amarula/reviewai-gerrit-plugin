@@ -31,7 +31,7 @@ PLUGIN_DEPS = [
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
-    srcs = glob(["src/main/java/**/*.java"]),
+    srcs = PRODUCTION_SRCS,
     manifest_entries = [
         "Gerrit-PluginName: reviewai-gerrit-plugin",
         "Gerrit-Module: com.googlesource.gerrit.plugins.reviewai.Module",
@@ -55,10 +55,10 @@ gerrit_plugin(
         "Gerrit-PluginName: reviewai-gerrit-plugin",
         "Gerrit-Module: com.googlesource.gerrit.plugins.reviewai.DevModule",
         "Gerrit-HttpModule: com.googlesource.gerrit.plugins.reviewai.HttpModule",
-        "Implementation-Vendor: Amarula Solutions",
+        "Implementation-Vendor: Amarula",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
-        "Implementation-Title: AI Code Review Gerrit Plugin Dev",
-        "Implementation-Version: 4.1.0-dev",
+        "Implementation-Title: ChatGPT Code Review Gerrit Plugin Dev",
+        "Implementation-Version: 4.0.0-dev",
         "Gerrit-ApiType: plugin",
         "Gerrit-ApiVersion: 3.13.1",
     ],
