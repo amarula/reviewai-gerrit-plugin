@@ -120,8 +120,10 @@ class TopicPatchSetReviewer {
               : publicErrorMessage);
     }
 
+    List<Double> topicReviewScores = patchSetReviewer.getReviewScores(reviewReply);
     for (TopicReviewPatchSet patchSet : patchSets) {
-      patchSetReviewer.publishTopicReviewPart(reviewReply, patchSet.change(), patchSet.prefix());
+      patchSetReviewer.publishTopicReviewPart(
+          reviewReply, patchSet.change(), patchSet.prefix(), topicReviewScores);
     }
   }
 }
