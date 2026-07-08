@@ -39,11 +39,13 @@ import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.google.gerrit.json.OutputFormat;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,8 +134,8 @@ public class AiReviewMessageTest extends TestBase {
             mockPluginDataPath,
             null,
             getTestReviewAiDb(),
-            groupCache,
-            permissionBackend);
+            new DevAiAdministratorAccess(groupCache, permissionBackend),
+            new DevClientCommandExtension());
   }
 
   private void grantAdministratorPrivileges() throws Exception {
