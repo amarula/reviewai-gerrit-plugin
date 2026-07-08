@@ -58,8 +58,7 @@ class LangChainExecutor {
         structuredResponseFormat != null);
     List<ChatMessage> requestMessages = new ArrayList<>(memory.messages());
     ChatRequest initialRequest = buildChatRequest(requestMessages, getInitialToolChoice());
-    log.debug("Sending initial LangChain chat request: {}",
-        LogArg.truncated(initialRequest));
+    log.debug("Sending initial LangChain chat request: {}", LogArg.truncated(initialRequest));
     ChatResponse response = AiModelRequestLimiter.chat(config, model, initialRequest);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
     logAiMessageToolRequests("initial", aiMessage);
