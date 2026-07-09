@@ -1,7 +1,7 @@
 load("//tools/bzl:plugin.bzl", "gerrit_plugin")
 load("//tools/bzl:junit.bzl", "junit_tests")
 load("@rules_java//java:defs.bzl", "java_library", "java_plugin", "java_import")
-load(":defs.bzl", "plugin_package")
+load(":defs.bzl", "plugin_package", "stamp_plugin_jar")
 
 PRODUCTION_SRCS = glob(
     ["src/main/java/**/*.java"],
@@ -29,6 +29,12 @@ PLUGIN_DEPS = [
     ":provided_deps",
 ] + EXTERNAL_PLUGIN_DEPS
 
+PLUGIN_VERSION = "4.0.0"
+PLUGIN_VERSION_STATUS_KEYS = [
+    "STABLE_BUILD_REVIEWAI-GERRIT-PLUGIN_LABEL",
+    "STABLE_REVIEWAI_GIT_DESCRIBE",
+]
+
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
     srcs = PRODUCTION_SRCS,
@@ -39,12 +45,23 @@ gerrit_plugin(
         "Implementation-Vendor: Amarula",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
         "Implementation-Title: ChatGPT Code Review Gerrit Plugin",
-        "Implementation-Version: 4.0.0",
+        "Implementation-Version: " + PLUGIN_VERSION,
         "Gerrit-ApiType: plugin",
         "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob(["src/main/resources/**/*"]),
     deps = PLUGIN_DEPS,
+    target_suffix = "__bazlets",
+)
+
+stamp_plugin_jar(
+    name = "reviewai-gerrit-plugin",
+    src = ":reviewai-gerrit-plugin__bazlets",
+    out = "reviewai-gerrit-plugin.jar",
+    status_keys = PLUGIN_VERSION_STATUS_KEYS,
+    version = PLUGIN_VERSION,
+    visibility = ["//visibility:public"],
+    workspace_marker = ":defs.bzl",
 )
 
 gerrit_plugin(
@@ -58,7 +75,7 @@ gerrit_plugin(
         "Implementation-Vendor: Amarula",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
         "Implementation-Title: ChatGPT Code Review Gerrit Plugin Dev",
-        "Implementation-Version: 4.0.0-dev",
+        "Implementation-Version: " + PLUGIN_VERSION + "-dev",
         "Gerrit-ApiType: plugin",
         "Gerrit-ApiVersion: 3.13.1",
     ],
@@ -66,6 +83,17 @@ gerrit_plugin(
         "src/main/resources/**/*",
     ]) + glob(["src/dev/main/resources/**/*"], allow_empty = True),
     deps = PLUGIN_DEPS,
+    target_suffix = "__bazlets",
+)
+
+stamp_plugin_jar(
+    name = "reviewai-gerrit-plugin-dev",
+    src = ":reviewai-gerrit-plugin-dev__bazlets",
+    out = "reviewai-gerrit-plugin-dev.jar",
+    status_keys = PLUGIN_VERSION_STATUS_KEYS,
+    version = PLUGIN_VERSION + "-dev",
+    visibility = ["//visibility:public"],
+    workspace_marker = ":defs.bzl",
 )
 
 java_library(
