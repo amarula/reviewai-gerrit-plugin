@@ -24,7 +24,9 @@ import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.Injector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,6 +37,7 @@ public class EventHandlerExecutor {
   private final Injector injector;
   private final ScheduledExecutorService executor;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
+  private final EventBuildFeatures buildFeatures;
 
   @Inject
   EventHandlerExecutor(
@@ -42,9 +45,12 @@ public class EventHandlerExecutor {
       WorkQueue workQueue,
       @PluginName String pluginName,
       PluginConfigFactory pluginConfigFactory,
-      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator) {
+      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
+      AiAdministratorAccess aiAdministratorAccess,
+      ClientCommandExtension clientCommandExtension) {
     this.injector = injector;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
+    this.buildFeatures = new EventBuildFeatures(aiAdministratorAccess, clientCommandExtension);
     int maximumPoolSize =
         pluginConfigFactory.getFromGerritConfig(pluginName).getInt("maximumPoolSize", 2);
     this.executor = workQueue.createQueue(maximumPoolSize, "AI request executor");
@@ -56,7 +62,8 @@ public class EventHandlerExecutor {
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
       topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
     }
-    GerritEventContextModule contextModule = new GerritEventContextModule(config, event);
+    GerritEventContextModule contextModule =
+        new GerritEventContextModule(config, event, buildFeatures);
     EventHandlerTask task =
         injector.createChildInjector(contextModule).getInstance(EventHandlerTask.class);
     executor.execute(task);
