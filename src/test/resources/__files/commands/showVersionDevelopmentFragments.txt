@@ -1,0 +1,2 @@
+VERSION INFORMATION
+pluginVersion:
