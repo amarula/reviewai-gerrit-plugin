@@ -938,6 +938,19 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandShowVersion() throws Exception {
+    setupCommandComment("/show --version");
+    grantAdministratorPrivileges();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    for (String expectedFragment :
+        readTestFile("__files/commands/showVersionDevelopmentFragments.txt").split("\\R")) {
+      Assert.assertTrue(changeSetData.getReviewSystemMessage().contains(expectedFragment));
+    }
+  }
+
+  @Test
   public void commandShowConfigDeniesGerritAdminOutsideConfiguredAiAdministratorsGroup()
       throws Exception {
     setupCommandComment("/show --config");
