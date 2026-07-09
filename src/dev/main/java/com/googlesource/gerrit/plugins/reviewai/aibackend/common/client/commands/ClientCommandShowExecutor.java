@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksDataDump;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksPromptingParamInstructions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksPromptingParamPrompts;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksVersion;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,8 @@ public class ClientCommandShowExecutor extends ClientCommandBase {
         case LOCAL_DATA -> commandDumpStoredData();
         case PROMPTS -> commandShowPrompts(baseOptions);
         case INSTRUCTIONS -> commandShowInstructions(baseOptions);
+        case VERSION ->
+            itemsToShow.add(new DebugCodeBlocksVersion(localizer).getDebugCodeBlock());
         case SCOPE -> {}
         case MODE -> {}
       }
