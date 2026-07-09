@@ -16,6 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.valueOrUnknown;
+
+import com.google.gerrit.common.Version;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public final class PluginBuild {
   private static final String DEV_MODULE_CLASS =
       "com.googlesource.gerrit.plugins.reviewai.DevModule";
@@ -33,5 +39,18 @@ public final class PluginBuild {
     } catch (ClassNotFoundException e) {
       return false;
     }
+  }
+
+  public static Map<String, String> getVersionInfo() {
+    Package pluginPackage = PluginBuild.class.getPackage();
+    Map<String, String> versionInfo = new LinkedHashMap<>();
+    versionInfo.put(
+        "pluginVersion",
+        valueOrUnknown(
+            pluginPackage == null ? null : pluginPackage.getImplementationVersion()));
+    versionInfo.put("gerritVersion", valueOrUnknown(Version.getVersion()));
+    versionInfo.put("javaVersion", valueOrUnknown(System.getProperty("java.version")));
+
+    return versionInfo;
   }
 }

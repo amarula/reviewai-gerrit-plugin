@@ -500,6 +500,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 - `instructions`: Shows the assistant instructions currently used
 - `local_data`: Shows locally stored data
 - `config`: Shows the current configuration
+- `version`: Shows the plugin, build, Gerrit, and Java versions
 
 For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
 Use `--mode=suggest` to show the prompts or instructions used by `/suggest`.
