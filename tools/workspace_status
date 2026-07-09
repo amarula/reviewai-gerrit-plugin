@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+git_describe="$(git describe --tags --always --dirty --long 2>/dev/null || true)"
+if [[ -z "${git_describe}" ]]; then
+  git_describe="unknown"
+fi
+
+echo "STABLE_REVIEWAI_GIT_DESCRIBE ${git_describe}"

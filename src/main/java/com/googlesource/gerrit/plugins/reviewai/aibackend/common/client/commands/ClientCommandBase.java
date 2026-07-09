@@ -52,6 +52,7 @@ public abstract class ClientCommandBase extends ClientBase {
     LOCAL_DATA,
     PROMPTS,
     INSTRUCTIONS,
+    VERSION,
     MODE,
     TOPIC
   }
