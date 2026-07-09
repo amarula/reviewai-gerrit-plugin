@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormat
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import lombok.extern.slf4j.Slf4j;
 
@@ -232,6 +233,13 @@ public class ClientCommandParser extends ClientCommandBase {
 
   private boolean validateCommand(CommandSet command) {
     log.debug("Validating command: {}", command);
+    if (devBuildRequired(command)) {
+      changeSetData.setReviewSystemMessage(
+          SystemMessageFormatter.getLocalizedWarningMessage(
+              localizer, "message.command.dev.build.required"));
+      log.debug("Command `{}` not validated: dev build is required", command);
+      return false;
+    }
     if (optionsMismatch(command)) {
       return false;
     }
@@ -244,6 +252,14 @@ public class ClientCommandParser extends ClientCommandBase {
     }
     log.debug("Command `{}` validated", command);
     return true;
+  }
+
+  private boolean devBuildRequired(CommandSet command) {
+    return PluginBuild.isProductionBuild()
+        && (command == CommandSet.CONFIGURE
+            || command == CommandSet.DIRECTIVES
+            || command == CommandSet.SHOW
+            || command == CommandSet.REVIEW && baseOptions.containsKey(BaseOptionSet.DEBUG));
   }
 
   private boolean optionsMismatch(CommandSet command) {
