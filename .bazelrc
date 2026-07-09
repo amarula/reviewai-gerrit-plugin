@@ -4,3 +4,4 @@ build --nojava_header_compilation
 build --tool_java_language_version=21
 build --tool_java_runtime_version=local_jdk
 build --workspace_status_command=tools/workspace_status
+common --deleted_packages=target/classes
