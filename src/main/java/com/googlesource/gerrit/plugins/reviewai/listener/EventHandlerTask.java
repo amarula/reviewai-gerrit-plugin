@@ -26,7 +26,6 @@ import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
-import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
@@ -71,7 +70,7 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewPermission aiReviewPermission;
   private final IdentifiedUser.GenericFactory identifiedUserFactory;
   private final AccountCache accountCache;
-  private AiAdministratorAccess aiAdministratorAccess = new NoAiAdministratorAccess();
+  private final AiAdministratorAccess aiAdministratorAccess;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
 
@@ -90,7 +89,8 @@ public class EventHandlerTask implements Runnable {
       IdentifiedUser.GenericFactory identifiedUserFactory,
       AccountCache accountCache,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
-      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator) {
+      TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
+      EventBuildFeatures buildFeatures) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -101,12 +101,8 @@ public class EventHandlerTask implements Runnable {
     this.accountCache = accountCache;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
+    this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
-  }
-
-  @Inject(optional = true)
-  void setAiAdministratorAccess(AiAdministratorAccess aiAdministratorAccess) {
-    this.aiAdministratorAccess = aiAdministratorAccess;
   }
 
   @Override

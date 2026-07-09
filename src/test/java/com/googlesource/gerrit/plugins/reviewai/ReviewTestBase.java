@@ -61,6 +61,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -337,7 +338,12 @@ public class ReviewTestBase extends TestBase {
                 new AbstractModule() {
                   @Override
                   protected void configure() {
-                    install(new GerritEventContextModule(config, event));
+                    install(
+                        new GerritEventContextModule(
+                            config,
+                            event,
+                            new EventBuildFeatures(
+                                getAiAdministratorAccess(), getClientCommandExtension())));
 
                     bind(GerritClient.class).toInstance(gerritClient);
                     bind(ConfigCreator.class).toInstance(mockConfigCreator);
