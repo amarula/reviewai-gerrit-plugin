@@ -99,4 +99,8 @@ public class StringUtils {
     }
     return str.length() <= length ? str : str.substring(0, length) + "...";
   }
+
+  public static String valueOrUnknown(String value) {
+    return value == null || value.isBlank() ? "unknown" : value;
+  }
 }
