@@ -29,7 +29,7 @@ PLUGIN_DEPS = [
     ":provided_deps",
 ] + EXTERNAL_PLUGIN_DEPS
 
-PLUGIN_VERSION = "4.0.0"
+PLUGIN_VERSION = "4.1.0"
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
