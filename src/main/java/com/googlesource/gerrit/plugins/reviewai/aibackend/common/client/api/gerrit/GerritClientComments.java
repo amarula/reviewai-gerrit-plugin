@@ -31,6 +31,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
@@ -60,7 +61,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
   private final PluginChatMemoryStore chatMemoryStore;
-  private ClientCommandExtension commandExtension;
+  private final ClientCommandExtension commandExtension;
 
   private String authorUsername;
   @Getter private List<GerritComment> commentProperties;
@@ -92,7 +93,8 @@ public class GerritClientComments extends GerritClientAccount {
       IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
-      PluginChatMemoryStore chatMemoryStore) {
+      PluginChatMemoryStore chatMemoryStore,
+      EventBuildFeatures buildFeatures) {
     this(
         config,
         changeSetData,
@@ -101,7 +103,7 @@ public class GerritClientComments extends GerritClientAccount {
         pluginDataHandlerProvider,
         localizer,
         chatMemoryStore,
-        new DisabledClientCommandExtension());
+        buildFeatures.clientCommandExtension());
   }
 
   public GerritClientComments(
@@ -124,11 +126,6 @@ public class GerritClientComments extends GerritClientAccount {
     commentProperties = new ArrayList<>();
     commentMap = new HashMap<>();
     patchSetCommentMap = new HashMap<>();
-  }
-
-  @Inject(optional = true)
-  void setCommandExtension(ClientCommandExtension commandExtension) {
-    this.commandExtension = commandExtension;
   }
 
   public CommentData getCommentData() {
