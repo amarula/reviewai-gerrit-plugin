@@ -41,6 +41,10 @@ command help with `/help` or `/help <command>`.
 
    The generated JAR files are available under Gerrit's `bazel-bin/plugins/reviewai-gerrit-plugin/` directory.
 
+   Gerrit's Bazlets packaging populates `Implementation-Version` from the nearest annotated `v*` Git tag. Create release
+   tags as annotated tags (for example, `git tag -a v4.1.0`); lightweight tags are ignored and the version falls back to
+   the commit SHA.
+
 2. **Install:** Upload the desired jar file to the `$gerrit_site/plugins` directory.
 
 3. **Configure:** First, create an AI user in Gerrit. Then set the basic parameters in
@@ -500,6 +504,7 @@ fine-tuning purposes. Below are the currently supported options and their associ
 - `instructions`: Shows the assistant instructions currently used
 - `local_data`: Shows locally stored data
 - `config`: Shows the current configuration
+- `version`: Shows the plugin, build, Gerrit, and Java versions
 
 For `--prompts` and `--instructions`, `--scope=full|patchset|commit_message` limits the output to a single review mode.
 Use `--mode=suggest` to show the prompts or instructions used by `/suggest`.
