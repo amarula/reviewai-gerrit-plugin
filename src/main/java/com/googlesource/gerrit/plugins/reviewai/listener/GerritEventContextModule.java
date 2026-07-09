@@ -34,6 +34,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.google.inject.Scopes.SINGLETON;
@@ -42,10 +44,21 @@ import static com.google.inject.Scopes.SINGLETON;
 public class GerritEventContextModule extends FactoryModule {
   private final Event event;
   private final Configuration config;
+  private final EventBuildFeatures buildFeatures;
 
   public GerritEventContextModule(Configuration config, Event event) {
+    this(
+        config,
+        event,
+        new EventBuildFeatures(
+            new NoAiAdministratorAccess(), new DisabledClientCommandExtension()));
+  }
+
+  public GerritEventContextModule(
+      Configuration config, Event event, EventBuildFeatures buildFeatures) {
     this.event = event;
     this.config = config;
+    this.buildFeatures = buildFeatures;
     log.debug("Initializing GerritEventContextModule for event type: {}", event.getType());
   }
 
@@ -64,6 +77,7 @@ public class GerritEventContextModule extends FactoryModule {
 
     bind(Configuration.class).toInstance(config);
     bind(GerritChange.class).toInstance(new GerritChange(event));
+    bind(EventBuildFeatures.class).toInstance(buildFeatures);
     log.debug("GerritChange bound to instance created from event: {}", event.getType());
 
     bind(ChangeSetData.class).toProvider(ChangeSetDataProvider.class).in(SINGLETON);
