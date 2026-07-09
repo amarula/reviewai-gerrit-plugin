@@ -49,6 +49,7 @@ public class ClientCommandParser extends ClientCommandBase {
           Map.entry("local_data", BaseOptionSet.LOCAL_DATA),
           Map.entry("prompts", BaseOptionSet.PROMPTS),
           Map.entry("instructions", BaseOptionSet.INSTRUCTIONS),
+          Map.entry("version", BaseOptionSet.VERSION),
           Map.entry("mode", BaseOptionSet.MODE),
           Map.entry("topic", BaseOptionSet.TOPIC));
   private static final Map<CommandSet, List<BaseOptionSet>> COMMAND_VALID_OPTIONS_MAP =
@@ -68,6 +69,7 @@ public class ClientCommandParser extends ClientCommandBase {
                   BaseOptionSet.LOCAL_DATA,
                   BaseOptionSet.PROMPTS,
                   BaseOptionSet.INSTRUCTIONS,
+                  BaseOptionSet.VERSION,
                   BaseOptionSet.SCOPE,
                   BaseOptionSet.MODE));
   private static final List<CommandSet> REVIEW_COMMANDS =

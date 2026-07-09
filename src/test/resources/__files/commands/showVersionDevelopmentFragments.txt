@@ -1,0 +1,2 @@
+VERSION INFORMATION
+pluginBuild: development
