@@ -1,6 +1,6 @@
 {
   "name": "reviewai-gerrit-plugin",
-  "version": "3.1.2",
+  "version": "4.1.0",
   "description": "AI Code Review Gerrit Plugin",
   "scripts": {
     "lint": "eslint src/main/resources/static/**/*.js"
