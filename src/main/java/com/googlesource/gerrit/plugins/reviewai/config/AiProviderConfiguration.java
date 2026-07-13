@@ -48,7 +48,7 @@ final class AiProviderConfiguration {
   static final List<String> DEFAULT_DEEPSEEK_AI_MODELS =
       List.of("deepseek-v4-pro", DEFAULT_DEEPSEEK_AI_MODEL);
   static final List<String> DEFAULT_MOONSHOT_AI_MODELS =
-      List.of("kimi-k2.6", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-thinking-turbo", "kimi-k2-turbo-preview", DEFAULT_MOONSHOT_AI_MODEL);
+      List.of("kimi-k2.6", "kimi-k2.7-code", "kimi-k3", DEFAULT_MOONSHOT_AI_MODEL);
   static final List<String> DEFAULT_OLLAMA_AI_MODELS = List.of(DEFAULT_OLLAMA_AI_MODEL);
 
   static final String KEY_AI_TOKENS = "aiTokens";
