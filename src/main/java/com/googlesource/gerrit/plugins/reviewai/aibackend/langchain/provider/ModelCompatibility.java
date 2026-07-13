@@ -16,17 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider;
 
+import java.util.Set;
+
 public final class ModelCompatibility {
+  private static final String GPT_5_6_MODEL_PREFIX = "gpt-5.6";
   private static final String GPT_5_5_MODEL_PREFIX = "gpt-5.5";
   private static final String KIMI_K2_5_MODEL_PREFIX = "kimi-k2.5";
   private static final String KIMI_K2_6_MODEL_PREFIX = "kimi-k2.6";
+  private static final Set<String> TEMPERATURE_UNSUPPORTED_MODEL_PREFIXES =
+      Set.of(
+          GPT_5_5_MODEL_PREFIX,
+          GPT_5_6_MODEL_PREFIX,
+          KIMI_K2_5_MODEL_PREFIX,
+          KIMI_K2_6_MODEL_PREFIX);
 
   private ModelCompatibility() {}
 
   public static boolean supportsTemperature(String model) {
     return model == null
-        || !(model.startsWith(GPT_5_5_MODEL_PREFIX)
-            || model.startsWith(KIMI_K2_5_MODEL_PREFIX)
-            || model.startsWith(KIMI_K2_6_MODEL_PREFIX));
+        || TEMPERATURE_UNSUPPORTED_MODEL_PREFIXES.stream().noneMatch(model::startsWith);
   }
 }
