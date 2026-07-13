@@ -183,8 +183,7 @@ Supported providers are:
 - Ollama
 
 Model and token settings are grouped by the provider part of the route. If a provider is configured without explicit
-models, the plugin exposes the built-in defaults for that provider. The current default route set for OpenAI is
-`OpenAI/gpt-5.4`, `OpenAI/gpt-5.5`, `OpenAI/gpt-5.2`, and `OpenAI/gpt-4.1`, with the first model selected by default.
+models, the plugin exposes the built-in defaults for that provider.
 
 ```
 [plugin "reviewai-gerrit-plugin"]
