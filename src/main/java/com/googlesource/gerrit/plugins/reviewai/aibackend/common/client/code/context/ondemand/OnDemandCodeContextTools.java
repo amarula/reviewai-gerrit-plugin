@@ -42,12 +42,14 @@ public class OnDemandCodeContextTools extends ClientBase {
 
   private final GerritChange change;
   private final GitRepoFiles gitRepoFiles;
+  private final TreeOutputCompressor treeOutputCompressor;
 
   public OnDemandCodeContextTools(
       Configuration config, GerritChange change, GitRepoFiles gitRepoFiles) {
     super(config);
     this.change = change;
     this.gitRepoFiles = gitRepoFiles;
+    this.treeOutputCompressor = new TreeOutputCompressor();
   }
 
   public String execute(String toolName, String arguments) {
@@ -88,7 +90,7 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (paths == null || paths.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    return String.join("\n", paths);
+    return treeOutputCompressor.format(paths, subdir);
   }
 
   private String getContent(String filePath) throws FileNotFoundException {

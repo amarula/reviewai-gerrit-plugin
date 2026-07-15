@@ -45,8 +45,9 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 public class LangChainExecutorTest {
-  private static final String LARGE_TOOL_OUTPUT_RESOURCE =
-      "__files/openai/gerritFormattedPatch.txt";
+  private static final String LARGE_TREE_RESOURCE = "__files/ondemand/treeLarge.txt";
+  private static final String COMPRESSED_TREE_OUTPUT_RESOURCE =
+      "__files/ondemand/treeCompressedRoot.txt";
 
   @Test
   public void continuationRequestKeepsToolResultsWhenMemoryWindowTrims() throws Exception {
@@ -56,10 +57,10 @@ public class LangChainExecutorTest {
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getFullChangeId()).thenReturn("project~branch~change");
 
-    String largeToolOutput = readTestResource(LARGE_TOOL_OUTPUT_RESOURCE).repeat(4);
+    List<String> largeTree = readTestResource(LARGE_TREE_RESOURCE).lines().toList();
+    String compressedTreeOutput = readTestResource(COMPRESSED_TREE_OUTPUT_RESOURCE).stripTrailing();
     GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
-    when(gitRepoFiles.getFileTree(config, change, null))
-        .thenReturn(List.of(largeToolOutput), List.of(largeToolOutput));
+    when(gitRepoFiles.getFileTree(config, change, null)).thenReturn(largeTree, largeTree);
 
     ToolExecutionRequest firstToolRequest = toolRequest("call_1");
     ToolExecutionRequest secondToolRequest = toolRequest("call_2");
@@ -88,8 +89,8 @@ public class LangChainExecutorTest {
     List<ChatMessage> continuationMessages = model.requests.get(1).messages();
     assertTrue(hasToolRequest(continuationMessages, "call_1"));
     assertTrue(hasToolRequest(continuationMessages, "call_2"));
-    assertTrue(hasToolResult(continuationMessages, "call_1", largeToolOutput));
-    assertTrue(hasToolResult(continuationMessages, "call_2", largeToolOutput));
+    assertTrue(hasToolResult(continuationMessages, "call_1", compressedTreeOutput));
+    assertTrue(hasToolResult(continuationMessages, "call_2", compressedTreeOutput));
   }
 
   private static ToolExecutionRequest toolRequest(String id) {
