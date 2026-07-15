@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
@@ -36,6 +37,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class OnDemandCodeContextToolsTest extends TestBase {
   private static final Path BASE_PATH = Path.of("src/test/resources");
   private static final String CONTEXT_FILE = "__files/openai/contextPatchOriginal.py";
+  private static final String SMALL_TREE_FILE = "__files/ondemand/treeSmall.txt";
+  private static final String LARGE_TREE_FILE = "__files/ondemand/treeLarge.txt";
 
   @Mock private Configuration config;
   @Mock private GitRepoFiles gitRepoFiles;
@@ -50,13 +53,24 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   }
 
   @Test
-  public void treeReturnsRepositoryPathsFromSubdir() {
-    when(gitRepoFiles.getFileTree(config, change, "src"))
-        .thenReturn(List.of("src/Main.java", "src/util/Helper.java"));
+  public void treeReturnsRepositoryPathsFromSubdir() throws Exception {
+    List<String> paths = readTestFileLines(SMALL_TREE_FILE);
+    when(gitRepoFiles.getFileTree(config, change, "src")).thenReturn(paths);
 
     String output = tools.execute("tree", "{\"subdir\":\"src\"}");
 
-    assertEquals("src/Main.java\nsrc/util/Helper.java", output);
+    assertEquals(String.join("\n", paths), output);
+  }
+
+  @Test
+  public void treeCompressesLargeRepositoryPaths() throws Exception {
+    when(gitRepoFiles.getFileTree(config, change, null))
+        .thenReturn(readTestFileLines(LARGE_TREE_FILE));
+
+    String output = tools.execute("tree", "{}");
+
+    assertEquals("docs/README.md\nsrc/...", output);
+    assertTrue(output.length() <= TreeOutputCompressor.DEFAULT_MAX_LENGTH);
   }
 
   @Test
@@ -87,5 +101,9 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
   private String readTestFile(String filename) throws Exception {
     return Files.readString(BASE_PATH.resolve(filename));
+  }
+
+  private List<String> readTestFileLines(String filename) throws Exception {
+    return Files.readAllLines(BASE_PATH.resolve(filename));
   }
 }
