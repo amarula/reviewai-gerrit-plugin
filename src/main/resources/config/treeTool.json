@@ -1,7 +1,7 @@
 {
   "type": "function",
   "name": "tree",
-  "description": "Return the repository file tree starting from the provided subdirectory, or from the git project root when no subdirectory is provided.",
+  "description": "Return the repository file tree starting from the provided subdirectory, or from the git project root when no subdirectory is provided. Large results are shortened by replacing expanded directories with path/... entries; request that path as subdir to inspect it.",
   "strict": false,
   "parameters": {
     "type": "object",
