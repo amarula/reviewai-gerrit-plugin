@@ -18,10 +18,10 @@ package com.googlesource.gerrit.plugins.reviewai;
 
 import com.google.gerrit.extensions.registration.DynamicItem;
 import com.google.gerrit.extensions.restapi.RestApiModule;
+import com.google.gerrit.lifecycle.LifecycleModule;
 import com.google.gerrit.server.avatar.AvatarProvider;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.events.EventListener;
-import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.multibindings.Multibinder;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarPluginDetector;
@@ -41,7 +41,7 @@ import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel;
 
 /** Configures ReviewAI listeners, REST endpoints, and optional avatar integration. */
-public class Module extends AbstractModule {
+public class Module extends LifecycleModule {
   private final ReviewAiAvatarPluginDetector avatarPluginDetector;
 
   @Inject
@@ -68,6 +68,7 @@ public class Module extends AbstractModule {
     if (avatarPluginDetector.isAvatarsGravatarAvailable()) {
       DynamicItem.bind(binder(), AvatarProvider.class).to(ReviewAiAvatarProvider.class);
     }
+    listener().to(ReviewAiLifecycle.class);
 
     install(
         new RestApiModule() {
