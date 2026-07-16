@@ -33,8 +33,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.h2.tools.Server;
 
+@Slf4j
 @Singleton
 public class ReviewAiDb {
   private static final String DB_FILE_NAME = "reviewai";
@@ -44,6 +46,7 @@ public class ReviewAiDb {
   private static final Object TCP_SERVER_LOCK = new Object();
 
   private static Server tcpServer;
+  private static String managedJdbcUrl;
 
   private final Path pluginDataDir;
   private final String jdbcUrl;
@@ -221,6 +224,7 @@ public class ReviewAiDb {
       return;
     }
     synchronized (TCP_SERVER_LOCK) {
+      managedJdbcUrl = jdbcUrl;
       if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
         return;
       }
@@ -231,6 +235,24 @@ public class ReviewAiDb {
                 .start();
       } catch (SQLException e) {
         throw new RuntimeException("Failed to start H2 TCP server for ReviewAI DB", e);
+      }
+    }
+  }
+
+  public static void stopManagedTcpServer() {
+    synchronized (TCP_SERVER_LOCK) {
+      if (managedJdbcUrl != null) {
+        try (Connection c = DriverManager.getConnection(managedJdbcUrl);
+            Statement s = c.createStatement()) {
+          s.execute("SHUTDOWN");
+        } catch (SQLException e) {
+          log.debug("Failed to shut down ReviewAI H2 database cleanly", e);
+        }
+        managedJdbcUrl = null;
+      }
+      if (tcpServer != null) {
+        tcpServer.stop();
+        tcpServer = null;
       }
     }
   }
