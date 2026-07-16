@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.ReviewAiExecutors;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -53,7 +54,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -91,6 +91,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
       GitRepoFiles gitRepoFiles,
+      ReviewAiExecutors reviewAiExecutors,
       ReviewAiMetrics metrics) {
     this(
         config,
@@ -100,7 +101,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         pluginDataHandlerProvider,
         conversationStore,
         chatMemoryStore,
-        ForkJoinPool.commonPool(),
+        reviewAiExecutors.getAgentExecutor(),
         gitRepoFiles,
         metrics);
   }
