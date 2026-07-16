@@ -69,6 +69,16 @@ public class GerritListener implements EventListener {
 
     log.debug("Processing event: {}", event);
     PatchSetEvent patchSetEvent = (PatchSetEvent) event;
+    log.debug(
+        "Patch set event diagnostic: listenerId={}, classLoaderId={}, eventId={}, eventClass={},"
+            + " type={}, createdOn={}, instanceId={}",
+        System.identityHashCode(this),
+        System.identityHashCode(getClass().getClassLoader()),
+        System.identityHashCode(event),
+        event.getClass().getName(),
+        event.getType(),
+        event.eventCreatedOn,
+        event.instanceId);
     Project.NameKey projectNameKey = patchSetEvent.getProjectNameKey();
     Change.Key changeKey = patchSetEvent.getChangeKey();
 
