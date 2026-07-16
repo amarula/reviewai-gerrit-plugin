@@ -20,6 +20,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.JsonSyntaxException;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.ReviewAiExecutors;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiResponseContentMerger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -63,7 +64,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -90,6 +90,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
       GitRepoFiles gitRepoFiles,
+      ReviewAiExecutors reviewAiExecutors,
       ReviewAiMetrics metrics) {
     this(
         config,
@@ -99,7 +100,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         pluginDataHandlerProvider,
         conversationStore,
         chatMemoryStore,
-        ForkJoinPool.commonPool(),
+        reviewAiExecutors.getAgentExecutor(),
         gitRepoFiles,
         metrics);
   }
