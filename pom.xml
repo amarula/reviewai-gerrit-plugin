@@ -163,12 +163,12 @@
                             <Gerrit-Module>com.googlesource.gerrit.plugins.reviewai.Module</Gerrit-Module>
                             <Gerrit-HttpModule>com.googlesource.gerrit.plugins.reviewai.HttpModule</Gerrit-HttpModule>
 
-                            <Implementation-Vendor>Amarula</Implementation-Vendor>
+                            <Implementation-Vendor>Amarula Solutions</Implementation-Vendor>
                             <Implementation-URL>
                                 https://github.com/amarula/reviewai-gerrit-plugin
                             </Implementation-URL>
 
-                            <Implementation-Title>ChatGPT Code Review Gerrit Plugin</Implementation-Title>
+                            <Implementation-Title>AI Code Review Gerrit Plugin</Implementation-Title>
                             <Implementation-Version>${project.version}</Implementation-Version>
 
                             <Gerrit-ApiType>${Gerrit-ApiType}</Gerrit-ApiType>
@@ -262,11 +262,11 @@
                                         <Gerrit-PluginName>reviewai-gerrit-plugin</Gerrit-PluginName>
                                         <Gerrit-Module>com.googlesource.gerrit.plugins.reviewai.Module</Gerrit-Module>
                                         <Gerrit-HttpModule>com.googlesource.gerrit.plugins.reviewai.HttpModule</Gerrit-HttpModule>
-                                        <Implementation-Vendor>Amarula</Implementation-Vendor>
+                                        <Implementation-Vendor>Amarula Solutions</Implementation-Vendor>
                                         <Implementation-URL>
                                             https://github.com/amarula/reviewai-gerrit-plugin
                                         </Implementation-URL>
-                                        <Implementation-Title>ChatGPT Code Review Gerrit Plugin</Implementation-Title>
+                                        <Implementation-Title>AI Code Review Gerrit Plugin</Implementation-Title>
                                         <Implementation-Version>${project.version}</Implementation-Version>
                                         <Gerrit-ApiType>${Gerrit-ApiType}</Gerrit-ApiType>
                                         <Gerrit-ApiVersion>${Gerrit-ApiVersion}</Gerrit-ApiVersion>
