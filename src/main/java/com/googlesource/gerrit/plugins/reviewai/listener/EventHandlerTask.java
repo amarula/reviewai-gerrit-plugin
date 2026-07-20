@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -73,6 +74,7 @@ public class EventHandlerTask implements Runnable {
   private final AiAdministratorAccess aiAdministratorAccess;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
+  private final ReviewAiMetrics metrics;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -90,7 +92,8 @@ public class EventHandlerTask implements Runnable {
       AccountCache accountCache,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
-      EventBuildFeatures buildFeatures) {
+      EventBuildFeatures buildFeatures,
+      ReviewAiMetrics metrics) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -102,6 +105,7 @@ public class EventHandlerTask implements Runnable {
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
+    this.metrics = metrics;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -124,11 +128,14 @@ public class EventHandlerTask implements Runnable {
       return Result.NOT_SUPPORTED;
     }
 
+    ReviewAiMetrics.MetricTimer reviewRunTimer = metrics.startReviewRun(change.getEventType());
     try {
       log.debug("Processing event for change ID:: {}", change.getFullChangeId());
       eventHandlerType.processEvent();
       log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
+      reviewRunTimer.complete();
     } catch (Exception e) {
+      reviewRunTimer.fail();
       log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);
       reviewAgentRequest.fail(e.getMessage());
       if (e instanceof InterruptedException) {

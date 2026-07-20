@@ -33,6 +33,14 @@ public class TimeUtils {
     return System.currentTimeMillis();
   }
 
+  public static long getCurrentNanos() {
+    return System.nanoTime();
+  }
+
+  public static long getElapsedNanos(long startNanos) {
+    return getCurrentNanos() - startNanos;
+  }
+
   public static long epochSecondsToMillisOrNow(long epochSeconds) {
     return epochSeconds > 0 ? epochSeconds * 1000 : getCurrentMillis();
   }

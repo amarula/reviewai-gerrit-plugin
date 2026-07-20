@@ -65,6 +65,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
@@ -358,6 +359,7 @@ public class ReviewTestBase extends TestBase {
                     bind(AiAdministratorAccess.class).toInstance(getAiAdministratorAccess());
                     bind(ClientCommandExtension.class).toInstance(getClientCommandExtension());
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
+                    bind(ReviewAiMetrics.class).toInstance(new ReviewAiMetrics());
                     bind(Path.class)
                         .annotatedWith(PluginData.class)
                         .toInstance(
