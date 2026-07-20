@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 
 class SpecializedSuggestLangChainClient extends LangChainClient {
@@ -39,7 +40,8 @@ class SpecializedSuggestLangChainClient extends LangChainClient {
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       PluginChatMemoryStore chatMemoryStore,
-      GitRepoFiles gitRepoFiles) {
+      GitRepoFiles gitRepoFiles,
+      ReviewAiMetrics metrics) {
     super(
         config,
         codeContextPolicy,
@@ -47,7 +49,8 @@ class SpecializedSuggestLangChainClient extends LangChainClient {
         localizer,
         pluginDataHandlerProvider,
         chatMemoryStore,
-        gitRepoFiles);
+        gitRepoFiles,
+        metrics);
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
   }
 
