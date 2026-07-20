@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -25,7 +27,7 @@ import java.util.List;
 import org.junit.Test;
 
 public class TreeOutputCompressorTest {
-  private static final Path BASE_PATH = Path.of("src/test/resources");
+  private static final Path BASE_PATH = TestResourceLoader.getTestResourcePath();
   private static final String SMALL_TREE_FILE = "__files/ondemand/treeSmall.txt";
   private static final String LARGE_TREE_FILE = "__files/ondemand/treeLarge.txt";
 

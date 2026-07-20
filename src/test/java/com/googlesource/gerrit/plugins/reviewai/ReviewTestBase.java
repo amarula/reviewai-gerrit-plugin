@@ -109,7 +109,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToCla
 import static org.mockito.Mockito.*;
 
 public class ReviewTestBase extends TestBase {
-  protected static final Path basePath = Paths.get("src/test/resources");
+  protected static final Path basePath = TestResourceLoader.getTestResourcePath();
   protected static final int GERRIT_AI_ACCOUNT_ID = 1000000;
   protected static final String GERRIT_AI_USERNAME = "gpt";
   protected static final int GERRIT_USER_ACCOUNT_ID = 1000001;

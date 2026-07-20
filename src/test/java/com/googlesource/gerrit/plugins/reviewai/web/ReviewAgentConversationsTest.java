@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.PatchSet;
@@ -699,7 +701,7 @@ public class ReviewAgentConversationsTest extends TestBase {
   }
 
   private String readTestResource(String resourceName) throws Exception {
-    return Files.readString(Paths.get("src/test/resources").resolve(resourceName)).trim();
+    return Files.readString(TestResourceLoader.getTestResourcePath().resolve(resourceName)).trim();
   }
 
   private boolean hasResponsePartsTable(java.sql.Connection c) throws Exception {

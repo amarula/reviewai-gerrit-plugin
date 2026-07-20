@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
@@ -33,7 +35,7 @@ import org.junit.Test;
 public class GitRepoFilesTest extends TestBase {
   private static final String SPECIALIZED_BRANCH = "release/device-a";
   private static final Path SPECIALIZED_BRANCH_CONTENT =
-      Paths.get("src/test/resources/__files/git/specializedBranch.txt");
+      TestResourceLoader.getTestResourcePath().resolve("__files/git/specializedBranch.txt");
 
   @Test
   public void getBranchRevTreeUsesChangeTargetBranch() throws Exception {

@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -31,7 +33,7 @@ import java.util.TreeMap;
 import org.junit.Test;
 
 public class CodeFinderTest {
-  private static final Path TEST_RESOURCES_PATH = Path.of("src/test/resources");
+  private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final Path BLE_TEST_CHUNK =
       TEST_RESOURCES_PATH.resolve("__files/codefinder/BleTest.kt");
   private static final String ORIGINAL_MANAGER_LINE =

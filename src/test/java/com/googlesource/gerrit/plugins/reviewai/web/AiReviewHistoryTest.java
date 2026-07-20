@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import com.google.gerrit.extensions.common.AccountInfo;
 import com.google.gerrit.extensions.common.ChangeMessageInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
@@ -130,7 +132,7 @@ public class AiReviewHistoryTest {
 
   private static String readTestFile(String filename) {
     try {
-      return Files.readString(Paths.get("src/test/resources").resolve(filename));
+      return Files.readString(TestResourceLoader.getTestResourcePath().resolve(filename));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

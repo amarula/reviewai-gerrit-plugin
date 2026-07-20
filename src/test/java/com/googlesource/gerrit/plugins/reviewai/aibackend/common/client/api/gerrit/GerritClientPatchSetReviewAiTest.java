@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.Changes;
@@ -48,7 +50,7 @@ import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class GerritClientPatchSetReviewAiTest extends TestBase {
-  private static final Path TEST_RESOURCES_PATH = Paths.get("src/test/resources");
+  private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String VERBOSE_RENAME_PATCH_FILE =
       "__files/openai/gerritVerboseRenamePatch.txt";
   private static final String MIXED_EXTENSION_PATCH_FILE =

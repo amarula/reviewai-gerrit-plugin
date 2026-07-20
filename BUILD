@@ -1,6 +1,7 @@
 load("//tools/bzl:plugin.bzl", "gerrit_plugin")
 load("//tools/bzl:junit.bzl", "junit_tests")
-load("@rules_java//java:defs.bzl", "java_library", "java_plugin")
+load("@rules_java//java:defs.bzl", "java_library", "java_plugin", "java_import")
+load(":defs.bzl", "plugin_package")
 
 PRODUCTION_SRCS = glob(
     ["src/main/java/**/*.java"],
@@ -10,6 +11,23 @@ PRODUCTION_SRCS = glob(
         "src/main/java/**/logging/LoggingConfigurationDeployed.java",
     ],
 )
+
+EXTERNAL_PLUGIN_DEPS = [
+    "@reviewai_plugin_deps//:com_openai_openai_java_core",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
+    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
+    "@reviewai_plugin_deps//:com_openai_openai_java_client_okhttp",
+    "@reviewai_plugin_deps//:com_h2database_h2",
+    "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
+]
+
+PLUGIN_DEPS = [
+    ":lombok",
+    ":provided_deps",
+] + EXTERNAL_PLUGIN_DEPS
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin",
@@ -26,23 +44,12 @@ gerrit_plugin(
         "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob(["src/main/resources/**/*"]),
-    deps = [
-        ":lombok",
-        ":provided_deps",
-        "@reviewai_plugin_deps//:com_openai_openai_java_core",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
-        "@reviewai_plugin_deps//:com_openai_openai_java_client_okhttp",
-        "@reviewai_plugin_deps//:com_h2database_h2",
-        "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
-    ],
+    deps = PLUGIN_DEPS,
 )
 
 gerrit_plugin(
     name = "reviewai-gerrit-plugin-dev",
+    dir_name = "reviewai-gerrit-plugin",
     srcs = PRODUCTION_SRCS + glob(["src/dev/main/java/**/*.java"]),
     manifest_entries = [
         "Gerrit-PluginName: reviewai-gerrit-plugin",
@@ -58,19 +65,7 @@ gerrit_plugin(
     resources = glob([
         "src/main/resources/**/*",
     ]) + glob(["src/dev/main/resources/**/*"], allow_empty = True),
-    deps = [
-        ":lombok",
-        ":provided_deps",
-        "@reviewai_plugin_deps//:com_openai_openai_java_core",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
-        "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
-        "@reviewai_plugin_deps//:com_openai_openai_java_client_okhttp",
-        "@reviewai_plugin_deps//:com_h2database_h2",
-        "@reviewai_plugin_deps//:org_apache_commons_commons_collections4",
-    ],
+    deps = PLUGIN_DEPS,
 )
 
 java_library(
@@ -84,23 +79,48 @@ java_library(
     neverlink = True,
 )
 
+# java_import uses the ijar tool (not Turbine) for its hjar, so
+# Lombok-generated public methods are preserved during test compilation.
+# We copy the full jar out of __plugin via a genrule because java_import
+# cannot accept java_library target labels directly.
+genrule(
+    name = "reviewai_plugin_jar",
+    srcs = [":reviewai-gerrit-plugin__plugin"],
+    outs = ["reviewai_plugin.jar"],
+    cmd = "cp $(location :reviewai-gerrit-plugin__plugin) $@",
+)
+
+java_import(
+    name = "reviewai_plugin_test_lib",
+    jars = [":reviewai_plugin.jar"],
+    visibility = ["//visibility:private"],
+)
+
+genrule(
+    name = "reviewai_plugin_dev_jar",
+    srcs = [":reviewai-gerrit-plugin-dev__plugin"],
+    outs = ["reviewai_plugin_dev.jar"],
+    cmd = "cp $(location :reviewai-gerrit-plugin-dev__plugin) $@",
+)
+
+java_import(
+    name = "reviewai_plugin_dev_test_lib",
+    jars = [":reviewai_plugin_dev.jar"],
+    visibility = ["//visibility:private"],
+)
+
 TEST_DEPS = [
+    ":reviewai_plugin_test_lib",
     ":lombok",
     ":provided_deps",
-    ":reviewai-gerrit-plugin_lib",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
     "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
-    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",
-    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
-    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_google_ai_gemini",
-    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_ollama",
-    "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_open_ai",
     "@reviewai_plugin_deps//:junit_junit",
     "@reviewai_plugin_deps//:org_mockito_mockito_core",
     "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
     "@reviewai_plugin_deps//:org_wiremock_wiremock_standalone",
-]
+] + EXTERNAL_PLUGIN_DEPS
 
 java_library(
     name = "reviewai_test_support",
@@ -118,8 +138,9 @@ junit_tests(
     name = "reviewai_tests",
     srcs = glob(["src/test/java/**/*Test.java"]),
     data = glob(["src/test/resources/**"]),
-    resource_strip_prefix = "src/test/resources",
+    resource_strip_prefix = plugin_package() + "/src/test/resources",
     resources = glob(["src/test/resources/**"]),
+    jvm_flags = ["-Dbazel.test.resourceBase=" + plugin_package() + "/src/test/resources"],
     deps = [
         ":reviewai_test_support",
     ] + TEST_DEPS,
@@ -136,7 +157,7 @@ java_library(
     ),
     deps = [
         ":reviewai_test_support",
-        ":reviewai-gerrit-plugin-dev_lib",
+        ":reviewai_plugin_dev_test_lib",
     ] + TEST_DEPS,
 )
 
@@ -144,14 +165,14 @@ junit_tests(
     name = "reviewai_dev_tests",
     srcs = glob(["src/dev/test/java/**/*Test.java"]),
     data = glob(["src/test/resources/**"]) + glob(["src/dev/test/resources/**"], allow_empty = True),
-    resource_strip_prefix = "src/test/resources",
+    resource_strip_prefix = plugin_package() + "/src/test/resources",
     resources = glob(["src/test/resources/**"]) + glob(["src/dev/test/resources/**"], allow_empty = True),
+    jvm_flags = ["-Dbazel.test.resourceBase=" + plugin_package() + "/src/test/resources"],
     deps = [
         ":reviewai_dev_test_support",
         ":reviewai_test_support",
-        ":reviewai-gerrit-plugin-dev_lib",
+        ":reviewai_plugin_dev_test_lib",
     ] + TEST_DEPS,
-    src_prefix = "src/dev/test/java/",
 )
 
 java_plugin(
