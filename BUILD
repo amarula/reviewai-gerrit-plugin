@@ -151,7 +151,6 @@ junit_tests(
         ":reviewai_test_support",
         ":reviewai-gerrit-plugin-dev_lib",
     ] + TEST_DEPS,
-    src_prefix = "src/dev/test/java/",
 )
 
 java_plugin(
