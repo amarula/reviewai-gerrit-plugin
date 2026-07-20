@@ -136,6 +136,7 @@ See the [Command Reference](docs/commands.md) for every command, option, scope, 
 - [Configuration](docs/configuration.md)
 - [Command Reference](docs/commands.md)
 - [Development and Debugging](docs/development.md)
+- [Telemetry](docs/telemetry.md)
 
 ## License
 
