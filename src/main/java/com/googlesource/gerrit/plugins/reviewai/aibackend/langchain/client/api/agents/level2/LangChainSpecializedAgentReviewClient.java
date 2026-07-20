@@ -45,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import dev.langchain4j.data.message.ChatMessage;
 import java.util.ArrayList;
@@ -90,7 +91,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
       GitRepoFiles gitRepoFiles,
-      ReviewAiExecutors reviewAiExecutors) {
+      ReviewAiExecutors reviewAiExecutors,
+      ReviewAiMetrics metrics) {
     this(
         config,
         codeContextPolicy,
@@ -100,7 +102,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         conversationStore,
         chatMemoryStore,
         reviewAiExecutors.getAgentExecutor(),
-        gitRepoFiles);
+        gitRepoFiles,
+        metrics);
   }
 
   @VisibleForTesting
@@ -110,7 +113,17 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       GerritClient gerritClient,
       Localizer localizer,
       Executor executor) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, null, null, executor, null);
+    this(
+        config,
+        codeContextPolicy,
+        gerritClient,
+        localizer,
+        null,
+        null,
+        null,
+        executor,
+        null,
+        new ReviewAiMetrics());
   }
 
   @VisibleForTesting
@@ -123,7 +136,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
       Executor executor,
-      GitRepoFiles gitRepoFiles) {
+      GitRepoFiles gitRepoFiles,
+      ReviewAiMetrics metrics) {
     super(
         config,
         codeContextPolicy,
@@ -133,7 +147,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         conversationStore,
         chatMemoryStore,
         executor,
-        gitRepoFiles);
+        gitRepoFiles,
+        metrics);
     this.stageExecutor = new SpecializedReviewStageExecutor(executor);
     this.pastCommentsCollector =
         new SpecializedReviewPastCommentsCollector(config, gerritClient, localizer);
@@ -154,7 +169,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             localizer,
             pluginDataHandlerProvider,
             chatMemoryStore,
-            gitRepoFiles);
+            gitRepoFiles,
+            metrics);
     LangChainClient suggestContextClient =
         new SpecializedSuggestLangChainClient(
             config,
@@ -163,7 +179,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             localizer,
             pluginDataHandlerProvider,
             chatMemoryStore,
-            gitRepoFiles);
+            gitRepoFiles,
+            metrics);
     return new LangChainSpecializedSuggestClient(
         reviewClient,
         suggestContextClient,

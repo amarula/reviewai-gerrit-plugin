@@ -49,6 +49,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -93,6 +94,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
+  protected final ReviewAiMetrics metrics;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
   private final ResponseFormat specializedRepliesResponseFormat;
@@ -149,7 +151,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider,
       PluginChatMemoryStore chatMemoryStore,
-      GitRepoFiles gitRepoFiles) {
+      GitRepoFiles gitRepoFiles,
+      ReviewAiMetrics metrics) {
     super(config);
     this.codeContextPolicy = codeContextPolicy;
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
@@ -159,6 +162,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.localizer = localizer;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
+    this.metrics = metrics == null ? new ReviewAiMetrics() : metrics;
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -259,7 +263,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GerritClient gerritClient,
       Localizer localizer,
       PluginDataHandlerProvider pluginDataHandlerProvider) {
-    this(config, codeContextPolicy, gerritClient, localizer, pluginDataHandlerProvider, null, null);
+    this(
+        config,
+        codeContextPolicy,
+        gerritClient,
+        localizer,
+        pluginDataHandlerProvider,
+        null,
+        null,
+        new ReviewAiMetrics());
   }
 
   @VisibleForTesting
@@ -268,7 +280,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
       Localizer localizer) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, null, null);
+    this(config, codeContextPolicy, gerritClient, localizer, null, null, null, new ReviewAiMetrics());
   }
 
   @Override
@@ -341,8 +353,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String patchSet,
       boolean rebuildToolExecutor)
       throws Exception {
+    AiProviderType providerType = config.getAiProviderType();
+    ReviewAiMetrics.MetricTimer requestTimer =
+        metrics.startAiRequest(
+            providerType, config.getAiModel(), changeSetData.getReviewAssistantStage());
     try {
-      AiProviderType providerType = config.getAiProviderType();
       boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
       String systemInstructions =
@@ -418,6 +433,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
       if (responseText == null) {
         log.warn("LangChain model returned null response text");
+        requestTimer.empty();
         return null;
       }
 
@@ -427,8 +443,10 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         memory.add(ai);
       }
 
+      requestTimer.complete();
       return new RawReviewRequestResult(responseText, userMessage);
     } catch (Exception e) {
+      requestTimer.fail();
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
     }
