@@ -46,6 +46,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
@@ -88,7 +89,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       PluginDataHandlerProvider pluginDataHandlerProvider,
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
-      GitRepoFiles gitRepoFiles) {
+      GitRepoFiles gitRepoFiles,
+      ReviewAiMetrics metrics) {
     this(
         config,
         codeContextPolicy,
@@ -98,7 +100,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         conversationStore,
         chatMemoryStore,
         ForkJoinPool.commonPool(),
-        gitRepoFiles);
+        gitRepoFiles,
+        metrics);
   }
 
   @VisibleForTesting
@@ -118,7 +121,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         null,
         null,
         executor,
-        null);
+        null,
+        new ReviewAiMetrics());
   }
 
   @VisibleForTesting
@@ -138,7 +142,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         conversationStore,
         null,
         executor,
-        null);
+        null,
+        new ReviewAiMetrics());
   }
 
   @VisibleForTesting
@@ -148,7 +153,17 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       GerritClient gerritClient,
       Localizer localizer,
       Executor executor) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, null, null, executor, null);
+    this(
+        config,
+        codeContextPolicy,
+        gerritClient,
+        localizer,
+        null,
+        null,
+        null,
+        executor,
+        null,
+        new ReviewAiMetrics());
   }
 
   @VisibleForTesting
@@ -161,7 +176,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       ReviewAgentConversationStore conversationStore,
       PluginChatMemoryStore chatMemoryStore,
       Executor executor,
-      GitRepoFiles gitRepoFiles) {
+      GitRepoFiles gitRepoFiles,
+      ReviewAiMetrics metrics) {
     super(
         config,
         codeContextPolicy,
@@ -169,7 +185,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         localizer,
         pluginDataHandlerProvider,
         chatMemoryStore,
-        gitRepoFiles);
+        gitRepoFiles,
+        metrics);
     this.executor = executor;
     this.gerritClient = gerritClient;
     this.localizer = localizer;
