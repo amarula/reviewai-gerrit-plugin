@@ -16,6 +16,24 @@
       "message": "@patrizio.gelosi@amarulasolutions.com Why you change this part?",
       "revId": "80246fa27908a5f5f0668c0b0449c232d5ef5eaa",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "77227a44_53fca6cf",
+        "filename": "BUILD",
+        "patchSetId": 13
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-22T13:28:18Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com The vendor an title information are fixed in a later commit (Change-Id I3510a2d7607a74a14eeb410682cb0070c0175f6a - https://gerrithub.io/c/amarula/chatgpt-code-review-gerrit-plugin/+/1242394).\nThe implementation version is still 4.0.0 at this point, before the version-bump commit. In any case, this entry is removed in a later commit (Change-Id I89d9fe9647fa35387c3ddc53f281e1ae0232544f - https://gerrithub.io/c/amarula/chatgpt-code-review-gerrit-plugin/+/1241601)",
+      "parentUuid": "9ec67a10_6e77e18d",
+      "revId": "80246fa27908a5f5f0668c0b0449c232d5ef5eaa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
