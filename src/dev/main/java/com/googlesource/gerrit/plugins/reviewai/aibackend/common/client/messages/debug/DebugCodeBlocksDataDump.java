@@ -19,12 +19,13 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.message
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-
+import static com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore.KEY_REQUEST_STATUSES;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.prettyStringifyMap;
 
 @Slf4j
@@ -42,26 +43,25 @@ public class DebugCodeBlocksDataDump extends DebugCodeBlocksComposer {
   }
 
   private void retrieveStoredData(PluginDataHandlerProvider pluginDataHandlerProvider) {
-    for (Method method : pluginDataHandlerProvider.getClass().getDeclaredMethods()) {
-      method.setAccessible(true);
-      try {
-        String methodName = method.getName();
-        log.debug("Retrieving stored method {}", methodName);
-        if (!methodName.startsWith("get") || !methodName.endsWith("Scope")) continue;
-        String dataKey = methodName.replaceAll("^get", "");
-        log.debug("Populating data key {}", dataKey);
-        dataDump.add(getAsTitle(dataKey));
-        PluginDataHandler dataHandler =
-            (PluginDataHandler) method.invoke(pluginDataHandlerProvider);
-        try {
-          dataDump.add(prettyStringifyMap(dataHandler.getAllValues()) + "\n");
-        } catch (Exception e) {
-          log.warn("Exception while retrieving data", e);
-        }
-      } catch (Exception e) {
-        log.error("Error while invoking method: {}", method.getName(), e);
-        throw new RuntimeException("Error while retrieving stored data", e);
+    addStoredData("GlobalScope", pluginDataHandlerProvider.getGlobalScope(), false);
+    addStoredData("ProjectScope", pluginDataHandlerProvider.getProjectScope(), false);
+    addStoredData("ChangeScope", pluginDataHandlerProvider.getChangeScope(), true);
+  }
+
+  private void addStoredData(
+      String dataKey, PluginDataHandler dataHandler, boolean omitRequestStatuses) {
+    log.debug("Populating data key {}", dataKey);
+    dataDump.add(getAsTitle(dataKey));
+    try {
+      Map<String, String> values = new HashMap<>(dataHandler.getAllValues());
+      if (omitRequestStatuses) {
+        // Response bodies can contain earlier /show output, which would recursively reproduce
+        // entire debug panels inside the Change Scope dump.
+        values.remove(KEY_REQUEST_STATUSES);
       }
+      dataDump.add(prettyStringifyMap(values) + "\n");
+    } catch (Exception e) {
+      log.warn("Exception while retrieving data", e);
     }
   }
 }
