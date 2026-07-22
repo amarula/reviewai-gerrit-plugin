@@ -913,9 +913,15 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     when(pluginDataHandlerProvider.getGlobalScope()).thenReturn(globalHandler);
     PluginDataHandler projectHandler = provider.getProjectScope();
     when(pluginDataHandlerProvider.getProjectScope()).thenReturn(projectHandler);
+    PluginDataHandler changeHandler = getChangeDataHandler();
 
     globalHandler.setValue("configKey1", "configValue1");
     globalHandler.setValue("configKey2", "{\"configSubKey\": \"configSubValue\"}");
+    changeHandler.setValue("changeKey1", "changeValue1");
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(changeHandler);
+    statusStore.pending("request-1", "/show --config");
+    statusStore.completed("request-1", readTestFile("__files/commands/dumpConfig.txt"));
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 

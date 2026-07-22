@@ -27,7 +27,7 @@ public class ReviewAgentRequestStatusStore {
   public static final String STATUS_COMPLETED = "completed";
   public static final String STATUS_FAILED = "failed";
 
-  private static final String KEY_REQUEST_STATUSES = "reviewAgentRequestStatuses";
+  public static final String KEY_REQUEST_STATUSES = "reviewAgentRequestStatuses";
   private static final Type STATUSES_TYPE =
       new TypeToken<Map<String, RequestStatus>>() {}.getType();
 
