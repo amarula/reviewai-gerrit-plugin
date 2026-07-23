@@ -21,6 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.logging.LogArg;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -47,6 +48,7 @@ class LangChainExecutor {
   private final List<ToolSpecification> onDemandTools;
   private final boolean requireInitialToolUse;
   private final GitRepoFiles gitRepoFiles;
+  private final AiCostTracker costTracker;
 
   AiMessage execute(ChatModel model, GerritChange change, ChatMemory memory) {
     log.debug(
@@ -60,6 +62,7 @@ class LangChainExecutor {
     ChatRequest initialRequest = buildChatRequest(requestMessages, getInitialToolChoice());
     log.debug("Sending initial LangChain chat request: {}", LogArg.truncated(initialRequest));
     ChatResponse response = AiModelRequestLimiter.chat(config, model, initialRequest);
+    recordCost(response);
     AiMessage aiMessage = response != null ? response.aiMessage() : null;
     logAiMessageToolRequests("initial", aiMessage);
     int maxToolResponseRounds = config.getAiMaxToolResponseRounds();
@@ -99,6 +102,7 @@ class LangChainExecutor {
       response =
           AiModelRequestLimiter.chat(
               config, model, buildChatRequest(requestMessages, ToolChoice.AUTO));
+      recordCost(response);
       aiMessage = response != null ? response.aiMessage() : null;
       logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);
     }
@@ -117,6 +121,12 @@ class LangChainExecutor {
         aiMessage != null,
         aiMessage != null && aiMessage.hasToolExecutionRequests());
     return aiMessage;
+  }
+
+  private void recordCost(ChatResponse response) {
+    if (costTracker != null) {
+      costTracker.record(response);
+    }
   }
 
   private ChatRequest buildChatRequest(List<ChatMessage> messages, ToolChoice toolChoice) {
