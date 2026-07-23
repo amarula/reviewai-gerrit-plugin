@@ -37,6 +37,8 @@ public class ReviewAiMetrics {
   private final Timer2<String, String> reviewRunLatency;
   private final Counter3<String, String, String> aiRequestCount;
   private final Timer3<String, String, String> aiRequestLatency;
+  private final Counter2<String, String> aiEstimatedCostNanoUsd;
+  private final Counter2<String, String> aiPricingMissing;
 
   @Inject
   public ReviewAiMetrics(MetricMaker metricMaker) {
@@ -91,6 +93,22 @@ public class ReviewAiMetrics {
             providerField,
             modelField,
             stageField);
+    aiEstimatedCostNanoUsd =
+        metricMaker.newCounter(
+            "reviewai/ai_request/estimated_cost_nanousd",
+            new Description("Estimated ReviewAI provider cost")
+                .setCumulative()
+                .setUnit("nanoUSD"),
+            providerField,
+            modelField);
+    aiPricingMissing =
+        metricMaker.newCounter(
+            "reviewai/ai_request/pricing_missing",
+            new Description("ReviewAI responses without configured model pricing")
+                .setRate()
+                .setUnit("responses"),
+            providerField,
+            modelField);
   }
 
   @VisibleForTesting
@@ -99,6 +117,8 @@ public class ReviewAiMetrics {
     reviewRunLatency = null;
     aiRequestCount = null;
     aiRequestLatency = null;
+    aiEstimatedCostNanoUsd = null;
+    aiPricingMissing = null;
   }
 
   public MetricTimer startReviewRun(String eventType) {
@@ -127,6 +147,18 @@ public class ReviewAiMetrics {
     }
     aiRequestCount.increment(label(provider), label(stage), label(status));
     aiRequestLatency.record(label(provider), label(model), label(stage), elapsedNanos, TimeUnit.NANOSECONDS);
+  }
+
+  public void recordAiEstimatedCostNanoUsd(String provider, String model, long nanoUsd) {
+    if (aiEstimatedCostNanoUsd != null) {
+      aiEstimatedCostNanoUsd.incrementBy(label(provider), label(model), nanoUsd);
+    }
+  }
+
+  public void recordAiPricingMissing(String provider, String model) {
+    if (aiPricingMissing != null) {
+      aiPricingMissing.increment(label(provider), label(model));
+    }
   }
 
   private static String label(String value) {

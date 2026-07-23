@@ -50,6 +50,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -95,6 +96,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
   protected final ReviewAiMetrics metrics;
+  protected final AiCostTracker costTracker;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
   private final ResponseFormat specializedRepliesResponseFormat;
@@ -163,6 +165,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
     this.metrics = metrics == null ? new ReviewAiMetrics() : metrics;
+    this.costTracker = new AiCostTracker(config, metrics);
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -204,7 +207,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         getProviderResponseFormat(config, contextTools, structuredResponseFormat);
     this.toolExecutor =
         new LangChainExecutor(
-            config, toolExecutorResponseFormat, contextTools, requireInitialToolUse, gitRepoFiles);
+            config,
+            toolExecutorResponseFormat,
+            contextTools,
+            requireInitialToolUse,
+            gitRepoFiles,
+            costTracker);
     ResponseFormat specializedToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
     this.specializedRepliesToolExecutor =
@@ -213,7 +221,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             specializedToolExecutorResponseFormat,
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     ResponseFormat specializedTriageToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedTriageResponseFormat);
     this.specializedTriageToolExecutor =
@@ -222,14 +231,16 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             specializedTriageToolExecutorResponseFormat,
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     this.specializedConsolidationToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(config, contextTools, specializedConsolidationResponseFormat),
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     this.specializedHistoricalRepetitionToolExecutor =
         new LangChainExecutor(
             config,
@@ -237,7 +248,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
                 config, contextTools, specializedHistoricalRepetitionResponseFormat),
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     this.specializedConflictResolutionToolExecutor =
         new LangChainExecutor(
             config,
@@ -245,14 +257,16 @@ public class LangChainClient extends AiClientBase implements IAiClient {
                 config, contextTools, specializedConflictResolutionResponseFormat),
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     this.specializedVerificationToolExecutor =
         new LangChainExecutor(
             config,
             getProviderResponseFormat(config, contextTools, specializedVerificationResponseFormat),
             contextTools,
             requireInitialToolUse,
-            gitRepoFiles);
+            gitRepoFiles,
+            costTracker);
     log.debug("Initialized LangChainClient");
   }
 
@@ -651,7 +665,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         getProviderResponseFormat(config, contextTools, responseFormat),
         contextTools,
         requireInitialToolUse,
-        gitRepoFiles);
+        gitRepoFiles,
+        costTracker);
   }
 
   private ResponseFormat getProviderResponseFormat(
