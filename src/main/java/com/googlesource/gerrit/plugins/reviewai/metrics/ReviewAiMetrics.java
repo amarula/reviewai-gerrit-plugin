@@ -26,6 +26,7 @@ import com.google.gerrit.metrics.Timer2;
 import com.google.gerrit.metrics.Timer3;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +38,8 @@ public class ReviewAiMetrics {
   private final Timer2<String, String> reviewRunLatency;
   private final Counter3<String, String, String> aiRequestCount;
   private final Timer3<String, String, String> aiRequestLatency;
+  private final Counter2<String, String> aiEstimatedCostNanoUsd;
+  private final Counter2<String, String> aiPricingMissing;
 
   @Inject
   public ReviewAiMetrics(MetricMaker metricMaker) {
@@ -91,6 +94,22 @@ public class ReviewAiMetrics {
             providerField,
             modelField,
             stageField);
+    aiEstimatedCostNanoUsd =
+        metricMaker.newCounter(
+            "reviewai/ai_request/estimated_cost_nanousd",
+            new Description("Estimated ReviewAI provider cost")
+                .setCumulative()
+                .setUnit("nanoUSD"),
+            providerField,
+            modelField);
+    aiPricingMissing =
+        metricMaker.newCounter(
+            "reviewai/ai_request/pricing_missing",
+            new Description("ReviewAI responses without configured model pricing")
+                .setRate()
+                .setUnit("responses"),
+            providerField,
+            modelField);
   }
 
   @VisibleForTesting
@@ -99,6 +118,8 @@ public class ReviewAiMetrics {
     reviewRunLatency = null;
     aiRequestCount = null;
     aiRequestLatency = null;
+    aiEstimatedCostNanoUsd = null;
+    aiPricingMissing = null;
   }
 
   public MetricTimer startReviewRun(String eventType) {
@@ -106,10 +127,12 @@ public class ReviewAiMetrics {
         (status, elapsedNanos) -> recordReviewRun(eventType, status, elapsedNanos));
   }
 
-  public MetricTimer startAiRequest(Enum<?> provider, String model, Enum<?> stage) {
+  public MetricTimer startAiRequest(
+      Enum<?> provider, String model, Enum<?> stage, String specializedAgentName) {
+    String stageLabel = aiRequestStageLabel(stage, specializedAgentName);
     return new MetricTimer(
         (status, elapsedNanos) ->
-            recordAiRequest(provider, model, stage, status, elapsedNanos));
+            recordAiRequest(provider, model, stageLabel, status, elapsedNanos));
   }
 
   private void recordReviewRun(String eventType, String status, long elapsedNanos) {
@@ -121,12 +144,24 @@ public class ReviewAiMetrics {
   }
 
   private void recordAiRequest(
-      Enum<?> provider, String model, Enum<?> stage, String status, long elapsedNanos) {
+      Enum<?> provider, String model, String stage, String status, long elapsedNanos) {
     if (aiRequestCount == null || aiRequestLatency == null) {
       return;
     }
     aiRequestCount.increment(label(provider), label(stage), label(status));
     aiRequestLatency.record(label(provider), label(model), label(stage), elapsedNanos, TimeUnit.NANOSECONDS);
+  }
+
+  public void recordAiEstimatedCostNanoUsd(String provider, String model, long nanoUsd) {
+    if (aiEstimatedCostNanoUsd != null) {
+      aiEstimatedCostNanoUsd.incrementBy(label(provider), label(model), nanoUsd);
+    }
+  }
+
+  public void recordAiPricingMissing(String provider, String model) {
+    if (aiPricingMissing != null) {
+      aiPricingMissing.increment(label(provider), label(model));
+    }
   }
 
   private static String label(String value) {
@@ -135,6 +170,17 @@ public class ReviewAiMetrics {
 
   private static String label(Enum<?> value) {
     return value == null ? UNKNOWN_VALUE : value.name();
+  }
+
+  @VisibleForTesting
+  static String aiRequestStageLabel(Enum<?> stage, String specializedAgentName) {
+    String stageLabel = label(stage);
+    if (!ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT.name().equals(stageLabel)
+        || specializedAgentName == null
+        || specializedAgentName.isBlank()) {
+      return stageLabel;
+    }
+    return stageLabel + "_" + specializedAgentName.trim();
   }
 
   @FunctionalInterface

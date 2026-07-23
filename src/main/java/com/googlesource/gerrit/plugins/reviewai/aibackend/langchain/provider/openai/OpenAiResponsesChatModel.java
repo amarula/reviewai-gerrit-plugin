@@ -35,6 +35,7 @@ import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.ResponseUsage;
 import com.openai.models.responses.ToolChoiceOptions;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -367,8 +368,28 @@ public class OpenAiResponsesChatModel implements ChatModel {
   }
 
   private TokenUsage toTokenUsage(ResponseUsage usage) {
-    return new TokenUsage(
-        toInteger(usage.inputTokens()), toInteger(usage.outputTokens()), toInteger(usage.totalTokens()));
+    ResponseUsage.InputTokensDetails inputDetails =
+        usage._inputTokensDetails().asKnown().orElse(null);
+    return new DetailedTokenUsage(
+        toInteger(usage.inputTokens()),
+        toInteger(usage.outputTokens()),
+        toInteger(usage.totalTokens()),
+        cachedTokenCount(inputDetails),
+        additionalTokenCount(inputDetails, "cache_write_tokens"));
+  }
+
+  private Integer cachedTokenCount(ResponseUsage.InputTokensDetails inputDetails) {
+    return inputDetails == null
+        ? null
+        : inputDetails._cachedTokens().asKnown().map(value -> toInteger(value)).orElse(null);
+  }
+
+  private Integer additionalTokenCount(
+      ResponseUsage.InputTokensDetails inputDetails, String fieldName) {
+    JsonValue value =
+        inputDetails == null ? null : inputDetails._additionalProperties().get(fieldName);
+    Object number = value == null ? null : value.asNumber().orElse(null);
+    return number instanceof Number tokenCount ? toInteger(tokenCount.longValue()) : null;
   }
 
   private Integer toInteger(long value) {

@@ -24,6 +24,15 @@ import org.junit.Test;
 
 public class JsonUtilsTest {
   @Test
+  public void readsTypedJsonResource() {
+    JsonResource resource =
+        JsonUtils.readJsonResource("utils/jsonUtilsTest.json", JsonResource.class);
+
+    assertEquals("pricing", resource.name);
+    assertEquals(18, resource.count);
+  }
+
+  @Test
   public void parsesJsonObjectEmbeddedInText() {
     JsonObject object =
         JsonUtils.parseJsonObjectFromText(
@@ -47,5 +56,10 @@ public class JsonUtilsTest {
   public void returnsNullWhenTextDoesNotContainJsonObject() {
     assertNull(
         JsonUtils.parseJsonObjectFromText("java.net.SocketTimeoutException: Read timed out"));
+  }
+
+  private static final class JsonResource {
+    private String name;
+    private int count;
   }
 }
