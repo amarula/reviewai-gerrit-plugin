@@ -323,6 +323,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
 
     try {
       ChatResponse response = AiModelRequestLimiter.chat(config, model, memory.messages());
+      costTracker.record(response);
       AiMessage aiMessage = response == null ? null : response.aiMessage();
       if (aiMessage != null) {
         memory.add(aiMessage);
