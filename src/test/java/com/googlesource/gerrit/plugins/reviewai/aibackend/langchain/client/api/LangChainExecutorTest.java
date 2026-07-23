@@ -23,7 +23,11 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -37,6 +41,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.output.TokenUsage;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -81,7 +86,8 @@ public class LangChainExecutorTest {
                 null,
                 List.of(treeToolSpecification()),
                 true,
-                gitRepoFiles)
+                gitRepoFiles,
+                null)
             .execute(model, change, memory);
 
     assertEquals("done", result.text());
@@ -91,6 +97,42 @@ public class LangChainExecutorTest {
     assertTrue(hasToolRequest(continuationMessages, "call_2"));
     assertTrue(hasToolResult(continuationMessages, "call_1", compressedTreeOutput));
     assertTrue(hasToolResult(continuationMessages, "call_2", compressedTreeOutput));
+  }
+
+  @Test
+  public void recordsCostForInitialAndContinuationRequests() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiMaxToolResponseRounds()).thenReturn(3);
+    when(config.getSelectedAiModelRoute())
+        .thenReturn(new AiModelRoute(AiProviderType.OPENAI, "gpt-4.1"));
+
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("project~branch~change");
+    GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
+    when(gitRepoFiles.getFileTree(config, change, null)).thenReturn(List.of());
+    RecordingMetrics metrics = new RecordingMetrics();
+    RecordingChatModel model =
+        new RecordingChatModel(
+            new TokenUsage(10, 2),
+            AiMessage.from(List.of(toolRequest("call_1"))),
+            AiMessage.from("done"));
+    ChatMemory memory =
+        TokenWindowChatMemory.builder()
+            .id("review")
+            .maxTokens(1000, new TestTokenCountEstimator())
+            .build();
+    memory.add(UserMessage.from("review"));
+
+    new LangChainExecutor(
+            config,
+            null,
+            List.of(treeToolSpecification()),
+            true,
+            gitRepoFiles,
+            new AiCostTracker(config, metrics))
+        .execute(model, change, memory);
+
+    assertEquals(72_000L, metrics.nanoUsd);
   }
 
   private static ToolExecutionRequest toolRequest(String id) {
@@ -130,15 +172,33 @@ public class LangChainExecutorTest {
   private static class RecordingChatModel implements ChatModel {
     private final List<AiMessage> responses;
     private final List<ChatRequest> requests = new ArrayList<>();
+    private final TokenUsage tokenUsage;
 
     private RecordingChatModel(AiMessage... responses) {
+      this(null, responses);
+    }
+
+    private RecordingChatModel(TokenUsage tokenUsage, AiMessage... responses) {
       this.responses = List.of(responses);
+      this.tokenUsage = tokenUsage;
     }
 
     @Override
     public ChatResponse chat(ChatRequest request) {
       requests.add(request);
-      return ChatResponse.builder().aiMessage(responses.get(requests.size() - 1)).build();
+      return ChatResponse.builder()
+          .aiMessage(responses.get(requests.size() - 1))
+          .tokenUsage(tokenUsage)
+          .build();
+    }
+  }
+
+  private static class RecordingMetrics extends ReviewAiMetrics {
+    private long nanoUsd;
+
+    @Override
+    public void recordAiEstimatedCostNanoUsd(String provider, String model, long nanoUsd) {
+      this.nanoUsd += nanoUsd;
     }
   }
 

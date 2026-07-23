@@ -23,6 +23,8 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,14 @@ public class JsonUtils extends TextUtils {
   private static final Pattern JSON_OBJECT = Pattern.compile("^\\{.*\\}$", Pattern.DOTALL);
   private static final Pattern JSON_COMPLEX_VALUE =
       Pattern.compile(patternJoinAlternation(JSON_ARRAY, JSON_OBJECT), Pattern.DOTALL);
+
+  public static <T> T readJsonResource(String filename, Class<T> type) {
+    try (InputStreamReader reader = FileUtils.getInputStreamReader(filename)) {
+      return getGson().fromJson(reader, type);
+    } catch (IOException | JsonSyntaxException e) {
+      throw new IllegalStateException("Unable to read JSON resource: " + filename, e);
+    }
+  }
 
   public static String unwrapJsonCode(String text) {
     return JSON_DELIMITED.matcher(normalizeJsonText(text)).replaceAll("$1").strip();

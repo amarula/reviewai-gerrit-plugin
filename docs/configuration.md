@@ -21,6 +21,7 @@ as follows:
     aiModels = OpenAI/gpt-5.2
     aiModels = MoonShot/moonshot-v1-8k
     aiModelsDefault = OpenAI/gpt-5.2
+    aiPricing = OpenAI/custom-model,input=1.00,cachedInput=0.10,output=5.00
     aiAdministratorsGroup = Administrators
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
@@ -49,6 +50,7 @@ To add the following content, please edit the `project.config` file in `refs/met
     # Optional parameters
     aiProviders = {providerRoute}
     aiModels = {providerModelRoute}
+    aiPricing = {providerModelPricing}
     aiSystemPromptInstructions = {aiSystemPromptInstructions}
     ...
 ```
@@ -99,6 +101,45 @@ Ollama does not require an `aiTokens` entry. A bare model can also be configured
 configured token-backed provider identifies the bare model route, the plugin guesses `Ollama/llama3.2`. If a bare model
 matches a configured or default model for a token-backed provider that has a token, that provider route is used.
 
+## AI Pricing Overrides
+
+`aiPricing` overrides a built-in price or adds pricing for a custom model route used by estimated-cost telemetry. It is
+a repeatable setting with one entry per exact provider/model route. All prices are in USD per one million tokens:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiPricing = <Provider>/<model>,input=<price>,output=<price>[,cachedInput=<price>][,cacheWrite=<price>][,longThreshold=<tokens>,longInput=<price>,longCachedInput=<price>,longCacheWrite=<price>,longOutput=<price>]
+```
+
+| Field | Required | Meaning and default |
+| --- | --- | --- |
+| `input` | Yes | Regular input-token price. |
+| `output` | Yes | Output-token price. |
+| `cachedInput` | No | Cached-input price; defaults to `input`. |
+| `cacheWrite` | No | Cache-write price; defaults to `input`. |
+| `longThreshold` | No | Positive input-token boundary above which long-context prices apply. |
+| `longInput` | No | Long-context input price; defaults to `input`. |
+| `longCachedInput` | No | Long-context cached-input price; defaults to `cachedInput`. |
+| `longCacheWrite` | No | Long-context cache-write price; defaults to `longInput`. |
+| `longOutput` | No | Long-context output price; defaults to `output`. |
+
+For example, the following entry adds a custom route with cache and long-context pricing:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiModels = OpenAI/custom-model
+    aiPricing = OpenAI/custom-model,input=1.00,cachedInput=0.10,cacheWrite=1.25,output=5.00,longThreshold=200000,longInput=2.00,longCachedInput=0.20,longCacheWrite=2.50,longOutput=7.50
+```
+
+The route is matched exactly. For example, pricing for `OpenAI/gpt-5.4` is not automatically applied to
+`OpenAI/gpt-5.4-2026-06-15`; the snapshot needs its own entry. Prices must be zero or positive. An invalid entry is
+ignored and logged, leaving any valid built-in price unchanged.
+
+Entries from `gerrit.config` and a project's `project.config` are combined. If both scopes define the same route, the
+project entry is applied last and takes precedence. Ollama and mock routes are excluded from cost tracking. See
+[Telemetry](telemetry.md#cost-calculation) for the built-in catalog, calculation rules, and exported cost
+metrics.
+
 ## Optional Parameters
 
 - `aiProviders`: Selects provider routes to expose. The default value is `OpenAI`.
@@ -107,6 +148,8 @@ matches a configured or default model for a token-backed provider that has a tok
 - `aiModelsDefault`: Selects the default model by provider/model route, such as `OpenAI/gpt-5.4`. This model is used
   for automatic Patch Set reviews and as the initial Review Agent dropdown value when no model has been selected yet.
   If unset or not found in the expanded `aiModels` list, the first available provider/model route is used.
+- `aiPricing`: Repeatable exact provider/model pricing override used by estimated-cost telemetry. See
+  [AI Pricing Overrides](#ai-pricing-overrides).
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `DeepSeek/{token}`,
   `MoonShot/{token}`, and so on. Ollama does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider. By default, it uses the provider’s standard domain:
