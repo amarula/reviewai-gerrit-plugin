@@ -108,6 +108,7 @@ public class Configuration extends ConfigCore {
   public static final String KEY_SELECTIVE_LOG_LEVEL_OVERRIDE = "selectiveLogLevelOverride";
   public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
   public static final String KEY_AI_ADMINISTRATORS_GROUP = "aiAdministratorsGroup";
+  public static final String KEY_AI_PRICING = "aiPricing";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -116,7 +117,8 @@ public class Configuration extends ConfigCore {
           KEY_SELECTIVE_LOG_LEVEL_OVERRIDE,
           KEY_AI_PROVIDER,
           KEY_AI_MODELS,
-          KEY_AI_TOKENS);
+          KEY_AI_TOKENS,
+          KEY_AI_PRICING);
 
   private static final String KEY_AI_DOMAIN = AiProviderConfiguration.KEY_AI_DOMAIN;
   private static final String KEY_REVIEW_COMMIT_MESSAGES = "aiReviewCommitMessages";
@@ -200,6 +202,10 @@ public class Configuration extends ConfigCore {
 
   public String getAiModelsDefault() {
     return aiProviderConfiguration.getAiModelsDefault();
+  }
+
+  public List<String> getAiPricing() {
+    return splitListIntoItems(KEY_AI_PRICING, List.of());
   }
 
   public AiModelRoute getSelectedAiModelRoute() {

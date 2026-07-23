@@ -100,6 +100,16 @@ public class StringUtils {
     return str.length() <= length ? str : str.substring(0, length) + "...";
   }
 
+  public static String stripQuotes(String value) {
+    if (value == null) {
+      return "";
+    }
+    String stripped = value.trim();
+    return stripped.length() >= 2 && stripped.startsWith("\"") && stripped.endsWith("\"")
+        ? stripped.substring(1, stripped.length() - 1)
+        : stripped;
+  }
+
   public static String valueOrUnknown(String value) {
     return value == null || value.isBlank() ? "unknown" : value;
   }
