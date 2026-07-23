@@ -15,6 +15,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -40,6 +41,8 @@ import org.mockito.Mockito;
 public class OpenAiLangChainProviderTest {
   private static final String OPENAI_RESPONSES_SUCCESS_RESOURCE =
       "__files/langchain/openAiResponsesSuccess.json";
+  private static final String OPENAI_RESPONSES_USAGE_WITHOUT_DETAILS_RESOURCE =
+      "__files/langchain/openAiResponsesUsageWithoutDetails.json";
 
   @Rule public WireMockRule wireMockRule = new WireMockRule(0);
 
@@ -72,6 +75,10 @@ public class OpenAiLangChainProviderTest {
 
     assertTrue(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
     assertEquals("ok", response.aiMessage().text());
+    assertTrue(response.tokenUsage() instanceof DetailedTokenUsage);
+    DetailedTokenUsage tokenUsage = (DetailedTokenUsage) response.tokenUsage();
+    assertEquals(Integer.valueOf(1), tokenUsage.cachedInputTokenCount());
+    assertEquals(Integer.valueOf(2), tokenUsage.cacheWriteTokenCount());
     WireMock.verify(
         1,
         postRequestedFor(urlEqualTo("/v1/responses"))
@@ -79,6 +86,35 @@ public class OpenAiLangChainProviderTest {
             .withRequestBody(matchingJsonPath("$.instructions", equalTo("review instructions")))
             .withRequestBody(matchingJsonPath("$.input[0].role", equalTo("user"))));
     WireMock.verify(0, postRequestedFor(urlEqualTo("/v1/chat/completions")));
+  }
+
+  @Test
+  public void acceptsUsageWithoutOptionalInputTokenDetails() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(config.getAiConnectionTimeout()).thenReturn(5);
+    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(responseBody(OPENAI_RESPONSES_USAGE_WITHOUT_DETAILS_RESOURCE))));
+
+    ChatResponse response =
+        provider
+            .buildChatModel(config, 0.0)
+            .getModel()
+            .chat(ChatRequest.builder().messages(UserMessage.from("Say ok")).build());
+
+    assertEquals("ok", response.aiMessage().text());
+    assertTrue(response.tokenUsage() instanceof DetailedTokenUsage);
+    DetailedTokenUsage tokenUsage = (DetailedTokenUsage) response.tokenUsage();
+    assertEquals(Integer.valueOf(4), tokenUsage.inputTokenCount());
+    assertNull(tokenUsage.cachedInputTokenCount());
+    assertNull(tokenUsage.cacheWriteTokenCount());
   }
 
   @Test
@@ -193,18 +229,20 @@ public class OpenAiLangChainProviderTest {
   }
 
   private static String successfulResponseBody() {
+    return responseBody(OPENAI_RESPONSES_SUCCESS_RESOURCE);
+  }
+
+  private static String responseBody(String resource) {
     try (InputStream inputStream =
         OpenAiLangChainProviderTest.class
             .getClassLoader()
-            .getResourceAsStream(OPENAI_RESPONSES_SUCCESS_RESOURCE)) {
+            .getResourceAsStream(resource)) {
       if (inputStream == null) {
-        throw new IllegalStateException(
-            "Missing test resource: " + OPENAI_RESPONSES_SUCCESS_RESOURCE);
+        throw new IllegalStateException("Missing test resource: " + resource);
       }
       return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
     } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to read test resource: " + OPENAI_RESPONSES_SUCCESS_RESOURCE, e);
+      throw new RuntimeException("Failed to read test resource: " + resource, e);
     }
   }
 }
