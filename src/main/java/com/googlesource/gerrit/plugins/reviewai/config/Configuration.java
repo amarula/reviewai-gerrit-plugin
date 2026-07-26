@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -97,6 +98,8 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_OLLAMA_THINK = false;
   private static final String DEFAULT_MOCK_AI_ADDRESS = DEFAULT_EMPTY_SETTING;
   private static final List<String> DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE = new ArrayList<>();
+  private static final List<String> DEFAULT_AI_REQUIRED_LABELS_TO_START_REVIEW = new ArrayList<>();
+  private static final String DEFAULT_AI_REQUIRED_LABELS_STRATEGY = "ALL";
 
   // Config setting keys
   public static final String KEY_AI_SYSTEM_PROMPT_INSTRUCTIONS = "aiSystemPromptInstructions";
@@ -108,6 +111,8 @@ public class Configuration extends ConfigCore {
   public static final String KEY_SELECTIVE_LOG_LEVEL_OVERRIDE = "selectiveLogLevelOverride";
   public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
   public static final String KEY_AI_ADMINISTRATORS_GROUP = "aiAdministratorsGroup";
+  public static final String KEY_AI_REQUIRED_LABELS_TO_START_REVIEW = "aiRequiredLabelsToStartReview";
+  public static final String KEY_AI_REQUIRED_LABELS_STRATEGY = "aiRequiredLabelsStrategy";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -116,7 +121,8 @@ public class Configuration extends ConfigCore {
           KEY_SELECTIVE_LOG_LEVEL_OVERRIDE,
           KEY_AI_PROVIDER,
           KEY_AI_MODELS,
-          KEY_AI_TOKENS);
+          KEY_AI_TOKENS,
+          KEY_AI_REQUIRED_LABELS_TO_START_REVIEW);
 
   private static final String KEY_AI_DOMAIN = AiProviderConfiguration.KEY_AI_DOMAIN;
   private static final String KEY_REVIEW_COMMIT_MESSAGES = "aiReviewCommitMessages";
@@ -431,6 +437,31 @@ public class Configuration extends ConfigCore {
   public List<String> getSelectiveLogLevelOverride() {
     return splitListIntoItems(
         KEY_SELECTIVE_LOG_LEVEL_OVERRIDE, DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE);
+  }
+
+  public List<LabelRequirement> getAiRequiredLabelsToStartReview() {
+    List<String> raw =
+        splitListIntoItems(
+            KEY_AI_REQUIRED_LABELS_TO_START_REVIEW,
+            DEFAULT_AI_REQUIRED_LABELS_TO_START_REVIEW);
+    return raw.stream()
+        .map(
+            entry -> {
+              try {
+                return LabelRequirement.parse(entry);
+              } catch (IllegalArgumentException e) {
+                return null;
+              }
+            })
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  public LabelRequirement.Strategy getAiRequiredLabelsStrategy() {
+    return getEnum(
+        KEY_AI_REQUIRED_LABELS_STRATEGY,
+        DEFAULT_AI_REQUIRED_LABELS_STRATEGY,
+        LabelRequirement.Strategy.class);
   }
 
   public boolean isDefinedKey(String key) {
