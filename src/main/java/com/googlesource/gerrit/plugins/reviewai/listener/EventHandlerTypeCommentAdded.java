@@ -16,15 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.LabelRequirement;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.google.gerrit.server.data.ApprovalAttribute;
+import com.google.gerrit.server.events.CommentAddedEvent;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 public class EventHandlerTypeCommentAdded implements IEventHandlerType {
+  private final Configuration config;
   private final ChangeSetData changeSetData;
   private final GerritChange change;
   private final PatchSetReviewer reviewer;
@@ -32,11 +41,13 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   private final boolean administratorUser;
 
   EventHandlerTypeCommentAdded(
+      Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       PatchSetReviewer reviewer,
       GerritClient gerritClient,
       boolean administratorUser) {
+    this.config = config;
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -52,6 +63,60 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     log.debug(
         "Starting preprocessing event for comment added on change ID: {}",
         change.getFullChangeId());
+
+    // Check if this event carries label votes that satisfy required labels for review
+    List<LabelRequirement> requiredLabels = config.getAiRequiredLabelsToStartReview();
+    if (!requiredLabels.isEmpty()) {
+      CommentAddedEvent commentEvent = (CommentAddedEvent) change.getPatchSetEvent();
+      ApprovalAttribute[] eventApprovals = null;
+      try {
+        eventApprovals =
+            commentEvent.approvals != null ? commentEvent.approvals.get() : null;
+      } catch (Exception e) {
+        log.debug(
+            "Could not read event approvals for change {}: {}",
+            change.getFullChangeId(),
+            e.getMessage());
+      }
+
+      if (eventApprovals != null && eventApprovals.length > 0) {
+        boolean relevantLabelChanged =
+            Arrays.stream(eventApprovals)
+                .anyMatch(
+                    a ->
+                        requiredLabels.stream()
+                            .anyMatch(r -> r.getLabelName().equals(a.type)));
+
+        if (relevantLabelChanged) {
+          Integer existingAiVote = gerritClient.getCodeReviewValue(change);
+          if (existingAiVote != null) {
+            log.debug(
+                "AI already reviewed change {} (existing Code-Review vote: {}), skipping",
+                change.getFullChangeId(),
+                existingAiVote);
+          } else {
+            Map<String, Short> currentApprovals = gerritClient.fetchCurrentApprovals(change);
+            if (LabelRequirement.areSatisfied(requiredLabels, currentApprovals)) {
+              log.info(
+                  "All required labels {} satisfied for change {} after label vote. "
+                      + "Current approvals: {}. Triggering review.",
+                  requiredLabels,
+                  change.getFullChangeId(),
+                  currentApprovals);
+              changeSetData.setCurrentApprovals(currentApprovals);
+              changeSetData.setForcedReview(true);
+              return PreprocessResult.SWITCH_TO_PATCH_SET_CREATED;
+            }
+            log.debug(
+                "Required labels {} not yet satisfied for change {}. Current approvals: {}",
+                requiredLabels,
+                change.getFullChangeId(),
+                currentApprovals);
+          }
+        }
+      }
+    }
+
     if (!gerritClient.retrieveLastComments(change, administratorUser)) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());
       if (changeSetData.getForcedReview()) {
