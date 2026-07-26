@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -111,6 +112,13 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .orElseGet(
                     () ->
                         resolveReviewInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS))));
+
+    // Inject current label votes as context when available
+    String labelContext = formatCurrentApprovals();
+    if (!labelContext.isEmpty()) {
+      sections.add(buildSection("Current Change Labels", labelContext));
+    }
+
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
@@ -233,5 +241,32 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .collect(Collectors.toList()),
             RULE_NUMBER_PREFIX,
             COLON_SPACE));
+  }
+
+  /**
+   * Formats the current label votes as context for the AI review prompt.
+   *
+   * @return a formatted string listing label names and their max vote values, or empty string
+   */
+  private String formatCurrentApprovals() {
+    Map<String, Short> approvals = changeSetData.getCurrentApprovals();
+    if (approvals == null || approvals.isEmpty()) {
+      return "";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append(
+        "The following labels have been voted on this change. "
+            + "Use this information when reviewing:\n");
+    for (Map.Entry<String, Short> entry : approvals.entrySet()) {
+      String sign = entry.getValue() >= 0 ? "+" : "";
+      sb.append("- ").append(entry.getKey()).append(": ").append(sign).append(entry.getValue());
+      sb.append("\n");
+    }
+    sb.append(
+        "\nIf a label indicates that the build or tests passed, "
+            + "do not flag build-related or test-related issues that CI would already catch. "
+            + "If a label has a negative vote, you may elaborate on the possible reason.");
+    return sb.toString();
   }
 }
