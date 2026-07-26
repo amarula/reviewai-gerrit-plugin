@@ -19,6 +19,8 @@ aiProviderZdr: false
 aiProviders:
     OpenAI
 aiRelevanceRules:
+aiRequiredLabelsStrategy: ALL
+aiRequiredLabelsToStartReview:
 aiReviewCommitMessages: true
 aiReviewPatchSet: true
 aiReviewTemperature: 0.2
