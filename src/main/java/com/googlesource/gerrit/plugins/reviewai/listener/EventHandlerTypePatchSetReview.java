@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.gerrit.extensions.client.ChangeKind;
 import com.google.gerrit.server.data.PatchSetAttribute;
+import com.googlesource.gerrit.plugins.reviewai.config.LabelRequirement;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
@@ -27,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -71,6 +73,23 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
     }
     gerritClient.retrievePatchSetInfo(change);
     log.debug("Patch set information retrieved for change ID: {}", change.getFullChangeId());
+    List<LabelRequirement> requiredLabels = config.getAiRequiredLabelsToStartReview();
+    if (!requiredLabels.isEmpty()) {
+      Map<String, Short> currentApprovals = gerritClient.fetchCurrentApprovals(change);
+      if (!LabelRequirement.areSatisfied(requiredLabels, currentApprovals)) {
+        log.debug(
+            "Required labels {} not yet satisfied for change {}. Current approvals: {}",
+            requiredLabels,
+            change.getFullChangeId(),
+            currentApprovals);
+        return PreprocessResult.EXIT;
+      }
+      changeSetData.setCurrentApprovals(currentApprovals);
+      log.debug(
+          "Required labels satisfied for change {}: {}",
+          change.getFullChangeId(),
+          currentApprovals);
+    }
     return PreprocessResult.OK;
   }
 
