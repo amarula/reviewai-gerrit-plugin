@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
@@ -45,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TimeZone;
 
 @Slf4j
@@ -77,12 +75,11 @@ public class GerritClientDetail {
 
   public GerritPermittedVotingRange getPermittedVotingRange(GerritChange change) {
     GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
-    if (gerritPatchSetDetail.getLabels() == null
-        || gerritPatchSetDetail.getLabels().getCodeReview() == null) {
+    if (gerritPatchSetDetail == null || gerritPatchSetDetail.getLabels() == null) {
       return null;
     }
     List<GerritPatchSetDetail.Permission> permissions =
-        gerritPatchSetDetail.getLabels().getCodeReview().getAll();
+        gerritPatchSetDetail.getLabels().getCodeReviewPermissions();
     if (permissions == null) {
       log.debug(
           "No limitations on the AI voting range were detected for change ID: {}",
@@ -103,18 +100,64 @@ public class GerritClientDetail {
   public Integer getCodeReviewValue(GerritChange change) {
     GerritPatchSetDetail gerritPatchSetDetail = loadPatchSetDetail(change);
     if (gerritPatchSetDetail == null
-        || gerritPatchSetDetail.getLabels() == null
-        || gerritPatchSetDetail.getLabels().getCodeReview() == null
-        || gerritPatchSetDetail.getLabels().getCodeReview().getAll() == null) {
+        || gerritPatchSetDetail.getLabels() == null) {
       return null;
     }
-    for (GerritPatchSetDetail.Permission permission :
-        gerritPatchSetDetail.getLabels().getCodeReview().getAll()) {
+    List<GerritPatchSetDetail.Permission> permissions =
+        gerritPatchSetDetail.getLabels().getCodeReviewPermissions();
+    if (permissions == null) {
+      return null;
+    }
+    for (GerritPatchSetDetail.Permission permission : permissions) {
       if (ReviewAiUser.matches(permission.getAccountId(), aiAccountId)) {
         return permission.getValue();
       }
     }
     return null;
+  }
+
+  /**
+   * Fetches the maximum vote per label across all voters for this change.
+   *
+   * <p>Uses the same REST API path as {@link #getReviewDetail(GerritChange)} but iterates
+   * all labels, not just Code-Review. For each label, computes the maximum integer vote
+   * value across all voters. If a label has no votes, it is omitted from the result.
+   *
+   * @param change the Gerrit change
+   * @return map of label name to maximum vote value; empty if no labels are present
+   */
+  public Map<String, Short> fetchCurrentApprovals(GerritChange change) {
+    GerritPatchSetDetail detail = loadPatchSetDetail(change);
+    if (detail == null || detail.getLabels() == null) {
+      return Map.of();
+    }
+
+    Map<String, List<GerritPatchSetDetail.Permission>> allLabels =
+        detail.getLabels().getAllLabels();
+    if (allLabels == null || allLabels.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<String, Short> result = new HashMap<>();
+    for (Entry<String, List<GerritPatchSetDetail.Permission>> entry : allLabels.entrySet()) {
+      String labelName = entry.getKey();
+      List<GerritPatchSetDetail.Permission> permissions = entry.getValue();
+      if (permissions == null || permissions.isEmpty()) {
+        continue;
+      }
+      short maxVote = Short.MIN_VALUE;
+      for (GerritPatchSetDetail.Permission permission : permissions) {
+        if (permission.getValue() != null) {
+          maxVote = (short) Math.max(maxVote, permission.getValue());
+        }
+      }
+      if (maxVote != Short.MIN_VALUE) {
+        result.put(labelName, maxVote);
+      }
+    }
+
+    log.debug("Current approvals for change {}: {}", change.getFullChangeId(), result);
+    return result;
   }
 
   public List<GerritChange> getTopicChanges(GerritChange change) {
@@ -172,16 +215,18 @@ public class GerritClientDetail {
 
       GerritPatchSetDetail detail = new GerritPatchSetDetail();
       detail.setWorkInProgress(info.workInProgress);
-      Optional.ofNullable(info.labels)
-          .map(Map::entrySet)
-          .map(Set::stream)
-          .flatMap(
-              labels ->
-                  labels
-                      .filter(label -> LabelId.CODE_REVIEW.equals(label.getKey()))
-                      .map(GerritClientDetail::toLabels)
-                      .findAny())
-          .ifPresent(detail::setLabels);
+      if (info.labels != null && !info.labels.isEmpty()) {
+        GerritPatchSetDetail.Labels labels = new GerritPatchSetDetail.Labels();
+        Map<String, List<GerritPatchSetDetail.Permission>> allLabels = new HashMap<>();
+        for (Entry<String, LabelInfo> labelEntry : info.labels.entrySet()) {
+          String labelName = labelEntry.getKey();
+          List<GerritPatchSetDetail.Permission> permissions =
+              toPermissions(labelEntry.getValue());
+          allLabels.put(labelName, permissions);
+        }
+        labels.setAllLabels(allLabels);
+        detail.setLabels(labels);
+      }
       Optional.ofNullable(info.messages)
           .map(messages -> messages.stream().map(GerritClientDetail::toComment).collect(toList()))
           .ifPresent(detail::setMessages);
@@ -202,16 +247,10 @@ public class GerritClientDetail {
     return change;
   }
 
-  private static GerritPatchSetDetail.Labels toLabels(Entry<String, LabelInfo> label) {
-    List<GerritPatchSetDetail.Permission> permissions =
-        Optional.ofNullable(label.getValue().all)
-            .map(all -> all.stream().map(GerritClientDetail::toPermission).collect(toList()))
-            .orElse(emptyList());
-    GerritPatchSetDetail.CodeReview codeReview = new GerritPatchSetDetail.CodeReview();
-    codeReview.setAll(permissions);
-    GerritPatchSetDetail.Labels labels = new GerritPatchSetDetail.Labels();
-    labels.setCodeReview(codeReview);
-    return labels;
+  private static List<GerritPatchSetDetail.Permission> toPermissions(LabelInfo labelInfo) {
+    return Optional.ofNullable(labelInfo.all)
+        .map(all -> all.stream().map(GerritClientDetail::toPermission).collect(toList()))
+        .orElse(emptyList());
   }
 
   private static GerritPatchSetDetail.Permission toPermission(ApprovalInfo value) {

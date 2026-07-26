@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -81,5 +82,13 @@ public class GerritClientFacade {
 
   public List<GerritChange> getTopicChanges(GerritChange change) {
     return gerritClientDetail.getTopicChanges(change);
+  }
+
+  public Map<String, Short> fetchCurrentApprovals(GerritChange change) {
+    return gerritClientDetail.fetchCurrentApprovals(change);
+  }
+
+  public Integer getCodeReviewValue(GerritChange change) {
+    return gerritClientDetail.getCodeReviewValue(change);
   }
 }
