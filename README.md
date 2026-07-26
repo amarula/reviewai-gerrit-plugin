@@ -243,6 +243,30 @@ matches a configured or default model for a token-backed provider that has a tok
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
+- `aiRequiredLabelsToStartReview`: Specifies which labels must be present on a change before the AI review is triggered.
+  When set, the plugin will not review a Patch Set until all required labels are satisfied. Each entry uses the syntax
+  `<LabelName>>=<Value>` (e.g. `Verified>=1`). The effective vote for each label is the maximum value across all voters,
+  matching Gerrit's submit-requirement semantics. If unset or empty, the plugin reviews immediately on Patch Set creation
+  (existing behavior). Multiple entries are combined with AND logic.
+
+  Example — wait for CI verification before reviewing:
+
+  ```
+  aiRequiredLabelsToStartReview = Verified>=1
+  ```
+
+  Example — wait for both CI and a human reviewer:
+
+  ```
+  aiRequiredLabelsToStartReview = Verified>=1
+  aiRequiredLabelsToStartReview = Code-Review>=1
+  ```
+
+  **How it works**: On Patch Set creation, the plugin fetches all current label votes via the Gerrit REST API. If the
+  required labels are already satisfied (e.g., CI voted `Verified+1` before upload), the review proceeds immediately.
+  If not, the event is silently skipped. Later, when someone votes a required label, `CommentAddedEvent` carries the
+  approval data and the plugin re-checks: if all requirements are now met and the AI has not already reviewed this
+  patch set, the review is triggered automatically. The label votes are also injected into the AI prompt as context.
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
   administrator-only details with the Development build. If this option is not set, or the configured group does not
   exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
