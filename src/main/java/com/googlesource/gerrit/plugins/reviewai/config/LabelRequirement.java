@@ -16,11 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -35,8 +32,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public final class LabelRequirement {
-  private static final Pattern PARSE_PATTERN =
-      Pattern.compile("^\\s*(.+?)\\s*>=\\s*(-?\\d+)\\s*$");
 
   @Getter private final String labelName;
   @Getter private final int threshold;
@@ -58,35 +53,29 @@ public final class LabelRequirement {
       throw new IllegalArgumentException("Label requirement must not be blank");
     }
 
-    Matcher matcher = PARSE_PATTERN.matcher(configValue);
-    if (!matcher.matches()) {
+    String[] parts = configValue.split(">=", 2);
+    if (parts.length != 2) {
       throw new IllegalArgumentException(
           "Invalid label requirement format: '"
               + configValue
               + "'. Expected format: <LabelName>>=<Value>, e.g. 'Verified>=1'");
     }
 
-    String labelName = matcher.group(1).trim();
-    int threshold = Integer.parseInt(matcher.group(2));
+    String labelName = parts[0].trim();
+    if (labelName.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Label name must not be empty: '" + configValue + "'");
+    }
+
+    int threshold;
+    try {
+      threshold = Integer.parseInt(parts[1].trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Label threshold must be an integer: '" + configValue + "'");
+    }
 
     return new LabelRequirement(labelName, threshold);
-  }
-
-  /**
-   * Parses a comma-separated config value (from dynamic config) into a list of requirements.
-   *
-   * @param configValue comma-separated label requirements, e.g. {@code "Verified>=1, Code-Review>=1"}
-   * @return list of parsed requirements
-   */
-  public static List<LabelRequirement> parseList(String configValue) {
-    if (configValue == null || configValue.isBlank()) {
-      return List.of();
-    }
-    return Arrays.stream(configValue.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .map(LabelRequirement::parse)
-        .toList();
   }
 
   /**
