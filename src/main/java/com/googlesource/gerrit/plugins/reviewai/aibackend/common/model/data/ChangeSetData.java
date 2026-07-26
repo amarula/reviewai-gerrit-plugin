@@ -48,6 +48,9 @@ public class ChangeSetData {
   private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
 
+  // Labels/approvals present on this change at review time
+  private Map<String, Short> currentApprovals;
+
   // Command variables
   private Boolean forcedReview = false;
   private Boolean forcedTopicReview = false;
@@ -131,6 +134,8 @@ public class ChangeSetData {
     copy.setSpecializedAgentReview(specializedAgentReview);
     copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
+    copy.setCurrentApprovals(
+        currentApprovals == null ? null : new HashMap<>(currentApprovals));
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
