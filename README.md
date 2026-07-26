@@ -243,6 +243,45 @@ matches a configured or default model for a token-backed provider that has a tok
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
+- `aiRequiredLabelsToStartReview`: Specifies which labels must be present on a change before the AI review is triggered.
+  When set, the plugin will not review a Patch Set or comment event until all required labels are satisfied. Each entry
+  uses the syntax `<LabelName><operator><Value>`, where `<operator>` is `>=`, `>`, or `=`, and `<Value>` is an integer or
+  the special tokens `MAX`/`MIN` (resolved to the label's configured maximum or minimum). This mirrors Gerrit's
+  submit-requirement `label:Verified=MAX` semantics: the effective vote for each label is the maximum value across all
+  voters. If unset or empty, the plugin reviews immediately on Patch Set creation (existing behavior).
+
+  Example — wait for CI verification before reviewing:
+
+  ```
+  aiRequiredLabelsToStartReview = Verified>=1
+  ```
+
+  Example — wait for both CI and a preliminary human review:
+
+  ```
+  aiRequiredLabelsToStartReview = Verified>=1
+  aiRequiredLabelsToStartReview = Code-Review>=1
+  ```
+
+- `aiRequiredLabelsStrategy`: Controls how multiple `aiRequiredLabelsToStartReview` entries combine. Supported values:
+
+    - `ALL` (default): Every required label must be satisfied.
+    - `ANY`: At least one required label must be satisfied.
+
+  Example — review after either CI passes or a human gives a preliminary +1:
+
+  ```
+  aiRequiredLabelsStrategy = ANY
+  aiRequiredLabelsToStartReview = Verified>=1
+  aiRequiredLabelsToStartReview = Code-Review>=1
+  ```
+
+  **How it works**: On Patch Set creation, the plugin fetches all current label votes via the Gerrit REST API. If the
+  required labels are already satisfied (e.g., CI ran and voted `Verified+1` before the patch was uploaded), the review
+  proceeds immediately. If not, the event is silently skipped. Later, when someone votes on a required label, the
+  `CommentAddedEvent` carries the approval data and the plugin re-checks: if all requirements are now met and the AI
+  has not already reviewed this patch set, the review is triggered automatically. The current label votes are also
+  included in the AI prompt so the model knows the build/test status and can avoid flagging issues CI already caught.
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
   administrator-only details with the Development build. If this option is not set, or the configured group does not
   exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
