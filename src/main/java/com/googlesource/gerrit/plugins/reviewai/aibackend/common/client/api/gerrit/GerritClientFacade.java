@@ -82,4 +82,8 @@ public class GerritClientFacade {
   public List<GerritChange> getTopicChanges(GerritChange change) {
     return gerritClientDetail.getTopicChanges(change);
   }
+
+  public Integer getCodeReviewValue(GerritChange change) {
+    return gerritClientDetail.getCodeReviewValue(change);
+  }
 }
