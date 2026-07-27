@@ -38,6 +38,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   private final GerritClient gerritClient;
   private final boolean administratorUser;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
+  private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
 
   EventHandlerTypePatchSetReview(
       Configuration config,
@@ -46,6 +47,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
       PatchSetReviewer reviewer,
       GerritClient gerritClient,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
+      AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       boolean administratorUser) {
     this.config = config;
     this.changeSetData = changeSetData;
@@ -54,6 +56,7 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
     this.gerritClient = gerritClient;
     this.administratorUser = administratorUser;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
+    this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     log.debug(
         "Initialized EventHandlerTypePatchSetReview for full change ID: {}",
         change.getFullChangeId());
@@ -67,6 +70,9 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
       log.debug(
           "Patch set review is disabled or not applicable for change ID: {}",
           change.getFullChangeId());
+      return PreprocessResult.EXIT;
+    }
+    if (!isReviewApplicable(change)) {
       return PreprocessResult.EXIT;
     }
     gerritClient.retrievePatchSetInfo(change);
@@ -130,11 +136,23 @@ public class EventHandlerTypePatchSetReview implements IEventHandlerType {
   }
 
   private boolean prepareTopicChangeForReview(GerritChange topicChange) {
-    if (!isPatchSetReviewEnabled(topicChange)) {
+    if (!isPatchSetReviewEnabled(topicChange) || !isReviewApplicable(topicChange)) {
       return false;
     }
     gerritClient.retrievePatchSetInfo(topicChange);
     return true;
+  }
+
+  private boolean isReviewApplicable(GerritChange change) {
+    String applicableIf = config.getAiReviewApplicableIf();
+    if (aiReviewApplicabilityChecker.isApplicable(change, applicableIf)) {
+      return true;
+    }
+    log.debug(
+        "AI review applicability expression '{}' is not satisfied for change {}",
+        applicableIf,
+        change.getFullChangeId());
+    return false;
   }
 
   private boolean isPatchSetReviewEnabled(GerritChange change) {
