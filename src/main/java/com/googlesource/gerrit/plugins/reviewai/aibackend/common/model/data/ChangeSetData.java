@@ -47,6 +47,7 @@ public class ChangeSetData {
   private Boolean specializedAgentReview = false;
   private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
+  private Boolean deferredReview = false;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -131,6 +132,7 @@ public class ChangeSetData {
     copy.setSpecializedAgentReview(specializedAgentReview);
     copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
+    copy.setDeferredReview(deferredReview);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
