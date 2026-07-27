@@ -109,6 +109,7 @@ public class Configuration extends ConfigCore {
   public static final String KEY_MOCK_AI_ADDRESS = "mockAiAddress";
   public static final String KEY_AI_ADMINISTRATORS_GROUP = "aiAdministratorsGroup";
   public static final String KEY_AI_PRICING = "aiPricing";
+  public static final String KEY_AI_REVIEW_APPLICABLE_IF = "aiReviewApplicableIf";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -437,6 +438,10 @@ public class Configuration extends ConfigCore {
   public List<String> getSelectiveLogLevelOverride() {
     return splitListIntoItems(
         KEY_SELECTIVE_LOG_LEVEL_OVERRIDE, DEFAULT_SELECTIVE_LOG_LEVEL_OVERRIDE);
+  }
+
+  public String getAiReviewApplicableIf() {
+    return getString(KEY_AI_REVIEW_APPLICABLE_IF, DEFAULT_EMPTY_SETTING).trim();
   }
 
   public boolean isDefinedKey(String key) {
