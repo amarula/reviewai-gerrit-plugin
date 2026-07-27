@@ -74,6 +74,7 @@ public class EventHandlerTask implements Runnable {
   private final AiAdministratorAccess aiAdministratorAccess;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
+  private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   private final ReviewAiMetrics metrics;
 
   private SupportedEvents processing_event_type;
@@ -92,6 +93,7 @@ public class EventHandlerTask implements Runnable {
       AccountCache accountCache,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
+      AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       EventBuildFeatures buildFeatures,
       ReviewAiMetrics metrics) {
     this.changeSetData = changeSetData;
@@ -104,6 +106,7 @@ public class EventHandlerTask implements Runnable {
     this.accountCache = accountCache;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
+    this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
     this.metrics = metrics;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
@@ -192,6 +195,7 @@ public class EventHandlerTask implements Runnable {
               reviewer,
               gerritClient,
               topicPatchSetReviewCoordinator,
+              aiReviewApplicabilityChecker,
               administratorUser);
       case COMMENT_ADDED ->
           new EventHandlerTypeCommentAdded(
