@@ -43,7 +43,8 @@ public class PatchSetReviewConversationRecorder {
   }
 
   void record(GerritChange change, List<ReviewBatch> reviewBatches, Integer reviewScore) {
-    if (!"patchset-created".equals(change.getEventType())) {
+    if (!"patchset-created".equals(change.getEventType())
+        && !Boolean.TRUE.equals(changeSetData.getDeferredReview())) {
       return;
     }
     Optional<Integer> changeNumber = change.getChangeNumber();

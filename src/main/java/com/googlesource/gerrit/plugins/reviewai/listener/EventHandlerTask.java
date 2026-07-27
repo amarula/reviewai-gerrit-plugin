@@ -199,7 +199,13 @@ public class EventHandlerTask implements Runnable {
               administratorUser);
       case COMMENT_ADDED ->
           new EventHandlerTypeCommentAdded(
-              changeSetData, change, reviewer, gerritClient, administratorUser);
+              config,
+              changeSetData,
+              change,
+              reviewer,
+              gerritClient,
+              aiReviewApplicabilityChecker,
+              administratorUser);
     };
   }
 
