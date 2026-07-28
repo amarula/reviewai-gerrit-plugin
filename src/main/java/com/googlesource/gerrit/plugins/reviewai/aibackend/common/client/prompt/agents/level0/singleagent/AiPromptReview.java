@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.AiReviewConditionLabelResolver;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import lombok.extern.slf4j.Slf4j;
@@ -111,6 +112,16 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .orElseGet(
                     () ->
                         resolveReviewInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS))));
+    String applicableIf = config.getAiReviewApplicableIf();
+    if (applicableIf != null && !applicableIf.isBlank()) {
+      sections.add(buildSection("Current AI Review Condition", applicableIf));
+      String conditionLabelValues =
+          AiReviewConditionLabelResolver.formatConditionLabelValues(
+              changeSetData.getConditionLabelValues());
+      if (!conditionLabelValues.isEmpty()) {
+        sections.add(buildSection("Current Values for Condition Labels", conditionLabelValues));
+      }
+    }
     sections.add(
         buildSection(
             DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
