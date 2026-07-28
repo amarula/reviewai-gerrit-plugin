@@ -26,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,6 +49,7 @@ public class ChangeSetData {
   private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
   private Boolean deferredReview = false;
+  private Map<String, List<Short>> conditionLabelValues;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -133,6 +135,12 @@ public class ChangeSetData {
     copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
     copy.setDeferredReview(deferredReview);
+    if (conditionLabelValues != null) {
+      Map<String, List<Short>> copiedLabelValues = new HashMap<>();
+      conditionLabelValues.forEach(
+          (label, values) -> copiedLabelValues.put(label, List.copyOf(values)));
+      copy.setConditionLabelValues(copiedLabelValues);
+    }
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
