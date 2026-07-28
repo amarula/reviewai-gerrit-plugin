@@ -162,6 +162,45 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void reviewPromptIncludesConfiguredApplicabilityExpression() {
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf())
+        .thenReturn("label:Verified=+1 OR label:Code-Review=+2");
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setConditionLabelValues(
+        Map.of("Verified", java.util.List.of((short) 1), "Code-Review", java.util.List.of()));
+    AiPromptReview prompt =
+        new AiPromptReview(
+            config,
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertTrue(instructions.contains("Current AI Review Condition"));
+    assertTrue(instructions.contains("label:Verified=+1 OR label:Code-Review=+2"));
+    assertTrue(instructions.contains("Current Values for Condition Labels"));
+    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("- Code-Review: no vote"));
+  }
+
+  @Test
+  public void reviewPromptOmitsApplicabilitySectionWhenExpressionIsBlank() {
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("");
+    AiPromptReview prompt =
+        new AiPromptReview(
+            config,
+            new ChangeSetData(1),
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    assertFalse(
+        prompt.getDefaultAiAssistantInstructions().contains("Current AI Review Condition"));
+  }
+
+  @Test
   public void suggestPromptsAreLoadedFromResources() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
