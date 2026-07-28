@@ -111,7 +111,7 @@ a repeatable setting with one entry per exact provider/model route. All prices a
     aiPricing = <Provider>/<model>,input=<price>,output=<price>[,cachedInput=<price>][,cacheWrite=<price>][,longThreshold=<tokens>,longInput=<price>,longCachedInput=<price>,longCacheWrite=<price>,longOutput=<price>]
 ```
 
-| Field | Required | Meaning and default |
+Chiama| Field | Required | Meaning and default |
 | --- | --- | --- |
 | `input` | Yes | Regular input-token price. |
 | `output` | Yes | Output-token price. |
@@ -139,6 +139,50 @@ Entries from `gerrit.config` and a project's `project.config` are combined. If b
 project entry is applied last and takes precedence. Ollama and mock routes are excluded from cost tracking. See
 [Telemetry](telemetry.md#cost-calculation) for the built-in catalog, calculation rules, and exported cost
 metrics.
+
+## Conditional AI Review Trigger
+
+`aiReviewApplicableIf` delays automatic AI review until a Gerrit submit-requirement expression matches the change.
+The expression uses Gerrit's submit-requirement query syntax, so Gerrit evaluates label votes and other change
+conditions instead of the plugin implementing its own comparison rules.
+
+If this option is unset or empty, Patch Sets are reviewed immediately as before. The option can be set globally or in
+a project's configuration. For example, to wait until CI has voted `Verified+1` or higher:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiReviewApplicableIf = label:Verified>=1
+```
+
+Multiple conditions can be combined in one expression. The following waits for both CI verification and a positive
+Code-Review vote:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiReviewApplicableIf = label:Verified>=1 AND label:Code-Review>=1
+```
+
+Gerrit label expressions can also check maximum and minimum votes, voter identity, and vote counts. For example, this
+condition requires the maximum `Verified` vote and rejects a minimum-vote veto:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiReviewApplicableIf = label:Verified=MAX AND -label:Verified=MIN
+```
+
+Branch, file, footer, author, and other predicates supported by Gerrit submit requirements can be combined with label
+conditions. `is:submittable` cannot be used because Gerrit disallows recursive submit-requirement evaluation. Refer to
+the [Gerrit submit-requirement expression documentation](https://gerrit-documentation.storage.googleapis.com/Documentation/3.13.1/config-submit-requirements.html#query_expression_syntax)
+for the available operators and escaping rules.
+
+When a Patch Set is created, the plugin evaluates the expression before starting its review. If it does not match, the
+Patch Set is skipped. A later label vote causes the expression to be evaluated again; when it becomes applicable, the
+plugin starts the deferred review automatically. Each change in a topic review is evaluated independently. Invalid
+expressions and evaluation failures are logged and fail closed, so they do not start an AI review.
+
+Currently, deferred reevaluation is driven by label-bearing `comment-added` events. Conditions that become true only
+after another event, such as deleting a veto vote or changing WIP, topic, or hashtag state, are applied on the next
+Patch Set or label-vote event rather than immediately.
 
 ## Optional Parameters
 
@@ -174,6 +218,8 @@ metrics.
   they are created or updated.
 - `aiReviewCommitMessages`: The default value is true. When enabled, this option also verifies if the commit message
   matches with the content of the Change Set.
+- `aiReviewApplicableIf`: Gerrit submit-requirement expression that must match before an automatic AI review starts.
+  See [Conditional AI Review Trigger](#conditional-ai-review-trigger).
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
   administrator-only details with the Development build. If this option is not set, or the configured group does not
   exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
