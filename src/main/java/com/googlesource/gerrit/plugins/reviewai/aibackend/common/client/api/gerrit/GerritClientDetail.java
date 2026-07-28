@@ -53,6 +53,8 @@ public class GerritClientDetail {
   private static final SimpleDateFormat DATE_FORMAT = newFormat();
 
   private final Map<String, GerritPatchSetDetail> gerritPatchSetDetails = new HashMap<>();
+  private final AiReviewConditionLabelResolver conditionLabelResolver =
+      new AiReviewConditionLabelResolver();
   private final int aiAccountId;
   private final Configuration config;
 
@@ -117,6 +119,16 @@ public class GerritClientDetail {
     return null;
   }
 
+  /** Returns current distinct values for every label referenced by the condition. */
+  public Map<String, List<Short>> getConditionLabelValues(
+      GerritChange change, String expression) {
+    if (!conditionLabelResolver.hasConditionLabels(expression)) {
+      return Map.of();
+    }
+    loadPatchSetDetail(change);
+    return conditionLabelResolver.resolve(change.getFullChangeId(), expression);
+  }
+
   public List<GerritChange> getTopicChanges(GerritChange change) {
     Optional<String> topic = change.getTopic();
     if (topic.isEmpty()) {
@@ -172,6 +184,7 @@ public class GerritClientDetail {
 
       GerritPatchSetDetail detail = new GerritPatchSetDetail();
       detail.setWorkInProgress(info.workInProgress);
+      conditionLabelResolver.cacheCurrentValues(change.getFullChangeId(), info.labels);
       Optional.ofNullable(info.labels)
           .map(Map::entrySet)
           .map(Set::stream)
