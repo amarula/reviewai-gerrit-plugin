@@ -57,7 +57,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   @Test
   public void treeReturnsRepositoryPathsFromSubdir() throws Exception {
     List<String> paths = readTestFileLines(SMALL_TREE_FILE);
-    when(gitRepoFiles.getFileTree(config, change, "src")).thenReturn(paths);
+    when(gitRepoFiles.getPatchSetFileTree(config, change, "src")).thenReturn(paths);
 
     String output = tools.execute("tree", "{\"subdir\":\"src\"}");
 
@@ -66,7 +66,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
   @Test
   public void treeCompressesLargeRepositoryPaths() throws Exception {
-    when(gitRepoFiles.getFileTree(config, change, null))
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null))
         .thenReturn(readTestFileLines(LARGE_TREE_FILE));
 
     String output = tools.execute("tree", "{}");
@@ -78,7 +78,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   @Test
   public void getContentReturnsFileContentFromProjectRoot() throws Exception {
     String content = readTestFile(CONTEXT_FILE);
-    when(gitRepoFiles.getFileContent(change, "context.py")).thenReturn(content);
+    when(gitRepoFiles.getPatchSetFileContent(change, "context.py")).thenReturn(content);
 
     String output = tools.execute("get_content", "{\"file_path\":\"context.py\"}");
 
@@ -89,7 +89,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void grepReturnsMatches() throws Exception {
     String firstLine = readTestFile(CONTEXT_FILE).split("\\R", 2)[0];
     String match = "context.py:1: " + firstLine;
-    when(gitRepoFiles.grep(config, change, "typing")).thenReturn(List.of(match));
+    when(gitRepoFiles.grepPatchSet(config, change, "typing")).thenReturn(List.of(match));
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 

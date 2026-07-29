@@ -17,6 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.PatchSet;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -71,10 +73,23 @@ public class GitRepoFiles {
   }
 
   public String getFileContent(GerritChange change, String path) throws FileNotFoundException {
+    return getFileContentAtRevision(change, path, this::getBranchRevTree);
+  }
+
+  public String getPatchSetFileContent(GerritChange change, String path)
+      throws FileNotFoundException {
+    return getFileContentAtRevision(change, path, this::getPatchSetRevTree);
+  }
+
+  private String getFileContentAtRevision(
+      GerritChange change, String path, RevTreeResolver treeResolver)
+      throws FileNotFoundException {
     try {
       String content =
           withRepositoryTreeReader(
-              change, (repository, tree, reader) -> readFileContent(reader, tree, path));
+              change,
+              treeResolver,
+              (repository, tree, reader) -> readFileContent(reader, tree, path));
       if (content != null) {
         return content;
       } else {
@@ -85,19 +100,23 @@ public class GitRepoFiles {
     }
   }
 
-  public List<String> getFileTree(Configuration config, GerritChange change, String subdir) {
+  public List<String> getPatchSetFileTree(
+      Configuration config, GerritChange change, String subdir) {
     log.debug("Getting repository file tree from subdir: {}", subdir);
     enabledFileExtensions = config.getEnabledFileExtensions();
     String normalizedSubdir = normalizePath(subdir);
     try {
       return withRepositoryTree(
-          change, (repository, tree) -> listMatchingPaths(repository, tree, normalizedSubdir));
+          change,
+          this::getPatchSetRevTree,
+          (repository, tree) -> listMatchingPaths(repository, tree, normalizedSubdir));
     } catch (IOException e) {
       throw new RuntimeException("Failed to retrieve file tree from " + normalizedSubdir, e);
     }
   }
 
-  public List<String> grep(Configuration config, GerritChange change, String searchString) {
+  public List<String> grepPatchSet(
+      Configuration config, GerritChange change, String searchString) {
     log.debug("Searching repository for string: {}", searchString);
     enabledFileExtensions = config.getEnabledFileExtensions();
     if (searchString == null || searchString.isEmpty()) {
@@ -106,6 +125,7 @@ public class GitRepoFiles {
     try {
       return withRepositoryTreeReader(
           change,
+          this::getPatchSetRevTree,
           (repository, tree, reader) -> grepTree(repository, tree, reader, searchString));
     } catch (IOException e) {
       throw new RuntimeException("Failed to search repository", e);
@@ -193,15 +213,27 @@ public class GitRepoFiles {
 
   private <T> T withRepositoryTree(GerritChange change, RepositoryTreeCallback<T> callback)
       throws IOException {
+    return withRepositoryTree(change, this::getBranchRevTree, callback);
+  }
+
+  private <T> T withRepositoryTree(
+      GerritChange change,
+      RevTreeResolver treeResolver,
+      RepositoryTreeCallback<T> callback)
+      throws IOException {
     try (Repository repository = openRepository(change)) {
-      return callback.execute(repository, getBranchRevTree(repository, change));
+      return callback.execute(repository, treeResolver.resolve(repository, change));
     }
   }
 
   private <T> T withRepositoryTreeReader(
-      GerritChange change, RepositoryTreeReaderCallback<T> callback) throws IOException {
+      GerritChange change,
+      RevTreeResolver treeResolver,
+      RepositoryTreeReaderCallback<T> callback)
+      throws IOException {
     return withRepositoryTree(
         change,
+        treeResolver,
         (repository, tree) -> {
           try (ObjectReader reader = repository.newObjectReader()) {
             return callback.execute(repository, tree, reader);
@@ -225,10 +257,27 @@ public class GitRepoFiles {
   }
 
   RevTree getBranchRevTree(Repository repository, GerritChange change) throws IOException {
-    String branchRef = change.getBranchNameKey().branch();
-    ObjectId lastCommitId = repository.resolve(branchRef);
+    return getRevTree(repository, change.getBranchNameKey().branch(), "Branch");
+  }
+
+  RevTree getPatchSetRevTree(Repository repository, GerritChange change) throws IOException {
+    int changeNumber =
+        change
+            .getChangeNumber()
+            .orElseThrow(() -> new IOException("Change number is not available"));
+    int patchSetNumber =
+        change
+            .getPatchSetAttribute()
+            .map(attribute -> attribute.number)
+            .orElseThrow(() -> new IOException("Patch set number is not available"));
+    String patchSetRef = PatchSet.id(Change.id(changeNumber), patchSetNumber).toRefName();
+    return getRevTree(repository, patchSetRef, "Patch set");
+  }
+
+  private RevTree getRevTree(Repository repository, String ref, String refType) throws IOException {
+    ObjectId lastCommitId = repository.resolve(ref);
     if (lastCommitId == null) {
-      throw new IOException("Branch not found: " + branchRef);
+      throw new IOException(refType + " not found: " + ref);
     }
     try (RevWalk revWalk = new RevWalk(repository)) {
       return revWalk.parseCommit(lastCommitId).getTree();
@@ -283,6 +332,10 @@ public class GitRepoFiles {
 
   private interface RepositoryTreeReaderCallback<T> {
     T execute(Repository repository, RevTree tree, ObjectReader reader) throws IOException;
+  }
+
+  private interface RevTreeResolver {
+    RevTree resolve(Repository repository, GerritChange change) throws IOException;
   }
 
   private interface PathMatcher {
