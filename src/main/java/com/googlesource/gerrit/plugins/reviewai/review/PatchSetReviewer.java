@@ -326,8 +326,8 @@ public class PatchSetReviewer {
       return new AiResponseContent(String.format(SPLIT_REVIEW_MSG, config.getMaxReviewLines()));
     }
 
-    changeSetData.setConditionLabelValues(
-        gerritClient.getConditionLabelValues(change, config.getAiReviewApplicableIf()));
+    changeSetData.setConditionLabels(
+        gerritClient.getConditionLabels(change, config.getAiReviewApplicableIf()));
     return openAiClient.ask(changeSetData, change, patchSet);
   }
 
