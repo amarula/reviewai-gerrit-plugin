@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2e42a62e_efb6d7c5",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/EventHandlerTypePatchSetReview.java",
+        "patchSetId": 6
+      },
+      "lineNbr": 163,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-07-29T06:00:21Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com you have same print in different file? this is now is debug",
+      "revId": "6bd535a76f64eb44b9cd4ebd023a06c515388897",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
