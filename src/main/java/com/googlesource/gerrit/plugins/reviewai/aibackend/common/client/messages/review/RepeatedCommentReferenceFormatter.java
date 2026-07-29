@@ -51,7 +51,7 @@ public final class RepeatedCommentReferenceFormatter {
     for (AiReplyItem replyItem : repeatedReplyItems) {
       repeatedCommentResolver
           .resolve(replyItem, change)
-          .map(comment -> commentLinkFormatter.toCommentLink(comment, replyItem, change))
+          .flatMap(comment -> commentLinkFormatter.toCommentLink(comment, replyItem, change))
           .ifPresent(repeatedCommentLinks::add);
     }
 
