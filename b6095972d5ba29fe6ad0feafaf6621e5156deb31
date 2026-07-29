@@ -69,6 +69,24 @@
       "parentUuid": "7acf4797_dd886b44",
       "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a3fe9e97_5d77b5e6",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/AiReviewApplicabilityChecker.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-29T08:03:10Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com Please disregard my previous reply: `Status.NOT_APPLICABLE` means simply that the condition does not match. \n\nOnly two statuses are expected here:\nSATISFIED: the applicability condition matches → start the review.\nNOT_APPLICABLE: the condition does not match → skip normally.\n\nEvery other status means Gerrit could not produce the expected applicability result. For example:\nERROR: invalid expression or evaluation error.\nTIMEOUT: evaluation timed out.\nUNSATISFIED: unexpected here because the submittability expression is hardcoded to is:true.\n\nAll these cases should result in an error.",
+      "parentUuid": "02b1ad2b_2a3c18f4",
+      "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
