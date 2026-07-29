@@ -26,6 +26,7 @@ import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.ChangeMessageInfo;
 import com.google.gerrit.extensions.common.LabelInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
@@ -119,8 +120,8 @@ public class GerritClientDetail {
     return null;
   }
 
-  /** Returns current distinct values for every label referenced by the condition. */
-  public Map<String, List<Short>> getConditionLabelValues(
+  /** Returns current distinct values and descriptions for labels referenced by the condition. */
+  public Map<String, GerritConditionLabel> getConditionLabels(
       GerritChange change, String expression) {
     if (!conditionLabelResolver.hasConditionLabels(expression)) {
       return Map.of();
@@ -184,7 +185,7 @@ public class GerritClientDetail {
 
       GerritPatchSetDetail detail = new GerritPatchSetDetail();
       detail.setWorkInProgress(info.workInProgress);
-      conditionLabelResolver.cacheCurrentValues(change.getFullChangeId(), info.labels);
+      conditionLabelResolver.cacheCurrentLabels(change.getFullChangeId(), info.labels);
       Optional.ofNullable(info.labels)
           .map(Map::entrySet)
           .map(Set::stream)
