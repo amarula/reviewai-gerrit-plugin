@@ -87,6 +87,24 @@
       "parentUuid": "02b1ad2b_2a3c18f4",
       "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4f2ad70e_e30837fe",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/AiReviewApplicabilityChecker.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-29T08:15:14Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com If the problem was a misleading error message, I\u0027ve just updated",
+      "parentUuid": "a3fe9e97_5d77b5e6",
+      "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
