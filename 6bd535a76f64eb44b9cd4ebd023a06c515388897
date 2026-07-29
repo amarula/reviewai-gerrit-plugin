@@ -16,6 +16,24 @@
       "message": "@patrizio.gelosi@amarulasolutions.com you have same print in different file? this is now is debug",
       "revId": "6bd535a76f64eb44b9cd4ebd023a06c515388897",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "8c7cb243_a34fbcaa",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/EventHandlerTypePatchSetReview.java",
+        "patchSetId": 6
+      },
+      "lineNbr": 163,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-29T08:18:52Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com Not sure you mean that this log message was similar to one misleading, that I\u0027ve just fixed https://gerrithub.io/c/amarula/chatgpt-code-review-gerrit-plugin/+/1243512/comment/7acf4797_dd886b44/",
+      "parentUuid": "2e42a62e_efb6d7c5",
+      "revId": "6bd535a76f64eb44b9cd4ebd023a06c515388897",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
