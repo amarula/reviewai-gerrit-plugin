@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
@@ -167,8 +168,12 @@ public class AiPromptFactoryTest {
     when(config.getAiReviewApplicableIf())
         .thenReturn("label:Verified=+1 OR label:Code-Review=+2");
     ChangeSetData changeSetData = new ChangeSetData(1);
-    changeSetData.setConditionLabelValues(
-        Map.of("Verified", java.util.List.of((short) 1), "Code-Review", java.util.List.of()));
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(java.util.List.of((short) 1), "CI verification"),
+            "Code-Review",
+            new GerritConditionLabel(java.util.List.of(), "Code quality review")));
     AiPromptReview prompt =
         new AiPromptReview(
             config,
@@ -180,9 +185,11 @@ public class AiPromptFactoryTest {
 
     assertTrue(instructions.contains("Current AI Review Condition"));
     assertTrue(instructions.contains("label:Verified=+1 OR label:Code-Review=+2"));
-    assertTrue(instructions.contains("Current Values for Condition Labels"));
+    assertTrue(instructions.contains("Condition Labels"));
     assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Description: CI verification"));
     assertTrue(instructions.contains("- Code-Review: no vote"));
+    assertTrue(instructions.contains("Description: Code quality review"));
   }
 
   @Test

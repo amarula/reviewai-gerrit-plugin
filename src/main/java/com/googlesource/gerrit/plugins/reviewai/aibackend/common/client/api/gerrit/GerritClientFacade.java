@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
@@ -84,9 +85,9 @@ public class GerritClientFacade {
     return gerritClientDetail.getTopicChanges(change);
   }
 
-  public Map<String, List<Short>> getConditionLabelValues(
+  public Map<String, GerritConditionLabel> getConditionLabels(
       GerritChange change, String expression) {
-    return gerritClientDetail.getConditionLabelValues(change, expression);
+    return gerritClientDetail.getConditionLabels(change, expression);
   }
 
   public Integer getCodeReviewValue(GerritChange change) {
