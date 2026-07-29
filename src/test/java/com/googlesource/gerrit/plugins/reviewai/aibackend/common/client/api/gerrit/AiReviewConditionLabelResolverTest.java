@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.gerrit.extensions.common.ApprovalInfo;
 import com.google.gerrit.extensions.common.LabelInfo;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -30,17 +31,22 @@ public class AiReviewConditionLabelResolverTest {
   @Test
   public void resolvesEveryLabelReferencedByCondition() {
     AiReviewConditionLabelResolver resolver = new AiReviewConditionLabelResolver();
-    resolver.cacheCurrentValues(
-        CHANGE_ID, Map.of("Verified", label(1), "Code-Review", label(2)));
+    resolver.cacheCurrentLabels(
+        CHANGE_ID,
+        Map.of(
+            "Verified",
+            label("CI verification", approval(1001, 1)),
+            "Code-Review",
+            label("Code quality", approval(1001, 2))));
 
     assertEquals(
         Map.of(
             "Verified",
-            List.of((short) 1),
+            new GerritConditionLabel(List.of((short) 1), "CI verification"),
             "Code-Review",
-            List.of((short) 2),
+            new GerritConditionLabel(List.of((short) 2), "Code quality"),
             "Build-Check",
-            List.of()),
+            new GerritConditionLabel(List.of(), null)),
         resolver.resolve(
             CHANGE_ID,
             "label:Verified=+1 OR (label:\"Code-Review>=2\" AND -label:Build-Check-1)"));
@@ -49,37 +55,29 @@ public class AiReviewConditionLabelResolverTest {
   @Test
   public void valuesAreDistinctAndDoNotContainAccounts() {
     AiReviewConditionLabelResolver resolver = new AiReviewConditionLabelResolver();
-    resolver.cacheCurrentValues(
+    resolver.cacheCurrentLabels(
         CHANGE_ID,
         Map.of(
             "Verified",
             label(
+                "CI verification",
                 approval(1001, -1), approval(1002, 1), approval(1003, 1))));
 
     assertEquals(
-        Map.of("Verified", List.of((short) -1, (short) 1)),
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) -1, (short) 1), "CI verification")),
         resolver.resolve(CHANGE_ID, "label:Verified=+1"));
   }
 
-  @Test
-  public void formatsValuesAndMissingVotesForPrompt() {
-    assertEquals(
-        "- Code-Review: no vote\n- Verified: -1, +1",
-        AiReviewConditionLabelResolver.formatConditionLabelValues(
-            Map.of(
-                "Verified",
-                List.of((short) -1, (short) 1),
-                "Code-Review",
-                List.of())));
-  }
-
   private static LabelInfo label(int value) {
-    return label(approval(1001, value));
+    return label(null, approval(1001, value));
   }
 
-  private static LabelInfo label(ApprovalInfo... approvals) {
+  private static LabelInfo label(String description, ApprovalInfo... approvals) {
     LabelInfo label = new LabelInfo();
     label.all = List.of(approvals);
+    label.description = description;
     return label;
   }
 
