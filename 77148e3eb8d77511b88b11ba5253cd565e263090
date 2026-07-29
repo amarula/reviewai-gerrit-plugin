@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "55c0d6ce_79580426",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/common/client/prompt/agents/level0/singleagent/AiPromptReview.java",
+        "patchSetId": 6
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-07-29T06:04:55Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com This make the instruction a bit wird, desrib ein the commit message how it will look like. Then This is applicable to all the level of reviewing including sanshiko one",
+      "revId": "77148e3eb8d77511b88b11ba5253cd565e263090",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
