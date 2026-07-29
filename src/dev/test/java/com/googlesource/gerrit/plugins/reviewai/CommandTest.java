@@ -307,6 +307,20 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandReviewFiltersLowRelevanceBeforeRepeatedCommentMessage() throws Exception {
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiRepeatedLowRelevanceReviewResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/noUpdateSystemMessage.txt").stripTrailing(),
+        captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+  }
+
+  @Test
   public void commandReviewShowsRepeatedCommentReferenceWithVisibleReplies() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
     setupMockRequestCreateResponse("openAiRepeatedAndVisibleReviewResponse.json");

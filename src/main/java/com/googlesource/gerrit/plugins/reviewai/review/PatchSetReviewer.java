@@ -258,7 +258,7 @@ public class PatchSetReviewer {
               || isIrrelevant;
       boolean hiddenByReplyFilter =
           !change.getIsCommentEvent() && changeSetData.getReplyFilterEnabled() && isHidden;
-      if (hiddenByReplyFilter && replyItem.isRepeated()) {
+      if (hiddenByReplyFilter && replyItem.isRepeated() && !isIrrelevant) {
         filteredRepeatedReplyItems.add(replyItem);
       }
       if (isScoredReply(replyItem, isIrrelevant) && score != null) {
