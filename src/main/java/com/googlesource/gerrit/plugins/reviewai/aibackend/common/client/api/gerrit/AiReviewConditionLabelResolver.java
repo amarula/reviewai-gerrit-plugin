@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import com.google.gerrit.extensions.common.LabelInfo;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,57 +38,64 @@ public final class AiReviewConditionLabelResolver {
           "(?i)(?:^|[\\s(])-?label:(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^\\s()]+)");
   private static final Pattern TRAILING_NUMERIC_VOTE = Pattern.compile("^(.*?)[+-]\\d+$");
 
-  private final Map<String, Map<String, List<Short>>> currentValuesByChange = new HashMap<>();
+  private final Map<String, Map<String, GerritConditionLabel>> currentLabelsByChange =
+      new HashMap<>();
 
   boolean hasConditionLabels(String expression) {
     return !extractConditionLabels(expression).isEmpty();
   }
 
-  void cacheCurrentValues(String changeId, Map<String, LabelInfo> labels) {
-    currentValuesByChange.put(changeId, toCurrentLabelValues(labels));
+  void cacheCurrentLabels(String changeId, Map<String, LabelInfo> labels) {
+    currentLabelsByChange.put(changeId, toCurrentLabels(labels));
   }
 
-  Map<String, List<Short>> resolve(String changeId, String expression) {
+  Map<String, GerritConditionLabel> resolve(String changeId, String expression) {
     Set<String> conditionLabels = extractConditionLabels(expression);
     if (conditionLabels.isEmpty()) {
       return Map.of();
     }
-    Map<String, List<Short>> valuesForChange =
-        currentValuesByChange.getOrDefault(changeId, Map.of());
-    Map<String, List<Short>> result = new LinkedHashMap<>();
+    Map<String, GerritConditionLabel> labelsForChange =
+        currentLabelsByChange.getOrDefault(changeId, Map.of());
+    Map<String, GerritConditionLabel> result = new LinkedHashMap<>();
     conditionLabels.forEach(
         label -> {
-          Optional<Map.Entry<String, List<Short>>> currentLabel =
-              valuesForChange.entrySet().stream()
+          Optional<Map.Entry<String, GerritConditionLabel>> currentLabel =
+              labelsForChange.entrySet().stream()
                   .filter(entry -> entry.getKey().equalsIgnoreCase(label))
                   .findFirst();
           if (currentLabel.isPresent()) {
             result.put(currentLabel.get().getKey(), currentLabel.get().getValue());
           } else {
-            result.put(label, List.of());
+            result.put(label, new GerritConditionLabel(List.of(), null));
           }
         });
     return result;
   }
 
-  /** Formats resolved condition-label values for inclusion in an AI prompt. */
-  public static String formatConditionLabelValues(Map<String, List<Short>> labelValues) {
-    if (labelValues == null || labelValues.isEmpty()) {
+  /** Formats resolved condition-label context for inclusion in an AI prompt. */
+  public static String formatConditionLabels(Map<String, GerritConditionLabel> labels) {
+    if (labels == null || labels.isEmpty()) {
       return "";
     }
-    return labelValues.entrySet().stream()
+    return labels.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
-        .map(
-            entry ->
-                "- "
-                    + entry.getKey()
-                    + ": "
-                    + (entry.getValue().isEmpty()
-                        ? "no vote"
-                        : entry.getValue().stream()
-                            .map(value -> (value >= 0 ? "+" : "") + value)
-                            .collect(Collectors.joining(", "))))
+        .map(AiReviewConditionLabelResolver::formatConditionLabel)
         .collect(Collectors.joining("\n"));
+  }
+
+  private static String formatConditionLabel(Map.Entry<String, GerritConditionLabel> entry) {
+    GerritConditionLabel label = entry.getValue();
+    String values =
+        label.values().isEmpty()
+            ? "no vote"
+            : label.values().stream()
+                .map(value -> (value >= 0 ? "+" : "") + value)
+                .collect(Collectors.joining(", "));
+    String description =
+        label.description() == null || label.description().isBlank()
+            ? ""
+            : "\n  Description: " + label.description();
+    return "- " + entry.getKey() + ": " + values + description;
   }
 
   private static Set<String> extractConditionLabels(String expression) {
@@ -132,12 +140,11 @@ public final class AiReviewConditionLabelResolver {
     return -1;
   }
 
-  private static Map<String, List<Short>> toCurrentLabelValues(
-      Map<String, LabelInfo> labels) {
+  private static Map<String, GerritConditionLabel> toCurrentLabels(Map<String, LabelInfo> labels) {
     if (labels == null || labels.isEmpty()) {
       return Map.of();
     }
-    Map<String, List<Short>> values = new HashMap<>();
+    Map<String, GerritConditionLabel> conditionLabels = new HashMap<>();
     labels.forEach(
         (labelName, labelInfo) -> {
           Set<Short> distinctValues = new TreeSet<>();
@@ -148,8 +155,11 @@ public final class AiReviewConditionLabelResolver {
                 .map(Integer::shortValue)
                 .forEach(distinctValues::add);
           }
-          values.put(labelName, List.copyOf(distinctValues));
+          conditionLabels.put(
+              labelName,
+              new GerritConditionLabel(
+                  List.copyOf(distinctValues), labelInfo == null ? null : labelInfo.description));
         });
-    return values;
+    return conditionLabels;
   }
 }

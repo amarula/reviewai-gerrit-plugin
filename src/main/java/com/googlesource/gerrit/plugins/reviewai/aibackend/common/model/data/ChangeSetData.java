@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import lombok.Data;
 import lombok.NonNull;
@@ -48,7 +49,7 @@ public class ChangeSetData {
   private Boolean specializedAgentReview = false;
   private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
-  private Map<String, List<Short>> conditionLabelValues;
+  private Map<String, GerritConditionLabel> conditionLabels;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -133,11 +134,8 @@ public class ChangeSetData {
     copy.setSpecializedAgentReview(specializedAgentReview);
     copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
-    if (conditionLabelValues != null) {
-      Map<String, List<Short>> copiedLabelValues = new HashMap<>();
-      conditionLabelValues.forEach(
-          (label, values) -> copiedLabelValues.put(label, List.copyOf(values)));
-      copy.setConditionLabelValues(copiedLabelValues);
+    if (conditionLabels != null) {
+      copy.setConditionLabels(new HashMap<>(conditionLabels));
     }
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);

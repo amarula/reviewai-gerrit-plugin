@@ -115,11 +115,10 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     String applicableIf = config.getAiReviewApplicableIf();
     if (applicableIf != null && !applicableIf.isBlank()) {
       sections.add(buildSection("Current AI Review Condition", applicableIf));
-      String conditionLabelValues =
-          AiReviewConditionLabelResolver.formatConditionLabelValues(
-              changeSetData.getConditionLabelValues());
-      if (!conditionLabelValues.isEmpty()) {
-        sections.add(buildSection("Current Values for Condition Labels", conditionLabelValues));
+      String conditionLabels =
+          AiReviewConditionLabelResolver.formatConditionLabels(changeSetData.getConditionLabels());
+      if (!conditionLabels.isEmpty()) {
+        sections.add(buildSection("Condition Labels", conditionLabels));
       }
     }
     sections.add(
