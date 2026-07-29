@@ -85,6 +85,9 @@ final class RepeatedCommentResolver {
       return Optional.empty();
     }
     String id = commentId.trim();
+    if (id.chars().allMatch(Character::isDigit)) {
+      return Optional.empty();
+    }
     Pattern idPattern =
         Pattern.compile(
             "(^|[^" + idBoundaryCharacters(id) + "])"

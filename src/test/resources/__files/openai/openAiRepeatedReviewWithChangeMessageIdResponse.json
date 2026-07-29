@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_REPEATED_REVIEW_CHANGE_MESSAGE_ID",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_123",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"replies\":[{\"reply\":\"The commit subject is still too vague.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"eebb61ec790c5cb3bfaa1be74f07ceae4c00b94e\",\"conflicting\":false,\"filename\":\"/COMMIT_MSG\"}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+        }
+      ]
+    }
+  ]
+}
