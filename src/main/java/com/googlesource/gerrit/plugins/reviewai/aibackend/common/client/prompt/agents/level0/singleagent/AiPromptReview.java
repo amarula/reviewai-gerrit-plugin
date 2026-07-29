@@ -18,11 +18,11 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptConditionLabelFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.AiReviewConditionLabelResolver;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import lombok.extern.slf4j.Slf4j;
@@ -115,11 +115,10 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     String applicableIf = config.getAiReviewApplicableIf();
     if (applicableIf != null && !applicableIf.isBlank()) {
       sections.add(buildSection("Current AI Review Condition", applicableIf));
-      String conditionLabelValues =
-          AiReviewConditionLabelResolver.formatConditionLabelValues(
-              changeSetData.getConditionLabelValues());
-      if (!conditionLabelValues.isEmpty()) {
-        sections.add(buildSection("Current Values for Condition Labels", conditionLabelValues));
+      String conditionLabels =
+          AiPromptConditionLabelFormatter.format(changeSetData.getConditionLabels());
+      if (!conditionLabels.isEmpty()) {
+        sections.add(buildSection("Condition Labels", conditionLabels));
       }
     }
     sections.add(
