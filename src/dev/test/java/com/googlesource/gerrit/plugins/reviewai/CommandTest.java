@@ -276,6 +276,37 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandReviewDoesNotResolveNumericConcernIdFromChangeMessageText()
+      throws Exception {
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiRepeatedReviewWithNumericIdResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/repeatedReviewNoReferencesSystemMessage.txt")
+            .stripTrailing(),
+        captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+  }
+
+  @Test
+  public void commandReviewDoesNotLinkChangeMessageId() throws Exception {
+    setupCommandCommentWithPastAiComments("/review");
+    setupMockRequestCreateResponse("openAiRepeatedReviewWithChangeMessageIdResponse.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    ArgumentCaptor<ReviewInput> captor = testRequestSent();
+    Assert.assertEquals(
+        readTestFile("__files/commands/repeatedReviewNoReferencesSystemMessage.txt")
+            .stripTrailing(),
+        captor.getValue().message);
+    Assert.assertNull(captor.getValue().comments);
+  }
+
+  @Test
   public void commandReviewShowsRepeatedCommentReferenceWithVisibleReplies() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
     setupMockRequestCreateResponse("openAiRepeatedAndVisibleReviewResponse.json");

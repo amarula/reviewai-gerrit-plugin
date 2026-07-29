@@ -42,9 +42,17 @@ final class GerritCommentLinkFormatter {
     this.canonicalWebUrl = canonicalWebUrl;
   }
 
-  String toCommentLink(GerritComment comment, AiReplyItem replyItem, GerritChange change) {
+  Optional<String> toCommentLink(
+      GerritComment comment, AiReplyItem replyItem, GerritChange change) {
+    if (comment.getId() == null
+        || comment.getId().isBlank()
+        || comment.getFilename() == null
+        || comment.getFilename().isBlank()) {
+      return Optional.empty();
+    }
     String commentUrl = toCommentUrl(comment.getId(), change);
-    return String.format("[%s](%s)", toCommentLinkLabel(comment, replyItem), commentUrl);
+    return Optional.of(
+        String.format("[%s](%s)", toCommentLinkLabel(comment, replyItem), commentUrl));
   }
 
   static String toMarkdownList(Collection<String> items) {

@@ -85,6 +85,15 @@ final class RepeatedCommentResolver {
       return Optional.empty();
     }
     String id = commentId.trim();
+    // Do not interpret a digits-only reference as an ID embedded in message text:
+    // "1" could otherwise falsely identify an unrelated message such as "Patch Set 1".
+    // Numeric concern markers embedded in messages are intentionally unsupported because they
+    // cannot be distinguished reliably from those ordinary numbers.
+    // NOTE: An entirely numeric Gerrit comment ID is excluded from this message-text lookup
+    // because it was already checked by getCommentById().
+    if (id.chars().allMatch(Character::isDigit)) {
+      return Optional.empty();
+    }
     Pattern idPattern =
         Pattern.compile(
             "(^|[^" + idBoundaryCharacters(id) + "])"
