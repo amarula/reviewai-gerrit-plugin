@@ -20,6 +20,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "ae0b598d_f5f41e7d",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/AiReviewApplicabilityChecker.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-29T07:50:23Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com This exception could occur when, for example:\n- The change no longer exists or cannot be seen by the AI user.\n- Gerrit cannot load the change from NoteDb/index storage.\n- A permission check fails unexpectedly.\n- Gerrit encounters an internal I/O or runtime error while constructing or evaluating the submit requirement.\n\nAny of these issues matches more to an error level rather than a warning.",
+      "parentUuid": "dc1f4381_820ecbcc",
+      "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "7acf4797_dd886b44",
         "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/AiReviewApplicabilityChecker.java",
         "patchSetId": 4
@@ -31,6 +49,24 @@
       "writtenOn": "2026-07-29T05:58:15Z",
       "side": 1,
       "message": "@patrizio.gelosi@amarulasolutions.com this should be a warning. why an error?",
+      "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "02b1ad2b_2a3c18f4",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/listener/AiReviewApplicabilityChecker.java",
+        "patchSetId": 4
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-07-29T07:50:23Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com The definition of `Status.NOT_APPLICABLE` is \"Any of the applicability, submittability or override expressions contain invalid syntax and are not parsable.\" It should definitely raise an error to be fixed urgently, since many expected reviews may be permanently missed.",
+      "parentUuid": "7acf4797_dd886b44",
       "revId": "b6095972d5ba29fe6ad0feafaf6621e5156deb31",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
