@@ -29,11 +29,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
 public class GitRepoFilesTest extends TestBase {
   private static final String SPECIALIZED_BRANCH = "release/device-a";
+  private static final int CHANGE_NUMBER = 12345;
+  private static final int PATCH_SET_NUMBER = 7;
+  private static final String PATCH_SET_REF = "refs/changes/45/12345/7";
   private static final Path SPECIALIZED_BRANCH_CONTENT =
       TestResourceLoader.getTestResourcePath().resolve("__files/git/specializedBranch.txt");
 
@@ -64,6 +68,23 @@ public class GitRepoFilesTest extends TestBase {
               () -> new GitRepoFiles().getBranchRevTree(git.getRepository(), change));
 
       assertEquals("Branch not found: refs/heads/missing-branch", exception.getMessage());
+    }
+  }
+
+  @Test
+  public void getPatchSetRevTreeUsesCurrentPatchSetRef() throws Exception {
+    try (Git git = createRepository()) {
+      RevCommit patchSetCommit = commitSpecializedBranchContent(git);
+      RefUpdate patchSetRef = git.getRepository().updateRef(PATCH_SET_REF);
+      patchSetRef.setNewObjectId(patchSetCommit);
+      assertEquals(RefUpdate.Result.NEW, patchSetRef.update());
+      GerritChange change = getGerritChange();
+      change.setChangeNumber(CHANGE_NUMBER);
+      change.setPatchSetNumber(PATCH_SET_NUMBER);
+
+      assertEquals(
+          patchSetCommit.getTree(),
+          new GitRepoFiles().getPatchSetRevTree(git.getRepository(), change));
     }
   }
 

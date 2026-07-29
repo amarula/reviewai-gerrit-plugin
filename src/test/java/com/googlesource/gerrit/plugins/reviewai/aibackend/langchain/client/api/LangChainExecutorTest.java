@@ -65,7 +65,7 @@ public class LangChainExecutorTest {
     List<String> largeTree = readTestResource(LARGE_TREE_RESOURCE).lines().toList();
     String compressedTreeOutput = readTestResource(COMPRESSED_TREE_OUTPUT_RESOURCE).stripTrailing();
     GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
-    when(gitRepoFiles.getFileTree(config, change, null)).thenReturn(largeTree, largeTree);
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null)).thenReturn(largeTree, largeTree);
 
     ToolExecutionRequest firstToolRequest = toolRequest("call_1");
     ToolExecutionRequest secondToolRequest = toolRequest("call_2");
@@ -109,7 +109,7 @@ public class LangChainExecutorTest {
     GerritChange change = Mockito.mock(GerritChange.class);
     when(change.getFullChangeId()).thenReturn("project~branch~change");
     GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
-    when(gitRepoFiles.getFileTree(config, change, null)).thenReturn(List.of());
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null)).thenReturn(List.of());
     RecordingMetrics metrics = new RecordingMetrics();
     RecordingChatModel model =
         new RecordingChatModel(
