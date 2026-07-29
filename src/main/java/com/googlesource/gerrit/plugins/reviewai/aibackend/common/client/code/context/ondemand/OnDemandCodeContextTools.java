@@ -86,7 +86,7 @@ public class OnDemandCodeContextTools extends ClientBase {
   }
 
   private String tree(String subdir) {
-    List<String> paths = gitRepoFiles.getFileTree(config, change, subdir);
+    List<String> paths = gitRepoFiles.getPatchSetFileTree(config, change, subdir);
     if (paths == null || paths.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
@@ -97,14 +97,14 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (filePath == null || filePath.isBlank()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    return gitRepoFiles.getFileContent(change, filePath);
+    return gitRepoFiles.getPatchSetFileContent(change, filePath);
   }
 
   private String grep(String string) {
     if (string == null || string.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    List<String> matches = gitRepoFiles.grep(config, change, string);
+    List<String> matches = gitRepoFiles.grepPatchSet(config, change, string);
     if (matches == null || matches.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
