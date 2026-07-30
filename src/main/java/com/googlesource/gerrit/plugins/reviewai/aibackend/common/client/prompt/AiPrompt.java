@@ -25,7 +25,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,7 +35,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 public class AiPrompt {
   private static final String PROMPT_EXTENDS_ATTRIBUTE = "$extends";
 
-  // Reply attributes
+  // Reply attributes (compile-time constants, not JSON-loaded)
   public static final String ATTRIBUTE_ID = "id";
   public static final String ATTRIBUTE_REPLY = "reply";
   public static final String ATTRIBUTE_SCORE = "score";
@@ -51,31 +50,24 @@ public class AiPrompt {
   public static final String ATTRIBUTE_FILENAME = "filename";
   public static final String ATTRIBUTE_LINE_NUMBER = "lineNumber";
   public static final String ATTRIBUTE_CODE_SNIPPET = "codeSnippet";
+
   public static final List<String> PATCH_SET_REVIEW_REPLY_ATTRIBUTES =
-      new ArrayList<>(
+      Collections.unmodifiableList(
           Arrays.asList(
               ATTRIBUTE_REPLY,
               ATTRIBUTE_SCORE,
               ATTRIBUTE_REPEATED,
               ATTRIBUTE_CONFLICTING,
               ATTRIBUTE_RELEVANCE));
-  public static final List<String> REQUEST_REPLY_ATTRIBUTES =
-      new ArrayList<>(Arrays.asList(ATTRIBUTE_REPLY, ATTRIBUTE_ID, ATTRIBUTE_CHANGE_ID));
 
-  // Prompt constants loaded from JSON file
-  public static String DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS;
-  public static String DEFAULT_AI_REVIEW_PROMPT_DIRECTIVES;
-  public static String DEFAULT_AI_PROMPT_FORCE_JSON_FORMAT;
-  public static String DEFAULT_AI_REPLIES_PROMPT_SPECS;
-  public static String DEFAULT_AI_REPLIES_PROMPT_INLINE;
-  public static String DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK;
-  public static String DEFAULT_AI_REQUEST_PROMPT_DIFF;
-  public static String DEFAULT_AI_REQUEST_PROMPT_REQUESTS;
-  public static String DEFAULT_AI_REVIEW_PROMPT_COMMIT_MESSAGES;
-  public static String DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES;
-  public static String DEFAULT_AI_RELEVANCE_RULES;
-  public static String DEFAULT_AI_HOW_TO_FIND_COMMIT_MESSAGE;
-  public static Map<String, String> DEFAULT_AI_REPLIES_ATTRIBUTES;
+  public static final List<String> REQUEST_REPLY_ATTRIBUTES =
+      Collections.unmodifiableList(
+          Arrays.asList(ATTRIBUTE_REPLY, ATTRIBUTE_ID, ATTRIBUTE_CHANGE_ID));
+
+  // ---- Instance prompt storage (no reflection) ----
+
+  private final Map<String, Object> promptValues = new LinkedHashMap<>();
+  private Map<String, String> repliesAttributes;
 
   protected final Configuration config;
 
@@ -83,21 +75,100 @@ public class AiPrompt {
 
   public AiPrompt(Configuration config) {
     this.config = config;
-    loadDefaultPrompts("prompts");
+    loadPromptMap("prompts");
     log.debug("AiPrompt initialized.");
   }
 
-  public static String getReviewPromptCommitMessages() {
-    log.debug("Constructing review prompt for commit messages.");
-    return joinWithSpace(
-        new ArrayList<>(
-            List.of(
-                String.format(
-                    DEFAULT_AI_REVIEW_PROMPT_COMMIT_MESSAGES,
-                    DEFAULT_AI_HOW_TO_FIND_COMMIT_MESSAGE),
-                DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES)));
+  // ---- Prompt value access ----
+
+  /** Returns a string prompt value by its JSON key. */
+  protected String prompt(String key) {
+    return (String) promptValues.get(key);
   }
 
+  /** Returns the replies-attributes map, which is a nested JSON object in prompts.json. */
+  @SuppressWarnings("unchecked")
+  public Map<String, String> getRepliesAttributes() {
+    if (repliesAttributes == null) {
+      Object raw = promptValues.get("DEFAULT_AI_REPLIES_ATTRIBUTES");
+      if (raw instanceof Map) {
+        repliesAttributes = new LinkedHashMap<>((Map<String, String>) raw);
+      } else {
+        repliesAttributes = new LinkedHashMap<>();
+      }
+    }
+    return repliesAttributes;
+  }
+
+  /**
+   * Loads a JSON prompt file into this instance's promptValues map.
+   * Later loads override earlier values for the same key, which correctly
+   * handles subclass overrides (e.g. DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS).
+   */
+  protected void loadPromptMap(String promptFilename) {
+    Map<String, Object> values = getJsonPromptValues(promptFilename);
+    Object repliesAttr = values.remove("DEFAULT_AI_REPLIES_ATTRIBUTES");
+    promptValues.putAll(values);
+    if (repliesAttr instanceof Map) {
+      @SuppressWarnings("unchecked")
+      Map<String, String> replies = (Map<String, String>) repliesAttr;
+      repliesAttributes = new LinkedHashMap<>(replies);
+    }
+  }
+
+  // ---- Convenience accessors ----
+
+  public String getDefaultAiSystemPromptInstructions() {
+    return prompt("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS");
+  }
+
+  public String getDefaultAiReviewPromptDirectives() {
+    return prompt("DEFAULT_AI_REVIEW_PROMPT_DIRECTIVES");
+  }
+
+  public String getDefaultAiPromptForceJsonFormat() {
+    return prompt("DEFAULT_AI_PROMPT_FORCE_JSON_FORMAT");
+  }
+
+  public String getDefaultAiRepliesPromptSpecs() {
+    return prompt("DEFAULT_AI_REPLIES_PROMPT_SPECS");
+  }
+
+  public String getDefaultAiRepliesPromptInline() {
+    return prompt("DEFAULT_AI_REPLIES_PROMPT_INLINE");
+  }
+
+  public String getDefaultAiRepliesPromptEnforceResponseCheck() {
+    return prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK");
+  }
+
+  public String getDefaultAiRequestPromptDiff() {
+    return prompt("DEFAULT_AI_REQUEST_PROMPT_DIFF");
+  }
+
+  public String getDefaultAiRequestPromptRequests() {
+    return prompt("DEFAULT_AI_REQUEST_PROMPT_REQUESTS");
+  }
+
+  public String getDefaultAiReviewPromptCommitMessages() {
+    return prompt("DEFAULT_AI_REVIEW_PROMPT_COMMIT_MESSAGES");
+  }
+
+  public String getDefaultAiReviewPromptInstructionsCommitMessages() {
+    return prompt("DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES");
+  }
+
+  public String getDefaultAiRelevanceRules() {
+    return prompt("DEFAULT_AI_RELEVANCE_RULES");
+  }
+
+  public String getDefaultAiHowToFindCommitMessage() {
+    return prompt("DEFAULT_AI_HOW_TO_FIND_COMMIT_MESSAGE");
+  }
+
+  // ---- Static utility ----
+
+  /** Reads a JSON prompt file and follows $extends chains. Returns merged key-value map. */
   public static Map<String, Object> getJsonPromptValues(String promptFilename) {
     String promptFile = String.format("config/%s.json", promptFilename);
     try (InputStreamReader reader = FileUtils.getInputStreamReader(promptFile)) {
@@ -116,32 +187,24 @@ public class AiPrompt {
     }
   }
 
-  protected void loadDefaultPrompts(String promptFilename) {
-    loadDefaultPrompts(this.getClass(), promptFilename);
+  // ---- Prompt building methods ----
+
+  public String getReviewPromptCommitMessages() {
+    log.debug("Constructing review prompt for commit messages.");
+    return joinWithSpace(
+        new ArrayList<>(
+            List.of(
+                String.format(
+                    getDefaultAiReviewPromptCommitMessages(),
+                    getDefaultAiHowToFindCommitMessage()),
+                getDefaultAiReviewPromptInstructionsCommitMessages())));
   }
 
-  protected void loadDefaultPrompts(Class<?> promptClass, String promptFilename) {
-    Map<String, Object> values = getJsonPromptValues(promptFilename);
-    for (Map.Entry<String, Object> entry : values.entrySet()) {
-      try {
-        Field field = promptClass.getField(entry.getKey());
-        field.setAccessible(true);
-        field.set(null, entry.getValue());
-        log.debug("Loaded prompt attribute: {} with value: {}", entry.getKey(), entry.getValue());
-      } catch (NoSuchFieldException | IllegalAccessException e) {
-        log.error("Error setting prompt '{}'", entry.getKey(), e);
-        throw new RuntimeException("Error setting prompt field", e);
-      }
-    }
-    // Keep the given order of attributes
-    DEFAULT_AI_REPLIES_ATTRIBUTES = new LinkedHashMap<>(DEFAULT_AI_REPLIES_ATTRIBUTES);
+  protected String buildFieldSpecifications(List<String> filterFields) {
+    return buildFieldSpecifications(filterFields, getRepliesAttributes());
   }
 
-  protected static String buildFieldSpecifications(List<String> filterFields) {
-    return buildFieldSpecifications(filterFields, DEFAULT_AI_REPLIES_ATTRIBUTES);
-  }
-
-  protected static String buildFieldSpecifications(
+  protected String buildFieldSpecifications(
       List<String> filterFields, Map<String, String> replyAttributes) {
     log.debug("Building field specifications for filter fields: {}", filterFields);
     Set<String> orderedFilterFields = new LinkedHashSet<>(filterFields);
@@ -160,7 +223,7 @@ public class AiPrompt {
             .collect(Collectors.toList());
 
     return String.format(
-        DEFAULT_AI_REPLIES_PROMPT_SPECS,
+        getDefaultAiRepliesPromptSpecs(),
         joinWithComma(attributes.keySet()),
         joinWithSemicolon(fieldDescription));
   }
@@ -171,7 +234,7 @@ public class AiPrompt {
     if (!config.isVotingEnabled()) {
       attributes.remove(ATTRIBUTE_SCORE);
     }
-    Map<String, String> replyAttributes = new LinkedHashMap<>(DEFAULT_AI_REPLIES_ATTRIBUTES);
+    Map<String, String> replyAttributes = new LinkedHashMap<>(getRepliesAttributes());
     updateScoreDescription(replyAttributes);
     updateRelevanceDescription(replyAttributes);
     return buildFieldSpecifications(attributes, replyAttributes);
@@ -179,13 +242,13 @@ public class AiPrompt {
 
   public String getPatchSetReviewPrompt() {
     log.debug("Getting patch set review prompt.");
-    return getPatchSetReviewPromptInstructions() + SPACE + DEFAULT_AI_REPLIES_PROMPT_INLINE;
+    return getPatchSetReviewPromptInstructions() + SPACE + getDefaultAiRepliesPromptInline();
   }
 
   private void updateScoreDescription(Map<String, String> replyAttributes) {
     log.debug("Updating score description.");
     String scoreDescription = replyAttributes.get(ATTRIBUTE_SCORE);
-    if (scoreDescription.contains("%s")) {
+    if (scoreDescription != null && scoreDescription.contains("%s")) {
       String votingRangeDescription =
           getPermittedVotingRange()
               .map(range -> String.format(" from %d to %d", range.getMin(), range.getMax()))
@@ -203,12 +266,22 @@ public class AiPrompt {
   private void updateRelevanceDescription(Map<String, String> replyAttributes) {
     log.debug("Updating relevance description.");
     String relevanceDescription = replyAttributes.get(ATTRIBUTE_RELEVANCE);
-    if (relevanceDescription.contains("%s")) {
+    if (relevanceDescription != null && relevanceDescription.contains("%s")) {
       String defaultAiRelevanceRules =
-          config.getString(Configuration.KEY_AI_RELEVANCE_RULES, DEFAULT_AI_RELEVANCE_RULES);
+          config.getString(Configuration.KEY_AI_RELEVANCE_RULES, getDefaultAiRelevanceRules());
       relevanceDescription = String.format(relevanceDescription, defaultAiRelevanceRules);
       replyAttributes.put(ATTRIBUTE_RELEVANCE, relevanceDescription);
       log.debug("Updated relevance description to: {}", relevanceDescription);
     }
+  }
+
+  // ---- Backward-compatibility bridge for subclasses still calling loadDefaultPrompts ----
+
+  protected void loadDefaultPrompts(String promptFilename) {
+    loadPromptMap(promptFilename);
+  }
+
+  protected void loadDefaultPrompts(Class<?> promptClass, String promptFilename) {
+    loadPromptMap(promptFilename);
   }
 }

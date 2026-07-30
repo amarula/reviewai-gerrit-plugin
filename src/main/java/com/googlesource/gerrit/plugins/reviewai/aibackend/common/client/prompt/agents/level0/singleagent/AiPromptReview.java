@@ -37,24 +37,21 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   private static final String RULE_NUMBER_PREFIX = "RULE #";
 
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS;
-  public static String DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_DONT_GUESS_CODE;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION;
+  // Lazy static cache for callers that do not have an instance.
+  private static volatile java.util.Map<String, Object> cachedReviewPrompts;
+
+  private static synchronized java.util.Map<String, Object> getCachedReviewPrompts() {
+    if (cachedReviewPrompts == null) {
+      cachedReviewPrompts = getJsonPromptValues("agents/level0/single-agent/prompts");
+    }
+    return cachedReviewPrompts;
+  }
+
+  /** Returns a prompt value without requiring an instance. */
+  public static String staticPrompt(String key) {
+    return (String) getCachedReviewPrompts().get(key);
+  }
+
 
   private final ICodeContextPolicy codeContextPolicy;
 
@@ -65,13 +62,13 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
     this.codeContextPolicy = codeContextPolicy;
-    loadDefaultPrompts("agents/level0/single-agent/prompts");
+    loadPromptMap("agents/level0/single-agent/prompts");
     log.debug("AiPromptReview initialized for change ID: {}", change.getFullChangeId());
   }
 
   public static String getRoutedReviewAgentInstructions(ReviewAssistantStage stage) {
     return switch (stage) {
-      case REVIEW_COMMIT_MESSAGE -> DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT;
+      case REVIEW_COMMIT_MESSAGE -> staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
       case REVIEW_CODE,
           REVIEW_REITERATED,
           REVIEW_SPECIALIZED_TRIAGE,
@@ -80,7 +77,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
           REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
           REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
           REVIEW_SPECIALIZED_VERIFICATION ->
-          DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT;
+          staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
     };
   }
 
@@ -89,7 +86,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     addReviewInstructions(instructions);
     if (includeCommitMessageReviewRequirement()) {
       instructions.add(getReviewPromptCommitMessages());
-      instructions.add(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION);
+      instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION"));
     }
     log.debug("AI Assistant Review Instructions added: {}", instructions);
   }
@@ -105,40 +102,40 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     List<String> sections = new ArrayList<>();
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
             config
                 .getConfiguredAiSystemPromptInstructions()
                 .orElseGet(
                     () ->
-                        resolveReviewInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS))));
+                        resolveReviewInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
             getScopeAndReviewConstraints()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES, getAiAssistantInstructionsReview()));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getAiAssistantInstructionsReview()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES")));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
             getMandatoryResponseFormat()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
             getPatchSetReviewPrompt()
                 + getCommitMessageLocationInstructionsIfNeeded()));
     if (includeCommitMessageReviewRequirement()) {
       sections.add(
           buildSection(
-              DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
+              prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT"),
               getReviewPromptCommitMessages()));
     }
 
@@ -151,7 +148,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     if (!includeCommitMessageReviewRequirement()) {
       return "";
     }
-    return "\n\n" + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION;
+    return "\n\n" + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION");
   }
 
   protected boolean includeCommitMessageReviewRequirement() {
@@ -172,17 +169,17 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(
-                        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES,
+                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES"),
                         getAiAssistantInstructionsReview(),
-                        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES,
-                        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT,
-                        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES))),
+                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES"),
+                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
+                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")))),
             getPatchSetReviewPrompt()));
     log.debug("Review instructions formed: {}", instructions);
   }
 
   protected String getScopeAndReviewConstraints() {
-    List<String> constraints = new ArrayList<>(List.of(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT));
+    List<String> constraints = new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT")));
     List<String> commonInstructions = new ArrayList<>();
     addCommonAiAssistantInstructions(commonInstructions, false);
     commonInstructions.stream()
@@ -193,7 +190,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String getMandatoryResponseFormat() {
     return joinWithNewLine(
-        splitString(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT.strip(), "\n").stream()
+        splitString(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT").strip(), "\n").stream()
             .map(String::strip)
             .filter(line -> !line.isEmpty())
             .filter(line -> !line.startsWith("//"))
@@ -219,8 +216,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     codeContextPolicy.addCodeContextPolicyAwareAssistantRule(rules);
     rules.addAll(
         List.of(
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET));
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
     if (includeConfiguredDirectives && config.getDirective() != null) {
       rules.addAll(config.getDirective());
     }
