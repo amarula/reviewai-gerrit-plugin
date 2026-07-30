@@ -69,7 +69,11 @@ public final class ResourceUtils {
     Path directory = Path.of(resource.toURI());
     try (var paths = Files.list(directory)) {
       for (Path path : paths.filter(Files::isRegularFile).sorted().toList()) {
-        String filename = path.getFileName().toString();
+        Path namePath = path.getFileName();
+        if (namePath == null) {
+          continue;
+        }
+        String filename = namePath.toString();
         if (filename.endsWith(resourceSuffix)) {
           try (InputStream inputStream = Files.newInputStream(path)) {
             consumer.accept(filename, inputStream);

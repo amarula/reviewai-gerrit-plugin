@@ -67,7 +67,7 @@ public class PatchSetReviewer {
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
   private List<GerritComment> commentProperties;
-  private List<Double> reviewScores;
+  private List<Double> reviewScores = new ArrayList<>();
 
   @Inject
   public PatchSetReviewer(
@@ -215,6 +215,9 @@ public class PatchSetReviewer {
   }
 
   private void setPatchSetReviewBatchMap(ReviewBatch batchMap, AiReplyItem replyItem) {
+    if (gerritCommentRange == null) {
+      return;
+    }
     Optional<GerritCodeRange> optGerritCommentRange =
         gerritCommentRange.getGerritCommentRange(replyItem);
     if (optGerritCommentRange.isPresent()) {
