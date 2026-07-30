@@ -234,7 +234,11 @@ public class PluginDataHandler {
   }
 
   private static String scopeFrom(Path configFilePath) {
-    String fileName = configFilePath.getFileName().toString();
+    Path namePath = configFilePath.getFileName();
+    if (namePath == null) {
+      return configFilePath.toString();
+    }
+    String fileName = namePath.toString();
     return fileName.endsWith(PATH_SUFFIX)
         ? fileName.substring(0, fileName.length() - PATH_SUFFIX.length())
         : fileName;
