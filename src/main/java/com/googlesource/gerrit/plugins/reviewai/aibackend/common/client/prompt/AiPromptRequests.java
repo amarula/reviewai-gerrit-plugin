@@ -30,7 +30,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithS
 
 @Slf4j
 public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS;
+  // prompts loaded via map
 
   public AiPromptRequests(
       Configuration config,
@@ -38,7 +38,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts("promptsAiRequests");
+    loadPromptMap("promptsAiRequests");
     log.debug("AiPromptRequests initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -46,7 +46,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
   public void addAiAssistantInstructions(List<String> instructions) {
     instructions.addAll(
         List.of(
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS,
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS"),
             getCommentRequestPrompt(changeSetData.getCommentPropertiesSize())));
     log.debug("AI Assistant Instructions for requests added: {}", instructions);
   }
@@ -71,10 +71,10 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
 
     List<String> promptSections = new ArrayList<>();
     if (patchSet != null && !patchSet.isEmpty()) {
-      promptSections.add(DEFAULT_AI_REQUEST_PROMPT_DIFF);
+      promptSections.add(prompt("DEFAULT_AI_REQUEST_PROMPT_DIFF"));
       promptSections.add(String.format("```%s```", patchSet));
     }
-    promptSections.add(DEFAULT_AI_REQUEST_PROMPT_REQUESTS);
+    promptSections.add(prompt("DEFAULT_AI_REQUEST_PROMPT_REQUESTS"));
     promptSections.add(requestDataPrompt);
     String prompt = joinWithSpace(promptSections);
     log.debug("AI thread review message for requests: {}", prompt);
@@ -89,10 +89,10 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
         new ArrayList<>(
             List.of(
                 buildFieldSpecifications(REQUEST_REPLY_ATTRIBUTES),
-                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT,
-                DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES,
-                DEFAULT_AI_REPLIES_PROMPT_INLINE,
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES"),
+                prompt("DEFAULT_AI_REPLIES_PROMPT_INLINE"),
                 String.format(
-                    DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK, commentPropertiesSize))));
+                    prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK"), commentPropertiesSize))));
   }
 }

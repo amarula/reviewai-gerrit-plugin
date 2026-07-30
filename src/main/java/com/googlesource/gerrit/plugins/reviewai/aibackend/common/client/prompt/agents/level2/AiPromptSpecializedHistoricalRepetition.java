@@ -22,11 +22,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 
 public class AiPromptSpecializedHistoricalRepetition extends AiPromptSpecializedReviewCollector {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES;
-  public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION;
 
   public AiPromptSpecializedHistoricalRepetition(
       Configuration config,
@@ -43,21 +38,21 @@ public class AiPromptSpecializedHistoricalRepetition extends AiPromptSpecialized
 
   @Override
   protected String getCollectorRole() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION");
   }
 
   @Override
   protected String getCollectorRules() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES");
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT");
   }
 
   @Override
   protected String getCollectorMessage() {
-    return DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION;
+    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION");
   }
 }

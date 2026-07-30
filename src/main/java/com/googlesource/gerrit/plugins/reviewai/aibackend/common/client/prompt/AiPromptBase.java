@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -32,14 +33,23 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 @Slf4j
 public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
-  public static String DEFAULT_AI_ASSISTANT_NAME;
-  public static String DEFAULT_AI_ASSISTANT_DESCRIPTION;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FILE_CONTEXT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES;
-  public static String DEFAULT_AI_MESSAGE_REQUEST_RESEND_FORMATTED;
-  public static String DEFAULT_AI_MESSAGE_REVIEW;
+
+  // Lazy static cache for callers that don't have an instance (e.g. CodeContextPolicyNone).
+  private static volatile Map<String, Object> cachedPromptsAi;
+
+  private static synchronized Map<String, Object> getCachedPromptsAi() {
+    if (cachedPromptsAi == null) {
+      cachedPromptsAi = getJsonPromptValues("promptsAi");
+    }
+    return cachedPromptsAi;
+  }
+
+  /** Returns a prompt value from promptsAi.json without requiring an instance. */
+  public static String staticPrompt(String key) {
+    return (String) getCachedPromptsAi().get(key);
+  }
+
+  // ---- Instance fields ----
 
   protected final ChangeSetData changeSetData;
   protected final GerritChange change;
@@ -57,10 +67,46 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
     this.isCommentEvent = change.getIsCommentEvent();
-    loadDefaultPrompts("promptsAi");
-    this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_REVIEW;
+    loadPromptMap("promptsAi");
+    this.defaultAiMessageReview = prompt("DEFAULT_AI_MESSAGE_REVIEW");
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
   }
+
+  // ---- Convenience accessors ----
+
+  public String getDefaultAiAssistantName() {
+    return prompt("DEFAULT_AI_ASSISTANT_NAME");
+  }
+
+  public String getDefaultAiAssistantDescription() {
+    return prompt("DEFAULT_AI_ASSISTANT_DESCRIPTION");
+  }
+
+  public String getDefaultAiAssistantInstructionsFileContext() {
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FILE_CONTEXT");
+  }
+
+  public String getDefaultAiAssistantInstructionsNoFileContext() {
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT");
+  }
+
+  public String getDefaultAiAssistantInstructionsResponseFormat() {
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT");
+  }
+
+  public String getDefaultAiAssistantInstructionsResponseExamples() {
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES");
+  }
+
+  public String getDefaultAiMessageRequestResendFormatted() {
+    return prompt("DEFAULT_AI_MESSAGE_REQUEST_RESEND_FORMATTED");
+  }
+
+  public String getDefaultAiMessageReview() {
+    return prompt("DEFAULT_AI_MESSAGE_REVIEW");
+  }
+
+  // ---- Abstract and instance methods ----
 
   public abstract void addAiAssistantInstructions(List<String> instructions);
 
@@ -80,8 +126,9 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
   }
 
-  protected String getDefaultAiSystemPromptInstructions() {
-    return DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS;
+  @Override
+  public String getDefaultAiSystemPromptInstructions() {
+    return prompt("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS");
   }
 
   public String getDefaultAiAssistantInstructions() {
