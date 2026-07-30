@@ -59,7 +59,9 @@ pipeline {
                 cpd(pattern: '**/target/cpd.xml'),
                 spotBugs(pattern: '**/target/spotbugsXml.xml')
               ],
-              qualityGates: []
+              qualityGates: [
+                  [threshold: 1, type: 'NEW', criticality: 'ERROR']
+              ]
             )
           }
         }
