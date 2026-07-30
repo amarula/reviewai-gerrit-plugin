@@ -11,13 +11,14 @@ node('android-build') {
 
     def ui = new Ui.Builder(this)
         .addStringParameter("BRANCH", "main", "Branch or tag to be built")
+        .addStringParameter("GERRIT_REF_TAG", "v3.14.0", "Gerrit reference server build")
         .addBooleanParameter("KEEP_BUILD", false, "If you want to keep build select it")
         .build()
 
     def repoUrl = 'https://gerrithub.io/a/amarula/chatgpt-code-review-gerrit-plugin.git'
     def ver = new Build(this, env, credentials)
 
-    final def GERRIT_TAG = 'v3.14.2'
+    final def GERRIT_TAG = GERRIT_REF_TAG?.trim() ?: 'v3.14.0'
     final def GERRIT_REPO = 'https://gerrit.googlesource.com/gerrit'
 
     final def options = ['dockerImage': dockerImage, branch: "${BRANCH}", 'history': true,
@@ -119,25 +120,24 @@ node('android-build') {
                 def jarPath = 'reviewai-gerrit-plugin.jar'
                 archiveArtifacts artifacts: jarPath, fingerprint: true, onlyIfSuccessful: true
 
-                // Only create a GitHub release when branchParam is a real tag.
-                // isTag and tagCommitish were determined inside Docker during Setup.
-                if (branchParam != 'master' && isTag) {
-                    createGitHubRelease(
-                        credentialId: 'github-release-token',
-                        repository: 'amarula/reviewai-gerrit-plugin',
-                        tag: branchParam,
-                        commitish: tagCommitish,
-                        generateReleaseNotes: true
-                    )
-                    uploadGithubReleaseAsset(
-                        credentialId: 'github-release-token',
-                        repository: 'amarula/reviewai-gerrit-plugin',
-                        tagName: branchParam,
-                        uploadAssets: [[filePath: jarPath]],
-                    )
-                }
-
                 if (KEEP_BUILD.toBoolean()) {
+                    // Only create a GitHub release when branchParam is a real tag.
+                    // isTag and tagCommitish were determined inside Docker during Setup.
+                    if (branchParam != 'master' && isTag) {
+                        createGitHubRelease(
+                            credentialId: 'github-release-token',
+                            repository: 'amarula/reviewai-gerrit-plugin',
+                            tag: branchParam,
+                            commitish: tagCommitish,
+                            generateReleaseNotes: true
+                        )
+                        uploadGithubReleaseAsset(
+                            credentialId: 'github-release-token',
+                            repository: 'amarula/reviewai-gerrit-plugin',
+                            tagName: branchParam,
+                            uploadAssets: [[filePath: jarPath]],
+                        )
+                    }
                     currentBuild.setKeepLog(true)
                 }
 
