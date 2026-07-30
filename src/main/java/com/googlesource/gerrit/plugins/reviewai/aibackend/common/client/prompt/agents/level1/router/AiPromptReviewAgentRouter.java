@@ -20,20 +20,18 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 
 public class AiPromptReviewAgentRouter extends AiPrompt {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER;
-  public static String DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER;
 
   public AiPromptReviewAgentRouter(Configuration config) {
     super(config);
-    loadDefaultPrompts("agents/level1/router/prompts");
+    loadPromptMap("agents/level1/router/prompts");
   }
 
   public String getDefaultAiAssistantInstructions() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER");
   }
 
   public String getDefaultAiThreadReviewMessage(String requestData) {
     return String.format(
-        DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER, requestData == null ? "" : requestData);
+        prompt("DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER"), requestData == null ? "" : requestData);
   }
 }
