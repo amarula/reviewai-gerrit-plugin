@@ -26,10 +26,6 @@ import java.util.List;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 public class AiPromptSpecializedReviewTriage extends AiPromptReview {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_TRIAGE;
 
   public AiPromptSpecializedReviewTriage(
       Configuration config,
@@ -37,22 +33,22 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts("agents/level2/triage/prompts");
-    this.defaultAiMessageReview = DEFAULT_AI_MESSAGE_SPECIALIZED_TRIAGE;
+    loadPromptMap("agents/level2/triage/prompts");
+    this.defaultAiMessageReview = prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_TRIAGE");
   }
 
   @Override
   public String getDefaultAiAssistantInstructions() {
     return joinWithDoubleNewLine(
         List.of(
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE),
+            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")),
             buildSection("Available Specialized Agents", getAvailableSpecializedAgents()),
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS, getScopeAndReviewConstraints()),
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES, getAiAssistantInstructionsReview()),
+            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"), getScopeAndReviewConstraints()),
+            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getAiAssistantInstructionsReview()),
             buildSection(
-                DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+                prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
                 getTriageResponseFormat()),
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE, DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE)));
+            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE"))));
   }
 
   private String getAvailableSpecializedAgents() {
@@ -62,7 +58,7 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
 
   private String getTriageResponseFormat() {
     return String.format(
-        DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_FORMAT,
+        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_FORMAT"),
         "COMMIT_MESSAGE, " + SpecializedReviewAgentDefinitions.agentNames());
   }
 }
