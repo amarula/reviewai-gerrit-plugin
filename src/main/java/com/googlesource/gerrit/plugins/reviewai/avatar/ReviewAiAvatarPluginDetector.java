@@ -56,7 +56,10 @@ public class ReviewAiAvatarPluginDetector {
     try (Stream<Path> plugins = Files.list(sitePaths.plugins_dir)) {
       return plugins
           .filter(Files::isRegularFile)
-          .filter(path -> !path.getFileName().toString().endsWith(".disabled"))
+          .filter(path -> {
+            Path namePath = path.getFileName();
+            return namePath != null && !namePath.toString().endsWith(".disabled");
+          })
           .anyMatch(this::isAvatarsGravatarPlugin);
     } catch (IOException e) {
       return false;
