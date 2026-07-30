@@ -22,11 +22,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 
 public class AiPromptSpecializedConsolidation extends AiPromptSpecializedReviewCollector {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES;
-  public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION;
 
   public AiPromptSpecializedConsolidation(
       Configuration config,
@@ -43,21 +38,21 @@ public class AiPromptSpecializedConsolidation extends AiPromptSpecializedReviewC
 
   @Override
   protected String getCollectorRole() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION");
   }
 
   @Override
   protected String getCollectorRules() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES");
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT");
   }
 
   @Override
   protected String getCollectorMessage() {
-    return DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION;
+    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION");
   }
 }

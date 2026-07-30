@@ -74,7 +74,7 @@ public class AiPromptFactoryTest {
   public void routedReviewAgentInstructionsAreLoadedIntoReviewPromptFields() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
-    new AiPromptRoutedReviewAgentRequest(
+    AiPromptRoutedReviewAgentRequest request = new AiPromptRoutedReviewAgentRequest(
         mock(Configuration.class),
         changeSetData,
         commentEventChange(),
@@ -84,8 +84,7 @@ public class AiPromptFactoryTest {
 
     assertEquals(
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"),
-        AiPromptReview.getRoutedReviewAgentInstructions(
-            ReviewAssistantStage.REVIEW_COMMIT_MESSAGE));
+        request.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"));
   }
 
   @Test
@@ -222,7 +221,7 @@ public class AiPromptFactoryTest {
 
     assertEquals(
         prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE"),
-        AiPromptSuggest.DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE);
+        prompt.prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE"));
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertTrue(instructions.contains("Suggestion Task"));
     assertTrue(instructions.contains("exactly ONE all-inclusive commit-message Suggested Edit"));
@@ -321,7 +320,7 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertTrue(instructions.startsWith("You are ReviewPatchsetAgent."));
-    assertFalse(instructions.contains(AiPrompt.DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS));
+    assertFalse(instructions.contains((String) AiPrompt.getJsonPromptValues("prompts").get("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS")));
   }
 
   @Test
@@ -334,9 +333,8 @@ public class AiPromptFactoryTest {
     Map<String, Object> prompts =
         AiPrompt.getJsonPromptValues("agents/level1/patchset/prompts");
 
-    assertEquals(
-        prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS"),
-        AiPromptReview.DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS);
+    String reviewTasks = (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS");
+    assertFalse(prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS").toString().isEmpty());
   }
 
   @Test

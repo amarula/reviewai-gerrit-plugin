@@ -40,7 +40,12 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
   }
 
   @Override
-  protected String getDefaultAiSystemPromptInstructions() {
-    return AiPromptReview.getRoutedReviewAgentInstructions(changeSetData.getReviewAssistantStage());
+  public String getDefaultAiSystemPromptInstructions() {
+    return switch (changeSetData.getReviewAssistantStage()) {
+      case REVIEW_COMMIT_MESSAGE ->
+          prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
+      default ->
+          prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
+    };
   }
 }

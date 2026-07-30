@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview.DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 
 @Slf4j
 public class CodeContextPolicyOnDemand extends CodeContextPolicyBase implements ICodeContextPolicy {
@@ -39,7 +39,7 @@ public class CodeContextPolicyOnDemand extends CodeContextPolicyBase implements 
 
   @Override
   public void addCodeContextPolicyAwareAssistantRule(List<String> rules) {
-    rules.add(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST);
+    rules.add(AiPromptReview.staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST"));
     log.debug("Added Assistant Rules for On-Demand code context policy");
   }
 }
