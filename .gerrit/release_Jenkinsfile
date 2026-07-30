@@ -1,0 +1,150 @@
+#!groovy
+
+@Library('ci_scripts')
+@Library('repo_jenkins_lib')
+import com.amarula.build.Build
+import com.amarula.ui.Ui
+
+node('android-build') {
+    def dockerImage = 'gerrit-plugin-builder:1.0'
+    def credentials = 'gerrithub'
+
+    def ui = new Ui.Builder(this)
+        .addStringParameter("BRANCH", "main", "Branch or tag to be built")
+        .addBooleanParameter("KEEP_BUILD", false, "If you want to keep build select it")
+        .build()
+
+    def repoUrl = 'https://gerrithub.io/a/amarula/chatgpt-code-review-gerrit-plugin.git'
+    def ver = new Build(this, env, credentials)
+
+    final def GERRIT_TAG = 'v3.14.2'
+    final def GERRIT_REPO = 'https://gerrit.googlesource.com/gerrit'
+
+    final def options = ['dockerImage': dockerImage, branch: "${BRANCH}", 'history': true,
+        intermediateDocker: false, proxyCache: false]
+
+    def isTag = false
+    def tagCommitish = ''
+    def branchParam = BRANCH?.trim() ?: 'main'
+
+    try {
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+            ver.build(repoUrl, [
+                'Setup': {
+                    // Check whether branchParam is a tag and capture its commit
+                    // SHA while we're inside Docker with the repo checked out.
+                    isTag = sh(
+                        returnStatus: true,
+                        script: 'git rev-parse --verify "refs/tags/' + branchParam + '" >/dev/null 2>&1'
+                    ) == 0
+                    if (isTag) {
+                        tagCommitish = sh(
+                            returnStdout: true,
+                            script: 'git rev-parse HEAD'
+                        ).trim()
+                    }
+                    sh """#!/bin/bash -el
+                        # Jenkins (via the Build class) checks the plugin
+                        # out into a subdirectory of WORKSPACE named after the
+                        # repo — that is PWD.  We must:
+                        #   1. Move the plugin source aside into plugin-source/.
+                        #   2. Clone Gerrit into WORKSPACE (the *parent* of PWD).
+                        #   3. Symlink plugin-source/ → WORKSPACE/plugins/reviewai-gerrit-plugin
+                        #      so Bazel finds //plugins/reviewai-gerrit-plugin.
+                        if [ ! -d plugin-source ]; then
+                            mkdir plugin-source
+                            shopt -s dotglob nullglob
+                            for item in * .*; do
+                                case "\${item}" in plugin-source|.|..) continue ;; esac
+                                if [ -e "\${item}" ]; then
+                                    mv "\${item}" plugin-source/
+                                fi
+                            done
+                            shopt -u dotglob nullglob
+                        fi
+
+                        if [ ! -f "\${WORKSPACE}/WORKSPACE.bzlmod" ]; then
+                            git clone --depth 1 --branch "${GERRIT_TAG}" \
+                                --recurse-submodules --shallow-submodules \
+                                "${GERRIT_REPO}" /tmp/gerrit-clone
+
+                            shopt -s dotglob nullglob
+                            for item in /tmp/gerrit-clone/* /tmp/gerrit-clone/.*; do
+                                case "\${item}" in */.|*/..) continue ;; esac
+                                if [ -e "\${item}" ]; then
+                                    mv "\${item}" "\${WORKSPACE}/"
+                                fi
+                            done
+                            shopt -u dotglob nullglob
+
+                            rmdir /tmp/gerrit-clone
+                        fi
+
+                        # Symlink into Gerrit's existing plugins/ directory at
+                        # the workspace root — Bazel resolves //plugins/... from
+                        # WORKSPACE, not from PWD.
+                        ln -sfn "\${PWD}/plugin-source" "\${WORKSPACE}/plugins/reviewai-gerrit-plugin"
+
+                        # Symlink the plugin's external dependency file into
+                        # plugins/ so the in-tree build uses the plugin-specific
+                        # deps instead of the shared no-op stubs.
+                        ln -sfn "\${WORKSPACE}/plugins/reviewai-gerrit-plugin/external_plugin_deps.MODULE.bazel" \
+                            "\${WORKSPACE}/plugins/external_plugin_deps.MODULE.bazel"
+                    """
+                },
+
+                'Build': {
+                    sh """#!/bin/bash -el
+                        JOBS="\${BAZEL_JOBS:-\$(nproc)}"
+                        bazel build \
+                            --jobs="\${JOBS}" \
+                            //plugins/reviewai-gerrit-plugin/...
+
+                        # Copy the built jar to the workspace root, dereferencing
+                        # the bazel-bin symlink.  bazel-bin is at WORKSPACE (the
+                        # Gerrit tree root), but PWD is the plugin checkout
+                        # directory one level below.  The symlink target is a
+                        # container-internal path that doesn't resolve on the
+                        # Jenkins host, so we write a real file instead.
+                        cp -L "\${WORKSPACE}/bazel-bin/plugins/reviewai-gerrit-plugin/reviewai-gerrit-plugin.jar" \
+                            "\${WORKSPACE}/reviewai-gerrit-plugin.jar"
+                    """
+                }
+            ], options)
+        }
+        if (currentBuild.result == 'FAILURE' || currentBuild.result == 'UNSTABLE') {
+            explainError()
+        } else {
+            notification.monitoredStage('Deploy') {
+                def jarPath = 'reviewai-gerrit-plugin.jar'
+                archiveArtifacts artifacts: jarPath, fingerprint: true, onlyIfSuccessful: true
+
+                // Only create a GitHub release when branchParam is a real tag.
+                // isTag and tagCommitish were determined inside Docker during Setup.
+                if (branchParam != 'master' && isTag) {
+                    createGitHubRelease(
+                        credentialId: 'github-release-token',
+                        repository: 'amarula/reviewai-gerrit-plugin',
+                        tag: branchParam,
+                        commitish: tagCommitish,
+                        generateReleaseNotes: true
+                    )
+                    uploadGithubReleaseAsset(
+                        credentialId: 'github-release-token',
+                        repository: 'amarula/reviewai-gerrit-plugin',
+                        tagName: branchParam,
+                        uploadAssets: [[filePath: jarPath]],
+                    )
+                }
+
+                if (KEEP_BUILD.toBoolean()) {
+                    currentBuild.setKeepLog(true)
+                }
+
+                notification.notifySuccess()
+            }
+        }
+    } finally {
+        cleanWs()
+    }
+}
