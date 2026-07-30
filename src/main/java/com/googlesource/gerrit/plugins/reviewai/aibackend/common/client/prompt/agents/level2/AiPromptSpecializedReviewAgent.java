@@ -27,10 +27,6 @@ import java.util.List;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW;
 
   public AiPromptSpecializedReviewAgent(
       Configuration config,
@@ -38,7 +34,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts("agents/level2/specialized/prompts");
+    loadPromptMap("agents/level2/specialized/prompts");
   }
 
   @Override
@@ -48,14 +44,14 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     }
 
     List<String> sections = new ArrayList<>();
-    sections.add(buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, getSpecializationInstructions()));
+    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
             getScopeAndReviewConstraints()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
             getAiAssistantInstructionsReviewWithoutDirectives()));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
@@ -63,16 +59,16 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     }
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
             getSpecializedReplyFieldDefinitions(true)));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT")));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES")));
     return joinWithDoubleNewLine(sections);
   }
 
@@ -80,15 +76,15 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     List<String> sections = new ArrayList<>();
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE,
-            resolveCommitMessageInstructions(DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES)));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
+            resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
             getScopeAndReviewConstraints()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
             getAiAssistantInstructionsReviewWithoutDirectives(false, true, false)));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
@@ -96,24 +92,24 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     }
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT"),
             getReviewPromptCommitMessages()));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS,
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
             getSpecializedReplyFieldDefinitions(false)));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES")));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT")));
     sections.add(
         buildSection(
-            DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE,
-            DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES")));
     return joinWithDoubleNewLine(sections);
   }
 
@@ -133,7 +129,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         + "`reasoning`: evidence, triggering condition, and why the issue matters; "
         + "`preexisting`: true only when the concern existed before this patch; "
         + locations
-        + DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION
+        + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION")
         + " "
         + "Specialized agents must not write final Gerrit comments and must not include `reply`, `score`, `relevance`, `duplicated`, `repeated`, `conflicting`, or `source_agent` fields.";
   }
@@ -143,6 +139,6 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     if (changeSetData.getSpecializedAgentName() == null) {
       return super.getDefaultAiThreadReviewMessage(patchSet);
     }
-    return String.format(DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW, patchSet);
+    return String.format(prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW"), patchSet);
   }
 }

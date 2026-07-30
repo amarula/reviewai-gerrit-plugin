@@ -22,11 +22,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 
 public class AiPromptSpecializedConflictResolution extends AiPromptSpecializedReviewCollector {
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION;
-  public static String DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RULES;
-  public static String
-      DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT;
-  public static String DEFAULT_AI_MESSAGE_SPECIALIZED_CONFLICT_RESOLUTION;
 
   public AiPromptSpecializedConflictResolution(
       Configuration config,
@@ -43,21 +38,21 @@ public class AiPromptSpecializedConflictResolution extends AiPromptSpecializedRe
 
   @Override
   protected String getCollectorRole() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION");
   }
 
   @Override
   protected String getCollectorRules() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RULES;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RULES");
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT;
+    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT");
   }
 
   @Override
   protected String getCollectorMessage() {
-    return DEFAULT_AI_MESSAGE_SPECIALIZED_CONFLICT_RESOLUTION;
+    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_CONFLICT_RESOLUTION");
   }
 }
