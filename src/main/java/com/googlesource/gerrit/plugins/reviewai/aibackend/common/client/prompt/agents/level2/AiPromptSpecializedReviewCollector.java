@@ -33,7 +33,7 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
       ICodeContextPolicy codeContextPolicy,
       String promptResource) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts(promptResource);
+    loadPromptMap(promptResource);
     this.defaultAiMessageReview = getCollectorMessage();
   }
 
@@ -41,11 +41,11 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
   public String getDefaultAiAssistantInstructions() {
     return joinWithDoubleNewLine(
         List.of(
-            buildSection(DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE, getCollectorRole()),
+            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getCollectorRole()),
             buildSection(
-                DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES, getCollectorRules()),
+                prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getCollectorRules()),
             buildSection(
-                DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT,
+                prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
                 getCollectorResponseFormat())));
   }
 
