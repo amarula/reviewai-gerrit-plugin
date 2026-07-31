@@ -239,9 +239,19 @@ public class ReviewAiDb {
     }
   }
 
-  public static void stopManagedTcpServer() {
+  /**
+   * Stops the managed TCP server <em>only</em> if this instance's JDBC URL is the one currently
+   * registered as {@link #managedJdbcUrl}.
+   *
+   * <p>During a plugin reload, Gerrit calls {@code start()} on the new plugin before {@code stop()}
+   * on the old one. The new {@code ReviewAiDb} constructor calls {@link #ensureTcpServerStarted()},
+   * which overwrites {@code managedJdbcUrl} with the new instance's URL. When the old instance's
+   * {@code stop()} fires, this guard prevents it from shutting down the TCP server that the new
+   * plugin is still using.
+   */
+  public void stopManagedTcpServerIfOwner() {
     synchronized (TCP_SERVER_LOCK) {
-      if (managedJdbcUrl != null) {
+      if (managedJdbcUrl != null && managedJdbcUrl.equals(jdbcUrl)) {
         try (Connection c = DriverManager.getConnection(managedJdbcUrl);
             Statement s = c.createStatement()) {
           s.execute("SHUTDOWN");
@@ -250,7 +260,7 @@ public class ReviewAiDb {
         }
         managedJdbcUrl = null;
       }
-      if (tcpServer != null) {
+      if (managedJdbcUrl == null && tcpServer != null) {
         tcpServer.stop();
         tcpServer = null;
       }
