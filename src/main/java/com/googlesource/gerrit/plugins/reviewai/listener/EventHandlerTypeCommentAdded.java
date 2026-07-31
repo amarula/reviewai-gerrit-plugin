@@ -18,12 +18,16 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.gerrit.server.data.ApprovalAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.AiReviewConditionLabelResolver;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -101,36 +105,46 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
 
   private boolean shouldStartDeferredReview() {
     String applicableIf = config.getAiReviewApplicableIf();
-    if (applicableIf.isBlank() || !hasApprovalUpdate()) {
-      return false;
-    }
-    Integer existingAiVote = gerritClient.getCodeReviewValue(change);
-    if (existingAiVote != null) {
-      log.debug(
-          "AI already reviewed change {} with Code-Review {}, skipping deferred review",
-          change.getFullChangeId(),
-          existingAiVote);
+    if (applicableIf.isBlank() || !hasConditionLabelTransition(applicableIf)) {
       return false;
     }
     if (!aiReviewApplicabilityChecker.isApplicable(change, applicableIf)) {
       return false;
     }
     log.info(
-        "AI review applicability expression '{}' became satisfied for change {}",
+        "AI review applicability expression '{}' is satisfied after a condition label update for"
+            + " change {}",
         applicableIf,
         change.getFullChangeId());
     return true;
   }
 
-  private boolean hasApprovalUpdate() {
+  private boolean hasConditionLabelTransition(String applicableIf) {
     CommentAddedEvent commentEvent = (CommentAddedEvent) change.getPatchSetEvent();
     try {
       ApprovalAttribute[] approvals =
           commentEvent.approvals == null ? null : commentEvent.approvals.get();
-      return approvals != null && approvals.length > 0;
+      Set<String> conditionLabels =
+          AiReviewConditionLabelResolver.extractConditionLabels(applicableIf);
+      return approvals != null
+          && Arrays.stream(approvals)
+              .anyMatch(
+                  approval ->
+                      isConditionLabel(approval.type, conditionLabels)
+                          && hasChangedStatus(approval));
     } catch (RuntimeException e) {
       log.warn("Could not read approval updates for change {}", change.getFullChangeId(), e);
       return false;
     }
+  }
+
+  private static boolean isConditionLabel(String label, Set<String> conditionLabels) {
+    return label != null
+        && conditionLabels.stream().anyMatch(labelName -> labelName.equalsIgnoreCase(label));
+  }
+
+  private static boolean hasChangedStatus(ApprovalAttribute approval) {
+    // Gerrit leaves oldValue == null when a submitted vote is unchanged.
+    return approval.oldValue != null && !Objects.equals(approval.oldValue, approval.value);
   }
 }

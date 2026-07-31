@@ -71,7 +71,7 @@ public final class AiReviewConditionLabelResolver {
     return result;
   }
 
-  private static Set<String> extractConditionLabels(String expression) {
+  public static Set<String> extractConditionLabels(String expression) {
     if (expression == null || expression.isBlank()) {
       return Set.of();
     }

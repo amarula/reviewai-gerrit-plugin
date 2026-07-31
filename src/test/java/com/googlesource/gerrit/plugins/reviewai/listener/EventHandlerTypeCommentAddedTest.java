@@ -64,7 +64,6 @@ public class EventHandlerTypeCommentAddedTest {
 
     when(config.getAiReviewApplicableIf()).thenReturn(EXPRESSION);
     when(change.getPatchSetEvent()).thenReturn(event);
-    when(gerritClient.getCodeReviewValue(change)).thenReturn(null);
     handler =
         new EventHandlerTypeCommentAdded(
             config,
@@ -78,7 +77,8 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void startsDeferredReviewAfterMatchingApprovalUpdate() {
-    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {new ApprovalAttribute()});
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
     when(applicabilityChecker.isApplicable(change, EXPRESSION)).thenReturn(true);
 
     assertEquals(PreprocessResult.SWITCH_TO_PATCH_SET_CREATED, handler.preprocessEvent());
@@ -90,7 +90,7 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void doesNotStartDeferredReviewWhenExpressionDoesNotMatch() {
-    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {new ApprovalAttribute()});
+    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
 
     assertEquals(PreprocessResult.EXIT, handler.preprocessEvent());
 
@@ -109,14 +109,61 @@ public class EventHandlerTypeCommentAddedTest {
   }
 
   @Test
-  public void existingAiVotePreventsDeferredReview() {
-    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {new ApprovalAttribute()});
+  public void existingAiVoteDoesNotPreventReviewAfterConditionLabelChanges() {
+    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
     when(gerritClient.getCodeReviewValue(change)).thenReturn(1);
+    when(applicabilityChecker.isApplicable(change, EXPRESSION)).thenReturn(true);
+
+    assertEquals(PreprocessResult.SWITCH_TO_PATCH_SET_CREATED, handler.preprocessEvent());
+
+    verify(gerritClient, never()).getCodeReviewValue(change);
+    verify(changeSetData).setForcedReview(true);
+    verify(changeSetData).setDeferredReview(true);
+  }
+
+  @Test
+  public void doesNotReevaluateExpressionWhenConditionLabelDidNotChange() {
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", null, "1")});
 
     assertEquals(PreprocessResult.EXIT, handler.preprocessEvent());
 
     verify(applicabilityChecker, never()).isApplicable(change, EXPRESSION);
     verify(changeSetData, never()).setForcedReview(true);
     verify(changeSetData, never()).setDeferredReview(true);
+  }
+
+  @Test
+  public void doesNotReevaluateExpressionWhenUnrelatedLabelChanges() {
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Code-Review", "0", "1")});
+
+    assertEquals(PreprocessResult.EXIT, handler.preprocessEvent());
+
+    verify(applicabilityChecker, never()).isApplicable(change, EXPRESSION);
+    verify(changeSetData, never()).setForcedReview(true);
+    verify(changeSetData, never()).setDeferredReview(true);
+  }
+
+  @Test
+  public void reevaluatesWhenAnyConditionLabelChanges() {
+    String expression = "label:Verified>=1 OR label:Code-Review>=2";
+    when(config.getAiReviewApplicableIf()).thenReturn(expression);
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Code-Review", "1", "2")});
+    when(applicabilityChecker.isApplicable(change, expression)).thenReturn(true);
+
+    assertEquals(PreprocessResult.SWITCH_TO_PATCH_SET_CREATED, handler.preprocessEvent());
+
+    verify(changeSetData).setForcedReview(true);
+    verify(changeSetData).setDeferredReview(true);
+  }
+
+  private static ApprovalAttribute approval(String type, String oldValue, String value) {
+    ApprovalAttribute approval = new ApprovalAttribute();
+    approval.type = type;
+    approval.oldValue = oldValue;
+    approval.value = value;
+    return approval;
   }
 }
