@@ -33,6 +33,7 @@ import com.google.gerrit.extensions.api.changes.Changes;
 import com.google.gerrit.extensions.common.SubmitRequirementInput;
 import com.google.gerrit.extensions.common.SubmitRequirementResultInfo;
 import com.google.gerrit.extensions.restapi.BadRequestException;
+import com.google.gerrit.extensions.restapi.ResourceNotFoundException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import org.junit.Before;
@@ -98,6 +99,14 @@ public class AiReviewApplicabilityCheckerTest {
   @Test
   public void apiErrorFailsClosed() throws Exception {
     when(changeApi.checkSubmitRequirement(any())).thenThrow(new BadRequestException("failed"));
+
+    assertFalse(checker.isApplicable(change, EXPRESSION));
+  }
+
+  @Test
+  public void notFoundFailsClosedQuietly() throws Exception {
+    when(changeApi.checkSubmitRequirement(any()))
+        .thenThrow(new ResourceNotFoundException("not found"));
 
     assertFalse(checker.isApplicable(change, EXPRESSION));
   }

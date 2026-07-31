@@ -373,17 +373,15 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewAllowedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
-    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
-        .thenReturn(false);
+  public void commandReviewSkippedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
+    when(aiReviewPermission.isAiReviewConfigured(Mockito.any())).thenReturn(false);
 
     setupCommandComment("/review");
     setupMockRequestCreateResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
-    testRequestSent();
+    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
   }
 
   @Test

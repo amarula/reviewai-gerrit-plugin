@@ -63,6 +63,24 @@ public class AiReviewPermission {
     return isAiReviewExplicitlyDisallowed(projectNameKey, refName, null);
   }
 
+  public boolean isAiReviewConfigured(Project.NameKey projectNameKey) {
+    try {
+      return projectCache
+          .get(projectNameKey)
+          .map(
+              projectState ->
+                  projectState.getAllSections().stream()
+                      .anyMatch(
+                          sectionMatcher ->
+                              getAiReviewPermission(sectionMatcher.getSection()) != null))
+          .orElse(false);
+    } catch (RuntimeException e) {
+      log.warn(
+          "Failed to inspect AI review configuration for project {}", projectNameKey, e);
+      return false;
+    }
+  }
+
   public boolean isAiReviewExplicitlyDisallowed(
       Project.NameKey projectNameKey, String refName, CurrentUser user) {
     try {
