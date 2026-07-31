@@ -21,14 +21,11 @@ import com.google.gerrit.extensions.restapi.RestApiModule;
 import com.google.gerrit.lifecycle.LifecycleModule;
 import com.google.gerrit.server.avatar.AvatarProvider;
 import com.google.gerrit.server.change.ChangeResource;
-import com.google.gerrit.server.events.EventListener;
 import com.google.inject.Inject;
-import com.google.inject.multibindings.Multibinder;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarPluginDetector;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
-import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.listener.NoLoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
@@ -52,9 +49,6 @@ public class Module extends LifecycleModule {
 
   @Override
   protected void configure() {
-    Multibinder<EventListener> eventListenerBinder =
-        Multibinder.newSetBinder(binder(), EventListener.class);
-    eventListenerBinder.addBinding().to(GerritListener.class);
     bind(AiAdministratorAccess.class).to(aiAdministratorAccessClass());
     bind(ClientCommandExtension.class).to(clientCommandExtensionClass());
     bind(LoggingConfigurator.class).to(loggingConfiguratorClass());
