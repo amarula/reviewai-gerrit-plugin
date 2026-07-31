@@ -22,6 +22,7 @@ import com.google.gerrit.entities.PermissionRule;
 import com.google.gerrit.entities.Project;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.server.CurrentUser;
+import com.google.gerrit.server.account.ServiceUserClassifier;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.project.ProjectCache;
 import com.google.gerrit.server.project.SectionMatcher;
@@ -39,10 +40,12 @@ public class AiReviewPermission {
   static final String AI_REVIEW_ACCESS_PERMISSION = "aiReview";
 
   private final ProjectCache projectCache;
+  private final ServiceUserClassifier serviceUserClassifier;
 
   @Inject
-  AiReviewPermission(ProjectCache projectCache) {
+  AiReviewPermission(ProjectCache projectCache, ServiceUserClassifier serviceUserClassifier) {
     this.projectCache = projectCache;
+    this.serviceUserClassifier = serviceUserClassifier;
   }
 
   public Boolean canAiReview(ChangeResource resource) {
@@ -77,7 +80,7 @@ public class AiReviewPermission {
                                   getAiReviewPermission(sectionMatcher.getSection()),
                                   user),
                           AiReviewAccessDecision::merge)
-                      .isDisallowed())
+                      .isDisallowed(isServiceUser(user)))
           .orElse(false);
     } catch (RuntimeException e) {
       log.warn(
@@ -91,6 +94,12 @@ public class AiReviewPermission {
 
   private boolean appliesToUser(PermissionRule rule, CurrentUser user) {
     return user == null || user.getEffectiveGroups().contains(rule.getGroup().getUUID());
+  }
+
+  private boolean isServiceUser(CurrentUser user) {
+    return user != null
+        && user.isIdentifiedUser()
+        && serviceUserClassifier.isServiceUser(user.getAccountId());
   }
 
   private class AiReviewAccessDecision {
@@ -116,8 +125,11 @@ public class AiReviewPermission {
       hasLocalAllow |= other.hasLocalAllow;
     }
 
-    boolean isDisallowed() {
-      return hasBlock || hasLocalDeny || hasInheritedDeny && !hasLocalAllow;
+    boolean isDisallowed(boolean serviceUserDefaultAllow) {
+      // Service Users behave like a local allow: explicit local denies and blocks still win.
+      return hasBlock
+          || hasLocalDeny
+          || hasInheritedDeny && !hasLocalAllow && !serviceUserDefaultAllow;
     }
 
     private void applyRule(boolean localProject, PermissionRule rule) {

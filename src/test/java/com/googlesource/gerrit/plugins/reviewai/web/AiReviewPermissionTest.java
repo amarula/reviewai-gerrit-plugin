@@ -26,6 +26,7 @@ import com.google.gerrit.entities.PermissionRule;
 import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.account.GroupMembership;
+import com.google.gerrit.server.account.ServiceUserClassifier;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.project.ProjectCache;
 import com.google.gerrit.server.project.ProjectState;
@@ -52,6 +53,7 @@ import static org.mockito.Mockito.when;
 public class AiReviewPermissionTest extends TestBase {
   private static final Project.NameKey ALL_PROJECTS = Project.NameKey.parse("All-Projects");
   private static final AccountGroup.UUID DUMMY_GROUP_UUID = AccountGroup.uuid("dummy-group");
+  private static final Account.Id SERVICE_USER_ID = Account.id(101);
   private static final GroupReference DUMMY_GROUP =
       GroupReference.create(DUMMY_GROUP_UUID, "Dummy");
 
@@ -59,13 +61,14 @@ public class AiReviewPermissionTest extends TestBase {
   @Mock private ProjectState projectState;
   @Mock private CurrentUser currentUser;
   @Mock private GroupMembership groupMembership;
+  @Mock private ServiceUserClassifier serviceUserClassifier;
   @Mock private ChangeResource changeResource;
 
   private AiReviewPermission aiReviewPermission;
 
   @Before
   public void setUp() {
-    aiReviewPermission = new AiReviewPermission(projectCache);
+    aiReviewPermission = new AiReviewPermission(projectCache, serviceUserClassifier);
   }
 
   @Test
@@ -132,6 +135,38 @@ public class AiReviewPermissionTest extends TestBase {
         matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.DENY), null));
 
     assertTrue(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+  }
+
+  @Test
+  public void serviceUserDefaultAllowOverridesInheritedDeny() {
+    setupMatchingAccessSections(
+        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), currentUser));
+    setupServiceUser();
+
+    assertFalse(
+        aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, "myBranchName", currentUser));
+  }
+
+  @Test
+  public void localDenyOverridesServiceUserDefaultAllow() {
+    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY), currentUser);
+    setupServiceUser();
+
+    assertTrue(
+        aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, "myBranchName", currentUser));
+  }
+
+  @Test
+  public void inheritedBlockOverridesServiceUserDefaultAllow() {
+    setupMatchingAccessSections(
+        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.BLOCK), currentUser));
+    setupServiceUser();
+
+    assertTrue(
+        aiReviewPermission.isAiReviewExplicitlyDisallowed(
+            PROJECT_NAME, "myBranchName", currentUser));
   }
 
   @Test
@@ -202,5 +237,13 @@ public class AiReviewPermissionTest extends TestBase {
     when(changeResource.getProject()).thenReturn(PROJECT_NAME);
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getUser()).thenReturn(user);
+  }
+
+  private void setupServiceUser() {
+    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
+    when(groupMembership.contains(DUMMY_GROUP_UUID)).thenReturn(true);
+    when(currentUser.isIdentifiedUser()).thenReturn(true);
+    when(currentUser.getAccountId()).thenReturn(SERVICE_USER_ID);
+    when(serviceUserClassifier.isServiceUser(SERVICE_USER_ID)).thenReturn(true);
   }
 }
