@@ -78,17 +78,13 @@ public class InlineCode {
     if (line == null) {
       throw new RuntimeException("Error retrieving line number from content");
     }
-    try {
-      if (line_num == range.endLine) {
-        line = line.substring(0, range.endCharacter);
-      }
-      if (line_num == range.startLine) {
-        line = line.substring(range.startCharacter);
-      }
-    } catch (StringIndexOutOfBoundsException e) {
-      log.info("Could not extract a slice from line \"{}\". The whole line is returned", line);
+    int start = line_num == range.startLine ? range.startCharacter : 0;
+    int end = line_num == range.endLine ? range.endCharacter : line.length();
+
+    if (start < 0 || end < start || end > line.length()) {
+      return line;
     }
-    return line;
+    return line.substring(start, end);
   }
 
   private String getLineFromLineNumber(int line_num) {
