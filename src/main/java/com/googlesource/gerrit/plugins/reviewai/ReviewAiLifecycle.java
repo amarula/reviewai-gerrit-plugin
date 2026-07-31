@@ -16,31 +16,165 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
+import com.google.gerrit.extensions.annotations.PluginName;
 import com.google.gerrit.extensions.events.LifecycleListener;
+import com.google.gerrit.extensions.registration.DynamicSet;
+import com.google.gerrit.extensions.registration.Extension;
+import com.google.gerrit.extensions.registration.RegistrationHandle;
+import com.google.gerrit.server.events.EventListener;
 import com.google.inject.Inject;
+import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Manages the ReviewAI plugin lifecycle.
+ *
+ * <p>Registers and unregisters the {@link GerritListener} event listener manually so the plugin
+ * owns the {@link RegistrationHandle} and can remove it during {@link #stop()}. This avoids
+ * stale listeners when Gerrit fails to clean up the previous plugin instance during reload.
+ */
 @Slf4j
 @Singleton
 public class ReviewAiLifecycle implements LifecycleListener {
   private final ReviewAiExecutors reviewAiExecutors;
+  private final Provider<GerritListener> gerritListenerProvider;
+  private final DynamicSet<EventListener> eventListeners;
+  private final String pluginName;
+  private RegistrationHandle listenerHandle;
 
   @Inject
-  ReviewAiLifecycle(ReviewAiExecutors reviewAiExecutors) {
+  ReviewAiLifecycle(
+      ReviewAiExecutors reviewAiExecutors,
+      Provider<GerritListener> gerritListenerProvider,
+      DynamicSet<EventListener> eventListeners,
+      @PluginName String pluginName) {
     this.reviewAiExecutors = reviewAiExecutors;
+    this.gerritListenerProvider = gerritListenerProvider;
+    this.eventListeners = eventListeners;
+    this.pluginName = pluginName;
   }
 
   @Override
   public void start() {
     log.info("Starting ReviewAI lifecycle");
+
+    List<String> staleListeners = findExistingReviewAiListeners();
+    if (!staleListeners.isEmpty()) {
+      log.warn(
+          "Found {} stale GerritListener(s) already registered for plugin '{}': {}. "
+              + "Attempting proactive cleanup.",
+          staleListeners.size(),
+          pluginName,
+          staleListeners);
+      removeStaleListeners();
+    }
+
+    GerritListener listener = gerritListenerProvider.get();
+    listenerHandle = eventListeners.add(pluginName, listener);
+    log.info("Registered GerritListener for plugin '{}'", pluginName);
   }
 
   @Override
   public void stop() {
     log.info("Stopping ReviewAI lifecycle");
+
+    if (listenerHandle != null) {
+      listenerHandle.remove();
+      log.info("Unregistered GerritListener for plugin '{}'", pluginName);
+      listenerHandle = null;
+    }
+
+    // Belt-and-suspenders: remove any remaining listeners for our plugin that
+    // may have been left behind by Gerrit's incomplete plugin unload.
+    removeStaleListeners();
+
     reviewAiExecutors.shutdown();
     ReviewAiDb.stopManagedTcpServer();
+  }
+
+  /**
+   * Removes any GerritListener instances already registered for this plugin.
+   *
+   * <p>Gerrit's {@link DynamicSet} entries are backed by {@code NamedEntry} objects that implement
+   * both {@link Extension}&lt;T&gt; and {@link RegistrationHandle}. When Gerrit fails to properly
+   * unload a previous plugin version (observed on 3.14.2), the stale entries remain in the set but
+   * can still be removed by casting to {@code RegistrationHandle}. If the cast fails on a future
+   * Gerrit version, we throw a clear error instructing the admin to restart Gerrit.
+   */
+  private void removeStaleListeners() {
+    for (Extension<EventListener> extension : eventListeners.entries()) {
+      if (!pluginName.equals(extension.getPluginName())) {
+        continue;
+      }
+      EventListener listener;
+      try {
+        listener = extension.get();
+      } catch (RuntimeException e) {
+        log.warn(
+            "Unable to inspect an event listener for plugin '{}': {}",
+            pluginName,
+            e.getMessage());
+        continue;
+      }
+      if (listener instanceof GerritListener) {
+        try {
+          RegistrationHandle handle = (RegistrationHandle) extension;
+          handle.remove();
+          log.info(
+              "Removed stale GerritListener for plugin '{}': {}",
+              pluginName,
+              describeListener(listener));
+        } catch (ClassCastException e) {
+          throw new IllegalStateException(
+              String.format(
+                  "ReviewAI plugin load refused: found a stale GerritListener registered for"
+                      + " plugin '%s' but was unable to remove it. This usually means Gerrit did"
+                      + " not properly unload the previous plugin version. Please restart Gerrit"
+                      + " to force a clean unload before reinstalling the plugin."
+                      + " Stale listener: %s",
+                  pluginName,
+                  describeListener(listener)),
+              e);
+        }
+      }
+    }
+  }
+
+  private List<String> findExistingReviewAiListeners() {
+    List<String> listeners = new ArrayList<>();
+    for (Extension<EventListener> extension : eventListeners.entries()) {
+      if (!pluginName.equals(extension.getPluginName())) {
+        continue;
+      }
+      EventListener listener;
+      try {
+        listener = extension.get();
+      } catch (RuntimeException e) {
+        log.warn(
+            "Unable to inspect an event listener for plugin '{}': {}",
+            pluginName,
+            e.getMessage());
+        continue;
+      }
+      if (listener instanceof GerritListener) {
+        listeners.add(describeListener(listener));
+      }
+    }
+    return listeners;
+  }
+
+  private static String describeListener(EventListener listener) {
+    Class<?> listenerClass = listener.getClass();
+    ClassLoader classLoader = listenerClass.getClassLoader();
+    return String.format(
+        "%s@%x,classLoader@%x",
+        listenerClass.getName(),
+        System.identityHashCode(listener),
+        classLoader == null ? 0 : System.identityHashCode(classLoader));
   }
 }
