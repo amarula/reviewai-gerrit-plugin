@@ -27,4 +27,6 @@ public interface IAiDataPrompt {
   List<GerritComment> getCommentProperties();
 
   List<AiMessageItem> getMessageItems();
+
+  default void appendExtraMessageItems() {}
 }

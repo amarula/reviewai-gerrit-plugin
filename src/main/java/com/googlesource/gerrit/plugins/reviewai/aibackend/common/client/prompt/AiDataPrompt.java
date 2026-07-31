@@ -51,6 +51,7 @@ public class AiDataPrompt {
       openAiDataPromptHandler.addMessageItem(i);
       log.debug("Added message item to prompt for comment index: {}", i);
     }
+    openAiDataPromptHandler.appendExtraMessageItems();
     List<AiMessageItem> messageItems = openAiDataPromptHandler.getMessageItems();
     String promptJson = messageItems.isEmpty() ? "" : getGson().toJson(messageItems);
     log.debug("Final AI prompt JSON: {}", promptJson);
