@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.common.SubmitRequirementInput;
 import com.google.gerrit.extensions.common.SubmitRequirementResultInfo;
+import com.google.gerrit.extensions.restapi.ResourceNotFoundException;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -52,6 +53,11 @@ public class AiReviewApplicabilityChecker {
     SubmitRequirementResultInfo result;
     try (ManualRequestContext ignored = config.openRequestContext()) {
       result = getChangeApi(change).checkSubmitRequirement(input);
+    } catch (ResourceNotFoundException e) {
+      log.debug(
+          "AI review applicability check skipped: change {} not accessible",
+          change.getFullChangeId());
+      return false;
     } catch (Exception e) {
       log.error(
           "Could not evaluate AI review applicability expression '{}' for change {}",

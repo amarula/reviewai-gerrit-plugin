@@ -214,6 +214,14 @@ public class EventHandlerTask implements Runnable {
   }
 
   private boolean isReviewEnabled(GerritChange change) {
+    if (!aiReviewPermission.isAiReviewConfigured(change.getProjectNameKey())) {
+      log.debug(
+          "Project {} has no AI review configuration; skipping review for change {}",
+          change.getProjectNameKey(),
+          change.getFullChangeId());
+      return false;
+    }
+
     if (eventUser != null
         && aiReviewPermission.isAiReviewExplicitlyDisallowed(
             change.getProjectNameKey(), change.getBranchNameKey().branch(), eventUser)) {

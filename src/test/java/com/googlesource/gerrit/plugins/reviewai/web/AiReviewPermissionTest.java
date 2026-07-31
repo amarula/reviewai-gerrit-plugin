@@ -199,6 +199,28 @@ public class AiReviewPermissionTest extends TestBase {
     assertTrue(aiReviewPermission.canAiReview(changeResource));
   }
 
+  @Test
+  public void isAiReviewConfiguredReturnsTrueWhenPermissionExists() {
+    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.ALLOW));
+
+    assertTrue(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+  }
+
+  @Test
+  public void isAiReviewConfiguredReturnsFalseWhenNoPermissionExists() {
+    AccessSection accessSection = AccessSection.builder("refs/heads/*").build();
+    setupMatchingAccessSection(accessSection);
+
+    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+  }
+
+  @Test
+  public void isAiReviewConfiguredReturnsFalseWhenProjectNotCached() {
+    when(projectCache.get(PROJECT_NAME)).thenReturn(Optional.empty());
+
+    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+  }
+
   private void setupMatchingAccessSection(AccessSection accessSection) {
     setupMatchingAccessSection(accessSection, null);
   }

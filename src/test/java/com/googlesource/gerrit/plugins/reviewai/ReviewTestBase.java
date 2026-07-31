@@ -393,6 +393,8 @@ public class ReviewTestBase extends TestBase {
     changeSetData = new ChangeSetData(AI_USER_ACCOUNT_ID);
     when(changeSetDataProvider.get()).thenReturn(changeSetData);
 
+    when(aiReviewPermission.isAiReviewConfigured(any())).thenReturn(true);
+
     localizer = new Localizer(config);
     IGerritClientPatchSet gerritClientPatchSet = getGerritClientPatchSet();
     gerritClient =
