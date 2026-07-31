@@ -64,4 +64,54 @@ public class AiDataPromptReview extends AiDataPromptBase implements IAiDataPromp
     log.debug("Message item populated with history for review: {}", messageItem);
     return messageItem;
   }
+
+  @Override
+  public void appendExtraMessageItems() {
+    List<AiHistory.AddressedConcern> concerns =
+        aiMessageHistory.collectPreviouslyAddressedConcerns();
+    if (concerns.isEmpty()) {
+      return;
+    }
+
+    String template =
+        (String) AiPrompt.getJsonPromptValues("prompts")
+            .getOrDefault("DEFAULT_AI_PREVIOUSLY_ADDRESSED_CONCERNS_MESSAGE", "");
+
+    int maxConcerns = 10;
+    StringBuilder concernsText = new StringBuilder();
+    int count = 0;
+    for (AiHistory.AddressedConcern concern : concerns) {
+      if (concern.isEmpty() || count >= maxConcerns) {
+        break;
+      }
+      count++;
+      String location = "";
+      if (concern.getFilename() != null) {
+        location = concern.getFilename();
+        if (concern.getLine() != null) {
+          location += " line " + concern.getLine();
+        }
+      }
+      concernsText.append("\nConcern ").append(count).append(": ");
+      if (!location.isEmpty()) {
+        concernsText.append(location).append("\n");
+      } else {
+        concernsText.append("\n");
+      }
+      concernsText.append("- AI noted: \"").append(concern.getAiConcern()).append("\"\n");
+      concernsText.append("- User responded: \"").append(concern.getUserResponse()).append("\"\n");
+      if (!concern.getAiAcknowledgment().isEmpty()) {
+        concernsText.append("- AI acknowledged: \"").append(concern.getAiAcknowledgment()).append("\"\n");
+      }
+    }
+
+    if (!template.isEmpty()) {
+      String message = String.format(template, concernsText.toString());
+      AiMessageItem summaryItem = new AiMessageItem();
+      summaryItem.setHistory(
+          List.of(AiRequestMessage.builder().role("system").content(message).build()));
+      messageItems.add(summaryItem);
+    }
+    log.debug("Added previously addressed concerns summary ({} of {} concerns)", count, concerns.size());
+  }
 }
