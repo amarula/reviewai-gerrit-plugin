@@ -124,7 +124,7 @@ public class AiReviewPermission {
     private boolean hasBlock;
     private boolean hasLocalDeny;
     private boolean hasInheritedDeny;
-    private boolean hasLocalAllow;
+    private boolean hasAllow;
 
     void withRules(boolean localProject, Permission permission, CurrentUser user) {
       if (permission == null) {
@@ -140,14 +140,15 @@ public class AiReviewPermission {
       hasBlock |= other.hasBlock;
       hasLocalDeny |= other.hasLocalDeny;
       hasInheritedDeny |= other.hasInheritedDeny;
-      hasLocalAllow |= other.hasLocalAllow;
+      hasAllow |= other.hasAllow;
     }
 
     boolean isDisallowed(boolean serviceUserDefaultAllow) {
-      // Service Users behave like a local allow: explicit local denies and blocks still win.
+      // Service Users and inherited ALLOWs from parent projects override inherited DENYs
+      // from more distant ancestors. Local DENYs and blocks always win.
       return hasBlock
           || hasLocalDeny
-          || hasInheritedDeny && !hasLocalAllow && !serviceUserDefaultAllow;
+          || hasInheritedDeny && !hasAllow && !serviceUserDefaultAllow;
     }
 
     private void applyRule(boolean localProject, PermissionRule rule) {
@@ -159,8 +160,8 @@ public class AiReviewPermission {
         } else {
           hasInheritedDeny = true;
         }
-      } else if (localProject && rule.getAction() == PermissionRule.Action.ALLOW) {
-        hasLocalAllow = true;
+      } else if (rule.getAction() == PermissionRule.Action.ALLOW) {
+        hasAllow = true;
       }
     }
   }

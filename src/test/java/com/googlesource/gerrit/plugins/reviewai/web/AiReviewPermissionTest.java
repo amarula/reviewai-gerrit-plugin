@@ -52,6 +52,7 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class AiReviewPermissionTest extends TestBase {
   private static final Project.NameKey ALL_PROJECTS = Project.NameKey.parse("All-Projects");
+  private static final Project.NameKey PARENT_PROJECT = Project.NameKey.parse("parent/child");
   private static final AccountGroup.UUID DUMMY_GROUP_UUID = AccountGroup.uuid("dummy-group");
   private static final Account.Id SERVICE_USER_ID = Account.id(101);
   private static final GroupReference DUMMY_GROUP =
@@ -114,6 +115,18 @@ public class AiReviewPermissionTest extends TestBase {
     setupMatchingAccessSections(
         matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
         matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
+
+    assertFalse(
+        aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+  }
+
+  @Test
+  public void inheritedParentAllowOverridesInheritedGrandparentDeny() {
+    // PARENT_PROJECT has ALLOW, ALL_PROJECTS has DENY.
+    // The child PROJECT_NAME inherits both. The closer ALLOW from PARENT should win.
+    setupMatchingAccessSections(
+        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
+        matcher(PARENT_PROJECT, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
 
     assertFalse(
         aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
