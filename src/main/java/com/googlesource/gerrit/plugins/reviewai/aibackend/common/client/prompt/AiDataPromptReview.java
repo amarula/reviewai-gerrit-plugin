@@ -19,10 +19,12 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -36,8 +38,13 @@ public class AiDataPromptReview extends AiDataPromptBase implements IAiDataPromp
       GerritClientData gerritClientData,
       Localizer localizer) {
     super(config, changeSetData, gerritClientData, localizer);
-    commentProperties = new ArrayList<>(commentData.getCommentMap().values());
-    log.debug("AiDataPromptReview initialized with comment properties.");
+    int aiAccountId = changeSetData.getAiAccountId();
+    commentProperties =
+        commentData.getCommentMap().values().stream()
+            .filter(c -> !ReviewAiUser.matches(c, aiAccountId))
+            .collect(Collectors.toList());
+    log.debug("AiDataPromptReview initialized with {} user comment properties ({} total)",
+        commentProperties.size(), commentData.getCommentMap().size());
   }
 
   @Override

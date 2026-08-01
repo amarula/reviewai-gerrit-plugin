@@ -123,7 +123,7 @@ public class AiPromptFactory {
       GerritChange change,
       GerritClientData gerritClientData,
       Localizer localizer) {
-    if (change.getIsCommentEvent()) {
+    if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       log.debug("AiPromptFactory: Return ReferencedAiDataPromptRequests");
       return new ReferencedAiDataPromptRequests(config, changeSetData, gerritClientData, localizer);
     } else {
