@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 
@@ -204,6 +205,62 @@ public class AiPromptFactoryTest {
 
     assertFalse(
         prompt.getDefaultAiAssistantInstructions().contains("Current AI Review Condition"));
+  }
+
+  @Test
+  public void specializedReviewPromptsIncludeConditionLabelsExceptCommitMessage() {
+    String applicableIf = "label:Verified=+1";
+    Configuration config = mock(Configuration.class);
+    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getAiReviewApplicableIf()).thenReturn(applicableIf);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSpecializedAgentName("CORRECTNESS");
+    changeSetData.setSpecializedAgentInstructions("Review correctness only.");
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+
+    for (ReviewAssistantStage stage :
+        List.of(
+            ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION)) {
+      changeSetData.setReviewAssistantStage(stage);
+
+      String instructions =
+          AiPromptFactory.getAiPrompt(
+                  config,
+                  changeSetData,
+                  patchSetEventChange(),
+                  mock(ICodeContextPolicy.class))
+              .getDefaultAiAssistantInstructions();
+
+      assertTrue(
+          stage + " should include the applicability expression",
+          instructions.contains(applicableIf));
+      assertTrue(
+          stage + " should include condition labels", instructions.contains("- Verified: +1"));
+    }
+
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setSpecializedAgentName(null);
+    changeSetData.setSpecializedAgentReview(true);
+
+    String commitMessageInstructions =
+        AiPromptFactory.getAiPrompt(
+                config,
+                changeSetData,
+                patchSetEventChange(),
+                mock(ICodeContextPolicy.class))
+            .getDefaultAiAssistantInstructions();
+
+    assertFalse(commitMessageInstructions.contains(applicableIf));
+    assertFalse(commitMessageInstructions.contains("Condition Labels"));
   }
 
   @Test

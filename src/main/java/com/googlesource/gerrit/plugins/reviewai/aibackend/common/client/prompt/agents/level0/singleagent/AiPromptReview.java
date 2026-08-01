@@ -109,15 +109,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .orElseGet(
                     () ->
                         resolveReviewInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
-    String applicableIf = config.getAiReviewApplicableIf();
-    if (applicableIf != null && !applicableIf.isBlank()) {
-      sections.add(buildSection("Current AI Review Condition", applicableIf));
-      String conditionLabels =
-          AiPromptConditionLabelFormatter.format(changeSetData.getConditionLabels());
-      if (!conditionLabels.isEmpty()) {
-        sections.add(buildSection("Condition Labels", conditionLabels));
-      }
-    }
+    sections.addAll(buildConditionLabelSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
@@ -209,6 +201,21 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String buildSection(String title, String body) {
     return AiPromptSections.buildSection(title, body);
+  }
+
+  protected List<String> buildConditionLabelSections() {
+    String applicableIf = config.getAiReviewApplicableIf();
+    if (applicableIf == null || applicableIf.isBlank()) {
+      return List.of();
+    }
+    List<String> sections = new ArrayList<>();
+    sections.add(buildSection("Current AI Review Condition", applicableIf));
+    String conditionLabels =
+        AiPromptConditionLabelFormatter.format(changeSetData.getConditionLabels());
+    if (!conditionLabels.isEmpty()) {
+      sections.add(buildSection("Condition Labels", conditionLabels));
+    }
+    return sections;
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
