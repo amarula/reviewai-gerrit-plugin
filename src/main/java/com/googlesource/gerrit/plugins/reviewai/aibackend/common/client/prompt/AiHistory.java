@@ -384,7 +384,11 @@ public class AiHistory extends AiComment {
             && commentTs.compareTo(concernTimestamp) < 0) {
           continue; // this comment predates the concern source
         }
-        userResponse = summarizeComment(getCleanedMessage(comment));
+        String cleaned = getCleanedMessage(comment);
+        if (messagesExcludedFromHistory.contains(cleaned)) {
+          continue; // trivial reply — keep looking for real engagement
+        }
+        userResponse = summarizeComment(cleaned);
         break;
       }
     }
