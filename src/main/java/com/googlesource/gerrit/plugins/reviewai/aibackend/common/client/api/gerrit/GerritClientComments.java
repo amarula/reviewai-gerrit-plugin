@@ -167,6 +167,14 @@ public class GerritClientComments extends GerritClientAccount {
     patchSetCommentMap.clear();
   }
 
+  private boolean isReplyToAssistant(GerritComment comment) {
+    if (comment.getInReplyTo() == null) {
+      return false;
+    }
+    GerritComment parent = commentMap.get(comment.getInReplyTo());
+    return parent != null && ReviewAiUser.matches(parent, changeSetData.getAiAccountId());
+  }
+
   private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
       Map<String, List<CommentInfo>> comments =
@@ -249,7 +257,10 @@ public class GerritClientComments extends GerritClientAccount {
       for (GerritComment latestComment : latestComments) {
         String commentMessage = latestComment.getMessage();
         log.debug("Processing comment: {}", commentMessage);
-        if (messageParser.isBotAddressed(commentMessage)) {
+        boolean isAddressed =
+            messageParser.isBotAddressed(commentMessage)
+                || isReplyToAssistant(latestComment);
+        if (isAddressed) {
           if (messageParser.parseCommands(commentMessage)) {
             commentProperties.clear();
             return;
