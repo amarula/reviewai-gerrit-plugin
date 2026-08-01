@@ -328,6 +328,7 @@ public class PatchSetReviewer {
 
     changeSetData.setConditionLabels(
         gerritClient.getConditionLabels(change, config.getAiReviewApplicableIf()));
+    changeSetData.setPriorCodeReviewVote(gerritClient.getCodeReviewValue(change));
     return openAiClient.ask(changeSetData, change, patchSet);
   }
 

@@ -51,6 +51,7 @@ public class ChangeSetData {
   private GerritPermittedVotingRange permittedVotingRange;
   private Boolean deferredReview = false;
   private Map<String, GerritConditionLabel> conditionLabels;
+  private Integer priorCodeReviewVote;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -139,6 +140,7 @@ public class ChangeSetData {
     if (conditionLabels != null) {
       copy.setConditionLabels(new HashMap<>(conditionLabels));
     }
+    copy.setPriorCodeReviewVote(priorCodeReviewVote);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
