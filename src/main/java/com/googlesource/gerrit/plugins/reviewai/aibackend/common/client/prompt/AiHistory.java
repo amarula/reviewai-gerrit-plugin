@@ -348,12 +348,42 @@ public class AiHistory extends AiComment {
 
   private AddressedConcern buildAddressedConcern(
       GerritComment rootComment, List<GerritComment> thread) {
-    String aiConcern = summarizeComment(getCleanedMessage(rootComment));
+    // When the thread root is an AI comment, use it directly as the concern source.
+    // When the root is a user command (e.g. /review), the AI comment that raised the
+    // concern is a descendant in the thread — find it.
+    GerritComment concernSource;
+    if (isFromAssistant(rootComment)) {
+      concernSource = rootComment;
+    } else {
+      concernSource = null;
+      for (GerritComment comment : thread) {
+        if (isFromAssistant(comment)) {
+          concernSource = comment;
+          break;
+        }
+      }
+    }
+    if (concernSource == null) {
+      return null;
+    }
 
-    // First pass: find the user response
+    String aiConcern = summarizeComment(getCleanedMessage(concernSource));
+    if (aiConcern.isEmpty()) {
+      return null;
+    }
+
+    String concernTimestamp = getCommentTimestamp(concernSource);
+
+    // First pass: find the user response that comes after the concern
     String userResponse = null;
     for (GerritComment comment : thread) {
-      if (!isFromAssistant(comment) && !comment.getId().equals(rootComment.getId())) {
+      if (!isFromAssistant(comment) && !comment.getId().equals(concernSource.getId())) {
+        // A real response must come chronologically after the concern source
+        String commentTs = getCommentTimestamp(comment);
+        if (concernTimestamp != null && commentTs != null
+            && commentTs.compareTo(concernTimestamp) < 0) {
+          continue; // this comment predates the concern source
+        }
         userResponse = summarizeComment(getCleanedMessage(comment));
         break;
       }
@@ -363,21 +393,21 @@ public class AiHistory extends AiComment {
     String aiAcknowledgment = null;
     for (GerritComment comment : thread) {
       if (isFromAssistant(comment) && userResponse != null
-          && !comment.getId().equals(rootComment.getId())) {
+          && !comment.getId().equals(concernSource.getId())) {
         aiAcknowledgment = summarizeComment(getCleanedMessage(comment));
       }
     }
 
-    if (aiConcern.isEmpty() || userResponse == null || userResponse.isEmpty()) {
+    if (userResponse == null || userResponse.isEmpty()) {
       return null;
     }
 
-    String updated = rootComment.getUpdated() != null
-        ? rootComment.getUpdated()
-        : rootComment.getDate();
+    String updated = concernSource.getUpdated() != null
+        ? concernSource.getUpdated()
+        : concernSource.getDate();
     return new AddressedConcern(
-        rootComment.getFilename(),
-        rootComment.getLine(),
+        concernSource.getFilename(),
+        concernSource.getLine(),
         aiConcern,
         userResponse,
         aiAcknowledgment != null ? aiAcknowledgment : "",
