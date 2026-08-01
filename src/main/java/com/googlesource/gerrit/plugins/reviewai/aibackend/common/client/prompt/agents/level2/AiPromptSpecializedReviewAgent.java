@@ -45,6 +45,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
 
     List<String> sections = new ArrayList<>();
     sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
+    sections.addAll(buildConditionLabelSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
