@@ -1,0 +1,53 @@
+{
+  "src/Test.java": [
+    {
+      "author": {
+        "_account_id": 1000,
+        "name": "ReviewAI",
+        "email": "reviewai@example.com",
+        "username": "reviewai"
+      },
+      "change_message_id": "ai-review",
+      "unresolved": true,
+      "patch_set": 1,
+      "id": "ai-parent",
+      "line": 10,
+      "updated": "2023-11-06 11:37:51.000000000",
+      "message": "This value can be null.",
+      "commit_id": "0123456789012345678901234567890123456789"
+    },
+    {
+      "author": {
+        "_account_id": 2000,
+        "name": "Reviewer",
+        "email": "reviewer@example.com",
+        "username": "reviewer"
+      },
+      "change_message_id": "human-review",
+      "unresolved": true,
+      "patch_set": 1,
+      "id": "human-parent",
+      "line": 10,
+      "updated": "2023-11-06 11:40:51.000000000",
+      "message": "I agree with this concern.",
+      "commit_id": "0123456789012345678901234567890123456789"
+    },
+    {
+      "author": {
+        "_account_id": 2000,
+        "name": "Reviewer",
+        "email": "reviewer@example.com",
+        "username": "reviewer"
+      },
+      "change_message_id": "latest-review",
+      "unresolved": true,
+      "patch_set": 1,
+      "id": "latest-reply",
+      "line": 10,
+      "in_reply_to": "ai-parent",
+      "updated": "2023-11-06 11:47:51.000000000",
+      "message": "Can you explain why?",
+      "commit_id": "0123456789012345678901234567890123456789"
+    }
+  ]
+}
