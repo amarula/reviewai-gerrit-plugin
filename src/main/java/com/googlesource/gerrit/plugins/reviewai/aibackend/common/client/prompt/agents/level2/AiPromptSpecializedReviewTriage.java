@@ -21,6 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
@@ -39,16 +40,17 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
 
   @Override
   public String getDefaultAiAssistantInstructions() {
-    return joinWithDoubleNewLine(
-        List.of(
-            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")),
-            buildSection("Available Specialized Agents", getAvailableSpecializedAgents()),
-            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"), getScopeAndReviewConstraints()),
-            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getAiAssistantInstructionsReview()),
-            buildSection(
-                prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-                getTriageResponseFormat()),
-            buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE"))));
+    List<String> sections = new ArrayList<>();
+    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")));
+    sections.addAll(buildConditionLabelSections());
+    sections.add(buildSection("Available Specialized Agents", getAvailableSpecializedAgents()));
+    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"), getScopeAndReviewConstraints()));
+    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getAiAssistantInstructionsReview()));
+    sections.add(buildSection(
+        prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+        getTriageResponseFormat()));
+    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"), prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE")));
+    return joinWithDoubleNewLine(sections);
   }
 
   private String getAvailableSpecializedAgents() {
