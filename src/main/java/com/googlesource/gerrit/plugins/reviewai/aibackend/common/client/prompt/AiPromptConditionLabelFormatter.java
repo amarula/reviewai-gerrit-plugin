@@ -34,6 +34,10 @@ public final class AiPromptConditionLabelFormatter {
         .collect(Collectors.joining("\n"));
   }
 
+  private static final Map<String, String> DEFAULT_DESCRIPTIONS = Map.of(
+      "Verified", "Verified label usually means that automated tests have run and the code compiles and passes basic checks"
+  );
+
   private static String formatLabel(Map.Entry<String, GerritConditionLabel> entry) {
     GerritConditionLabel label = entry.getValue();
     String values =
@@ -44,8 +48,11 @@ public final class AiPromptConditionLabelFormatter {
                 .collect(Collectors.joining(", "));
     String description =
         label.description() == null || label.description().isBlank()
-            ? ""
-            : "\n  Description: " + label.description();
-    return "- " + entry.getKey() + ": " + values + description;
+            ? DEFAULT_DESCRIPTIONS.getOrDefault(entry.getKey(), "")
+            : label.description();
+    if (description.isBlank()) {
+      return "- " + entry.getKey() + ": " + values;
+    }
+    return "- " + entry.getKey() + ": " + values + "\n  Description: " + description;
   }
 }
