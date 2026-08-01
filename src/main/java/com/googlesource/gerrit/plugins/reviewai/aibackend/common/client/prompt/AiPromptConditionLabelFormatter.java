@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,23 +18,29 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Formats condition-label context for inclusion in an AI prompt. */
 public final class AiPromptConditionLabelFormatter {
+  private static final Map<String, String> DEFAULT_DESCRIPTION_KEYS =
+      Map.of("Verified", "prompt.condition.label.verified.description");
+
   private AiPromptConditionLabelFormatter() {}
 
-  public static String format(Map<String, GerritConditionLabel> labels) {
+  public static String format(
+      Map<String, GerritConditionLabel> labels, Function<String, String> localize) {
     if (labels == null || labels.isEmpty()) {
       return "";
     }
     return labels.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
-        .map(AiPromptConditionLabelFormatter::formatLabel)
+        .map(entry -> formatLabel(entry, localize))
         .collect(Collectors.joining("\n"));
   }
 
-  private static String formatLabel(Map.Entry<String, GerritConditionLabel> entry) {
+  private static String formatLabel(
+      Map.Entry<String, GerritConditionLabel> entry, Function<String, String> localize) {
     GerritConditionLabel label = entry.getValue();
     String values =
         label.values().isEmpty()
@@ -44,8 +50,17 @@ public final class AiPromptConditionLabelFormatter {
                 .collect(Collectors.joining(", "));
     String description =
         label.description() == null || label.description().isBlank()
-            ? ""
-            : "\n  Description: " + label.description();
-    return "- " + entry.getKey() + ": " + values + description;
+            ? getDefaultDescription(entry.getKey(), localize)
+            : label.description();
+    if (description.isBlank()) {
+      return "- " + entry.getKey() + ": " + values;
+    }
+    return "- " + entry.getKey() + ": " + values + "\n  Description: " + description;
+  }
+
+  private static String getDefaultDescription(
+      String labelName, Function<String, String> localize) {
+    String descriptionKey = DEFAULT_DESCRIPTION_KEYS.get(labelName);
+    return descriptionKey == null ? "" : localize.apply(descriptionKey);
   }
 }
