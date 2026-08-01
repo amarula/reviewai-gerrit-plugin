@@ -204,16 +204,21 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   }
 
   protected List<String> buildConditionLabelSections() {
-    String applicableIf = config.getAiReviewApplicableIf();
-    if (applicableIf == null || applicableIf.isBlank()) {
-      return List.of();
-    }
     List<String> sections = new ArrayList<>();
-    sections.add(buildSection("Current AI Review Condition", applicableIf));
-    String conditionLabels =
-        AiPromptConditionLabelFormatter.format(changeSetData.getConditionLabels());
-    if (!conditionLabels.isEmpty()) {
-      sections.add(buildSection("Condition Labels", conditionLabels));
+    String applicableIf = config.getAiReviewApplicableIf();
+    if (applicableIf != null && !applicableIf.isBlank()) {
+      sections.add(buildSection("Current AI Review Condition", applicableIf));
+      String conditionLabels =
+          AiPromptConditionLabelFormatter.format(changeSetData.getConditionLabels());
+      if (!conditionLabels.isEmpty()) {
+        sections.add(buildSection("Condition Labels", conditionLabels));
+      }
+    }
+    Integer priorVote = changeSetData.getPriorCodeReviewVote();
+    if (priorVote != null) {
+      String voteLabel = priorVote >= 0 ? "+" + priorVote : String.valueOf(priorVote);
+      sections.add(buildSection("Vote Continuity",
+          String.format(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_VOTE_CONTINUITY"), voteLabel).trim()));
     }
     return sections;
   }
