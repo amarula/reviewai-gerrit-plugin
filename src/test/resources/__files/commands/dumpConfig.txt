@@ -71,5 +71,8 @@ ollamaThink: false
 patchContextLines: 3
 patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
+storePassword:
+storeUrl:
+storeUsername:
 topicPatchSetWaitMs: 3000
 ```
