@@ -131,6 +131,38 @@ They can also be sent through traditional Gerrit comments by addressing the conf
 
 See the [Command Reference](docs/commands.md) for every command, option, scope, and administrator-only operation.
 
+## Multi-Site Support
+
+For deployments with multiple Gerrit primaries sharing a load balancer, ReviewAI can use a shared PostgreSQL
+database instead of local H2:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+  storeUrl = jdbc:postgresql://db-host:5432/reviewai
+  storeUsername = reviewai
+  storePassword = secret
+```
+
+When `storeUrl` is configured, the dialect switches from H2 to PostgreSQL automatically. All conversation
+state — chat memory, OpenAI conversation IDs, plugin data — is stored in the shared database, visible
+from any Gerrit node. When `storeUrl` is absent, local H2 is used as before.
+
+## Debug Endpoints
+
+The plugin exposes REST endpoints for inspecting internal state:
+
+| Endpoint | Method | Variant | Description |
+|---|---|---|---|
+| `.../ai-review-threads` | GET | Prod + dev | Full comment thread data: comments, threads, addressed concerns |
+| `.../ai-review-config` | GET | Dev only | Plugin configuration: static config, dynamic overrides, models |
+| `.../ai-review-history` | GET | Prod + dev | Full comment history with change messages merged |
+| `.../ai-review-agent-model` | GET | Prod + dev | Available AI models and selected default |
+| `.../ai-review-agent-conversations` | POST | Prod + dev | List/get/upsert/append conversation metadata |
+
+The `ai-review-threads` endpoint runs the same `collectPreviouslyAddressedConcerns()` logic the review
+pipeline uses and returns the result as JSON, making it useful for debugging why the AI did or didn't
+re-raise a concern.
+
 ## Documentation
 
 - [Configuration](docs/configuration.md)
