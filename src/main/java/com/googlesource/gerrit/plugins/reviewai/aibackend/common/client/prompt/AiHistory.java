@@ -38,6 +38,12 @@ import java.util.stream.Stream;
 @Slf4j
 public class AiHistory extends AiComment {
   private static final int MAX_PREVIOUSLY_ADDRESSED_CONCERNS = 10;
+  // Structural pattern: matches file:line references, Gerrit comment URLs, and
+  // change URLs that appear in AI patchset-level "my previous comment" messages
+  // regardless of the exact phrasing the model invents.
+  private static final java.util.regex.Pattern CONVERSATION_REFERENCE_PATTERN =
+      java.util.regex.Pattern.compile(
+          "[\\w./-]+\\.[\\w]+\\s*(?::|\\sline\\s)\\d+|/[cC]/[^/]+/\\+/(?:[T\\d]+/)?comment/|/comment/\\w+");
   private final Set<String> messagesExcludedFromHistory;
   private final AiHistoryMessageFilter messageFilter;
   @Getter private final HashMap<String, GerritComment> commentMap;
@@ -243,7 +249,8 @@ public class AiHistory extends AiComment {
             || !messageFilter.shouldIncludeMessage(messageContent)
             || patchSetCommentAdded.contains(messageContent)
             || isBeforeOrAtForgetThreadCutoff(comment)
-            || filterActive && isInactiveComment(comment);
+            || filterActive && isInactiveComment(comment)
+            || isConversationRepetitionMessage(comment, messageContent);
 
     if (shouldNotProcessComment) {
       log.debug(
@@ -286,6 +293,37 @@ public class AiHistory extends AiComment {
     }
     GerritComment parent = commentMap.get(comment.getInReplyTo());
     return parent != null && isFromAssistant(parent);
+  }
+
+  /**
+   * Structural fuzzer: detects AI-authored messages that merely reference prior
+   * inline concerns without providing new review content.
+   *
+   * <p>A message is considered repetition if ALL of:
+   * <ol>
+   *   <li>It is from the AI and at patchset level (no attached filename or line)</li>
+   *   <li>It is NOT JSON — real review responses always start with {@code {}</li>
+   *   <li>It contains a reference to a prior comment (file:line pattern or
+   *       comment URL)</li>
+   * </ol>
+   *
+   * This catches any variant the AI may invent ("still holds", "previous comment",
+   * "as noted in", etc.) without hardcoding phrases — because the structure is
+   * always the same: a patchset-level AI post with no new JSON review content
+   * that points back to an earlier inline comment.
+   */
+  private boolean isConversationRepetitionMessage(
+      GerritComment comment, String cleanedContent) {
+    if (!isFromAssistant(comment)) {
+      return false;
+    }
+    if (comment.getFilename() != null && !comment.isPatchSetComment()) {
+      return false;
+    }
+    if (cleanedContent.startsWith("{")) {
+      return false;
+    }
+    return CONVERSATION_REFERENCE_PATTERN.matcher(cleanedContent).find();
   }
 
   /**
