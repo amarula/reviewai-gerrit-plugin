@@ -74,6 +74,21 @@ public class AiDataPromptReview extends AiDataPromptBase implements IAiDataPromp
 
   @Override
   public void appendExtraMessageItems() {
+    // Collect and inject the pending issues state summary (replaces raw history)
+    String pendingSummary = aiMessageHistory.collectPendingIssuesSummary();
+    if (!pendingSummary.isEmpty()) {
+      String summaryTemplate =
+          (String) AiPrompt.getJsonPromptValues("prompts")
+              .getOrDefault("DEFAULT_AI_PENDING_ISSUES_SUMMARY_MESSAGE", "");
+      if (!summaryTemplate.isEmpty()) {
+        String message = String.format(summaryTemplate, pendingSummary);
+        AiMessageItem summaryItem = new AiMessageItem();
+        summaryItem.setHistory(
+            List.of(AiRequestMessage.builder().role("system").content(message).build()));
+        messageItems.add(summaryItem);
+      }
+    }
+
     List<AiHistory.AddressedConcern> concerns =
         aiMessageHistory.collectPreviouslyAddressedConcerns();
     if (concerns.isEmpty()) {
