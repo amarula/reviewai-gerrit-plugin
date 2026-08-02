@@ -131,6 +131,35 @@ They can also be sent through traditional Gerrit comments by addressing the conf
 
 See the [Command Reference](docs/commands.md) for every command, option, scope, and administrator-only operation.
 
+## Conversation Features
+
+### Implicit Reply Detection
+
+When a user replies inline to an AI-authored comment, the reply is automatically recognized as addressed to
+the AI — no `@bot-name` mention required. The plugin checks whether the comment's `inReplyTo` points to an
+AI comment and includes it for processing.
+
+### Previously Addressed Concerns
+
+When `/review` is triggered on a patchset that was already reviewed, the plugin scans inline comment threads
+for concerns the AI raised and the user addressed via `/message` conversation. These are injected as a system
+message instructing the AI not to re-raise them unless the code has materially changed. Only substantive
+conversations qualify — trivial replies like `Done` are excluded.
+
+### Condition Labels &amp; CI Awareness
+
+When `aiReviewApplicableIf` is configured (e.g. `label:Verified>=1`), current label values are injected into
+every review agent's system instructions. The AI sees condition labels with descriptions and is instructed to
+re-evaluate prior concerns against CI results: if `Verified +1` proves the code compiles, it must drop rather
+than re-state a "does not compile" claim. Condition labels are included in all agent stages including
+specialized agents and collectors.
+
+### Vote Continuity
+
+The AI's prior `Code-Review` vote is read from Gerrit's label API and injected into system instructions.
+The AI sees its current vote and is told not to change it silently — when prior concerns remain valid,
+each must carry `score ≤ 0`.
+
 ## Multi-Site Support
 
 For deployments with multiple Gerrit primaries sharing a load balancer, ReviewAI can use a shared PostgreSQL
