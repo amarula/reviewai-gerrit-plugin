@@ -141,6 +141,11 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
               getReviewPromptCommitMessages()));
     }
 
+    sections.add(
+        buildSection(
+            "Before You Respond",
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FINAL_REMINDER")));
+
     String compiledInstructions = joinWithDoubleNewLine(sections);
     log.debug("Compiled AI Assistant Review Instructions: {}", compiledInstructions);
     return compiledInstructions;
