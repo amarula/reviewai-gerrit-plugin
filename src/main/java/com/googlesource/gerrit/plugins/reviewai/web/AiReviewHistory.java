@@ -138,7 +138,7 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     return result;
   }
 
-  private static GerritComment toComment(CommentInfo commentInfo, String filename) {
+  static GerritComment toComment(CommentInfo commentInfo, String filename) {
     GerritComment comment = new GerritComment();
     Optional.ofNullable(commentInfo.author).ifPresent(author -> comment.setAuthor(toAuthor(author)));
     comment.setChangeMessageId(commentInfo.changeMessageId);
