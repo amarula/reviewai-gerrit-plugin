@@ -342,7 +342,7 @@ public class PatchSetReviewer {
       return null;
     }
     if (config.isVotingEnabled()) {
-      if (change.getIsCommentEvent()) {
+      if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
         return null;
       }
       int reviewScore = scores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(scores));
