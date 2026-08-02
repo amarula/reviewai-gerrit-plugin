@@ -72,14 +72,14 @@ public class PluginDataHandler {
   public synchronized void setValue(String key, String value) {
     log.debug("Setting value for key: {} with value: {}", key, value);
     synchronized (fileLock) {
+      String upsertSql = db.getDialect().upsert(
+          "plugin_data",
+          "scope, data_key, data_value, updated_at",
+          "?, ?, ?, CURRENT_TIMESTAMP",
+          "scope, data_key",
+          "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
       try (Connection c = db.getConnection();
-          PreparedStatement ps =
-              c.prepareStatement(
-                  """
-                  MERGE INTO plugin_data
-                  KEY(scope, data_key)
-                  VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                  """)) {
+          PreparedStatement ps = c.prepareStatement(upsertSql)) {
         ps.setString(1, scope);
         ps.setString(2, key);
         ps.setString(3, value);
@@ -195,14 +195,14 @@ public class PluginDataHandler {
     if (legacyProperties.isEmpty()) {
       return;
     }
+    String upsertSql = db.getDialect().upsert(
+        "plugin_data",
+        "scope, data_key, data_value, updated_at",
+        "?, ?, ?, CURRENT_TIMESTAMP",
+        "scope, data_key",
+        "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
     try (Connection c = db.getConnection();
-        PreparedStatement ps =
-            c.prepareStatement(
-                """
-                MERGE INTO plugin_data
-                KEY(scope, data_key)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                """)) {
+        PreparedStatement ps = c.prepareStatement(upsertSql)) {
       for (String key : legacyProperties.stringPropertyNames()) {
         if (KEY_REVIEW_AGENT_CONVERSATIONS.equals(key) || hasValue(c, key)) {
           continue;
