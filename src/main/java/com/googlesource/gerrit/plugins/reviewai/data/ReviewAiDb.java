@@ -19,6 +19,9 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn;
 
 import com.google.gerrit.extensions.annotations.PluginData;
+import com.google.gerrit.extensions.annotations.PluginName;
+import com.google.gerrit.server.config.PluginConfig;
+import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
@@ -32,6 +35,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.h2.tools.Server;
@@ -50,9 +54,50 @@ public class ReviewAiDb {
 
   private final Path pluginDataDir;
   private final String jdbcUrl;
+  private final DbDialect dialect;
+  private final Properties connectionProperties;
+
+  /** Public for ConfigCreator to access when reading storeUrl config. */
+  public static final String KEY_STORE_URL = "storeUrl";
+  public static final String KEY_STORE_USERNAME = "storeUsername";
+  public static final String KEY_STORE_PASSWORD = "storePassword";
 
   @Inject
-  public ReviewAiDb(@PluginData Path pluginDataDir) throws IOException {
+  public ReviewAiDb(
+      @PluginData Path pluginDataDir,
+      PluginConfigFactory configFactory,
+      @PluginName String pluginName)
+      throws IOException {
+    Files.createDirectories(pluginDataDir);
+    this.pluginDataDir = pluginDataDir;
+
+    PluginConfig globalConfig = configFactory.getFromGerritConfig(pluginName);
+    String storeUrl = globalConfig.getString(KEY_STORE_URL);
+    String storeUsername = globalConfig.getString(KEY_STORE_USERNAME);
+    String storePassword = globalConfig.getString(KEY_STORE_PASSWORD);
+
+    if (storeUrl != null && !storeUrl.isBlank()) {
+      this.dialect = DbDialect.fromJdbcUrl(storeUrl);
+      this.jdbcUrl = storeUrl;
+      this.connectionProperties = new Properties();
+      if (storeUsername != null && !storeUsername.isBlank()) {
+        connectionProperties.setProperty("user", storeUsername);
+      }
+      if (storePassword != null && !storePassword.isBlank()) {
+        connectionProperties.setProperty("password", storePassword);
+      }
+    } else {
+      this.dialect = DbDialect.H2;
+      this.jdbcUrl = buildJdbcUrl(pluginDataDir);
+      this.connectionProperties = new Properties();
+    }
+
+    if (dialect.needsTcpServer()) {
+      ensureTcpServerStarted();
+    }
+  }
+
+  public ReviewAiDb(Path pluginDataDir) throws IOException {
     this(pluginDataDir, buildJdbcUrl(pluginDataDir));
   }
 
@@ -60,7 +105,15 @@ public class ReviewAiDb {
     Files.createDirectories(pluginDataDir);
     this.pluginDataDir = pluginDataDir;
     this.jdbcUrl = jdbcUrl;
-    ensureTcpServerStarted();
+    this.dialect = DbDialect.fromJdbcUrl(jdbcUrl);
+    this.connectionProperties = new Properties();
+    if (dialect.needsTcpServer()) {
+      ensureTcpServerStarted();
+    }
+  }
+
+  public DbDialect getDialect() {
+    return dialect;
   }
 
   public static String buildJdbcUrl(Path pluginDataDir) {
@@ -73,7 +126,12 @@ public class ReviewAiDb {
   }
 
   public Connection getConnection() throws SQLException {
-    ensureTcpServerStarted();
+    if (dialect.needsTcpServer()) {
+      ensureTcpServerStarted();
+    }
+    if (!connectionProperties.isEmpty()) {
+      return DriverManager.getConnection(jdbcUrl, connectionProperties);
+    }
     return DriverManager.getConnection(jdbcUrl);
   }
 
@@ -85,33 +143,27 @@ public class ReviewAiDb {
 
   public void initLangChainChatMemorySchema() throws SQLException {
     executeSchema(
-        """
-        CREATE TABLE IF NOT EXISTS langchain_chat_memory_messages (
-          id IDENTITY PRIMARY KEY,
-          change_id VARCHAR(512) NOT NULL,
-          patch_set INT NOT NULL,
-          scope VARCHAR(64) NOT NULL,
-          message_json CLOB NOT NULL,
-          updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_scope_lookup
-        ON langchain_chat_memory_messages(change_id, patch_set, scope, updated_at, id)
-        """);
+        "CREATE TABLE IF NOT EXISTS langchain_chat_memory_messages ("
+            + getDialect().autoIncrementPk("id")
+            + ", change_id VARCHAR(512) NOT NULL"
+            + ", patch_set INT NOT NULL"
+            + ", scope VARCHAR(64) NOT NULL"
+            + ", message_json " + getDialect().clobType() + " NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ")",
+        "CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_scope_lookup"
+            + " ON langchain_chat_memory_messages(change_id, patch_set, scope, updated_at, id)");
   }
 
   public void initPluginDataSchema() throws SQLException {
     executeSchema(
-        """
-        CREATE TABLE IF NOT EXISTS plugin_data (
-          scope VARCHAR(512) NOT NULL,
-          data_key VARCHAR(255) NOT NULL,
-          data_value CLOB NOT NULL,
-          updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY(scope, data_key)
-        )
-        """);
+        "CREATE TABLE IF NOT EXISTS plugin_data ("
+            + "scope VARCHAR(512) NOT NULL"
+            + ", data_key VARCHAR(255) NOT NULL"
+            + ", data_value " + getDialect().clobType() + " NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ", PRIMARY KEY(scope, data_key)"
+            + ")");
   }
 
   public void initReviewAgentConversationSchema() throws SQLException {
@@ -119,31 +171,27 @@ public class ReviewAiDb {
         c -> {
           try (Statement s = c.createStatement()) {
             s.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS review_agent_conversations (
-                  change_id VARCHAR(512) NOT NULL,
-                  user_id BIGINT NOT NULL DEFAULT 0,
-                  conversation_id VARCHAR(255) NOT NULL,
-                  title VARCHAR(1024),
-                  timestamp_millis BIGINT,
-                  updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  PRIMARY KEY(change_id, user_id, conversation_id)
-                )
-                """);
+                "CREATE TABLE IF NOT EXISTS review_agent_conversations ("
+                    + "change_id VARCHAR(512) NOT NULL"
+                    + ", user_id BIGINT NOT NULL DEFAULT 0"
+                    + ", conversation_id VARCHAR(255) NOT NULL"
+                    + ", title VARCHAR(1024)"
+                    + ", timestamp_millis BIGINT"
+                    + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    + ", PRIMARY KEY(change_id, user_id, conversation_id)"
+                    + ")");
             s.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS review_agent_conversation_turns (
-                  change_id VARCHAR(512) NOT NULL,
-                  user_id BIGINT NOT NULL DEFAULT 0,
-                  conversation_id VARCHAR(255) NOT NULL,
-                  turn_index INT NOT NULL,
-                  user_message_id BIGINT,
-                  turn_metadata_json CLOB NOT NULL,
-                  timestamp_millis BIGINT,
-                  updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  PRIMARY KEY(change_id, user_id, conversation_id, turn_index)
-                )
-                """);
+                "CREATE TABLE IF NOT EXISTS review_agent_conversation_turns ("
+                    + "change_id VARCHAR(512) NOT NULL"
+                    + ", user_id BIGINT NOT NULL DEFAULT 0"
+                    + ", conversation_id VARCHAR(255) NOT NULL"
+                    + ", turn_index INT NOT NULL"
+                    + ", user_message_id BIGINT"
+                    + ", turn_metadata_json " + getDialect().clobType() + " NOT NULL"
+                    + ", timestamp_millis BIGINT"
+                    + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    + ", PRIMARY KEY(change_id, user_id, conversation_id, turn_index)"
+                    + ")");
             addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATIONS");
             addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATION_TURNS");
             ensurePrimaryKeyIncludesUserId(
@@ -220,7 +268,7 @@ public class ReviewAiDb {
   }
 
   private void ensureTcpServerStarted() {
-    if (!usesManagedTcpServer()) {
+    if (!usesManagedTcpServer() || !dialect.needsTcpServer()) {
       return;
     }
     synchronized (TCP_SERVER_LOCK) {

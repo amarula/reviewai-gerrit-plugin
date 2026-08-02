@@ -110,6 +110,9 @@ public class Configuration extends ConfigCore {
   public static final String KEY_AI_ADMINISTRATORS_GROUP = "aiAdministratorsGroup";
   public static final String KEY_AI_PRICING = "aiPricing";
   public static final String KEY_AI_REVIEW_APPLICABLE_IF = "aiReviewApplicableIf";
+  public static final String KEY_STORE_URL = "storeUrl";
+  public static final String KEY_STORE_USERNAME = "storeUsername";
+  public static final String KEY_STORE_PASSWORD = "storePassword";
 
   // Config entry keys with list values
   public static final Set<String> LIST_TYPE_ENTRY_KEYS =
@@ -442,6 +445,18 @@ public class Configuration extends ConfigCore {
 
   public String getAiReviewApplicableIf() {
     return getString(KEY_AI_REVIEW_APPLICABLE_IF, DEFAULT_EMPTY_SETTING).trim();
+  }
+
+  public String getStoreUrl() {
+    return getString(KEY_STORE_URL, DEFAULT_EMPTY_SETTING).trim();
+  }
+
+  public String getStoreUsername() {
+    return getString(KEY_STORE_USERNAME, DEFAULT_EMPTY_SETTING).trim();
+  }
+
+  public String getStorePassword() {
+    return getString(KEY_STORE_PASSWORD, DEFAULT_EMPTY_SETTING).trim();
   }
 
   public boolean isDefinedKey(String key) {
