@@ -150,13 +150,18 @@ public class GerritClientReview extends GerritClientAccount {
   }
 
   private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
-    if (reviewScore == null
-        || changeSetData.getReviewSystemMessage() != null
+    if (changeSetData.getReviewSystemMessage() != null
         || changeSetData.getReviewRepeatedCommentsMessage() != null) {
       return false;
     }
+    if (reviewScore == null) {
+      return false;
+    }
     Integer existingReviewScore = getCurrentCodeReviewValue(changeSetData);
-    return existingReviewScore == null || !existingReviewScore.equals(reviewScore);
+    if (existingReviewScore == null || !existingReviewScore.equals(reviewScore)) {
+      return true;
+    }
+    return changeSetData.getForcedReview();
   }
 
   private Integer getCurrentCodeReviewValue(ChangeSetData changeSetData) {
