@@ -6,6 +6,16 @@ examples in this section do not include a @{gerritUserName} prefix.
 The `/configure`, `/show`, and `/directives` commands and the `/review --debug` option are available only in the
 development build and are restricted to users in the ReviewAI Administrator group.
 
+## Addressing ReviewAI
+
+Start a conversation in Gerrit comments by mentioning the configured ReviewAI user. An unresolved direct inline reply
+to a ReviewAI comment is also treated as addressed to ReviewAI, without requiring another mention.
+
+Replies that resolve a thread require an explicit mention. ReviewAI records addressed comments so that durable
+guidance can be applied during later reviews. See
+[User Feedback Classification](architecture/review-agents.md#user-feedback-classification) for feedback classification
+and concern continuity.
+
 ## Roles and Permissions
 
 ReviewAI assigns each user one of three roles for the current Change:
