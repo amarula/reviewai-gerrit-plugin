@@ -192,6 +192,22 @@ The `ai-review-threads` endpoint runs the same `collectPreviouslyAddressedConcer
 pipeline uses and returns the result as JSON, making it useful for debugging why the AI did or didn't
 re-raise a concern.
 
+## Debug Endpoints
+
+The plugin exposes REST endpoints for inspecting internal state:
+
+| Endpoint | Method | Variant | Description |
+|---|---|---|---|
+| `.../ai-review-threads` | GET | Prod + dev | Full comment thread data: comments, threads, addressed concerns |
+| `.../ai-review-config` | GET | Dev only | Plugin configuration: static config, dynamic overrides, models |
+| `.../ai-review-history` | GET | Prod + dev | Full comment history with change messages merged |
+| `.../ai-review-agent-model` | GET | Prod + dev | Available AI models and selected default |
+| `.../ai-review-agent-conversations` | POST | Prod + dev | List/get/upsert/append conversation metadata |
+
+The `ai-review-threads` endpoint runs the same `collectPreviouslyAddressedConcerns()` logic the review
+pipeline uses and returns the result as JSON, making it useful for debugging why the AI did or didn't
+re-raise a concern.
+
 ## Documentation
 
 - [Configuration](docs/configuration.md)
