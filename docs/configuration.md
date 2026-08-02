@@ -60,6 +60,57 @@ To add the following content, please edit the `project.config` file in `refs/met
 Please ensure **strict control over the access permissions of `refs/meta/config`** if sensitive information such as
 `aiTokens` is configured in the `project.config` file within `refs/meta/config`.
 
+## Shared PostgreSQL Storage
+
+By default, ReviewAI stores its persisted state in an H2 database under the plugin data directory. Deployments with
+multiple Gerrit primaries can instead configure one shared PostgreSQL database so that each node sees the same plugin
+state.
+
+Database settings are global only. Add the connection URL and, when required by the database, the username to
+`$gerrit_site/etc/gerrit.config` on every Gerrit node:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    storeUrl = jdbc:postgresql://db-host:5432/reviewai
+    storeUsername = reviewai
+```
+
+Store the password in `$gerrit_site/etc/secure.config` rather than `gerrit.config`:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    storePassword = {databasePassword}
+```
+
+A `storeUrl` beginning with `jdbc:postgresql:` selects the PostgreSQL dialect. If `storeUrl` is absent or blank, the
+plugin continues to use its local H2 database. Project-level configuration cannot override these settings.
+
+The PostgreSQL JDBC driver is not bundled with the plugin. Download a compatible
+[pgJDBC driver](https://jdbc.postgresql.org/download/) JAR and install it in Gerrit's `lib` directory on every Gerrit
+node before starting the plugin. For example:
+
+```bash
+GERRIT_SITE_PATH=/path/to/gerrit
+PGJDBC_JAR=/path/to/postgresql-{version}.jar
+
+install -m 0644 "$PGJDBC_JAR" "$GERRIT_SITE_PATH/lib/"
+```
+
+Adding a JAR to `$gerrit_site/lib` requires a full Gerrit restart; reloading only the plugin does not rebuild Gerrit's
+runtime classpath. For an installation managed by `gerrit.sh`, restart it with:
+
+```bash
+"$GERRIT_SITE_PATH/bin/gerrit.sh" restart
+```
+
+The database, user, and privileges must also be provisioned in advance; ReviewAI creates and updates only its own
+tables. All Gerrit primaries must use the same connection settings, have the JDBC driver installed, and be able to
+reach the database.
+
+Switching `storeUrl` does not copy existing data from H2. It initializes the ReviewAI schema in PostgreSQL and leaves
+the local H2 data unchanged. If existing conversations and other persisted plugin state must be retained, migrate the
+data during a maintenance window before enabling PostgreSQL on all nodes.
+
 ## AI Provider Routes
 
 The plugin supports multiple AI providers through LangChain. The Review Agent exposes each configured provider/model
@@ -234,6 +285,10 @@ Patch Set or label-vote event rather than immediately.
   matches with the content of the Change Set.
 - `aiReviewApplicableIf`: Gerrit submit-requirement expression that must match before an automatic AI review starts.
   See [Conditional AI Review Trigger](#conditional-ai-review-trigger).
+- `storeUrl`: Global-only external JDBC URL. A `jdbc:postgresql:` URL enables shared PostgreSQL storage; when unset,
+  ReviewAI uses its local H2 database. See [Shared PostgreSQL Storage](#shared-postgresql-storage).
+- `storeUsername`: Global-only username for the external database, if its authentication configuration requires one.
+- `storePassword`: Global-only password for the external database, if required. Store it in `secure.config`.
 - `aiAdministratorsGroup`: Gerrit group whose members can use administrator-only ReviewAI commands and view
   administrator-only details with the Development build. If this option is not set, or the configured group does not
   exist in Gerrit, the plugin falls back to the Gerrit Administrators group.
