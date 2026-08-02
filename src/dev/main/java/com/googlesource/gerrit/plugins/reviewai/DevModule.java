@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
+import com.google.gerrit.extensions.restapi.RestApiModule;
+import com.google.gerrit.server.change.ChangeResource;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
@@ -24,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.DevLoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.web.DevAiReviewConfig;
 
 public class DevModule extends Module {
   @Inject
@@ -44,5 +47,17 @@ public class DevModule extends Module {
   @Override
   protected Class<? extends LoggingConfigurator> loggingConfiguratorClass() {
     return DevLoggingConfigurator.class;
+  }
+
+  @Override
+  protected void configure() {
+    super.configure();
+    install(
+        new RestApiModule() {
+          @Override
+          protected void configure() {
+            get(ChangeResource.CHANGE_KIND, "ai-review-config").to(DevAiReviewConfig.class);
+          }
+        });
   }
 }
