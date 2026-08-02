@@ -298,14 +298,13 @@ public class ReviewAgentConversationStore {
       String title,
       Long timestampMillis)
       throws SQLException {
-    try (PreparedStatement ps =
-        c.prepareStatement(
-            """
-            MERGE INTO review_agent_conversations
-              (change_id, user_id, conversation_id, title, timestamp_millis, updated_at)
-            KEY(change_id, user_id, conversation_id)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """)) {
+    String upsertSql = db.getDialect().upsert(
+        "review_agent_conversations",
+        "change_id, user_id, conversation_id, title, timestamp_millis, updated_at",
+        "?, ?, ?, ?, ?, CURRENT_TIMESTAMP",
+        "change_id, user_id, conversation_id",
+        "title = EXCLUDED.title, timestamp_millis = EXCLUDED.timestamp_millis, updated_at = CURRENT_TIMESTAMP");
+    try (PreparedStatement ps = c.prepareStatement(upsertSql)) {
       ps.setString(1, changeId);
       ps.setLong(2, userId);
       ps.setString(3, conversationId);
