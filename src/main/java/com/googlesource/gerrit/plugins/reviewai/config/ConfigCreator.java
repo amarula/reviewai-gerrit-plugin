@@ -30,6 +30,7 @@ import com.google.gerrit.server.util.OneOffRequestContext;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.config.entry.IConfigEntry;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -62,13 +63,22 @@ public class ConfigCreator {
       PluginConfigFactory configFactory,
       OneOffRequestContext context,
       GerritApi gerritApi,
-      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider) {
+      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      ReviewAiDb reviewAiDb) {
     this.pluginName = pluginName;
     this.accountCache = accountCache;
     this.configFactory = configFactory;
     this.context = context;
     this.gerritApi = gerritApi;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+
+    // Apply external database configuration if present in gerrit.config.
+    PluginConfig globalConfig = configFactory.getFromGerritConfig(pluginName);
+    reviewAiDb.applyConfig(
+        globalConfig.getString(ReviewAiDb.KEY_STORE_URL),
+        globalConfig.getString(ReviewAiDb.KEY_STORE_USERNAME),
+        globalConfig.getString(ReviewAiDb.KEY_STORE_PASSWORD));
+
     log.debug("ConfigCreator initialized for plugin: {}", pluginName);
   }
 
