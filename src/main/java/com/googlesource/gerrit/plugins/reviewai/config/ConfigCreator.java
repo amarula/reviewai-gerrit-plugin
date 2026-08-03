@@ -87,7 +87,8 @@ public class ConfigCreator {
     log.debug("Creating configuration for project: {} and change: {}", projectName, changeKey);
     PluginConfig globalConfig = configFactory.getFromGerritConfig(pluginName);
     log.debug("Global configuration loaded with items: {}", globalConfig.getNames());
-    PluginConfig projectConfig = configFactory.getFromProjectConfig(projectName, pluginName);
+    PluginConfig projectConfig =
+        configFactory.getFromProjectConfigWithInheritance(projectName, pluginName);
     log.debug("Project configuration loaded with items: {}", projectConfig.getNames());
     // `PluginDataHandlerProvider` cannot be injected because `GerritChange` is not initialized at
     // this stage:
