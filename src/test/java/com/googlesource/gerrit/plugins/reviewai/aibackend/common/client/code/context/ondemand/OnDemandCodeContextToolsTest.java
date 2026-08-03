@@ -20,6 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
@@ -83,6 +84,19 @@ public class OnDemandCodeContextToolsTest extends TestBase {
     String output = tools.execute("get_content", "{\"file_path\":\"context.py\"}");
 
     assertEquals(content, output);
+  }
+
+  @Test
+  public void getContentRejectsVirtualCommitMessagePaths() {
+    assertEquals(
+        "CONTEXT NOT PROVIDED",
+        tools.execute("get_content", "{\"file_path\":\"/COMMIT_MSG\"}"));
+    assertEquals(
+        "CONTEXT NOT PROVIDED",
+        tools.execute(
+            "get_content",
+            "{\"file_path\":\"reviewai-topic-change-1/COMMIT_MSG\"}"));
+    verifyNoInteractions(gitRepoFiles);
   }
 
   @Test

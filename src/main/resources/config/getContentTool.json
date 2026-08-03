@@ -8,7 +8,7 @@
     "properties": {
       "file_path": {
         "type": "string",
-        "description": "File path relative to the git project root."
+        "description": "Repository-tracked file path relative to the git project root."
       }
     },
     "required": [

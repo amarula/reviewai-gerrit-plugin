@@ -38,6 +38,8 @@ public class OnDemandCodeContextTools extends ClientBase {
   public static final Set<String> FUNCTION_NAMES = Set.of(TREE, GET_CONTENT, GREP);
 
   private static final String CONTEXT_NOT_PROVIDED = "CONTEXT NOT PROVIDED";
+  private static final String COMMIT_MESSAGE_FILENAME = "/COMMIT_MSG";
+    private static final String TOPIC_CHANGE_PREFIX = "reviewai-topic-change-";
   private static final int LOG_MAX_CONTENT_SIZE = 256;
 
   private final GerritChange change;
@@ -94,10 +96,16 @@ public class OnDemandCodeContextTools extends ClientBase {
   }
 
   private String getContent(String filePath) throws FileNotFoundException {
-    if (filePath == null || filePath.isBlank()) {
+    if (filePath == null || filePath.isBlank() || isCommitMessagePath(filePath)) {
       return CONTEXT_NOT_PROVIDED;
     }
     return gitRepoFiles.getPatchSetFileContent(change, filePath);
+  }
+
+  private static boolean isCommitMessagePath(String filePath) {
+    return COMMIT_MESSAGE_FILENAME.equals(filePath)
+        || (filePath.startsWith(TOPIC_CHANGE_PREFIX)
+            && filePath.endsWith(COMMIT_MESSAGE_FILENAME));
   }
 
   private String grep(String string) {
