@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0881bf33_694e630d",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/data/ReviewAiDb.java",
+        "patchSetId": 7
+      },
+      "lineNbr": 270,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-08-03T07:38:20Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com why to keep the old version `stopManagedTcpServer`, no more used?",
+      "range": {
+        "startLine": 270,
+        "startChar": 21,
+        "endLine": 270,
+        "endChar": 41
+      },
+      "revId": "f69706008c7fc8f8cb431b19e9ef1ce953d56d75",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
