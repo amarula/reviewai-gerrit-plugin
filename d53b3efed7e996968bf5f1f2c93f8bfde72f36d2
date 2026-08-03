@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8c09e241_50c246f8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-08-03T08:17:13Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com Please keep the README content generic. Put advanced documentation in\ndedicated files such as `docs/development.md` or\n`docs/configuration.md`.",
+      "revId": "d53b3efed7e996968bf5f1f2c93f8bfde72f36d2",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
