@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6af96f90_5a4e85b7",
+        "filename": "src/main/resources/config/agents/level0/single-agent/prompts.json",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-08-04T07:59:25Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com This has no effect because the AI does not output global Code-Review or approval values. Instead, it produces separate replies with individual scores, and the global value is calculated deterministically as the minimum of the valid review scores.",
+      "range": {
+        "startLine": 17,
+        "startChar": 72,
+        "endLine": 17,
+        "endChar": 346
+      },
+      "revId": "649510d88378b62eb844387f20352a8a2b9c5f90",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
