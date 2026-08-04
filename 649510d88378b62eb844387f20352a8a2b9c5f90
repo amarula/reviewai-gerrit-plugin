@@ -22,6 +22,30 @@
       },
       "revId": "649510d88378b62eb844387f20352a8a2b9c5f90",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d47dc667_906651c9",
+        "filename": "src/main/resources/config/agents/level0/single-agent/prompts.json",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-08-04T08:07:33Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com Mi last comment refers only to the last sentence \"Do not approve the patchset while ...\"",
+      "parentUuid": "6af96f90_5a4e85b7",
+      "range": {
+        "startLine": 17,
+        "startChar": 72,
+        "endLine": 17,
+        "endChar": 346
+      },
+      "revId": "649510d88378b62eb844387f20352a8a2b9c5f90",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
     }
   ]
 }
