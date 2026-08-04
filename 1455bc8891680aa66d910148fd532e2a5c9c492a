@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0aed645f_a1fbec6c",
+        "filename": "src/main/java/com/googlesource/gerrit/plugins/reviewai/aibackend/common/client/prompt/AiHistory.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 311,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-08-04T07:03:22Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com Actually that sentence is not invented by AI, it\u0027s hardcoded in our plugin. So we can easily and deterministically catch it without using RegEx",
+      "range": {
+        "startLine": 310,
+        "startChar": 5,
+        "endLine": 311,
+        "endChar": 25
+      },
+      "revId": "1455bc8891680aa66d910148fd532e2a5c9c492a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
