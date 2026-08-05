@@ -47,6 +47,8 @@ import java.util.*;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils.getEpochSeconds;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toAuthor;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toDateString;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_ACKNOWLEDGED;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_DONE;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 
 @Slf4j
@@ -175,6 +177,11 @@ public class GerritClientComments extends GerritClientAccount {
     return parent != null && ReviewAiUser.matches(parent, changeSetData.getAiAccountId());
   }
 
+  private boolean isPredefinedTrivialReply(String message) {
+    return GERRIT_DEFAULT_MESSAGE_ACKNOWLEDGED.equals(message)
+        || GERRIT_DEFAULT_MESSAGE_DONE.equals(message);
+  }
+
   private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
       Map<String, List<CommentInfo>> comments =
@@ -259,7 +266,8 @@ public class GerritClientComments extends GerritClientAccount {
         log.debug("Processing comment: {}", commentMessage);
         boolean isAddressed =
             messageParser.isBotAddressed(commentMessage)
-                || isReplyToAssistant(latestComment);
+                || (isReplyToAssistant(latestComment)
+                    && !isPredefinedTrivialReply(commentMessage));
         if (isAddressed) {
           if (messageParser.parseCommands(commentMessage)) {
             commentProperties.clear();

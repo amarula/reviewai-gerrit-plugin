@@ -20,6 +20,7 @@ import java.util.Map;
 
 public class Settings {
   public static final String GERRIT_PATCH_SET_FILENAME = "/PATCHSET_LEVEL";
+  public static final String GERRIT_DEFAULT_MESSAGE_ACKNOWLEDGED = "Acknowledged";
   public static final String GERRIT_DEFAULT_MESSAGE_DONE = "Done";
   public static final String GERRIT_DEFAULT_MESSAGE_PATCH_SET = "Patch Set";
   public static final String GERRIT_DEFAULT_MESSAGE_COMMENTS = "comments";
