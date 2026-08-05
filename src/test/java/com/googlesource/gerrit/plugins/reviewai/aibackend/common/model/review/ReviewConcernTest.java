@@ -18,8 +18,11 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonObject;
 import java.util.List;
 import org.junit.Test;
 
@@ -35,6 +38,9 @@ public class ReviewConcernTest {
     concern.setId("concern-1");
     concern.setStatus(ConcernStatus.FIXED);
     concern.setStatusReason("A guard now rejects null.");
+    concern.setRepeated(true);
+    concern.setRepeatedReason("The same problem was reported before.");
+    concern.setPreviousCommentId("comment-1");
     concern.setMergedConcernIds(List.of("raw-1", "raw-2"));
     concern.setReviewers(
         List.of(
@@ -42,10 +48,24 @@ public class ReviewConcernTest {
                 ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
     concern.setLocations(List.of(location));
 
-    ReviewConcern restored = getGson().fromJson(getGson().toJson(concern), ReviewConcern.class);
+    String serializedConcern = getGson().toJson(concern);
+    JsonObject serializedObject = getGson().fromJson(serializedConcern, JsonObject.class);
+    ReviewConcern restored = getGson().fromJson(serializedConcern, ReviewConcern.class);
     restored.normalize();
 
+    assertTrue(serializedObject.has("past_comment_id"));
+    assertFalse(serializedObject.has("previous_comment_id"));
     assertEquals(concern, restored);
+  }
+
+  @Test
+  public void acceptsPreviousCommentIdFromCanonicalConcernStorage() {
+    JsonObject storedConcern = new JsonObject();
+    storedConcern.addProperty("previous_comment_id", "comment-1");
+
+    ReviewConcern concern = getGson().fromJson(storedConcern, ReviewConcern.class);
+
+    assertEquals("comment-1", concern.getPreviousCommentId());
   }
 
   @Test
