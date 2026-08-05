@@ -17,6 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -96,13 +98,18 @@ final class SpecializedReviewTopicVerification {
   }
 
   private static boolean concernBelongsToTopicPrefix(
-      SpecializedReviewFindings.Concern concern, String prefix) {
+      ReviewConcern concern, String prefix) {
     concern.normalize();
-    if (concern.getLocations().isEmpty()) {
+    return locationsBelongToTopicPrefix(concern.getLocations(), prefix);
+  }
+
+  private static boolean locationsBelongToTopicPrefix(
+      List<ConcernLocation> locations, String prefix) {
+    if (locations.isEmpty()) {
       return true;
     }
-    return concern.getLocations().stream()
-        .map(SpecializedReviewFindings.Location::getFilename)
+    return locations.stream()
+        .map(ConcernLocation::getFilename)
         .anyMatch(filename -> filename == null || filename.isBlank() || filename.startsWith(prefix));
   }
 

@@ -32,6 +32,10 @@ public class ReviewConcern {
   private String description;
   private String reasoning;
   private Boolean preexisting;
+  private Boolean repeated;
+
+  @SerializedName("repeated_reason")
+  private String repeatedReason;
 
   @SerializedName("merged_concern_ids")
   private List<String> mergedConcernIds = List.of();
@@ -44,7 +48,7 @@ public class ReviewConcern {
   private Double score;
   private Double relevance;
 
-  @SerializedName("previous_comment_id")
+  @SerializedName(value = "past_comment_id", alternate = "previous_comment_id")
   private String previousCommentId;
 
   public void normalize() {
