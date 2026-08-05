@@ -28,6 +28,7 @@ import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -87,6 +88,7 @@ public class GerritClientReview extends GerritClientAccount {
 
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);
+        throw new GerritReviewException(result.error);
       }
     }
   }
