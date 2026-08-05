@@ -37,6 +37,7 @@ public class TopicReviewReplyMapper {
   private AiReplyItem copyWithFilename(AiReplyItem replyItem, String filename) {
     return AiReplyItem.builder()
         .id(replyItem.getId())
+        .concernId(replyItem.getConcernId())
         .filename(filename)
         .lineNumber(replyItem.getLineNumber())
         .codeSnippet(replyItem.getCodeSnippet())
