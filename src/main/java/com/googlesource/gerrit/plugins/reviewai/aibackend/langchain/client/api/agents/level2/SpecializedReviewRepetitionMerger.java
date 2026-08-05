@@ -18,6 +18,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +34,9 @@ final class SpecializedReviewRepetitionMerger {
       SpecializedReviewFindings targetFindings, SpecializedReviewFindings sourceFindings) {
     targetFindings.normalize();
     sourceFindings.normalize();
-    Map<String, SpecializedReviewFindings.Concern> sourceConcernsByRawId =
+    Map<String, ReviewConcern> sourceConcernsByRawId =
         sourceConcernsByRawId(sourceFindings);
-    for (SpecializedReviewFindings.Concern targetConcern : targetFindings.getConcerns()) {
+    for (ReviewConcern targetConcern : targetFindings.getConcerns()) {
       List<String> rawConcernIds = SpecializedReviewConcernIds.rawConcernIds(targetConcern);
       boolean repeated =
           !rawConcernIds.isEmpty()
@@ -66,7 +68,7 @@ final class SpecializedReviewRepetitionMerger {
         historicalRepetitionResult.getAnnotations()) {
       annotationsById.put(annotation.getConcernId(), annotation);
     }
-    for (SpecializedReviewFindings.Concern concern : consolidatedFindings.getConcerns()) {
+    for (ReviewConcern concern : consolidatedFindings.getConcerns()) {
       List<String> rawConcernIds = SpecializedReviewConcernIds.rawConcernIds(concern);
       if (!rawConcernIds.isEmpty()) {
         concern.setId("c-" + rawConcernIds.getFirst());
@@ -105,12 +107,12 @@ final class SpecializedReviewRepetitionMerger {
     List<AiReplyItem> replies = response.getReplies();
     for (int i = 0; i < replies.size(); i++) {
       AiReplyItem reply = replies.get(i);
-      Optional<SpecializedReviewFindings.Concern> matchedConcern =
+      Optional<ReviewConcern> matchedConcern =
           matchedConcernForReply(reply, findings.getConcerns(), i, replies.size());
       if (matchedConcern.isEmpty() || !Boolean.TRUE.equals(matchedConcern.get().getRepeated())) {
         continue;
       }
-      SpecializedReviewFindings.Concern concern = matchedConcern.get();
+      ReviewConcern concern = matchedConcern.get();
       applyRepeatedAnnotation(reply, concern);
       log.debug(
           "Level 2 final reply inherited repeated annotation from concernId={}",
@@ -119,10 +121,10 @@ final class SpecializedReviewRepetitionMerger {
     return response;
   }
 
-  private static Map<String, SpecializedReviewFindings.Concern> sourceConcernsByRawId(
+  private static Map<String, ReviewConcern> sourceConcernsByRawId(
       SpecializedReviewFindings sourceFindings) {
-    Map<String, SpecializedReviewFindings.Concern> sourceConcernsByRawId = new LinkedHashMap<>();
-    for (SpecializedReviewFindings.Concern sourceConcern : sourceFindings.getConcerns()) {
+    Map<String, ReviewConcern> sourceConcernsByRawId = new LinkedHashMap<>();
+    for (ReviewConcern sourceConcern : sourceFindings.getConcerns()) {
       for (String rawConcernId : SpecializedReviewConcernIds.rawConcernIds(sourceConcern)) {
         sourceConcernsByRawId.put(rawConcernId, sourceConcern);
       }
@@ -130,12 +132,12 @@ final class SpecializedReviewRepetitionMerger {
     return sourceConcernsByRawId;
   }
 
-  private static Optional<SpecializedReviewFindings.Concern> matchedConcernForReply(
+  private static Optional<ReviewConcern> matchedConcernForReply(
       AiReplyItem reply,
-      List<SpecializedReviewFindings.Concern> concerns,
+      List<ReviewConcern> concerns,
       int replyIndex,
       int replyCount) {
-    Optional<SpecializedReviewFindings.Concern> locationMatch =
+    Optional<ReviewConcern> locationMatch =
         concerns.stream().filter(concern -> matchesAnyLocation(reply, concern)).findFirst();
     if (locationMatch.isPresent()) {
       return locationMatch;
@@ -147,13 +149,13 @@ final class SpecializedReviewRepetitionMerger {
   }
 
   private static boolean matchesAnyLocation(
-      AiReplyItem reply, SpecializedReviewFindings.Concern concern) {
+      AiReplyItem reply, ReviewConcern concern) {
     concern.normalize();
     return concern.getLocations().stream().anyMatch(location -> matchesLocation(reply, location));
   }
 
   private static boolean matchesLocation(
-      AiReplyItem reply, SpecializedReviewFindings.Location location) {
+      AiReplyItem reply, ConcernLocation location) {
     boolean filenameMatches =
         reply.getFilename() != null
             && location.getFilename() != null
@@ -169,32 +171,31 @@ final class SpecializedReviewRepetitionMerger {
     return filenameMatches && (lineMatches || snippetMatches);
   }
 
-  private static void clearRepeatedAnnotation(SpecializedReviewFindings.Concern concern) {
+  private static void clearRepeatedAnnotation(ReviewConcern concern) {
     concern.setRepeated(false);
-    concern.setPastCommentId("");
+    concern.setPreviousCommentId("");
     concern.setRepeatedReason("");
   }
 
   private static void applyRepeatedAnnotation(
-      SpecializedReviewFindings.Concern concern,
+      ReviewConcern concern,
       SpecializedReviewFindings.HistoricalRepetitionAnnotation annotation) {
     concern.setRepeated(true);
-    concern.setPastCommentId(nullToEmpty(annotation.getPastCommentId()));
+    concern.setPreviousCommentId(nullToEmpty(annotation.getPastCommentId()));
     concern.setRepeatedReason(nullToEmpty(annotation.getReason()));
   }
 
   private static void applyRepeatedAnnotation(
-      SpecializedReviewFindings.Concern targetConcern,
-      SpecializedReviewFindings.Concern sourceConcern) {
+      ReviewConcern targetConcern, ReviewConcern sourceConcern) {
     targetConcern.setRepeated(true);
-    targetConcern.setPastCommentId(nullToEmpty(sourceConcern.getPastCommentId()));
+    targetConcern.setPreviousCommentId(nullToEmpty(sourceConcern.getPreviousCommentId()));
     targetConcern.setRepeatedReason(nullToEmpty(sourceConcern.getRepeatedReason()));
   }
 
   private static void applyRepeatedAnnotation(
-      AiReplyItem reply, SpecializedReviewFindings.Concern concern) {
+      AiReplyItem reply, ReviewConcern concern) {
     reply.setRepeated(true);
-    reply.setRepetitionReplyId(nullToEmpty(concern.getPastCommentId()));
+    reply.setRepetitionReplyId(nullToEmpty(concern.getPreviousCommentId()));
     reply.setRepeatedReason(nullToEmpty(concern.getRepeatedReason()));
   }
 
