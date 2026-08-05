@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,6 +29,8 @@ public final class AiResponseContentMerger {
   public static AiResponseContent merge(List<AiResponseContent> aiResponseContents) {
     log.debug("Merging responses from different multi-agent stages.");
     AiResponseContent mergedResponse = aiResponseContents.remove(0);
+    PendingReviewConcernUpdates pendingUpdates = new PendingReviewConcernUpdates();
+    pendingUpdates.mergeFrom(mergedResponse.getPendingConcernUpdates());
     for (AiResponseContent aiResponseContent : aiResponseContents) {
       List<AiReplyItem> replies = aiResponseContent.getReplies();
       if (replies != null) {
@@ -35,6 +38,10 @@ public final class AiResponseContentMerger {
       } else {
         mergedResponse.setMessageContent(aiResponseContent.getMessageContent());
       }
+      pendingUpdates.mergeFrom(aiResponseContent.getPendingConcernUpdates());
+    }
+    if (!pendingUpdates.isEmpty()) {
+      mergedResponse.setPendingConcernUpdates(pendingUpdates);
     }
     log.debug("Merged response content: {}", mergedResponse.getMessageContent());
     return mergedResponse;
