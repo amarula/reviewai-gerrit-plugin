@@ -259,7 +259,7 @@ public class GerritClientComments extends GerritClientAccount {
         log.debug("Processing comment: {}", commentMessage);
         boolean isAddressed =
             messageParser.isBotAddressed(commentMessage)
-                || isReplyToAssistant(latestComment);
+                || (isReplyToAssistant(latestComment) && !latestComment.isResolved());
         if (isAddressed) {
           if (messageParser.parseCommands(commentMessage)) {
             commentProperties.clear();

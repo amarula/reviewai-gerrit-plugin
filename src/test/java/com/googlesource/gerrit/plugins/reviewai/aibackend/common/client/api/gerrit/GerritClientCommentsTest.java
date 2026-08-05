@@ -57,6 +57,8 @@ public class GerritClientCommentsTest {
   private static final long LATEST_COMMENT_TIMESTAMP = 1699271271L;
   private static final String COMMENTS_RESOURCE =
       "__files/gerritImplicitReplyComments.json";
+  private static final String RESOLVED_REPLY_RESOURCE =
+      "__files/gerritImplicitResolvedReplyComments.json";
   private static final Type COMMENTS_TYPE =
       new TypeToken<Map<String, List<CommentInfo>>>() {}.getType();
 
@@ -131,13 +133,25 @@ public class GerritClientCommentsTest {
     assertFalse(client.retrieveLastComments(change, false));
   }
 
+  @Test
+  public void resolvedReplyToAssistantIsIgnored() throws Exception {
+    comments = readComments(RESOLVED_REPLY_RESOURCE);
+    when(commentsRequest.get()).thenReturn(comments);
+
+    assertFalse(client.retrieveLastComments(change, false));
+  }
+
   private CommentInfo latestComment() {
     return comments.get("src/Test.java").getLast();
   }
 
   private static Map<String, List<CommentInfo>> readComments() throws IOException {
+    return readComments(COMMENTS_RESOURCE);
+  }
+
+  private static Map<String, List<CommentInfo>> readComments(String resource) throws IOException {
     String json =
-        Files.readString(TestResourceLoader.getTestResourcePath().resolve(COMMENTS_RESOURCE));
+        Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
     return OutputFormat.JSON.newGson().fromJson(json, COMMENTS_TYPE);
   }
 
