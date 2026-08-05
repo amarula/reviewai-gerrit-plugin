@@ -213,6 +213,7 @@ public class LangChainSuggestClient {
   private AiReplyItem copyReply(AiReplyItem reply) {
     return AiReplyItem.builder()
         .id(reply.getId())
+        .concernId(reply.getConcernId())
         .reply(reply.getReply())
         .score(reply.getScore())
         .relevance(reply.getRelevance())
