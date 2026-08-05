@@ -25,6 +25,8 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 public class AiReplyItem extends AiDialogueItem {
+  @SerializedName("concern_id")
+  private String concernId;
   private String reply;
   private Double score;
   private Double relevance;
