@@ -17,15 +17,16 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
 import com.google.gson.annotations.SerializedName;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import java.util.List;
 import lombok.Data;
 
 @Data
 class SpecializedReviewFindings {
-  private List<Concern> concerns = List.of();
+  private List<ReviewConcern> concerns = List.of();
 
   @SerializedName("dismissed_concerns")
-  private List<Concern> dismissedConcerns = List.of();
+  private List<ReviewConcern> dismissedConcerns = List.of();
 
   static SpecializedReviewFindings empty() {
     return new SpecializedReviewFindings();
@@ -38,55 +39,17 @@ class SpecializedReviewFindings {
     if (dismissedConcerns == null) {
       dismissedConcerns = List.of();
     }
-    concerns.forEach(Concern::normalize);
-    dismissedConcerns.forEach(Concern::normalize);
-  }
-
-  @Data
-  static class Concern {
-    private String id;
-
-    @SerializedName("merged_concern_ids")
-    private List<String> mergedConcernIds = List.of();
-
-    private String type;
-    private String description;
-    private String reasoning;
-    private Boolean preexisting;
-    private Boolean repeated;
-
-    @SerializedName("past_comment_id")
-    private String pastCommentId;
-
-    @SerializedName("repeated_reason")
-    private String repeatedReason;
-
-    private List<Location> locations = List.of();
-
-    void normalize() {
-      if (mergedConcernIds == null) {
-        mergedConcernIds = List.of();
-      }
-      if (locations == null) {
-        locations = List.of();
-      }
-    }
-  }
-
-  @Data
-  static class Location {
-    private String filename;
-    private Integer lineNumber;
-    private String codeSnippet;
+    concerns.forEach(ReviewConcern::normalize);
+    dismissedConcerns.forEach(ReviewConcern::normalize);
   }
 
   @Data
   static class AgentFindings {
     private final String agent;
-    private final List<Concern> concerns;
+    private final List<ReviewConcern> concerns;
 
     @SerializedName("dismissed_concerns")
-    private final List<Concern> dismissedConcerns;
+    private final List<ReviewConcern> dismissedConcerns;
 
     static AgentFindings from(String agent, SpecializedReviewFindings findings) {
       findings.normalize();

@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,7 +46,7 @@ final class SpecializedReviewConcernIds {
     String reviewRunPrefix = "raw-" + UUID.randomUUID();
     int index = 1;
     for (SpecializedReviewFindings.AgentFindings agentFindings : specializedFindings) {
-      for (SpecializedReviewFindings.Concern concern : agentFindings.getConcerns()) {
+      for (ReviewConcern concern : agentFindings.getConcerns()) {
         if (concern.getId() == null || concern.getId().isBlank()) {
           concern.setId(reviewRunPrefix + "-r" + index);
         }
@@ -58,13 +60,13 @@ final class SpecializedReviewConcernIds {
     Set<String> concernIds = new LinkedHashSet<>();
     specializedFindings.stream()
         .flatMap(agentFindings -> agentFindings.getConcerns().stream())
-        .map(SpecializedReviewFindings.Concern::getId)
+        .map(ReviewConcern::getId)
         .filter(id -> id != null && !id.isBlank())
         .forEach(concernIds::add);
     return concernIds;
   }
 
-  static List<String> rawConcernIds(SpecializedReviewFindings.Concern concern) {
+  static List<String> rawConcernIds(ReviewConcern concern) {
     concern.normalize();
     if (!concern.getMergedConcernIds().isEmpty()) {
       return concern.getMergedConcernIds();
@@ -130,10 +132,9 @@ final class SpecializedReviewConcernIds {
     return fallbackFindings;
   }
 
-  static SpecializedReviewFindings.Concern copyConcern(
-      SpecializedReviewFindings.Concern concern) {
+  static ReviewConcern copyConcern(ReviewConcern concern) {
     concern.normalize();
-    SpecializedReviewFindings.Concern copy = new SpecializedReviewFindings.Concern();
+    ReviewConcern copy = new ReviewConcern();
     copy.setId(concern.getId());
     copy.setMergedConcernIds(List.copyOf(concern.getMergedConcernIds()));
     copy.setType(concern.getType());
@@ -141,8 +142,14 @@ final class SpecializedReviewConcernIds {
     copy.setReasoning(concern.getReasoning());
     copy.setPreexisting(concern.getPreexisting());
     copy.setRepeated(concern.getRepeated());
-    copy.setPastCommentId(concern.getPastCommentId());
+    copy.setPreviousCommentId(concern.getPreviousCommentId());
     copy.setRepeatedReason(concern.getRepeatedReason());
+    copy.setStatus(concern.getStatus());
+    copy.setStatusReason(concern.getStatusReason());
+    copy.setReviewers(List.copyOf(concern.getReviewers()));
+    copy.setReply(concern.getReply());
+    copy.setScore(concern.getScore());
+    copy.setRelevance(concern.getRelevance());
     copy.setLocations(
         concern.getLocations().stream()
             .map(SpecializedReviewConcernIds::copyLocation)
@@ -168,8 +175,8 @@ final class SpecializedReviewConcernIds {
   private static SpecializedReviewFindings deterministicConsolidation(
       List<SpecializedReviewFindings.AgentFindings> specializedFindings) {
     SpecializedReviewFindings findings = new SpecializedReviewFindings();
-    List<SpecializedReviewFindings.Concern> concerns = new ArrayList<>();
-    List<SpecializedReviewFindings.Concern> dismissedConcerns = new ArrayList<>();
+    List<ReviewConcern> concerns = new ArrayList<>();
+    List<ReviewConcern> dismissedConcerns = new ArrayList<>();
     for (SpecializedReviewFindings.AgentFindings agentFindings : specializedFindings) {
       agentFindings.getConcerns().forEach(concern -> concerns.add(consolidatedCopy(concern)));
       agentFindings
@@ -181,9 +188,8 @@ final class SpecializedReviewConcernIds {
     return findings;
   }
 
-  private static SpecializedReviewFindings.Concern consolidatedCopy(
-      SpecializedReviewFindings.Concern concern) {
-    SpecializedReviewFindings.Concern copy = copyConcern(concern);
+  private static ReviewConcern consolidatedCopy(ReviewConcern concern) {
+    ReviewConcern copy = copyConcern(concern);
     if (copy.getId() != null && !copy.getId().isBlank()) {
       copy.setMergedConcernIds(List.of(copy.getId()));
       copy.setId("c-" + copy.getId());
@@ -191,9 +197,8 @@ final class SpecializedReviewConcernIds {
     return copy;
   }
 
-  private static SpecializedReviewFindings.Location copyLocation(
-      SpecializedReviewFindings.Location location) {
-    SpecializedReviewFindings.Location copyLocation = new SpecializedReviewFindings.Location();
+  private static ConcernLocation copyLocation(ConcernLocation location) {
+    ConcernLocation copyLocation = new ConcernLocation();
     copyLocation.setFilename(location.getFilename());
     copyLocation.setLineNumber(location.getLineNumber());
     copyLocation.setCodeSnippet(location.getCodeSnippet());

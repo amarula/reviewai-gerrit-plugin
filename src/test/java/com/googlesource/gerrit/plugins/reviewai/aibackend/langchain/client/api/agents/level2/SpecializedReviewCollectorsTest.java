@@ -36,6 +36,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
@@ -275,10 +277,10 @@ public class SpecializedReviewCollectorsTest {
                 annotation("r1", true, "p10", "Same concern."),
                 annotation("r2", true, "p10", "Same concern.")));
 
-    SpecializedReviewFindings.Concern concern = result.getConcerns().getFirst();
+    ReviewConcern concern = result.getConcerns().getFirst();
     assertEquals("c-r1", concern.getId());
     assertTrue(concern.getRepeated());
-    assertEquals("p10", concern.getPastCommentId());
+    assertEquals("p10", concern.getPreviousCommentId());
     assertEquals("Same concern.", concern.getRepeatedReason());
   }
 
@@ -293,10 +295,10 @@ public class SpecializedReviewCollectorsTest {
                 annotation("r1", true, "p10", "Same concern."),
                 annotation("r2", false, "", "")));
 
-    SpecializedReviewFindings.Concern concern = result.getConcerns().getFirst();
+    ReviewConcern concern = result.getConcerns().getFirst();
     assertEquals("c-r1", concern.getId());
     assertFalse(concern.getRepeated());
-    assertEquals("", concern.getPastCommentId());
+    assertEquals("", concern.getPreviousCommentId());
     assertEquals("", concern.getRepeatedReason());
   }
 
@@ -306,7 +308,7 @@ public class SpecializedReviewCollectorsTest {
     SpecializedReviewFindings annotatedFindings =
         consolidatedConcern("c-raw-current-r1", List.of("raw-current-r1"));
     annotatedFindings.getConcerns().getFirst().setRepeated(true);
-    annotatedFindings.getConcerns().getFirst().setPastCommentId("p10");
+    annotatedFindings.getConcerns().getFirst().setPreviousCommentId("p10");
     annotatedFindings.getConcerns().getFirst().setRepeatedReason("Same concern.");
     SpecializedReviewFindings staleFindings =
         consolidatedConcern("c-raw-old-r1", List.of("raw-old-r1"));
@@ -317,7 +319,7 @@ public class SpecializedReviewCollectorsTest {
 
     assertEquals(List.of("raw-current-r1"), result.getConcerns().getFirst().getMergedConcernIds());
     assertTrue(result.getConcerns().getFirst().getRepeated());
-    assertEquals("p10", result.getConcerns().getFirst().getPastCommentId());
+    assertEquals("p10", result.getConcerns().getFirst().getPreviousCommentId());
   }
 
   @Test
@@ -475,23 +477,23 @@ public class SpecializedReviewCollectorsTest {
   }
 
   private static SpecializedReviewFindings findings(
-      List<SpecializedReviewFindings.Concern> concerns) {
+      List<ReviewConcern> concerns) {
     SpecializedReviewFindings findings = new SpecializedReviewFindings();
     findings.setConcerns(concerns);
     findings.setDismissedConcerns(List.of());
     return findings;
   }
 
-  private static SpecializedReviewFindings.Concern concern(
+  private static ReviewConcern concern(
       String id, List<String> mergedConcernIds, String description, String filename) {
-    SpecializedReviewFindings.Concern concern = new SpecializedReviewFindings.Concern();
+    ReviewConcern concern = new ReviewConcern();
     concern.setId(id);
     concern.setMergedConcernIds(mergedConcernIds);
     concern.setType("Correctness");
     concern.setDescription(description);
     concern.setReasoning("Reasoning");
     concern.setPreexisting(false);
-    SpecializedReviewFindings.Location location = new SpecializedReviewFindings.Location();
+    ConcernLocation location = new ConcernLocation();
     location.setFilename(filename);
     location.setLineNumber(42);
     location.setCodeSnippet("return value;");

@@ -44,6 +44,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -587,12 +589,12 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   private static SpecializedReviewFindings finding(String type, String description) {
     SpecializedReviewFindings findings = new SpecializedReviewFindings();
-    SpecializedReviewFindings.Concern concern = new SpecializedReviewFindings.Concern();
+    ReviewConcern concern = new ReviewConcern();
     concern.setType(type);
     concern.setDescription(description);
     concern.setReasoning("Reasoning");
     concern.setPreexisting(false);
-    SpecializedReviewFindings.Location location = new SpecializedReviewFindings.Location();
+    ConcernLocation location = new ConcernLocation();
     location.setFilename("src/Test.java");
     location.setLineNumber(42);
     location.setCodeSnippet("return value;");
