@@ -151,6 +151,45 @@ public class ReviewAiDb {
             + ")");
   }
 
+  public void initReviewConcernSchema() throws SQLException {
+    executeSchema(
+        "CREATE TABLE IF NOT EXISTS review_concern_ledgers ("
+            + "change_id VARCHAR(512) PRIMARY KEY"
+            + ", schema_version INT NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ")",
+        "CREATE TABLE IF NOT EXISTS review_concern_reviewers ("
+            + "change_id VARCHAR(512) NOT NULL"
+            + ", reviewer_kind VARCHAR(64) NOT NULL"
+            + ", reviewer_name VARCHAR(255) NOT NULL"
+            + ", reviewer_order INT NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ", PRIMARY KEY(change_id, reviewer_kind, reviewer_name)"
+            + ", UNIQUE(change_id, reviewer_order)"
+            + ", FOREIGN KEY(change_id) REFERENCES review_concern_ledgers(change_id)"
+            + " ON DELETE CASCADE"
+            + ")",
+        "CREATE TABLE IF NOT EXISTS review_concerns ("
+            + "change_id VARCHAR(512) NOT NULL"
+            + ", reviewer_kind VARCHAR(64) NOT NULL"
+            + ", reviewer_name VARCHAR(255) NOT NULL"
+            + ", concern_id VARCHAR(255) NOT NULL"
+            + ", concern_order INT NOT NULL"
+            + ", concern_status VARCHAR(32) NOT NULL"
+            + ", concern_json "
+            + getDialect().clobType()
+            + " NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ", PRIMARY KEY(change_id, reviewer_kind, reviewer_name, concern_id)"
+            + ", UNIQUE(change_id, reviewer_kind, reviewer_name, concern_order)"
+            + ", FOREIGN KEY(change_id, reviewer_kind, reviewer_name)"
+            + " REFERENCES review_concern_reviewers(change_id, reviewer_kind, reviewer_name)"
+            + " ON DELETE CASCADE"
+            + ")",
+        "CREATE INDEX IF NOT EXISTS idx_review_concerns_change_status"
+            + " ON review_concerns(change_id, concern_status)");
+  }
+
   public void initReviewAgentConversationSchema() throws SQLException {
     withConnection(
         c -> {
