@@ -35,9 +35,13 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.SpecializedReviewConcernLedgerOperations.AgentFollowUp;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
@@ -75,6 +79,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
   private final SpecializedReviewStageExecutor stageExecutor;
   private final SpecializedReviewPastCommentsCollector pastCommentsCollector;
+  private final SpecializedReviewConcernLedgerOperations specializedConcernLedgerOperations;
   private final ICodeContextPolicy codeContextPolicy;
   private final GerritClient gerritClient;
   private final Localizer localizer;
@@ -152,6 +157,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     this.stageExecutor = new SpecializedReviewStageExecutor(executor);
     this.pastCommentsCollector =
         new SpecializedReviewPastCommentsCollector(config, gerritClient, localizer);
+    this.specializedConcernLedgerOperations =
+        new SpecializedReviewConcernLedgerOperations(concernLedgerOperations());
     this.codeContextPolicy = codeContextPolicy;
     this.gerritClient = gerritClient;
     this.localizer = localizer;
@@ -200,19 +207,66 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     }
 
     SpecializedReviewTriage triage = askTriage(changeSetData, change, patchSet);
-    List<SpecializedReviewTriage.AgentPlan> enabledPlans = enabledPlans(changeSetData, triage);
+    ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+    List<SpecializedReviewTriage.AgentPlan> enabledPlans =
+        SpecializedReviewConcernPlanSelector.select(
+            enabledPlans(changeSetData, triage),
+            triage,
+            previousLedger,
+            agent -> agentInScope(changeSetData, agent));
     if (enabledPlans.isEmpty()) {
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(List.of());
+      concernLedgerOperations()
+          .attachPendingLedger(
+              response,
+              change,
+              previousLedger == null ? new ReviewConcernLedger() : previousLedger);
       return response;
     }
 
+    if (previousLedger == null) {
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings =
+          askSpecializedAgents(changeSetData, change, patchSet, enabledPlans);
+      SpecializedReviewConcernIds.assignRawConcernIds(specializedFindings);
+      CollectorResult collector =
+          askCollectorResult(
+              changeSetData,
+              change,
+              patchSet,
+              specializedFindings,
+              triage.getConsolidationContext());
+      AiResponseContent response =
+          specializedConcernLedgerOperations.nonNullResponse(collector.response());
+      concernLedgerOperations()
+          .attachPendingLedger(
+              response,
+              change,
+              specializedConcernLedgerOperations.verifiedUpdates(
+                  response, collector.verificationCandidates(), specializedFindings));
+      return response;
+    }
+
+    List<AgentFollowUp> followUps =
+        askSpecializedAgentFollowUps(
+            changeSetData, change, patchSet, enabledPlans, previousLedger);
     List<SpecializedReviewFindings.AgentFindings> specializedFindings =
-        askSpecializedAgents(changeSetData, change, patchSet, enabledPlans);
-    AiResponseContent collectorResponse =
-        askCollector(
-            changeSetData, change, patchSet, specializedFindings, triage.getConsolidationContext());
-    return collectorResponse == null ? new AiResponseContent("") : collectorResponse;
+        followUps.stream().map(AgentFollowUp::findings).toList();
+    SpecializedReviewConcernIds.assignRawConcernIds(specializedFindings);
+    CollectorResult collector =
+        askCollectorResult(
+            changeSetData,
+            change,
+            patchSet,
+            specializedFindings,
+            triage.getConsolidationContext());
+    return specializedConcernLedgerOperations.completeFollowUp(
+        specializedConcernLedgerOperations.nonNullResponse(collector.response()),
+        change,
+        previousLedger,
+        followUps,
+        specializedConcernLedgerOperations.verifiedUpdates(
+            collector.response(), collector.verificationCandidates(), specializedFindings));
   }
 
   @Override
@@ -272,6 +326,19 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       String patchSet,
       SpecializedReviewTriage.AgentPlan plan)
       throws Exception {
+    ChangeSetData agentData = specializedAgentData(changeSetData, plan);
+    if (agentData == null) {
+      return null;
+    }
+    RawReviewRequestResult result =
+        askSingleRawRequestWithFallback(agentData, change, buildSpecializedInput(patchSet, plan));
+    return result == null
+        ? SpecializedReviewFindings.empty()
+        : parseFindingsResponse(result.getResponseText());
+  }
+
+  private ChangeSetData specializedAgentData(
+      ChangeSetData changeSetData, SpecializedReviewTriage.AgentPlan plan) {
     ChangeSetData agentData = changeSetData.copy();
     if (isCommitMessageAgent(plan.getAgent())) {
       agentData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
@@ -291,11 +358,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     agentData.setForcedStagedReview(true);
     agentData.setSpecializedAgentReview(true);
     agentData.setSpecializedAgentCustomInstructions(plan.getCustomInstructions());
-    RawReviewRequestResult result =
-        askSingleRawRequestWithFallback(agentData, change, buildSpecializedInput(patchSet, plan));
-    return result == null
-        ? SpecializedReviewFindings.empty()
-        : parseFindingsResponse(result.getResponseText());
+    return agentData;
   }
 
   AiResponseContent askCollector(
@@ -308,6 +371,18 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   }
 
   AiResponseContent askCollector(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings,
+      String triageContext)
+      throws Exception {
+    return askCollectorResult(
+            changeSetData, change, patchSet, specializedFindings, triageContext)
+        .response();
+  }
+
+  protected CollectorResult askCollectorResult(
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
@@ -355,7 +430,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     AiResponseContent response = verification.response();
     inheritRepeatedAnnotations(response, conflictResolvedFindings);
     setRequestBody(verification.requestBody());
-    return response;
+    return new CollectorResult(response, conflictResolvedFindings);
   }
 
   private VerificationStageResult askVerificationStages(
@@ -527,6 +602,64 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return replies;
   }
 
+  private List<AgentFollowUp> askSpecializedAgentFollowUps(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String fullPatchSet,
+      List<SpecializedReviewTriage.AgentPlan> plans,
+      ReviewConcernLedger previousLedger)
+      throws Exception {
+    List<CompletableFuture<AgentFollowUp>> futures = new ArrayList<>();
+    for (SpecializedReviewTriage.AgentPlan plan : plans) {
+      futures.add(
+          stageExecutor.supplyAsync(
+              () ->
+                  askSpecializedAgentFollowUp(
+                      changeSetData, change, fullPatchSet, plan, previousLedger)));
+    }
+
+    List<AgentFollowUp> followUps = new ArrayList<>();
+    for (CompletableFuture<AgentFollowUp> future : futures) {
+      followUps.add(stageExecutor.join(future));
+    }
+    return followUps;
+  }
+
+  protected AgentFollowUp askSpecializedAgentFollowUp(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String fullPatchSet,
+      SpecializedReviewTriage.AgentPlan plan,
+      ReviewConcernLedger previousLedger)
+      throws Exception {
+    String agent = normalizedAgentName(plan.getAgent());
+    ChangeSetData agentData = specializedAgentData(changeSetData, plan);
+    if (agentData == null) {
+      throw new IllegalArgumentException("Unknown specialized review agent " + plan.getAgent());
+    }
+    ConcernReviewerId reviewer =
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, agent);
+    ReviewerConcerns reviewedConcerns =
+        reviewConcerns(
+            agentData,
+            change,
+            concernLedgerOperations().reviewerConcerns(previousLedger, reviewer),
+            changeSetData.getIncrementalPatchSet());
+    RawReviewRequestResult result =
+        findNewIssuesRaw(
+            agentData,
+            change,
+            reviewedConcerns,
+            changeSetData.getIncrementalPatchSet(),
+            fullPatchSet);
+    SpecializedReviewFindings findings =
+        result == null
+            ? SpecializedReviewFindings.empty()
+            : parseFindingsResponse(result.getResponseText());
+    return new AgentFollowUp(
+        SpecializedReviewFindings.AgentFindings.from(agent, findings), reviewedConcerns);
+  }
+
   @VisibleForTesting
   SpecializedReviewFindings parseFindingsResponse(String responseText) {
     return SpecializedReviewPayloads.parseFindingsResponse(responseText);
@@ -661,6 +794,10 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   private String normalizedAgentName(String agent) {
     return SpecializedReviewAgentDefinition.normalizeName(agent);
   }
+
+  protected record CollectorResult(
+      AiResponseContent response,
+      SpecializedReviewFindings verificationCandidates) {}
 
   private record VerificationStageResult(AiResponseContent response, String requestBody) {}
 }
