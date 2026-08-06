@@ -117,6 +117,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainExecutor specializedHistoricalRepetitionToolExecutor;
   private final LangChainExecutor specializedConflictResolutionToolExecutor;
   private final LangChainExecutor specializedVerificationToolExecutor;
+  private final ReviewConcernLedgerOperations concernLedgerOperations;
   private final LangChainSingleAgentConcernWorkflow singleAgentConcernWorkflow;
 
   private String requestBody;
@@ -282,8 +283,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             requireInitialToolUse,
             gitRepoFiles,
             costTracker);
-    ReviewConcernLedgerOperations concernLedgerOperations =
-        new ReviewConcernLedgerOperations();
+    this.concernLedgerOperations = new ReviewConcernLedgerOperations();
     this.singleAgentConcernWorkflow =
         new LangChainSingleAgentConcernWorkflow(
             config,
@@ -296,6 +296,10 @@ public class LangChainClient extends AiClientBase implements IAiClient {
                     findNewIssueReplies(
                         data, change, concerns, incrementalPatch, fullPatch)));
     log.debug("Initialized LangChainClient");
+  }
+
+  protected ReviewConcernLedgerOperations concernLedgerOperations() {
+    return concernLedgerOperations;
   }
 
   @VisibleForTesting
