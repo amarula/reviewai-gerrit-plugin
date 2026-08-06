@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.AiClientBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernLedgerOperations;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -116,6 +117,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainExecutor specializedHistoricalRepetitionToolExecutor;
   private final LangChainExecutor specializedConflictResolutionToolExecutor;
   private final LangChainExecutor specializedVerificationToolExecutor;
+  private final LangChainSingleAgentConcernWorkflow singleAgentConcernWorkflow;
 
   private String requestBody;
 
@@ -280,6 +282,19 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             requireInitialToolUse,
             gitRepoFiles,
             costTracker);
+    ReviewConcernLedgerOperations concernLedgerOperations =
+        new ReviewConcernLedgerOperations();
+    this.singleAgentConcernWorkflow =
+        new LangChainSingleAgentConcernWorkflow(
+            config,
+            concernLedgerOperations,
+            (data, change, patchSet) -> toConcernWorkflowResult(
+                askSingleRequest(data, change, patchSet)),
+            this::reviewConcerns,
+            (data, change, concerns, incrementalPatch, fullPatch) ->
+                toConcernWorkflowResult(
+                    findNewIssueReplies(
+                        data, change, concerns, incrementalPatch, fullPatch)));
     log.debug("Initialized LangChainClient");
   }
 
@@ -321,9 +336,23 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   protected AiResponseContent askReview(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    if (singleAgentConcernWorkflow.applies(changeSetData, change)) {
+      LangChainSingleAgentConcernWorkflow.ReviewResult result =
+          singleAgentConcernWorkflow.review(changeSetData, change, patchSet);
+      requestBody = result == null ? null : result.requestBody();
+      return result == null ? null : result.responseContent();
+    }
     ReviewRequestResult reviewRequestResult = askSingleRequest(changeSetData, change, patchSet);
     requestBody = reviewRequestResult == null ? null : reviewRequestResult.getRequestBody();
     return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
+  }
+
+  private LangChainSingleAgentConcernWorkflow.ReviewResult toConcernWorkflowResult(
+      ReviewRequestResult result) {
+    return result == null
+        ? null
+        : new LangChainSingleAgentConcernWorkflow.ReviewResult(
+            result.getResponseContent(), result.getRequestBody());
   }
 
   protected LangChainSuggestClient getSuggestClient() {
