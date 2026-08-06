@@ -60,6 +60,16 @@ public final class ReviewConcernLedgerOperations {
       GerritChange change,
       ReviewConcernLedger previousLedger,
       ReviewerConcerns reviewedConcerns) {
+    return completeFollowUp(
+        response, change, previousLedger, reviewedConcerns, true);
+  }
+
+  public AiResponseContent completeFollowUp(
+      AiResponseContent response,
+      GerritChange change,
+      ReviewConcernLedger previousLedger,
+      ReviewerConcerns reviewedConcerns,
+      boolean preserveOtherReviewers) {
     if (response == null) {
       return null;
     }
@@ -85,12 +95,25 @@ public final class ReviewConcernLedgerOperations {
       replies.addAll(response.getReplies());
     }
     response.setReplies(replies);
-    attachPendingLedger(
-        response, change, replaceReviewer(previousLedger, currentReviewerConcerns));
+    ReviewConcernLedger ledger =
+        preserveOtherReviewers
+            ? replaceReviewer(previousLedger, currentReviewerConcerns)
+            : ledgerForReviewer(currentReviewerConcerns);
+    attachPendingLedger(response, change, ledger);
     return response;
   }
 
-  private void attachPendingLedger(
+  public ReviewConcernLedger mergeReviewerUpdates(
+      ReviewConcernLedger ledger, ReviewConcernLedger updates) {
+    ReviewConcernLedger merged = ledger;
+    updates.normalize();
+    for (ReviewerConcerns update : updates.getReviewers()) {
+      merged = replaceReviewer(merged, update);
+    }
+    return merged;
+  }
+
+  public void attachPendingLedger(
       AiResponseContent response, GerritChange change, ReviewConcernLedger ledger) {
     PendingReviewConcernUpdates updates = response.getPendingConcernUpdates();
     if (updates == null) {
@@ -167,5 +190,11 @@ public final class ReviewConcernLedgerOperations {
     updated.setSchemaVersion(ledger.getSchemaVersion());
     updated.setReviewers(reviewers);
     return updated;
+  }
+
+  private ReviewConcernLedger ledgerForReviewer(ReviewerConcerns concerns) {
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(concerns));
+    return ledger;
   }
 }
