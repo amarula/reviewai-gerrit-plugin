@@ -31,10 +31,14 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptRoutedReviewAgentRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptConcernReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptNewIssueFinder;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.NewIssueFinderInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
@@ -137,6 +141,34 @@ public class AiPromptFactoryTest {
             config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptConcernReview);
+  }
+
+  @Test
+  public void newIssueFinderStageUsesReviewerAwarePrompt() {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
+    changeSetData.setNewIssueFinderInput(
+        new NewIssueFinderInput(concerns, "incremental patch", null));
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    assertTrue(prompt instanceof AiPromptNewIssueFinder);
+    Map<String, Object> prompts =
+        AiPrompt.getJsonPromptValues("agents/common/new-issue-finder/prompts");
+    assertTrue(
+        prompt
+            .getDefaultAiAssistantInstructions()
+            .contains(
+                (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
   }
 
   @Test
