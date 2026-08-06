@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.NewIssueFinderInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import org.junit.Test;
@@ -28,15 +29,19 @@ public class ChangeSetDataConcernContextTest {
   public void copyPreservesTransientConcernContext() {
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ReviewerConcerns concerns = new ReviewerConcerns();
+    NewIssueFinderInput finderInput =
+        new NewIssueFinderInput(concerns, "incremental patch", "full patch");
     ChangeSetData data = new ChangeSetData(1);
     data.setPreviousReviewConcernLedger(ledger);
     data.setIncrementalPatchSet("incremental patch");
     data.setConcernsToReview(concerns);
+    data.setNewIssueFinderInput(finderInput);
 
     ChangeSetData copy = data.copy();
 
     assertSame(ledger, copy.getPreviousReviewConcernLedger());
     assertEquals("incremental patch", copy.getIncrementalPatchSet());
     assertSame(concerns, copy.getConcernsToReview());
+    assertSame(finderInput, copy.getNewIssueFinderInput());
   }
 }
