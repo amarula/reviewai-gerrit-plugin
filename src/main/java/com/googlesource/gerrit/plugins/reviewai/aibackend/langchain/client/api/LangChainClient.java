@@ -394,13 +394,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ChangeSetData changeSetData,
       GerritChange change,
       ReviewerConcerns existingConcerns,
-      String incrementalPatchSet)
+      String incrementalPatchSet,
+      String fullPatchSet)
       throws Exception {
     return concernReviewer.review(
         changeSetData,
         change,
         existingConcerns,
         incrementalPatchSet,
+        fullPatchSet,
         (requestData, requestChange, requestPatchSet) -> {
           RawReviewRequestResult rawResult =
               askSingleRawRequestWithFallback(requestData, requestChange, requestPatchSet);
@@ -416,17 +418,28 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String fullPatchSet)
       throws Exception {
     RawReviewRequestResult rawResult =
-        newIssueFinder.find(
-            changeSetData,
-            change,
-            reviewedConcerns,
-            incrementalPatchSet,
-            fullPatchSet,
-            this::askSingleRawRequestWithFallback);
+        findNewIssuesRaw(
+            changeSetData, change, reviewedConcerns, incrementalPatchSet, fullPatchSet);
     return rawResult == null
         ? null
         : new ReviewRequestResult(
             toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+  }
+
+  protected RawReviewRequestResult findNewIssuesRaw(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ReviewerConcerns reviewedConcerns,
+      String incrementalPatchSet,
+      String fullPatchSet)
+      throws Exception {
+    return newIssueFinder.find(
+        changeSetData,
+        change,
+        reviewedConcerns,
+        incrementalPatchSet,
+        fullPatchSet,
+        this::askSingleRawRequestWithFallback);
   }
 
   protected RawReviewRequestResult askSingleRawRequest(

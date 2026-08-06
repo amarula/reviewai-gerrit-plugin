@@ -17,10 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.NewIssueFinderInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
@@ -40,18 +38,14 @@ final class LangChainNewIssueFinder {
       RequestExecutor<T> requestExecutor)
       throws Exception {
     reviewedConcerns.normalize();
-    String fullPatchContext =
-        config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
-            ? fullPatchSet
-            : null;
-    NewIssueFinderInput input =
-        new NewIssueFinderInput(reviewedConcerns, incrementalPatchSet, fullPatchContext);
     ChangeSetData finderData = changeSetData.copy();
     finderData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     finderData.setForcedStagedReview(true);
     finderData.setReviewAssistantStageConversationSuffix(
         conversationSuffix(reviewedConcerns));
-    finderData.setNewIssueFinderInput(input);
+    finderData.setConcernWorkflowInput(
+        LangChainConcernWorkflowInputFactory.create(
+            config, reviewedConcerns, incrementalPatchSet, fullPatchSet));
     return requestExecutor.execute(finderData, change, "");
   }
 
