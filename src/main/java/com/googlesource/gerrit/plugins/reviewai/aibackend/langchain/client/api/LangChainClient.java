@@ -394,13 +394,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ChangeSetData changeSetData,
       GerritChange change,
       ReviewerConcerns existingConcerns,
-      String incrementalPatchSet)
+      String incrementalPatchSet,
+      String fullPatchSet)
       throws Exception {
     return concernReviewer.review(
         changeSetData,
         change,
         existingConcerns,
         incrementalPatchSet,
+        fullPatchSet,
         (requestData, requestChange, requestPatchSet) -> {
           RawReviewRequestResult rawResult =
               askSingleRawRequestWithFallback(requestData, requestChange, requestPatchSet);
