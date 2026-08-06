@@ -109,6 +109,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final List<ToolSpecification> contextTools;
   private final LangChainExecutor toolExecutor;
   private final LangChainConcernReviewer concernReviewer;
+  private final LangChainNewIssueFinder newIssueFinder;
   private final LangChainExecutor specializedRepliesToolExecutor;
   private final LangChainExecutor specializedTriageToolExecutor;
   private final LangChainExecutor specializedConsolidationToolExecutor;
@@ -224,6 +225,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             costTracker,
             responseFormat ->
                 getProviderResponseFormat(config, this.contextTools, responseFormat));
+    this.newIssueFinder = new LangChainNewIssueFinder(config);
     ResponseFormat specializedToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
     this.specializedRepliesToolExecutor =
@@ -371,6 +373,32 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               askSingleRawRequestWithFallback(requestData, requestChange, requestPatchSet);
           return rawResult == null ? null : rawResult.getResponseText();
         });
+  }
+
+  protected ReviewRequestResult findNewIssueReplies(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ReviewerConcerns reviewedConcerns,
+      String incrementalPatchSet,
+      String fullPatchSet)
+      throws Exception {
+    if (incrementalPatchSet == null || incrementalPatchSet.isBlank()) {
+      AiResponseContent response = new AiResponseContent("");
+      response.setReplies(List.of());
+      return new ReviewRequestResult(response, null);
+    }
+    RawReviewRequestResult rawResult =
+        newIssueFinder.find(
+            changeSetData,
+            change,
+            reviewedConcerns,
+            incrementalPatchSet,
+            fullPatchSet,
+            this::askSingleRawRequestWithFallback);
+    return rawResult == null
+        ? null
+        : new ReviewRequestResult(
+            toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
   }
 
   protected RawReviewRequestResult askSingleRawRequest(
