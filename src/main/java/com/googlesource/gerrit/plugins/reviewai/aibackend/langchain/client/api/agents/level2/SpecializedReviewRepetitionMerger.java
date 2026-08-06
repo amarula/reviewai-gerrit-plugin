@@ -132,7 +132,7 @@ final class SpecializedReviewRepetitionMerger {
     return sourceConcernsByRawId;
   }
 
-  private static Optional<ReviewConcern> matchedConcernForReply(
+  static Optional<ReviewConcern> matchedConcernForReply(
       AiReplyItem reply,
       List<ReviewConcern> concerns,
       int replyIndex,
