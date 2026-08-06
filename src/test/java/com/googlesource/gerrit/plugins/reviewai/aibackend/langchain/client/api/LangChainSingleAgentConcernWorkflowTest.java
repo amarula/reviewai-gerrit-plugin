@@ -94,10 +94,15 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         List.of(ReviewAssistantStage.REVIEW_CONCERNS, ReviewAssistantStage.FIND_NEW_ISSUES),
         client.stages);
-    assertEquals(readTestResource(INCREMENTAL_PATCH), client.patches.get(ReviewAssistantStage.REVIEW_CONCERNS));
+    assertEquals(
+        readTestResource(INCREMENTAL_PATCH),
+        client.concernData.getConcernWorkflowInput().getIncrementalPatch());
     assertEquals(
         readTestResource(FULL_PATCH),
-        client.finderData.getNewIssueFinderInput().getFullPatch());
+        client.concernData.getConcernWorkflowInput().getFullPatch());
+    assertEquals(
+        readTestResource(FULL_PATCH),
+        client.finderData.getConcernWorkflowInput().getFullPatch());
     assertEquals(2, response.getReplies().size());
 
     var repeated = response.getReplies().getFirst();
@@ -202,6 +207,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     private final List<ReviewAssistantStage> stages = new ArrayList<>();
     private final Map<ReviewAssistantStage, String> patches =
         new EnumMap<>(ReviewAssistantStage.class);
+    private ChangeSetData concernData;
     private ChangeSetData finderData;
 
     private TestClient() {
@@ -220,6 +226,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
             readTestResource(NEW_ISSUES_RESPONSE), "new issue finder request");
       }
       if (stage == ReviewAssistantStage.REVIEW_CONCERNS) {
+        concernData = changeSetData;
         return rawReviewRequestResult(
             readTestResource(CONCERN_REVIEW_RESPONSE), "concern review request");
       }

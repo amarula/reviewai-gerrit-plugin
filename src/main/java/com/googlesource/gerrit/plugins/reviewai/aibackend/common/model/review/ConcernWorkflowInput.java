@@ -22,9 +22,8 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class NewIssueFinderInput {
-  @SerializedName("reviewed_concerns")
-  private ReviewerConcerns reviewedConcerns;
+public class ConcernWorkflowInput {
+  private ReviewerConcerns concerns;
 
   @SerializedName("incremental_patch")
   private String incrementalPatch;
