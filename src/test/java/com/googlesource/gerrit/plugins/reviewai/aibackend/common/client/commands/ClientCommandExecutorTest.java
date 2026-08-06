@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ope
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.Map;
 import java.util.Optional;
@@ -44,10 +47,13 @@ public class ClientCommandExecutorTest {
   @Mock private PluginDataHandler changeDataHandler;
   @Mock private Localizer localizer;
   @Mock private PluginChatMemoryStore chatMemoryStore;
+  @Mock private ReviewConcernPublisher reviewConcernPublisher;
 
   @Test
   public void forgetThreadClearsLangChainMemoryForCurrentChangeAndPatchSet() {
     ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(new ReviewConcernLedger());
+    changeSetData.setIncrementalPatchSet("stale incremental patch");
     when(pluginDataHandlerProvider.getChangeScope()).thenReturn(changeDataHandler);
     when(changeDataHandler.getValue("conversationId")).thenReturn("conv-1");
     when(change.getFullChangeId()).thenReturn("change~1");
@@ -65,13 +71,18 @@ public class ClientCommandExecutorTest {
             pluginDataHandlerProvider,
             localizer,
             null,
-            chatMemoryStore);
+            chatMemoryStore,
+            reviewConcernPublisher,
+            new DisabledClientCommandExtension());
 
     executor.executeCommand(
         ClientCommandBase.CommandSet.FORGET_THREAD, Map.of(), Map.of(), "");
 
     verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 1);
     verify(changeDataHandler).removeValue(OpenAiConversation.getMessagesConversationKey());
+    verify(reviewConcernPublisher).clear(change);
     assertEquals("forgot", changeSetData.getReviewSystemMessage());
+    assertNull(changeSetData.getPreviousReviewConcernLedger());
+    assertNull(changeSetData.getIncrementalPatchSet());
   }
 }

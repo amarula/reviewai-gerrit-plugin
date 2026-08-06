@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.command
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -46,12 +47,12 @@ public class ClientCommandExecutor extends ClientCommandBase {
   private final Localizer localizer;
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final PluginChatMemoryStore chatMemoryStore;
+  private final ReviewConcernPublisher reviewConcernPublisher;
   private final IPatchSetProvider IPatchSetProvider;
   private final ClientCommandExtension commandExtension;
 
   private CommandSet command;
   private Map<BaseOptionSet, String> baseOptions;
-  private Map<String, String> dynamicOptions;
   private String nextString;
 
   public ClientCommandExecutor(
@@ -62,28 +63,8 @@ public class ClientCommandExecutor extends ClientCommandBase {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
-      PluginChatMemoryStore chatMemoryStore) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        chatMemoryStore,
-        new DisabledClientCommandExtension());
-  }
-
-  public ClientCommandExecutor(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
+      ReviewConcernPublisher reviewConcernPublisher,
       ClientCommandExtension commandExtension) {
     super(config);
     this.localizer = localizer;
@@ -92,6 +73,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     this.codeContextPolicy = codeContextPolicy;
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.chatMemoryStore = chatMemoryStore;
+    this.reviewConcernPublisher = reviewConcernPublisher;
     this.IPatchSetProvider = IPatchSetProvider;
     this.commandExtension = commandExtension;
     log.debug("ClientCommandExecutor initialized.");
@@ -109,7 +91,6 @@ public class ClientCommandExecutor extends ClientCommandBase {
         dynamicOptions);
     this.command = command;
     this.baseOptions = baseOptions;
-    this.dynamicOptions = dynamicOptions;
     this.nextString = nextString.trim();
     switch (command) {
       case HELP -> commandHelp();
@@ -315,7 +296,16 @@ public class ClientCommandExecutor extends ClientCommandBase {
         changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID));
     new OpenAiConversation(config, pluginDataHandlerProvider).clear();
     clearLangChainMemory();
+    clearReviewConcerns();
     changeSetData.setReviewSystemMessage(localizer.getText("message.command.thread.forget"));
+  }
+
+  private void clearReviewConcerns() {
+    if (reviewConcernPublisher != null) {
+      reviewConcernPublisher.clear(change);
+    }
+    changeSetData.setPreviousReviewConcernLedger(null);
+    changeSetData.setIncrementalPatchSet(null);
   }
 
   private void clearLangChainMemory() {
