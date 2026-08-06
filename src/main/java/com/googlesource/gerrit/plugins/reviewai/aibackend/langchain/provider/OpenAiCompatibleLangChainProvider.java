@@ -39,9 +39,13 @@ public abstract class OpenAiCompatibleLangChainProvider implements ILangChainPro
     if (ModelCompatibility.supportsTemperature(modelName)) {
       builder.temperature(temperature);
     }
+    configureChatModelBuilder(config, builder);
 
     return new LangChainProvider(builder.build(), baseUrl);
   }
+
+  protected void configureChatModelBuilder(
+      Configuration config, OpenAiChatModel.OpenAiChatModelBuilder builder) {}
 
   protected abstract String defaultBaseUrl();
 

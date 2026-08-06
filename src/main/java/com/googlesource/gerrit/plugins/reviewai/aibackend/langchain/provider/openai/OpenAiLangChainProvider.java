@@ -16,11 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ModelCompatibility;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.OpenAiCompatibleLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import dev.langchain4j.model.TokenCountEstimator;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +71,17 @@ public class OpenAiLangChainProvider extends OpenAiCompatibleLangChainProvider {
   @Override
   protected String defaultBaseUrl() {
     return Configuration.OPENAI_DOMAIN;
+  }
+
+  @Override
+  protected void configureChatModelBuilder(
+      Configuration config, OpenAiChatModel.OpenAiChatModelBuilder builder) {
+    // Chat Completions rejects GPT-5.6 function tools unless reasoning effort is none.
+    if (config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
+        && ModelCompatibility.requiresNoReasoningEffortForChatCompletionTools(
+            config.getAiModel())) {
+      builder.reasoningEffort("none");
+    }
   }
 
   @Override

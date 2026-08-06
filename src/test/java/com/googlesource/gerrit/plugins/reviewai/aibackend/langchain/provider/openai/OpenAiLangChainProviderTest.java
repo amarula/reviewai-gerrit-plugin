@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
@@ -205,6 +206,38 @@ public class OpenAiLangChainProviderTest {
 
     assertTrue(langChainProvider.getModel() instanceof OpenAiChatModel);
     assertFalse(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
+  }
+
+  @Test
+  public void disablesReasoningForGpt56ZdrWithOnDemandTools() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-5.6-sol");
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+
+    OpenAiChatModel model =
+        (OpenAiChatModel) provider.buildChatModel(config, 0.0).getModel();
+
+    assertEquals("none", model.defaultRequestParameters().reasoningEffort());
+  }
+
+  @Test
+  public void leavesReasoningUnsetForGpt56ZdrWithoutOnDemandTools() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-5.6-sol");
+    when(config.getAiConnectionTimeout()).thenReturn(180);
+
+    OpenAiChatModel model =
+        (OpenAiChatModel) provider.buildChatModel(config, 0.0).getModel();
+
+    assertNull(model.defaultRequestParameters().reasoningEffort());
   }
 
   @Test

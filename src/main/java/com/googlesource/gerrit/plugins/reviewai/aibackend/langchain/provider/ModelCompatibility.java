@@ -34,4 +34,8 @@ public final class ModelCompatibility {
     return model == null
         || TEMPERATURE_UNSUPPORTED_MODEL_PREFIXES.stream().noneMatch(model::startsWith);
   }
+
+  public static boolean requiresNoReasoningEffortForChatCompletionTools(String model) {
+    return model != null && model.startsWith(GPT_5_6_MODEL_PREFIX);
+  }
 }
