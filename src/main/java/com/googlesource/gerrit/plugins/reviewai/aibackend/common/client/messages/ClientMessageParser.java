@@ -19,12 +19,12 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.message
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
@@ -43,53 +43,9 @@ public class ClientMessageParser extends ClientMessageBase {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
-      PluginChatMemoryStore chatMemoryStore) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        chatMemoryStore,
-        false,
-        new DisabledClientCommandExtension());
-  }
-
-  public ClientMessageParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider,
-      PluginChatMemoryStore chatMemoryStore,
-      boolean administratorUser) {
-    this(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        pluginDataHandlerProvider,
-        localizer,
-        IPatchSetProvider,
-        chatMemoryStore,
-        administratorUser,
-        new DisabledClientCommandExtension());
-  }
-
-  public ClientMessageParser(
-      Configuration config,
-      ChangeSetData changeSetData,
-      GerritChange change,
-      ICodeContextPolicy codeContextPolicy,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer,
-      IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
       boolean administratorUser,
+      ReviewConcernPublisher reviewConcernPublisher,
       ClientCommandExtension commandExtension) {
     super(config);
     clientCommandParser =
@@ -103,6 +59,7 @@ public class ClientMessageParser extends ClientMessageBase {
             IPatchSetProvider,
             chatMemoryStore,
             administratorUser,
+            reviewConcernPublisher,
             commandExtension);
     log.debug("ClientMessageParser initialized with bot mention pattern: {}", botMentionPattern);
   }
