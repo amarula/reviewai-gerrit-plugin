@@ -17,11 +17,14 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
@@ -38,17 +41,16 @@ import org.junit.Test;
 public class LangChainConcernReviewTest {
   private static final String RESPONSE_RESOURCE =
       "__files/langchain/concernReviewResponse.json";
+  private static final String INCREMENTAL_PATCH_RESOURCE =
+      "__files/langchain/newIssueIncrementalPatch.txt";
+  private static final String FULL_PATCH_RESOURCE =
+      "__files/langchain/newIssueFullPatch.txt";
 
   @Test
-  public void runsStatusReviewWithIsolatedStageContext() throws Exception {
-    LangChainConcernReviewer concernReviewer =
-        new LangChainConcernReviewer(
-            mock(Configuration.class),
-            List.of(),
-            false,
-            null,
-            mock(AiCostTracker.class),
-            responseFormat -> responseFormat);
+  public void nonePolicyProvidesSamePatchContextAsNewIssueFinder() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+    LangChainConcernReviewer concernReviewer = concernReviewer(config);
     CapturedRequest capturedRequest = new CapturedRequest();
     ConcernReviewerId reviewerId =
         new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
@@ -60,12 +62,15 @@ public class LangChainConcernReviewTest {
     reviewerConcerns.setReviewer(reviewerId);
     reviewerConcerns.setConcerns(List.of(existing));
 
+    String incrementalPatch = readTestResource(INCREMENTAL_PATCH_RESOURCE);
+    String fullPatch = readTestResource(FULL_PATCH_RESOURCE);
     ReviewerConcerns result =
         concernReviewer.review(
             new ChangeSetData(1),
             mock(GerritChange.class),
             reviewerConcerns,
-            "incremental patch",
+            incrementalPatch,
+            fullPatch,
             (requestData, change, patchSet) -> {
               capturedRequest.requestData = requestData;
               capturedRequest.patchSet = patchSet;
@@ -82,8 +87,53 @@ public class LangChainConcernReviewTest {
         ReviewAssistantStage.REVIEW_CONCERNS,
         capturedRequest.requestData.getReviewAssistantStage());
     assertTrue(capturedRequest.requestData.getForcedStagedReview());
-    assertSame(reviewerConcerns, capturedRequest.requestData.getConcernsToReview());
-    assertEquals("incremental patch", capturedRequest.patchSet);
+    assertSame(
+        reviewerConcerns,
+        capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
+    assertEquals(
+        incrementalPatch,
+        capturedRequest.requestData.getConcernWorkflowInput().getIncrementalPatch());
+    assertEquals(
+        fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals("", capturedRequest.patchSet);
+  }
+
+  @Test
+  public void onDemandPolicyOmitsFullPatchLikeNewIssueFinder() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+    LangChainConcernReviewer concernReviewer = concernReviewer(config);
+    CapturedRequest capturedRequest = new CapturedRequest();
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS"));
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-1");
+    concerns.setConcerns(List.of(concern));
+
+    concernReviewer.review(
+        new ChangeSetData(1),
+        mock(GerritChange.class),
+        concerns,
+        readTestResource(INCREMENTAL_PATCH_RESOURCE),
+        readTestResource(FULL_PATCH_RESOURCE),
+        (requestData, change, patchSet) -> {
+          capturedRequest.requestData = requestData;
+          capturedRequest.patchSet = patchSet;
+          return readTestResource(RESPONSE_RESOURCE);
+        });
+
+    assertNull(capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+  }
+
+  private static LangChainConcernReviewer concernReviewer(Configuration config) {
+    return new LangChainConcernReviewer(
+        config,
+        List.of(),
+        false,
+        null,
+        mock(AiCostTracker.class),
+        responseFormat -> responseFormat);
   }
 
   private static String readTestResource(String resource) throws IOException {
