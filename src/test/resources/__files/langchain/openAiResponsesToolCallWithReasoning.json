@@ -1,0 +1,35 @@
+{
+  "id": "resp_tool_call",
+  "object": "response",
+  "created_at": 1786000000,
+  "status": "completed",
+  "model": "gpt-5.6-sol",
+  "output": [
+    {
+      "id": "rs_test",
+      "type": "reasoning",
+      "summary": [],
+      "encrypted_content": "encrypted-reasoning",
+      "status": "completed"
+    },
+    {
+      "id": "fc_test",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_tree",
+      "name": "tree",
+      "arguments": "{}"
+    }
+  ],
+  "usage": {
+    "input_tokens": 8,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 4,
+    "output_tokens_details": {
+      "reasoning_tokens": 2
+    },
+    "total_tokens": 12
+  }
+}

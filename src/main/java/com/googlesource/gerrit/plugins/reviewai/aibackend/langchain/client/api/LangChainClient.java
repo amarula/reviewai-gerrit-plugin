@@ -398,8 +398,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       log.debug("LangChain system instructions for {}: {}", memoryId, systemInstructions);
       log.debug("LangChain user prompt for {}: {}", memoryId, userMessage);
 
-      ChatMemory memory =
-          useOpenAiResponses ? buildTransientMemory(memoryId) : buildMemory(memoryId);
+      boolean useLocalMemory = shouldUseLocalMemory(providerType);
+      ChatMemory memory = useLocalMemory ? buildMemory(memoryId) : buildTransientMemory(memoryId);
       boolean hasStoredMemory =
           prepareMemoryForRequest(memory, useOpenAiResponses, systemInstructions);
 
@@ -510,15 +510,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ChangeSetData changeSetData,
       GerritChange change) {
     return shouldOmitRequestContext(
-        shouldUseOpenAiResponses(providerType), existingConversation, changeSetData, change);
+        shouldUseOpenAiConversation(providerType), existingConversation, changeSetData, change);
   }
 
   protected boolean shouldOmitRequestContext(
-      boolean useOpenAiResponses,
+      boolean useOpenAiConversation,
       boolean existingConversation,
       ChangeSetData changeSetData,
       GerritChange change) {
-    return useOpenAiResponses
+    return useOpenAiConversation
         && existingConversation
         && change.getIsCommentEvent()
         && !changeSetData.getForcedReview();
@@ -549,7 +549,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected ConversationResolution resolveConversation(
       AiProviderType providerType, ChangeSetData changeSetData, GerritChange change)
       throws AiConnectionFailException {
-    if (!shouldUseOpenAiResponses(providerType) || pluginDataHandlerProvider == null) {
+    if (!shouldUseOpenAiConversation(providerType) || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
     OpenAiConversation conversation = openAiConversation(changeSetData, change);
@@ -578,7 +578,17 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldUseOpenAiResponses(AiProviderType providerType) {
-    return providerType == AiProviderType.OPENAI && (config == null || !config.getAiProviderZdr());
+    return providerType == AiProviderType.OPENAI;
+  }
+
+  protected boolean shouldUseOpenAiConversation(AiProviderType providerType) {
+    return shouldUseOpenAiResponses(providerType)
+        && (config == null || !config.getAiProviderZdr());
+  }
+
+  protected boolean shouldUseLocalMemory(AiProviderType providerType) {
+    return !shouldUseOpenAiResponses(providerType)
+        || (config != null && config.getAiProviderZdr());
   }
 
   protected boolean requireOpenAiScopeForExistingReviewContext() {

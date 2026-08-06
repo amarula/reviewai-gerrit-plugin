@@ -294,7 +294,9 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     AiProviderType providerType = config.getAiProviderType();
     boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
     ChatMemory memory =
-        useOpenAiResponses ? buildTransientMemory(routerMemoryId) : buildMemory(routerMemoryId);
+        shouldUseLocalMemory(providerType)
+            ? buildMemory(routerMemoryId)
+            : buildTransientMemory(routerMemoryId);
     AiPromptReviewAgentRouter routerPrompt = new AiPromptReviewAgentRouter(config);
     String routerInstructions = routerPrompt.getDefaultAiAssistantInstructions();
     if (!useOpenAiResponses) {
