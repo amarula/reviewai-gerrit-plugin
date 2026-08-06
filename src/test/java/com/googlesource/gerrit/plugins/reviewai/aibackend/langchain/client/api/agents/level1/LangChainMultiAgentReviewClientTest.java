@@ -36,6 +36,11 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
@@ -70,6 +75,10 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/suggestOriginalPatchSet.txt";
   private static final String SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE =
       "__files/langchain/suggestPatchSetFixReply.txt";
+  private static final String INCREMENTAL_PATCH_RESOURCE =
+      "__files/langchain/newIssueIncrementalPatch.txt";
+  private static final String FULL_PATCH_RESOURCE =
+      "__files/langchain/newIssueFullPatch.txt";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -88,6 +97,56 @@ public class LangChainMultiAgentReviewClientTest {
         client.recordedStages);
     assertEquals(List.of(true, true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
+    ReviewConcernLedger ledger =
+        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    assertEquals(2, ledger.getReviewers().size());
+    assertEquals(
+        List.of("PATCHSET", "COMMIT_MESSAGE"),
+        ledger.getReviewers().stream()
+            .map(entry -> entry.getReviewer().getName())
+            .toList());
+  }
+
+  @Test
+  public void followUpRunsSerialConcernPairsForEachScopedReviewer() throws Exception {
+    ConcernRecordingLangChainMultiAgentReviewClient client =
+        new ConcernRecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(scopedLedger());
+    changeSetData.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH_RESOURCE));
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(FULL_PATCH_RESOURCE));
+
+    assertEquals(
+        List.of(
+            "review-PATCHSET",
+            "find-PATCHSET",
+            "review-COMMIT_MESSAGE",
+            "find-COMMIT_MESSAGE"),
+        client.concernEvents);
+    assertEquals(3, response.getReplies().size());
+    assertTrue(response.getReplies().getFirst().isRepeated());
+    assertEquals("patch-old", response.getReplies().getFirst().getConcernId());
+    assertTrue(
+        response.getReplies().stream()
+            .noneMatch(reply -> "commit-old".equals(reply.getConcernId())));
+
+    ReviewConcernLedger ledger =
+        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    assertEquals(3, ledger.getReviewers().size());
+    ReviewerConcerns patchset = reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET");
+    ReviewerConcerns commitMessage =
+        reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE");
+    assertEquals(2, patchset.getConcerns().size());
+    assertEquals(ConcernStatus.PRESENT, patchset.getConcerns().getFirst().getStatus());
+    assertEquals(2, commitMessage.getConcerns().size());
+    assertEquals(ConcernStatus.FIXED, commitMessage.getConcerns().getFirst().getStatus());
+    assertNotNull(
+        reviewer(ledger, ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
   }
 
   @Test
@@ -586,6 +645,104 @@ public class LangChainMultiAgentReviewClientTest {
         Localizer localizer,
         ReviewAgentConversationStore conversationStore) {
       super(config, null, gerritClient, localizer, conversationStore, Runnable::run);
+    }
+  }
+
+  private static ReviewConcernLedger scopedLedger() {
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(
+        List.of(
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SINGLE_AGENT,
+                "PATCHSET",
+                concern("single-old", ConcernStatus.PRESENT)),
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SCOPED_AGENT,
+                "PATCHSET",
+                concern("patch-old", ConcernStatus.PRESENT)),
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SCOPED_AGENT,
+                "COMMIT_MESSAGE",
+                concern("commit-old", ConcernStatus.PRESENT))));
+    return ledger;
+  }
+
+  private static ReviewerConcerns reviewerConcerns(
+      ConcernReviewerId.Kind kind, String name, ReviewConcern... concerns) {
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setReviewer(new ConcernReviewerId(kind, name));
+    reviewerConcerns.setConcerns(List.of(concerns));
+    return reviewerConcerns;
+  }
+
+  private static ReviewerConcerns reviewer(
+      ReviewConcernLedger ledger, ConcernReviewerId.Kind kind, String name) {
+    ConcernReviewerId id = new ConcernReviewerId(kind, name);
+    return ledger.getReviewers().stream()
+        .filter(entry -> id.equals(entry.getReviewer()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static ReviewConcern concern(String id, ConcernStatus status) {
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId(id);
+    concern.setStatus(status);
+    concern.setReply("Stored " + id);
+    concern.setDescription(concern.getReply());
+    return concern;
+  }
+
+  private static class ConcernRecordingLangChainMultiAgentReviewClient
+      extends RecordingLangChainMultiAgentReviewClient {
+    private final List<String> concernEvents = new ArrayList<>();
+
+    @Override
+    protected ReviewerConcerns reviewConcerns(
+        ChangeSetData changeSetData,
+        GerritChange change,
+        ReviewerConcerns existingConcerns,
+        String incrementalPatchSet) {
+      String reviewerName = existingConcerns.getReviewer().getName();
+      concernEvents.add("review-" + reviewerName);
+      assertEquals(readTestResourceUnchecked(INCREMENTAL_PATCH_RESOURCE), incrementalPatchSet);
+      ReviewerConcerns reviewed = new ReviewerConcerns();
+      reviewed.setReviewer(existingConcerns.getReviewer());
+      reviewed.setConcerns(
+          existingConcerns.getConcerns().stream()
+              .map(
+                  concern -> {
+                    ReviewConcern update = concern.copy();
+                    update.setStatus(
+                        "COMMIT_MESSAGE".equals(reviewerName)
+                            ? ConcernStatus.FIXED
+                            : ConcernStatus.PRESENT);
+                    update.setStatusReason("Reviewed by " + reviewerName);
+                    return update;
+                  })
+              .toList());
+      return reviewed;
+    }
+
+    @Override
+    protected ReviewRequestResult findNewIssueReplies(
+        ChangeSetData changeSetData,
+        GerritChange change,
+        ReviewerConcerns reviewedConcerns,
+        String incrementalPatchSet,
+        String fullPatchSet) {
+      String reviewerName = reviewedConcerns.getReviewer().getName();
+      concernEvents.add("find-" + reviewerName);
+      assertEquals(readTestResourceUnchecked(INCREMENTAL_PATCH_RESOURCE), incrementalPatchSet);
+      assertEquals(readTestResourceUnchecked(FULL_PATCH_RESOURCE), fullPatchSet);
+      AiResponseContent response = new AiResponseContent("");
+      response.setReplies(
+          new ArrayList<>(
+              List.of(
+                  AiReplyItem.builder()
+                      .reply("New issue from " + reviewerName)
+                      .build())));
+      return new ReviewRequestResult(response, "body-find-" + reviewerName) {};
     }
   }
 
