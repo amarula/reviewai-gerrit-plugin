@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a27c2484_84a4ddc1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037987
+      },
+      "writtenOn": "2026-08-06T17:56:37Z",
+      "side": 1,
+      "message": "@patrizio.gelosi@amarulasolutions.com as we discussed I prefer to move to conversation where the model allow us",
+      "revId": "cd2de4aa3dc3fd792423efd423452f6f80ef4c8a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
