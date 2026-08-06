@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 public enum ReviewAssistantStage {
   REVIEW_CODE,
   REVIEW_COMMIT_MESSAGE,
+  REVIEW_CONCERNS,
   REVIEW_REITERATED,
   REVIEW_SPECIALIZED_TRIAGE,
   REVIEW_SPECIALIZED_AGENT,

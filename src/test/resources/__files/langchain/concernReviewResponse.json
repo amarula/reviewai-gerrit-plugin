@@ -1,0 +1,9 @@
+{
+  "concerns": [
+    {
+      "id": "concern-1",
+      "status": "FIXED",
+      "status_reason": "The latest patch adds the missing guard."
+    }
+  ]
+}

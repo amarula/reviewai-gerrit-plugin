@@ -40,6 +40,7 @@ final class LangChainOpenAiConversationKey {
               changeSetData.getSpecializedAgentName());
       case REVIEW_CODE,
           REVIEW_COMMIT_MESSAGE,
+          REVIEW_CONCERNS,
           REVIEW_SPECIALIZED_TRIAGE,
           REVIEW_SPECIALIZED_CONSOLIDATION,
           REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
