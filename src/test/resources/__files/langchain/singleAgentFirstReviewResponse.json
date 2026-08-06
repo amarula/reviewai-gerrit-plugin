@@ -1,0 +1,15 @@
+{
+  "replies": [
+    {
+      "reply": "An existing branch can dereference a null value.",
+      "score": -1.0,
+      "repeated": true,
+      "repeated_reason": "The model matched an older Gerrit comment.",
+      "repetition_reply_id": "comment-1",
+      "filename": "src/Example.java",
+      "lineNumber": 42,
+      "codeSnippet": "value.run();"
+    }
+  ],
+  "changeId": "change-1"
+}
