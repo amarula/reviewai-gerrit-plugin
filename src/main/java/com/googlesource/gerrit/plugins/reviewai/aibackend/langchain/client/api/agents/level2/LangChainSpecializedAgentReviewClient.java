@@ -674,7 +674,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             agentData,
             change,
             concernLedgerOperations().reviewerConcerns(previousLedger, reviewer),
-            changeSetData.getIncrementalPatchSet());
+            changeSetData.getIncrementalPatchSet(),
+            fullPatchSet);
     RawReviewRequestResult result =
         findNewIssuesRaw(
             agentData,

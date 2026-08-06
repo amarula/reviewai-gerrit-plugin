@@ -2,5 +2,5 @@
   "$extends": "promptsAi",
   "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER": "You are the new issue finder for this reviewer. Investigate only issues introduced by the latest incremental patch. The reviewed concerns are the source of truth for issues already known to this reviewer.",
   "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER_RULES": "Do not report, rephrase, or duplicate any reviewed concern, regardless of its PRESENT, FIXED, or UNCERTAIN status. Use the full patch only as supporting context when it is provided; it must not broaden the search beyond changes in incremental_patch. Report only genuinely new issues caused by incremental_patch and follow the reviewer's scope, severity, location, and response-format rules. An empty incremental patch cannot introduce a new issue.",
-  "DEFAULT_AI_MESSAGE_NEW_ISSUE_FINDER": "Find only genuinely new issues introduced by incremental_patch. Treat reviewed_concerns as the complete source of truth for already known issues. full_patch is optional supporting context and must not broaden the review scope.\n\n```json\n%s\n```"
+  "DEFAULT_AI_MESSAGE_NEW_ISSUE_FINDER": "Find only genuinely new issues introduced by incremental_patch. Treat concerns as the complete source of truth for already known issues. full_patch is optional supporting context and must not broaden the review scope.\n\n```json\n%s\n```"
 }
