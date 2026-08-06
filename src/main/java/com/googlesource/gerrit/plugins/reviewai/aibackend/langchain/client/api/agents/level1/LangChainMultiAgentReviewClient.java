@@ -39,6 +39,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -269,7 +272,9 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     if (latestReviewRequest != null) {
       setRequestBody(latestReviewRequest.getRequestBody());
     }
-    return AiResponseContentMerger.merge(aiResponseContents);
+    AiResponseContent merged = AiResponseContentMerger.merge(aiResponseContents);
+    preserveUnchangedReviewerConcerns(changeSetData, change, merged);
+    return merged;
   }
 
   private ReviewRequestResult askStage(
@@ -282,7 +287,81 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     stageChangeSetData.setReviewAssistantStage(assistantStage);
     stageChangeSetData.setForcedStagedReview(true);
     log.debug("Processing LangChain stage: {}", assistantStage);
-    return askSingleRequest(stageChangeSetData, change, patchSet);
+    if (Boolean.TRUE.equals(change.getIsCommentEvent())
+        && !Boolean.TRUE.equals(changeSetData.getForcedReview())) {
+      return askSingleRequest(stageChangeSetData, change, patchSet);
+    }
+
+    ConcernReviewerId reviewer = scopedReviewer(assistantStage);
+    ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+    if (previousLedger == null) {
+      ReviewRequestResult firstReview =
+          askSingleRequest(stageChangeSetData, change, patchSet);
+      if (firstReview == null) {
+        return null;
+      }
+      AiResponseContent response =
+          concernLedgerOperations()
+              .initializeLedger(firstReview.getResponseContent(), change, reviewer);
+      return new ReviewRequestResult(response, firstReview.getRequestBody()) {};
+    }
+
+    ReviewerConcerns existingConcerns =
+        concernLedgerOperations().reviewerConcerns(previousLedger, reviewer);
+    ReviewerConcerns reviewedConcerns =
+        reviewConcerns(
+            stageChangeSetData,
+            change,
+            existingConcerns,
+            changeSetData.getIncrementalPatchSet());
+    ReviewRequestResult newIssues =
+        findNewIssueReplies(
+            stageChangeSetData,
+            change,
+            reviewedConcerns,
+            changeSetData.getIncrementalPatchSet(),
+            patchSet);
+    if (newIssues == null) {
+      return null;
+    }
+    AiResponseContent response =
+        concernLedgerOperations()
+            .completeFollowUp(
+                newIssues.getResponseContent(), change, previousLedger, reviewedConcerns, false);
+    return new ReviewRequestResult(response, newIssues.getRequestBody()) {};
+  }
+
+  private ConcernReviewerId scopedReviewer(ReviewAssistantStage stage) {
+    String reviewerName =
+        switch (stage) {
+          case REVIEW_CODE -> "PATCHSET";
+          case REVIEW_COMMIT_MESSAGE -> "COMMIT_MESSAGE";
+          default -> throw new IllegalArgumentException("Unsupported scoped review stage: " + stage);
+        };
+    return new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, reviewerName);
+  }
+
+  private void preserveUnchangedReviewerConcerns(
+      ChangeSetData changeSetData, GerritChange change, AiResponseContent response) {
+    ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+    if (previousLedger == null
+        || response.getPendingConcernUpdates() == null
+        || response
+            .getPendingConcernUpdates()
+            .get(change.getFullChangeId())
+            .isEmpty()) {
+      return;
+    }
+    ReviewConcernLedger reviewerUpdates =
+        response
+            .getPendingConcernUpdates()
+            .get(change.getFullChangeId())
+            .orElseThrow();
+    concernLedgerOperations()
+        .attachPendingLedger(
+            response,
+            change,
+            concernLedgerOperations().mergeReviewerUpdates(previousLedger, reviewerUpdates));
   }
 
   @VisibleForTesting
