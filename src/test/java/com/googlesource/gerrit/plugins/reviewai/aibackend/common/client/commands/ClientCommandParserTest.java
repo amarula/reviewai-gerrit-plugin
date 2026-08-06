@@ -20,11 +20,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
@@ -33,6 +35,30 @@ import org.junit.Test;
 import org.mockito.MockedStatic;
 
 public class ClientCommandParserTest {
+  @Test
+  public void invalidForgetThreadCommandDoesNotClearConcerns() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    Localizer localizer = localizer();
+    ReviewConcernPublisher reviewConcernPublisher = mock(ReviewConcernPublisher.class);
+    ClientCommandParser parser =
+        new ClientCommandParser(
+            mock(Configuration.class),
+            changeSetData,
+            mock(GerritChange.class),
+            null,
+            null,
+            localizer,
+            null,
+            null,
+            false,
+            reviewConcernPublisher,
+            new DisabledClientCommandExtension());
+
+    assertTrue(parser.parseCommands("/forget_thread --unknown=true"));
+
+    verifyNoInteractions(reviewConcernPublisher);
+  }
+
   @Test
   public void productionBuildRejectsDevOnlyCommandsWithDevBuildRequiredMessage() {
     try (MockedStatic<PluginBuild> pluginBuild = mockStatic(PluginBuild.class)) {
@@ -69,6 +95,8 @@ public class ClientCommandParserTest {
     when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.command.dev.build.required"))
         .thenReturn("Unable to execute command: the -dev build is required");
+    when(localizer.getText("message.command.option.unknown"))
+        .thenReturn("Unknown command option: %s %s");
     return localizer;
   }
 }
