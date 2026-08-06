@@ -67,6 +67,16 @@ public class ReviewConcernPublisherTest extends TestBase {
   }
 
   @Test
+  public void clearsExistingLedgerForChange() {
+    new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
+        .save(new ReviewConcernLedger());
+
+    publisher.clear(change);
+
+    assertTrue(publisher.load(change).isEmpty());
+  }
+
+  @Test
   public void ignoresResponseWithoutAnUpdateForPublishedChange() {
     PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
     updates.put("another-change", new ReviewConcernLedger());

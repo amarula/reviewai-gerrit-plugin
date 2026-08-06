@@ -35,6 +35,10 @@ public final class ReviewConcernPublisher {
     return new ReviewConcernStore(db, change.getFullChangeId()).load();
   }
 
+  public void clear(GerritChange change) {
+    new ReviewConcernStore(db, change.getFullChangeId()).clear();
+  }
+
   public void persist(AiResponseContent response, GerritChange change) {
     if (response == null) {
       return;
