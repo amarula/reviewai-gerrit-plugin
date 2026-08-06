@@ -75,6 +75,7 @@ final class LangChainConcernReviewer {
 
     ChangeSetData concernReviewData = changeSetData.copy();
     concernReviewData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+    concernReviewData.setForcedStagedReview(true);
     concernReviewData.setReviewAssistantStageConversationSuffix(
         conversationSuffix(existingConcerns));
     concernReviewData.setConcernsToReview(existingConcerns);

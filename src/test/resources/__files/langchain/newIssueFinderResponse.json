@@ -1,0 +1,11 @@
+{
+  "replies": [
+    {
+      "reply": "The new branch dereferences value without checking it.",
+      "filename": "src/Example.java",
+      "lineNumber": 42,
+      "codeSnippet": "value.run();"
+    }
+  ],
+  "changeId": "change-1"
+}
