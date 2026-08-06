@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedHistoricalRepetition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedVerification;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptConcernReview;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -74,6 +75,10 @@ public class AiPromptFactory {
             log.debug("AiPromptFactory: Return AiPromptReviewCommitMessage");
             yield new AiPromptReviewCommitMessage(
                 config, changeSetData, change, codeContextPolicy);
+          }
+          case REVIEW_CONCERNS -> {
+            log.debug("AiPromptFactory: Return AiPromptConcernReview");
+            yield new AiPromptConcernReview(config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_REITERATED -> {
             log.debug("AiPromptFactory: Return AiPromptReviewReiterate");

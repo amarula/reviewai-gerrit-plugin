@@ -1,0 +1,26 @@
+{
+  "name": "format_concern_review",
+  "description": "Update the status of existing review concerns.",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "concerns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["PRESENT", "FIXED", "UNCERTAIN"]
+            },
+            "status_reason": { "type": "string" }
+          },
+          "required": ["id", "status", "status_reason"]
+        }
+      }
+    },
+    "required": ["concerns"]
+  }
+}
