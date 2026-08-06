@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -61,6 +62,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final PluginDataHandlerProvider pluginDataHandlerProvider;
   private final Localizer localizer;
   private final PluginChatMemoryStore chatMemoryStore;
+  private final ReviewConcernPublisher reviewConcernPublisher;
   private final ClientCommandExtension commandExtension;
 
   private String authorUsername;
@@ -82,6 +84,7 @@ public class GerritClientComments extends GerritClientAccount {
         pluginDataHandlerProvider,
         localizer,
         null,
+        null,
         new DisabledClientCommandExtension());
   }
 
@@ -94,6 +97,7 @@ public class GerritClientComments extends GerritClientAccount {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore,
+      ReviewConcernPublisher reviewConcernPublisher,
       EventBuildFeatures buildFeatures) {
     this(
         config,
@@ -103,6 +107,7 @@ public class GerritClientComments extends GerritClientAccount {
         pluginDataHandlerProvider,
         localizer,
         chatMemoryStore,
+        reviewConcernPublisher,
         buildFeatures.clientCommandExtension());
   }
 
@@ -114,6 +119,7 @@ public class GerritClientComments extends GerritClientAccount {
       PluginDataHandlerProvider pluginDataHandlerProvider,
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore,
+      ReviewConcernPublisher reviewConcernPublisher,
       ClientCommandExtension commandExtension) {
     super(config);
     this.changeSetData = changeSetData;
@@ -122,6 +128,7 @@ public class GerritClientComments extends GerritClientAccount {
     this.pluginDataHandlerProvider = pluginDataHandlerProvider;
     this.localizer = localizer;
     this.chatMemoryStore = chatMemoryStore;
+    this.reviewConcernPublisher = reviewConcernPublisher;
     this.commandExtension = commandExtension;
     commentProperties = new ArrayList<>();
     commentMap = new HashMap<>();
@@ -248,6 +255,7 @@ public class GerritClientComments extends GerritClientAccount {
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
             administratorUser,
+            reviewConcernPublisher,
             commandExtension);
     try {
       List<GerritComment> latestComments = retrieveComments(change);

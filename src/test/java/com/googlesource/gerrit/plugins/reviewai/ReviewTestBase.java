@@ -411,6 +411,7 @@ public class ReviewTestBase extends TestBase {
                     pluginDataHandlerProvider,
                     localizer,
                     null,
+                    null,
                     getClientCommandExtension()),
                 gerritClientPatchSet));
     patchSetReviewer =
