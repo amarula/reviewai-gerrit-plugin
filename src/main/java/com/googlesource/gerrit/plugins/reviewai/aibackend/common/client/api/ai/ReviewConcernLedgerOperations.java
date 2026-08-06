@@ -123,7 +123,7 @@ public final class ReviewConcernLedgerOperations {
     updates.put(change.getFullChangeId(), ledger);
   }
 
-  private AiReplyItem toRepeatedReply(ReviewConcern concern) {
+  public AiReplyItem toRepeatedReply(ReviewConcern concern) {
     ReviewConcern repeatedConcern = concern.copy();
     repeatedConcern.setRepeated(true);
     repeatedConcern.setRepeatedReason(concern.getStatusReason());
