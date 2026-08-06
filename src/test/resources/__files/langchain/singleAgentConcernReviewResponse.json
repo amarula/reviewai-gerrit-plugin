@@ -1,0 +1,14 @@
+{
+  "concerns": [
+    {
+      "id": "old-present",
+      "status": "PRESENT",
+      "status_reason": "The dereference remains reachable."
+    },
+    {
+      "id": "old-fixed",
+      "status": "FIXED",
+      "status_reason": "The new guard handles the empty value."
+    }
+  ]
+}
