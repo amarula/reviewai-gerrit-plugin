@@ -122,6 +122,7 @@ public class PatchSetReviewer {
     commentProperties = gerritClient.getClientData(change).getCommentProperties();
     gerritCommentRange = new GerritCommentRange(gerritClient, change);
     String patchSet = gerritClient.getPatchSet(change);
+    prepareConcernContext(change);
     if (shouldSkipAiReviewForEmptyPatchSet(change)) {
       log.debug(
           "Skipping AI review for change {} because no files remain after patch filtering.",
@@ -163,6 +164,16 @@ public class PatchSetReviewer {
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
     reviewConcernPublisher.persist(reviewReply, change);
     conversationRecorder.record(change, reviewBatches, reviewScore);
+  }
+
+  private void prepareConcernContext(GerritChange change) throws Exception {
+    changeSetData.setPreviousReviewConcernLedger(null);
+    changeSetData.setIncrementalPatchSet(null);
+    var existingLedger = reviewConcernPublisher.load(change);
+    if (existingLedger.isPresent()) {
+      changeSetData.setPreviousReviewConcernLedger(existingLedger.get());
+      changeSetData.setIncrementalPatchSet(gerritClient.getIncrementalPatchSet(change));
+    }
   }
 
   public void reviewTopic(List<GerritChange> changes, boolean includeAiFailureDetails)
