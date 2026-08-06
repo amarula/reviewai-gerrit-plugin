@@ -37,7 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.NewIssueFinderInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -151,8 +151,8 @@ public class AiPromptFactoryTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
-    changeSetData.setNewIssueFinderInput(
-        new NewIssueFinderInput(concerns, "incremental patch", null));
+    changeSetData.setConcernWorkflowInput(
+        new ConcernWorkflowInput(concerns, "incremental patch", null));
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
