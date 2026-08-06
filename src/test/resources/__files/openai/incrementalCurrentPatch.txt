@@ -1,0 +1,17 @@
+Subject: Patch set 3
+
+Change-Id: I1234567890
+---
+
+diff --git a/allowed.py b/allowed.py
+--- a/allowed.py
++++ b/allowed.py
+@@ -1 +1 @@
+-print('base')
++print('after')
+diff --git a/ignored.txt b/ignored.txt
+--- a/ignored.txt
++++ b/ignored.txt
+@@ -1 +1 @@
+-ignored content
++ignored change

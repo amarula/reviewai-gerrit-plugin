@@ -46,6 +46,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -55,6 +57,8 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       "__files/openai/gerritVerboseRenamePatch.txt";
   private static final String MIXED_EXTENSION_PATCH_FILE =
       "__files/openai/mixedExtensionPatch.txt";
+  private static final String INCREMENTAL_CURRENT_PATCH_FILE =
+      "__files/openai/incrementalCurrentPatch.txt";
   private static final String CONTEXT_LINES_PATCH_FILE =
       "__files/openai/gerritContextLinesPatch.txt";
   private static final String CONTEXT_PATCH_ORIGINAL_FILE =
@@ -68,6 +72,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
   @Mock private RevisionApi revisionApi;
+  @Mock private RevisionApi previousRevisionApi;
   @Mock private FileApi fileApi;
   private Path gitDir;
 
@@ -130,6 +135,120 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));
     Assert.assertFalse(patchSet.contains("ignored change"));
     Assert.assertEquals(List.of("allowed.py"), client.getPatchSetFiles());
+  }
+
+  @Test
+  public void getIncrementalPatchSetUsesPreviousPatchSetAsBase() throws Exception {
+    List<RevCommit> patchSetCommits = createIncrementalPatchSetCommits();
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(changeApi.revision(2)).thenReturn(previousRevisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
+    when(previousRevisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(0)));
+    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
+    when(repositoryManager.openRepository(any()))
+        .thenAnswer(
+            invocation ->
+                new FileRepositoryBuilder()
+                    .setGitDir(gitDir.toFile())
+                    .setMustExist(true)
+                    .build());
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getPatchContextLines()).thenReturn(3);
+    GerritChange change = getGerritChange();
+    change.setPatchSetNumber(3);
+
+    GerritClientPatchSetReviewAi client =
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
+    String patchSet = client.getIncrementalPatchSet(new ChangeSetData(1), change);
+
+    verify(changeApi).revision(2);
+    verify(revisionApi).patch();
+    verify(revisionApi, never()).patch("2");
+    Assert.assertTrue(patchSet.contains("Subject: Patch set 3"));
+    Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
+    Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));
+    Assert.assertTrue(patchSet.contains("-print('before')"));
+    Assert.assertFalse(patchSet.contains("-print('base')"));
+    Assert.assertTrue(patchSet.contains("+print('after')"));
+  }
+
+  @Test
+  public void getIncrementalPatchSetIsEmptyWhenOnlyCommitMessageChanges() throws Exception {
+    List<RevCommit> patchSetCommits = createCommitMessageOnlyPatchSetCommits();
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(changeApi.revision(2)).thenReturn(previousRevisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
+    when(previousRevisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(0)));
+    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
+    when(repositoryManager.openRepository(any()))
+        .thenAnswer(
+            invocation ->
+                new FileRepositoryBuilder()
+                    .setGitDir(gitDir.toFile())
+                    .setMustExist(true)
+                    .build());
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getPatchContextLines()).thenReturn(3);
+    GerritChange change = getGerritChange();
+    change.setPatchSetNumber(3);
+
+    GerritClientPatchSetReviewAi client =
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
+
+    Assert.assertEquals("", client.getIncrementalPatchSet(new ChangeSetData(1), change));
+  }
+
+  private List<RevCommit> createIncrementalPatchSetCommits() throws Exception {
+    try (Git git = Git.init().setDirectory(tempFolder.newFolder("incremental-repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Files.writeString(workTree.resolve("allowed.py"), "print('before')\n");
+      Files.writeString(workTree.resolve("ignored.txt"), "unchanged\n");
+      git.add().addFilepattern(".").call();
+      RevCommit previousPatchSet =
+          git.commit().setMessage("Patch set 2").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(workTree.resolve("allowed.py"), "print('after')\n");
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit currentPatchSet =
+          git.commit().setMessage("Patch set 3").setAuthor("Test", "test@example.com").call();
+      return List.of(previousPatchSet, currentPatchSet);
+    }
+  }
+
+  private List<RevCommit> createCommitMessageOnlyPatchSetCommits() throws Exception {
+    try (Git git =
+        Git.init().setDirectory(tempFolder.newFolder("commit-message-only-repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Files.writeString(workTree.resolve("allowed.py"), "print('unchanged')\n");
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit previousPatchSet =
+          git.commit().setMessage("Patch set 2").setAuthor("Test", "test@example.com").call();
+      RevCommit currentPatchSet =
+          git.commit()
+              .setMessage("Patch set 3")
+              .setAuthor("Test", "test@example.com")
+              .setAllowEmpty(true)
+              .call();
+      return List.of(previousPatchSet, currentPatchSet);
+    }
+  }
+
+  private CommitInfo commitInfo(RevCommit commit) {
+    CommitInfo commitInfo = new CommitInfo();
+    commitInfo.commit = commit.getName();
+    return commitInfo;
   }
 
   private RevCommit createRenameCommit() throws Exception {
@@ -203,6 +322,10 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
   private String getMixedExtensionPatch() throws Exception {
     return Files.readString(TEST_RESOURCES_PATH.resolve(MIXED_EXTENSION_PATCH_FILE));
+  }
+
+  private String getIncrementalCurrentPatch() throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(INCREMENTAL_CURRENT_PATCH_FILE));
   }
 
   private String getContextLinesPatch() throws Exception {
