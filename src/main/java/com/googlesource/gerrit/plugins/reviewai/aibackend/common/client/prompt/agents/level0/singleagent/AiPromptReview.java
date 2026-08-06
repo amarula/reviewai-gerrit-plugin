@@ -72,6 +72,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     return switch (stage) {
       case REVIEW_COMMIT_MESSAGE -> staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
       case REVIEW_CODE,
+          REVIEW_CONCERNS,
           REVIEW_REITERATED,
           REVIEW_SPECIALIZED_TRIAGE,
           REVIEW_SPECIALIZED_AGENT,
