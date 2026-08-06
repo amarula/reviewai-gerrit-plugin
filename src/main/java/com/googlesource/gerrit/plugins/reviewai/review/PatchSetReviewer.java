@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormat
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.review.RepeatedCommentReferenceFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.comment.GerritCommentRange;
@@ -114,6 +115,7 @@ public class PatchSetReviewer {
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    clearConcernsIfForgetThreadRequested(change);
     if (!changeSetData.shouldRequestAiReview()) {
       log.debug("Skipping patch retrieval and AI request because only a system response is needed.");
       clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
@@ -164,6 +166,15 @@ public class PatchSetReviewer {
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
     reviewConcernPublisher.persist(reviewReply, change);
     conversationRecorder.record(change, reviewBatches, reviewScore);
+  }
+
+  private void clearConcernsIfForgetThreadRequested(GerritChange change) {
+    if (!Boolean.TRUE.equals(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD))) {
+      return;
+    }
+    reviewConcernPublisher.clear(change);
+    changeSetData.setPreviousReviewConcernLedger(null);
+    changeSetData.setIncrementalPatchSet(null);
   }
 
   private void prepareConcernContext(GerritChange change) throws Exception {
