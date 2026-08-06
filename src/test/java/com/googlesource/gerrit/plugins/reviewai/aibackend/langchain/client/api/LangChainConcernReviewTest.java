@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -80,6 +81,7 @@ public class LangChainConcernReviewTest {
     assertEquals(
         ReviewAssistantStage.REVIEW_CONCERNS,
         capturedRequest.requestData.getReviewAssistantStage());
+    assertTrue(capturedRequest.requestData.getForcedStagedReview());
     assertSame(reviewerConcerns, capturedRequest.requestData.getConcernsToReview());
     assertEquals("incremental patch", capturedRequest.patchSet);
   }
