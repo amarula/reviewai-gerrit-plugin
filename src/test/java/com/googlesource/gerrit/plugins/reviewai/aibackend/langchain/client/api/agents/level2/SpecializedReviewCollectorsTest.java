@@ -222,6 +222,35 @@ public class SpecializedReviewCollectorsTest {
   }
 
   @Test
+  public void followUpCollectorSkipsHistoricalRepetition() throws Exception {
+    RecordingCollectorClient client = new RecordingCollectorClient(config());
+    client.historicalRepeated = true;
+    client.verificationRepeated = true;
+
+    AiResponseContent response =
+        client
+            .askCollectorResult(
+                new ChangeSetData(1),
+                change(),
+                "Patch",
+                sourceFindings(),
+                null,
+                false)
+            .response();
+
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONSOLIDATION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
+            ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION),
+        client.stages);
+    assertFalse(client.verificationInput.contains("\"repeated\":true"));
+    assertFalse(response.getReplies().getFirst().isRepeated());
+    assertEquals("", response.getReplies().getFirst().getRepetitionReplyId());
+    assertEquals("", response.getReplies().getFirst().getRepeatedReason());
+  }
+
+  @Test
   public void rawConcernIdsAreUniqueAcrossCollectorRuns() throws Exception {
     RecordingCollectorClient client = new RecordingCollectorClient(config());
 
@@ -540,6 +569,7 @@ public class SpecializedReviewCollectorsTest {
     private String verificationInput;
     private ReviewAssistantStage failingStage;
     private boolean historicalRepeated;
+    private boolean verificationRepeated;
     private SpecializedReviewFindings consolidationOverride;
     private CountDownLatch verificationStarted;
     private final AtomicBoolean verificationOverlapped = new AtomicBoolean(true);
@@ -629,6 +659,9 @@ public class SpecializedReviewCollectorsTest {
                   .filename(replyFilename(input))
                   .lineNumber(42)
                   .score(-1.0)
+                  .repeated(verificationRepeated)
+                  .repetitionReplyId(verificationRepeated ? "p10" : "")
+                  .repeatedReason(verificationRepeated ? "Same concern." : "")
                   .build()));
       return response;
     }

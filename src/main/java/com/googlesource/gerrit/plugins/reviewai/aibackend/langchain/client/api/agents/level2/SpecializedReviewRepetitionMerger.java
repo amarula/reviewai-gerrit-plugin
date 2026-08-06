@@ -121,6 +121,21 @@ final class SpecializedReviewRepetitionMerger {
     return response;
   }
 
+  static SpecializedReviewFindings clearRepeatedAnnotations(
+      SpecializedReviewFindings findings) {
+    findings.normalize();
+    findings.getConcerns().forEach(SpecializedReviewRepetitionMerger::clearRepeatedAnnotation);
+    return findings;
+  }
+
+  static AiResponseContent clearRepeatedAnnotations(AiResponseContent response) {
+    if (response == null || response.getReplies() == null) {
+      return response;
+    }
+    response.getReplies().forEach(SpecializedReviewRepetitionMerger::clearRepeatedAnnotation);
+    return response;
+  }
+
   private static Map<String, ReviewConcern> sourceConcernsByRawId(
       SpecializedReviewFindings sourceFindings) {
     Map<String, ReviewConcern> sourceConcernsByRawId = new LinkedHashMap<>();
@@ -175,6 +190,12 @@ final class SpecializedReviewRepetitionMerger {
     concern.setRepeated(false);
     concern.setPreviousCommentId("");
     concern.setRepeatedReason("");
+  }
+
+  private static void clearRepeatedAnnotation(AiReplyItem reply) {
+    reply.setRepeated(false);
+    reply.setRepetitionReplyId("");
+    reply.setRepeatedReason("");
   }
 
   private static void applyRepeatedAnnotation(
