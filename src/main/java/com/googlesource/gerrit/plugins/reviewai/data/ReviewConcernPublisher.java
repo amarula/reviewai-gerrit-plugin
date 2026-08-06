@@ -20,6 +20,8 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import java.util.Optional;
 
 public final class ReviewConcernPublisher {
   private final ReviewAiDb db;
@@ -27,6 +29,10 @@ public final class ReviewConcernPublisher {
   @Inject
   public ReviewConcernPublisher(ReviewAiDb db) {
     this.db = db;
+  }
+
+  public Optional<ReviewConcernLedger> load(GerritChange change) {
+    return new ReviewConcernStore(db, change.getFullChangeId()).load();
   }
 
   public void persist(AiResponseContent response, GerritChange change) {
