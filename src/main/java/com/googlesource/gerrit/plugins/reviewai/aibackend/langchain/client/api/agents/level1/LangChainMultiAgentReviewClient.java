@@ -313,7 +313,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
             stageChangeSetData,
             change,
             existingConcerns,
-            changeSetData.getIncrementalPatchSet());
+            changeSetData.getIncrementalPatchSet(),
+            patchSet);
     ReviewRequestResult newIssues =
         findNewIssueReplies(
             stageChangeSetData,

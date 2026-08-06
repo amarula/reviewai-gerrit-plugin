@@ -66,7 +66,7 @@ public final class AiPromptNewIssueFinder extends AiPromptBase {
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
         prompt("DEFAULT_AI_MESSAGE_NEW_ISSUE_FINDER"),
-        getGson().toJson(changeSetData.getNewIssueFinderInput()));
+        getGson().toJson(changeSetData.getConcernWorkflowInput()));
   }
 
   @Override
@@ -79,7 +79,7 @@ public final class AiPromptNewIssueFinder extends AiPromptBase {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    ReviewerConcerns concerns = changeSetData.getNewIssueFinderInput().getReviewedConcerns();
+    ReviewerConcerns concerns = changeSetData.getConcernWorkflowInput().getConcerns();
     ConcernReviewerId reviewer = concerns == null ? null : concerns.getReviewer();
     if (reviewer == null || reviewer.getKind() == null) {
       return new AiPromptReview(config, changeSetData, change, codeContextPolicy);

@@ -79,7 +79,8 @@ final class LangChainSingleAgentConcernWorkflow {
             changeSetData,
             change,
             existingConcerns,
-            changeSetData.getIncrementalPatchSet());
+            changeSetData.getIncrementalPatchSet(),
+            fullPatchSet);
     ReviewResult newIssues =
         newIssueReview.review(
             changeSetData,
@@ -109,7 +110,8 @@ final class LangChainSingleAgentConcernWorkflow {
         ChangeSetData changeSetData,
         GerritChange change,
         ReviewerConcerns existingConcerns,
-        String incrementalPatchSet)
+        String incrementalPatchSet,
+        String fullPatchSet)
         throws Exception;
   }
 
