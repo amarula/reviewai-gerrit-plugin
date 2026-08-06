@@ -100,6 +100,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertNotNull(response.getReplies());
     assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertEquals(List.of("CORRECTNESS"), client.collectorAgents);
+    assertEquals(List.of(true), client.historicalRepetitionSelections);
     assertEquals("Collected review", response.getReplies().getFirst().getReply());
     ReviewerConcerns stored =
         reviewer(
@@ -160,6 +161,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(List.of(incrementalPatch, incrementalPatch), client.incrementalPatches);
     assertEquals(List.of(fullPatch, fullPatch), client.fullPatches);
     assertEquals(List.of("CORRECTNESS", "COMMIT_MESSAGE"), client.collectorAgents);
+    assertEquals(List.of(false), client.historicalRepetitionSelections);
     assertEquals(2, response.getReplies().size());
     assertTrue(response.getReplies().getFirst().isRepeated());
     assertEquals("correctness-old", response.getReplies().getFirst().getConcernId());
@@ -606,6 +608,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     private final List<String> concernEvents = new ArrayList<>();
     private final List<String> incrementalPatches = new ArrayList<>();
     private final List<String> fullPatches = new ArrayList<>();
+    private final List<Boolean> historicalRepetitionSelections = new ArrayList<>();
     private SpecializedReviewTriage triage = triage();
     private boolean triageCalled;
     private boolean suggestClientCalled;
@@ -691,8 +694,10 @@ public class LangChainSpecializedAgentReviewClientTest {
         GerritChange change,
         String patchSet,
         List<SpecializedReviewFindings.AgentFindings> specializedFindings,
-        String triageContext) {
+        String triageContext,
+        boolean includeHistoricalRepetition) {
       specializedFindings.forEach(finding -> collectorAgents.add(finding.getAgent()));
+      historicalRepetitionSelections.add(includeHistoricalRepetition);
       SpecializedReviewFindings verifiedFindings = new SpecializedReviewFindings();
       verifiedFindings.setConcerns(
           specializedFindings.stream()
