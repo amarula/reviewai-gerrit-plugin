@@ -54,8 +54,7 @@ public final class AiPromptConcernReview extends AiPromptBase {
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
         prompt("DEFAULT_AI_MESSAGE_CONCERN_REVIEW"),
-        getGson().toJson(changeSetData.getConcernsToReview()),
-        patchSet);
+        getGson().toJson(changeSetData.getConcernWorkflowInput()));
   }
 
   @Override

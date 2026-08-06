@@ -38,6 +38,7 @@ final class LangChainConcernReviewer {
   private static final String RESPONSE_SCHEMA_RESOURCE =
       "config/formatConcernReviewSchema.json";
 
+  private final Configuration config;
   private final ResponseFormat responseFormat;
   private final LangChainExecutor toolExecutor;
 
@@ -48,6 +49,7 @@ final class LangChainConcernReviewer {
       GitRepoFiles gitRepoFiles,
       AiCostTracker costTracker,
       Function<ResponseFormat, ResponseFormat> providerResponseFormat) {
+    this.config = config;
     responseFormat =
         new LangChainStructuredResponseFactory(RESPONSE_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -66,6 +68,7 @@ final class LangChainConcernReviewer {
       GerritChange change,
       ReviewerConcerns existingConcerns,
       String incrementalPatchSet,
+      String fullPatchSet,
       RequestExecutor requestExecutor)
       throws Exception {
     existingConcerns.normalize();
@@ -78,10 +81,10 @@ final class LangChainConcernReviewer {
     concernReviewData.setForcedStagedReview(true);
     concernReviewData.setReviewAssistantStageConversationSuffix(
         conversationSuffix(existingConcerns));
-    concernReviewData.setConcernsToReview(existingConcerns);
-    String responseText =
-        requestExecutor.execute(
-            concernReviewData, change, incrementalPatchSet == null ? "" : incrementalPatchSet);
+    concernReviewData.setConcernWorkflowInput(
+        LangChainConcernWorkflowInputFactory.create(
+            config, existingConcerns, incrementalPatchSet, fullPatchSet));
+    String responseText = requestExecutor.execute(concernReviewData, change, "");
     if (responseText == null || !isJsonObjectAsString(responseText)) {
       throw new IllegalStateException("Concern reviewer returned no structured response");
     }

@@ -702,10 +702,12 @@ public class LangChainMultiAgentReviewClientTest {
         ChangeSetData changeSetData,
         GerritChange change,
         ReviewerConcerns existingConcerns,
-        String incrementalPatchSet) {
+        String incrementalPatchSet,
+        String fullPatchSet) {
       String reviewerName = existingConcerns.getReviewer().getName();
       concernEvents.add("review-" + reviewerName);
       assertEquals(readTestResourceUnchecked(INCREMENTAL_PATCH_RESOURCE), incrementalPatchSet);
+      assertEquals(readTestResourceUnchecked(FULL_PATCH_RESOURCE), fullPatchSet);
       ReviewerConcerns reviewed = new ReviewerConcerns();
       reviewed.setReviewer(existingConcerns.getReviewer());
       reviewed.setConcerns(

@@ -160,6 +160,9 @@ public class LangChainSpecializedAgentReviewClientTest {
         client.concernEvents);
     assertEquals(List.of(incrementalPatch, incrementalPatch), client.incrementalPatches);
     assertEquals(List.of(fullPatch, fullPatch), client.fullPatches);
+    assertEquals(
+        List.of(incrementalPatch, incrementalPatch), client.concernIncrementalPatches);
+    assertEquals(List.of(fullPatch, fullPatch), client.concernFullPatches);
     assertEquals(List.of("CORRECTNESS", "COMMIT_MESSAGE"), client.collectorAgents);
     assertEquals(List.of(false), client.historicalRepetitionSelections);
     assertEquals(2, response.getReplies().size());
@@ -606,6 +609,8 @@ public class LangChainSpecializedAgentReviewClientTest {
     private final List<String> recordedAgents = new ArrayList<>();
     private final List<String> collectorAgents = new ArrayList<>();
     private final List<String> concernEvents = new ArrayList<>();
+    private final List<String> concernIncrementalPatches = new ArrayList<>();
+    private final List<String> concernFullPatches = new ArrayList<>();
     private final List<String> incrementalPatches = new ArrayList<>();
     private final List<String> fullPatches = new ArrayList<>();
     private final List<Boolean> historicalRepetitionSelections = new ArrayList<>();
@@ -652,8 +657,11 @@ public class LangChainSpecializedAgentReviewClientTest {
         ChangeSetData changeSetData,
         GerritChange change,
         ReviewerConcerns existingConcerns,
-        String incrementalPatchSet) {
+        String incrementalPatchSet,
+        String fullPatchSet) {
       concernEvents.add("review-" + existingConcerns.getReviewer().getName());
+      concernIncrementalPatches.add(incrementalPatchSet);
+      concernFullPatches.add(fullPatchSet);
       ReviewerConcerns reviewed = new ReviewerConcerns();
       reviewed.setReviewer(existingConcerns.getReviewer());
       reviewed.setConcerns(

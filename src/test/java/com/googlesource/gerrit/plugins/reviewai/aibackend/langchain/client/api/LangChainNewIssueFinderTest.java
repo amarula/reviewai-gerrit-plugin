@@ -45,7 +45,8 @@ public class LangChainNewIssueFinderTest {
 
   @Test
   public void nonePolicyProvidesFullPatchAsSupportingContext() throws Exception {
-    LangChainNewIssueFinder finder = new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE));
+    LangChainNewIssueFinder finder =
+        new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE));
     CapturedRequest capturedRequest = new CapturedRequest();
     ReviewerConcerns concerns = reviewerConcerns();
     String incrementalPatch = readTestResource(INCREMENTAL_PATCH_RESOURCE);
@@ -71,12 +72,12 @@ public class LangChainNewIssueFinderTest {
     assertTrue(capturedRequest.requestData.getForcedStagedReview());
     assertSame(
         concerns,
-        capturedRequest.requestData.getNewIssueFinderInput().getReviewedConcerns());
+        capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
     assertEquals(
         incrementalPatch,
-        capturedRequest.requestData.getNewIssueFinderInput().getIncrementalPatch());
+        capturedRequest.requestData.getConcernWorkflowInput().getIncrementalPatch());
     assertEquals(
-        fullPatch, capturedRequest.requestData.getNewIssueFinderInput().getFullPatch());
+        fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
     assertEquals("", capturedRequest.patchSet);
   }
 
@@ -98,7 +99,7 @@ public class LangChainNewIssueFinderTest {
           return readTestResource(RESPONSE_RESOURCE);
         });
 
-    assertNull(capturedRequest.requestData.getNewIssueFinderInput().getFullPatch());
+    assertNull(capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   @Test
