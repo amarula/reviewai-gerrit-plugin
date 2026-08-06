@@ -65,4 +65,25 @@ public class ReviewConcern {
       locations = List.of();
     }
   }
+
+  public ReviewConcern copy() {
+    ReviewConcern copy = new ReviewConcern();
+    copy.setId(id);
+    copy.setStatus(status);
+    copy.setStatusReason(statusReason);
+    copy.setType(type);
+    copy.setDescription(description);
+    copy.setReasoning(reasoning);
+    copy.setPreexisting(preexisting);
+    copy.setRepeated(repeated);
+    copy.setRepeatedReason(repeatedReason);
+    copy.setMergedConcernIds(List.copyOf(mergedConcernIds));
+    copy.setReviewers(List.copyOf(reviewers));
+    copy.setLocations(List.copyOf(locations));
+    copy.setReply(reply);
+    copy.setScore(score);
+    copy.setRelevance(relevance);
+    copy.setPreviousCommentId(previousCommentId);
+    return copy;
+  }
 }
