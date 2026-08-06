@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
+package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
-public enum ReviewAssistantStage {
-  REVIEW_CODE,
-  REVIEW_COMMIT_MESSAGE,
-  REVIEW_CONCERNS,
-  FIND_NEW_ISSUES,
-  REVIEW_REITERATED,
-  REVIEW_SPECIALIZED_TRIAGE,
-  REVIEW_SPECIALIZED_AGENT,
-  REVIEW_SPECIALIZED_CONSOLIDATION,
-  REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
-  REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
-  REVIEW_SPECIALIZED_VERIFICATION
+import com.google.gson.annotations.SerializedName;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class NewIssueFinderInput {
+  @SerializedName("reviewed_concerns")
+  private ReviewerConcerns reviewedConcerns;
+
+  @SerializedName("incremental_patch")
+  private String incrementalPatch;
+
+  @SerializedName("full_patch")
+  private String fullPatch;
 }
