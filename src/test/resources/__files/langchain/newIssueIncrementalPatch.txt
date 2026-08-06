@@ -1,0 +1,4 @@
+diff --git a/src/Example.java b/src/Example.java
+@@ -40,0 +41,2 @@
++Object value = lookup();
++value.run();
