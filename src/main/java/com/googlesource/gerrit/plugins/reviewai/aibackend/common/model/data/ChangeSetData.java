@@ -20,6 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,8 @@ public class ChangeSetData {
   private GerritPermittedVotingRange permittedVotingRange;
   private Boolean deferredReview = false;
   private Map<String, GerritConditionLabel> conditionLabels;
+  private transient ReviewConcernLedger previousReviewConcernLedger;
+  private transient String incrementalPatchSet;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -139,6 +142,8 @@ public class ChangeSetData {
     if (conditionLabels != null) {
       copy.setConditionLabels(new HashMap<>(conditionLabels));
     }
+    copy.setPreviousReviewConcernLedger(previousReviewConcernLedger);
+    copy.setIncrementalPatchSet(incrementalPatchSet);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);
