@@ -35,6 +35,9 @@ public class ReviewConcernReplyMapperTest {
             .reply("A null value is dereferenced.")
             .score(-1.0)
             .relevance(0.9)
+            .repeated(true)
+            .repeatedReason("The concern still holds.")
+            .repetitionReplyId("comment-1")
             .filename("src/Example.java")
             .lineNumber(42)
             .codeSnippet("value.run();")
@@ -50,6 +53,9 @@ public class ReviewConcernReplyMapperTest {
     assertEquals(original.getFilename(), restored.getFilename());
     assertEquals(original.getLineNumber(), restored.getLineNumber());
     assertEquals(original.getCodeSnippet(), restored.getCodeSnippet());
+    assertEquals(original.isRepeated(), restored.isRepeated());
+    assertEquals(original.getRepeatedReason(), restored.getRepeatedReason());
+    assertEquals(original.getRepetitionReplyId(), restored.getRepetitionReplyId());
   }
 
   @Test
