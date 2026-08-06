@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.common.CommitInfo;
 import com.google.gerrit.server.git.GitRepositoryManager;
@@ -90,22 +91,52 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     return formattedPatch;
   }
 
+  @Override
+  public String getIncrementalPatchSet(ChangeSetData changeSetData, GerritChange change)
+      throws Exception {
+    int patchSetNumber =
+        change.getPatchSetAttribute().map(attribute -> attribute.number).orElse(1);
+    if (patchSetNumber <= 1) {
+      return getPatchSet(changeSetData, change);
+    }
+
+    this.change = change;
+    this.changeSetData = changeSetData;
+    try (ManualRequestContext ignored = config.openRequestContext()) {
+      ChangeApi changeApi = changeApi(change);
+      RevisionApi currentRevision = changeApi.current();
+      RevisionApi previousRevision = changeApi.revision(patchSetNumber - 1);
+      String formattedPatch = currentRevision.patch().asString();
+      String incrementalPatch =
+          replaceDiffWithIncrementalGitDiff(
+              formattedPatch, previousRevision, currentRevision);
+      log.debug(
+          "Incremental patch retrieved for change {} between patch sets {} and {}",
+          change.getFullChangeId(),
+          patchSetNumber - 1,
+          patchSetNumber);
+      return filterPatch(incrementalPatch);
+    }
+  }
+
   private String getPatchFromGerrit() throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      RevisionApi currentRevision =
-          config
-              .getGerritApi()
-              .changes()
-              .id(
-                  change.getProjectName(),
-                  change.getBranchNameKey().shortName(),
-                  change.getChangeKey().get())
-              .current();
+      RevisionApi currentRevision = changeApi(change).current();
       String formattedPatch = currentRevision.patch().asString();
       log.debug("Formatted Patch retrieved: {}", formattedPatch);
 
       return filterPatch(replaceDiffWithCompactGitDiff(formattedPatch, currentRevision));
     }
+  }
+
+  private ChangeApi changeApi(GerritChange change) throws Exception {
+    return config
+        .getGerritApi()
+        .changes()
+        .id(
+            change.getProjectName(),
+            change.getBranchNameKey().shortName(),
+            change.getChangeKey().get());
   }
 
   private String replaceDiffWithCompactGitDiff(String formattedPatch, RevisionApi currentRevision) {
@@ -121,6 +152,28 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
       return replacePatchDiff(formattedPatch, compactDiff);
     } catch (Exception e) {
       log.warn("Could not generate compact git diff for patch set. Using Gerrit patch output.", e);
+      return formattedPatch;
+    }
+  }
+
+  private String replaceDiffWithIncrementalGitDiff(
+      String formattedPatch, RevisionApi previousRevision, RevisionApi currentRevision) {
+    if (repositoryManager == null) {
+      return formattedPatch;
+    }
+    try {
+      CommitInfo previousCommit = previousRevision.commit(false);
+      CommitInfo currentCommit = currentRevision.commit(false);
+      String incrementalDiff =
+          getCompactGitDiff(previousCommit.commit, currentCommit.commit);
+      if (incrementalDiff.isBlank()) {
+        return "";
+      }
+      return replacePatchDiff(formattedPatch, incrementalDiff);
+    } catch (Exception e) {
+      log.warn(
+          "Could not generate incremental git diff between patch sets. Using current patch output.",
+          e);
       return formattedPatch;
     }
   }
@@ -143,6 +196,22 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
         diffFormatter.format(parentTree, commit.getTree());
       }
 
+      diffFormatter.flush();
+      return outputStream.toString(StandardCharsets.UTF_8);
+    }
+  }
+
+  private String getCompactGitDiff(String baseCommitId, String commitId) throws Exception {
+    try (Repository repository = repositoryManager.openRepository(change.getProjectNameKey());
+        RevWalk revWalk = new RevWalk(repository);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        DiffFormatter diffFormatter = new DiffFormatter(outputStream)) {
+      RevCommit baseCommit = revWalk.parseCommit(ObjectId.fromString(baseCommitId));
+      RevCommit commit = revWalk.parseCommit(ObjectId.fromString(commitId));
+      diffFormatter.setRepository(repository);
+      diffFormatter.setDetectRenames(true);
+      diffFormatter.setContext(config.getPatchContextLines());
+      diffFormatter.format(baseCommit.getTree(), commit.getTree());
       diffFormatter.flush();
       return outputStream.toString(StandardCharsets.UTF_8);
     }
