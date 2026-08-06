@@ -56,6 +56,10 @@ public class GerritClientFacade {
     return gerritClientPatchSet.getPatchSet(changeSetData, change);
   }
 
+  public String getIncrementalPatchSet(GerritChange change) throws Exception {
+    return gerritClientPatchSet.getIncrementalPatchSet(changeSetData, change);
+  }
+
   public boolean isDisabledUser(String authorUsername) {
     return gerritClientPatchSet.isDisabledUser(authorUsername);
   }
