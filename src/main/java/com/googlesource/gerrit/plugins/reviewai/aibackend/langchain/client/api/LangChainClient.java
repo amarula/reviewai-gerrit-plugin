@@ -421,17 +421,28 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       return new ReviewRequestResult(response, null);
     }
     RawReviewRequestResult rawResult =
-        newIssueFinder.find(
-            changeSetData,
-            change,
-            reviewedConcerns,
-            incrementalPatchSet,
-            fullPatchSet,
-            this::askSingleRawRequestWithFallback);
+        findNewIssuesRaw(
+            changeSetData, change, reviewedConcerns, incrementalPatchSet, fullPatchSet);
     return rawResult == null
         ? null
         : new ReviewRequestResult(
             toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+  }
+
+  protected RawReviewRequestResult findNewIssuesRaw(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ReviewerConcerns reviewedConcerns,
+      String incrementalPatchSet,
+      String fullPatchSet)
+      throws Exception {
+    return newIssueFinder.find(
+        changeSetData,
+        change,
+        reviewedConcerns,
+        incrementalPatchSet,
+        fullPatchSet,
+        this::askSingleRawRequestWithFallback);
   }
 
   protected RawReviewRequestResult askSingleRawRequest(
