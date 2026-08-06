@@ -45,7 +45,11 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -75,6 +79,10 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/suggestPreviousReviewContextAfterForget.json";
   private static final String MESSAGE_RESPONSE_RESOURCE =
       "__files/langchain/messageResponse.json";
+  private static final String INCREMENTAL_PATCH_RESOURCE =
+      "__files/langchain/newIssueIncrementalPatch.txt";
+  private static final String FULL_PATCH_RESOURCE =
+      "__files/langchain/newIssueFullPatch.txt";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -93,6 +101,86 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertEquals(List.of("CORRECTNESS"), client.collectorAgents);
     assertEquals("Collected review", response.getReplies().getFirst().getReply());
+    ReviewerConcerns stored =
+        reviewer(
+            pendingLedger(response),
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "CORRECTNESS");
+    assertEquals(1, stored.getConcerns().size());
+    assertEquals(
+        response.getReplies().getFirst().getConcernId(),
+        stored.getConcerns().getFirst().getId());
+  }
+
+  @Test
+  public void firstReviewStoresOnlyConcernPublishedByCollector() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage =
+        triage(
+            plan("CORRECTNESS", true),
+            plan("SECURITY", true));
+
+    AiResponseContent response =
+        client.ask(new ChangeSetData(1), change(false), readTestResource(PATCH_SET_RESOURCE));
+
+    ReviewConcernLedger ledger = pendingLedger(response);
+    assertEquals(1, ledger.getReviewers().size());
+    reviewer(
+        ledger,
+        ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+        "CORRECTNESS");
+    assertTrue(
+        ledger.getReviewers().stream()
+            .noneMatch(entry -> "SECURITY".equals(entry.getReviewer().getName())));
+  }
+
+  @Test
+  public void followUpRunsConcernReviewBeforeNewIssueFinderForEachSpecialist()
+      throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage =
+        triage(
+            plan("CORRECTNESS", true),
+            plan("COMMIT_MESSAGE", false));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(specializedLedger());
+    String incrementalPatch = readTestResource(INCREMENTAL_PATCH_RESOURCE);
+    String fullPatch = readTestResource(FULL_PATCH_RESOURCE);
+    changeSetData.setIncrementalPatchSet(incrementalPatch);
+
+    AiResponseContent response = client.ask(changeSetData, change(false), fullPatch);
+
+    assertEquals(
+        List.of(
+            "review-CORRECTNESS",
+            "find-CORRECTNESS",
+            "review-COMMIT_MESSAGE",
+            "find-COMMIT_MESSAGE"),
+        client.concernEvents);
+    assertEquals(List.of(incrementalPatch, incrementalPatch), client.incrementalPatches);
+    assertEquals(List.of(fullPatch, fullPatch), client.fullPatches);
+    assertEquals(List.of("CORRECTNESS", "COMMIT_MESSAGE"), client.collectorAgents);
+    assertEquals(2, response.getReplies().size());
+    assertTrue(response.getReplies().getFirst().isRepeated());
+    assertEquals("correctness-old", response.getReplies().getFirst().getConcernId());
+
+    ReviewConcernLedger ledger = pendingLedger(response);
+    assertEquals(3, ledger.getReviewers().size());
+    ReviewerConcerns correctness =
+        reviewer(
+            ledger,
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "CORRECTNESS");
+    ReviewerConcerns commitMessage =
+        reviewer(
+            ledger,
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "COMMIT_MESSAGE");
+    assertEquals(2, correctness.getConcerns().size());
+    assertEquals(ConcernStatus.PRESENT, correctness.getConcerns().getFirst().getStatus());
+    assertEquals(1, commitMessage.getConcerns().size());
+    assertEquals(ConcernStatus.FIXED, commitMessage.getConcerns().getFirst().getStatus());
+    reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET");
   }
 
   @Test
@@ -515,6 +603,9 @@ public class LangChainSpecializedAgentReviewClientTest {
   private static class RecordingSpecializedClient extends LangChainSpecializedAgentReviewClient {
     private final List<String> recordedAgents = new ArrayList<>();
     private final List<String> collectorAgents = new ArrayList<>();
+    private final List<String> concernEvents = new ArrayList<>();
+    private final List<String> incrementalPatches = new ArrayList<>();
+    private final List<String> fullPatches = new ArrayList<>();
     private SpecializedReviewTriage triage = triage();
     private boolean triageCalled;
     private boolean suggestClientCalled;
@@ -554,13 +645,62 @@ public class LangChainSpecializedAgentReviewClientTest {
     }
 
     @Override
-    protected AiResponseContent askCollector(
+    protected ReviewerConcerns reviewConcerns(
+        ChangeSetData changeSetData,
+        GerritChange change,
+        ReviewerConcerns existingConcerns,
+        String incrementalPatchSet) {
+      concernEvents.add("review-" + existingConcerns.getReviewer().getName());
+      ReviewerConcerns reviewed = new ReviewerConcerns();
+      reviewed.setReviewer(existingConcerns.getReviewer());
+      reviewed.setConcerns(
+          existingConcerns.getConcerns().stream()
+              .map(
+                  concern -> {
+                    ReviewConcern updated = concern.copy();
+                    updated.setStatus(
+                        "COMMIT_MESSAGE".equals(existingConcerns.getReviewer().getName())
+                            ? ConcernStatus.FIXED
+                            : ConcernStatus.PRESENT);
+                    updated.setStatusReason("Confirmed by concern reviewer");
+                    return updated;
+                  })
+              .toList());
+      return reviewed;
+    }
+
+    @Override
+    protected RawReviewRequestResult findNewIssuesRaw(
+        ChangeSetData changeSetData,
+        GerritChange change,
+        ReviewerConcerns reviewedConcerns,
+        String incrementalPatchSet,
+        String fullPatchSet) {
+      String agent = reviewedConcerns.getReviewer().getName();
+      concernEvents.add("find-" + agent);
+      incrementalPatches.add(incrementalPatchSet);
+      fullPatches.add(fullPatchSet);
+      return rawReviewRequestResult(
+          getGson().toJson(finding(agent, agent + " new concern")),
+          "finder-" + agent);
+    }
+
+    @Override
+    protected CollectorResult askCollectorResult(
         ChangeSetData changeSetData,
         GerritChange change,
         String patchSet,
         List<SpecializedReviewFindings.AgentFindings> specializedFindings,
         String triageContext) {
       specializedFindings.forEach(finding -> collectorAgents.add(finding.getAgent()));
+      SpecializedReviewFindings verifiedFindings = new SpecializedReviewFindings();
+      verifiedFindings.setConcerns(
+          specializedFindings.stream()
+              .flatMap(findings -> findings.getConcerns().stream())
+              .toList());
+      verifiedFindings.setDismissedConcerns(List.of());
+      ReviewConcern firstConcern = verifiedFindings.getConcerns().getFirst();
+      ConcernLocation firstLocation = firstConcern.getLocations().getFirst();
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(
           List.of(
@@ -568,8 +708,11 @@ public class LangChainSpecializedAgentReviewClientTest {
                   .reply("Collected review")
                   .score(-1.0)
                   .relevance(1.0)
+                  .filename(firstLocation.getFilename())
+                  .lineNumber(firstLocation.getLineNumber())
+                  .codeSnippet(firstLocation.getCodeSnippet())
                   .build()));
-      return response;
+      return new CollectorResult(response, verifiedFindings);
     }
 
     @Override
@@ -585,6 +728,53 @@ public class LangChainSpecializedAgentReviewClientTest {
         }
       };
     }
+  }
+
+  private static ReviewConcernLedger specializedLedger() {
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(
+        List.of(
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+                "CORRECTNESS",
+                storedConcern("correctness-old", ConcernStatus.PRESENT)),
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+                "COMMIT_MESSAGE",
+                storedConcern("commit-old", ConcernStatus.FIXED)),
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SCOPED_AGENT,
+                "PATCHSET",
+                storedConcern("scoped-old", ConcernStatus.PRESENT))));
+    return ledger;
+  }
+
+  private static ReviewerConcerns reviewerConcerns(
+      ConcernReviewerId.Kind kind, String name, ReviewConcern concern) {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(new ConcernReviewerId(kind, name));
+    concerns.setConcerns(List.of(concern));
+    return concerns;
+  }
+
+  private static ReviewConcern storedConcern(String id, ConcernStatus status) {
+    ReviewConcern concern = finding("Stored", id).getConcerns().getFirst();
+    concern.setId(id);
+    concern.setStatus(status);
+    concern.setReply(id + " reply");
+    return concern;
+  }
+
+  private static ReviewConcernLedger pendingLedger(AiResponseContent response) {
+    return response.getPendingConcernUpdates().get("change~1").orElseThrow();
+  }
+
+  private static ReviewerConcerns reviewer(
+      ReviewConcernLedger ledger, ConcernReviewerId.Kind kind, String name) {
+    return ledger.getReviewers().stream()
+        .filter(entry -> entry.getReviewer().equals(new ConcernReviewerId(kind, name)))
+        .findFirst()
+        .orElseThrow();
   }
 
   private static SpecializedReviewFindings finding(String type, String description) {
