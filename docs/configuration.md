@@ -308,8 +308,9 @@ costs.
 ### Optional Parameters Specific to OpenAI Provider
 
 - `aiProviderZdr`: Enables Zero Data Retention (ZDR) mode for the OpenAI provider. When set to `true`, the plugin uses
-  the generic LangChain chat workflow with local plugin memory instead of OpenAI Responses API conversations, so
-  conversation state is not stored by OpenAI. The default value is `false`.
+  the Responses API with `store: false`, keeps conversation state in local plugin memory, and replays encrypted
+  reasoning items between tool-call rounds. OpenAI Conversations are not used. This applies to every OpenAI model.
+  The default value is `false`.
 
 ### Optional Parameters Specific to Ollama
 

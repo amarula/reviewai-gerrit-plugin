@@ -16,9 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.gson.reflect.TypeToken;
 import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
+import com.openai.core.ObjectMappers;
 import com.openai.core.http.HttpResponseFor;
 import com.openai.models.ResponseFormatJsonObject;
 import com.openai.models.responses.EasyInputMessage;
@@ -28,6 +31,7 @@ import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseFormatTextJsonSchemaConfig;
 import com.openai.models.responses.ResponseFunctionToolCall;
 import com.openai.models.responses.ResponseInputItem;
+import com.openai.models.responses.ResponseIncludable;
 import com.openai.models.responses.ResponseOutputItem;
 import com.openai.models.responses.ResponseOutputMessage;
 import com.openai.models.responses.ResponseStatus;
@@ -68,12 +72,16 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 public class OpenAiResponsesChatModel implements ChatModel {
   private static final boolean STRICT_RESPONSE_SCHEMA = true;
   private static final boolean STRICT_TOOL_SCHEMA = false;
+  private static final String RESPONSE_OUTPUT_ITEMS_ATTRIBUTE =
+      "openai.responses.output_items";
+  private static final JsonMapper OPENAI_JSON_MAPPER = ObjectMappers.jsonMapper();
 
   private final Configuration config;
   private final String modelName;
   private final Double temperature;
   private final String conversationId;
   private final String instructions;
+  private final boolean stateless;
   private final ChatRequestParameters defaultRequestParameters;
 
   private String requestBody;
@@ -84,6 +92,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
     this.temperature = builder.temperature;
     this.conversationId = builder.conversationId;
     this.instructions = builder.instructions;
+    this.stateless = builder.stateless;
     this.defaultRequestParameters =
         DefaultChatRequestParameters.builder()
             .modelName(modelName)
@@ -137,6 +146,11 @@ public class OpenAiResponsesChatModel implements ChatModel {
     if (conversationId != null) {
       builder.conversation(conversationId);
     }
+    if (stateless) {
+      builder
+          .store(false)
+          .include(List.of(ResponseIncludable.REASONING_ENCRYPTED_CONTENT));
+    }
     if (instructions != null) {
       builder.instructions(instructions);
     }
@@ -188,6 +202,9 @@ public class OpenAiResponsesChatModel implements ChatModel {
       } else if (message instanceof UserMessage userMessage) {
         inputItems.add(toEasyInputMessage(EasyInputMessage.Role.USER, extractUserText(userMessage)));
       } else if (message instanceof AiMessage aiMessage) {
+        if (stateless && appendStoredResponseOutputItems(inputItems, aiMessage)) {
+          continue;
+        }
         if (aiMessage.text() != null && !aiMessage.text().isEmpty()) {
           inputItems.add(toEasyInputMessage(EasyInputMessage.Role.ASSISTANT, aiMessage.text()));
         }
@@ -216,6 +233,29 @@ public class OpenAiResponsesChatModel implements ChatModel {
       }
     }
     return inputItems;
+  }
+
+  private boolean appendStoredResponseOutputItems(
+      List<ResponseInputItem> inputItems, AiMessage aiMessage) {
+    Object attribute = aiMessage.attributes().get(RESPONSE_OUTPUT_ITEMS_ATTRIBUTE);
+    if (!(attribute instanceof List<?> serializedItems) || serializedItems.isEmpty()) {
+      return false;
+    }
+
+    List<ResponseInputItem> restoredItems = new ArrayList<>();
+    try {
+      for (Object serializedItem : serializedItems) {
+        if (!(serializedItem instanceof String json)) {
+          return false;
+        }
+        restoredItems.add(OPENAI_JSON_MAPPER.readValue(json, ResponseInputItem.class));
+      }
+    } catch (JsonProcessingException e) {
+      log.warn("Unable to restore OpenAI Responses output items; using chat message fallback", e);
+      return false;
+    }
+    inputItems.addAll(restoredItems);
+    return true;
   }
 
   private ResponseInputItem toEasyInputMessage(EasyInputMessage.Role role, String text) {
@@ -339,11 +379,15 @@ public class OpenAiResponsesChatModel implements ChatModel {
       }
     }
 
-    AiMessage aiMessage =
+    AiMessage.Builder aiMessageBuilder =
         AiMessage.builder()
             .text(responseText.isEmpty() ? null : responseText.toString())
-            .toolExecutionRequests(toolRequests.isEmpty() ? null : toolRequests)
-            .build();
+            .toolExecutionRequests(toolRequests.isEmpty() ? null : toolRequests);
+    if (stateless) {
+      aiMessageBuilder.attributes(
+          Map.of(RESPONSE_OUTPUT_ITEMS_ATTRIBUTE, serializeOutputItems(response.output())));
+    }
+    AiMessage aiMessage = aiMessageBuilder.build();
 
     TokenUsage tokenUsage = response.usage().map(this::toTokenUsage).orElse(null);
     FinishReason finishReason = getFinishReason(response, toolRequests);
@@ -354,6 +398,18 @@ public class OpenAiResponsesChatModel implements ChatModel {
         .tokenUsage(tokenUsage)
         .finishReason(finishReason)
         .build();
+  }
+
+  private List<String> serializeOutputItems(List<ResponseOutputItem> outputItems) {
+    try {
+      List<String> serializedItems = new ArrayList<>();
+      for (ResponseOutputItem outputItem : outputItems) {
+        serializedItems.add(OPENAI_JSON_MAPPER.writeValueAsString(outputItem));
+      }
+      return serializedItems;
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Unable to preserve OpenAI Responses output items", e);
+    }
   }
 
   private void appendMessageText(StringBuilder responseText, ResponseOutputMessage message) {
@@ -417,6 +473,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
     private Double temperature;
     private String conversationId;
     private String instructions;
+    private boolean stateless;
 
     public Builder config(Configuration config) {
       this.config = config;
@@ -440,6 +497,11 @@ public class OpenAiResponsesChatModel implements ChatModel {
 
     public Builder instructions(String instructions) {
       this.instructions = instructions;
+      return this;
+    }
+
+    public Builder stateless(boolean stateless) {
+      this.stateless = stateless;
       return this;
     }
 

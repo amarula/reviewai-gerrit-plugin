@@ -13,6 +13,8 @@ PRODUCTION_SRCS = glob(
 )
 
 EXTERNAL_PLUGIN_DEPS = [
+    "@reviewai_plugin_deps//:com_fasterxml_jackson_core_jackson_core",
+    "@reviewai_plugin_deps//:com_fasterxml_jackson_core_jackson_databind",
     "@reviewai_plugin_deps//:com_openai_openai_java_core",
     "@reviewai_plugin_deps//:dev_langchain4j_langchain4j_core",
     "@reviewai_plugin_deps//:dev_langchain4j_langchain4j",

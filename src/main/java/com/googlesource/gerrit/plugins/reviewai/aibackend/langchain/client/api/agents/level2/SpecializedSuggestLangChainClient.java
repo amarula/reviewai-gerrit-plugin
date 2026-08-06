@@ -58,7 +58,7 @@ class SpecializedSuggestLangChainClient extends LangChainClient {
   protected ConversationResolution resolveConversation(
       AiProviderType providerType, ChangeSetData changeSetData) throws AiConnectionFailException {
     if (!changeSetData.getSuggestMode()
-        || !shouldUseOpenAiResponses(providerType)
+        || !shouldUseOpenAiConversation(providerType)
         || pluginDataHandlerProvider == null) {
       return super.resolveConversation(providerType, changeSetData);
     }

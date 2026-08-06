@@ -13,11 +13,16 @@ import static org.mockito.Mockito.when;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessageDeserializer;
+import dev.langchain4j.data.message.ChatMessageSerializer;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -26,7 +31,6 @@ import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,6 +47,8 @@ public class OpenAiLangChainProviderTest {
       "__files/langchain/openAiResponsesSuccess.json";
   private static final String OPENAI_RESPONSES_USAGE_WITHOUT_DETAILS_RESOURCE =
       "__files/langchain/openAiResponsesUsageWithoutDetails.json";
+  private static final String OPENAI_RESPONSES_TOOL_CALL_WITH_REASONING_RESOURCE =
+      "__files/langchain/openAiResponsesToolCallWithReasoning.json";
 
   @Rule public WireMockRule wireMockRule = new WireMockRule(0);
 
@@ -192,19 +198,118 @@ public class OpenAiLangChainProviderTest {
   }
 
   @Test
-  public void usesLangChainOpenAiChatModelWhenAiProviderZdrIsEnabled() {
+  public void usesStatelessResponsesForZdrWithAnyOpenAiModel() {
     Configuration config = Mockito.mock(Configuration.class);
     when(config.getAiProviderZdr()).thenReturn(true);
-    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
+    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
     when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(180);
+    when(config.getAiConnectionTimeout()).thenReturn(5);
+    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(successfulResponseBody())));
 
     LangChainProvider langChainProvider =
         provider.buildChatModel(config, 0.0, "conv_test", "review instructions");
+    langChainProvider
+        .getModel()
+        .chat(ChatRequest.builder().messages(UserMessage.from("Say ok")).build());
 
-    assertTrue(langChainProvider.getModel() instanceof OpenAiChatModel);
-    assertFalse(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
+    assertTrue(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
+    WireMock.verify(
+        1,
+        postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(matchingJsonPath("$.store", equalTo("false")))
+            .withRequestBody(
+                matchingJsonPath(
+                    "$.include[0]", equalTo("reasoning.encrypted_content"))));
+    WireMock.verify(
+        0,
+        postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(matchingJsonPath("$.conversation")));
+    WireMock.verify(0, postRequestedFor(urlEqualTo("/v1/chat/completions")));
+  }
+
+  @Test
+  public void replaysEncryptedReasoningForZdrToolContinuation() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-5.6-sol");
+    when(config.getAiConnectionTimeout()).thenReturn(5);
+    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .inScenario("zdr-tool-continuation")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("tool-called")
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(responseBody(OPENAI_RESPONSES_TOOL_CALL_WITH_REASONING_RESOURCE))));
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .inScenario("zdr-tool-continuation")
+            .whenScenarioStateIs("tool-called")
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(successfulResponseBody())));
+
+    ToolSpecification treeTool =
+        ToolSpecification.builder()
+            .name("tree")
+            .parameters(JsonObjectSchema.builder().required(List.of()).build())
+            .build();
+    OpenAiResponsesChatModel model =
+        (OpenAiResponsesChatModel) provider.buildChatModel(config, 0.0).getModel();
+    UserMessage userMessage = UserMessage.from("Inspect the tree");
+    ChatRequestParameters parameters =
+        ChatRequestParameters.builder()
+            .toolSpecifications(List.of(treeTool))
+            .toolChoice(ToolChoice.REQUIRED)
+            .build();
+
+    ChatResponse firstResponse =
+        model.chat(
+            ChatRequest.builder().messages(userMessage).parameters(parameters).build());
+    AiMessage restoredAiMessage =
+        (AiMessage)
+            ChatMessageDeserializer.messageFromJson(
+                ChatMessageSerializer.messageToJson(firstResponse.aiMessage()));
+    ToolExecutionResultMessage toolResult =
+        ToolExecutionResultMessage.from(
+            restoredAiMessage.toolExecutionRequests().getFirst(), "src/main/java");
+
+    ChatResponse finalResponse =
+        model.chat(
+            ChatRequest.builder()
+                .messages(userMessage, restoredAiMessage, toolResult)
+                .parameters(parameters)
+                .build());
+
+    assertEquals("ok", finalResponse.aiMessage().text());
+    WireMock.verify(
+        2,
+        postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(matchingJsonPath("$.store", equalTo("false"))));
+    WireMock.verify(
+        1,
+        postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(
+                matchingJsonPath("$.input[1].type", equalTo("reasoning")))
+            .withRequestBody(
+                matchingJsonPath(
+                    "$.input[1].encrypted_content", equalTo("encrypted-reasoning")))
+            .withRequestBody(
+                matchingJsonPath("$.input[2].type", equalTo("function_call")))
+            .withRequestBody(
+                matchingJsonPath("$.input[3].type", equalTo("function_call_output"))));
   }
 
   @Test

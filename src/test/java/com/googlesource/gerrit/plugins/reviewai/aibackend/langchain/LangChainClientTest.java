@@ -277,7 +277,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void openAiZdrDoesNotRequireInitialOnDemandToolUse() throws Exception {
+  public void openAiZdrRequiresInitialOnDemandToolUseWithResponses() throws Exception {
     Configuration config = Mockito.mock(Configuration.class);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
@@ -285,7 +285,27 @@ public class LangChainClientTest {
 
     LangChainClient client = new LangChainClient(config, null, null, null);
 
-    assertEquals(false, getToolExecutorRequireInitialToolUse(client));
+    assertEquals(true, getToolExecutorRequireInitialToolUse(client));
+  }
+
+  @Test
+  public void openAiZdrUsesLocalMemoryForStatelessResponses() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(true);
+
+    TestableLangChainClient client = new TestableLangChainClient(config);
+
+    assertFalse(client.useOpenAiConversation(AiProviderType.OPENAI));
+  }
+
+  @Test
+  public void openAiNonZdrUsesServerConversationInsteadOfLocalMemory() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderZdr()).thenReturn(false);
+
+    TestableLangChainClient client = new TestableLangChainClient(config);
+
+    assertTrue(client.useOpenAiConversation(AiProviderType.OPENAI));
   }
 
   @Test
@@ -828,6 +848,10 @@ public class LangChainClientTest {
 
     private boolean includeInitialHistory(ChangeSetData changeSetData) {
       return shouldIncludeInitialHistory(changeSetData);
+    }
+
+    private boolean useOpenAiConversation(AiProviderType providerType) {
+      return shouldUseOpenAiConversation(providerType);
     }
 
     private boolean prepareMemory(
