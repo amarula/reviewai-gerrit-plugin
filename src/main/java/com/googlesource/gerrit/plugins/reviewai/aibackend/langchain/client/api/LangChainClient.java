@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.isJsonObjectAsString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
@@ -34,6 +35,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.P
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernStatusUpdater;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -72,6 +77,8 @@ import lombok.extern.slf4j.Slf4j;
 public class LangChainClient extends AiClientBase implements IAiClient {
 
   private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
+  private static final String FORMAT_CONCERN_REVIEW_SCHEMA_RESOURCE =
+      "config/formatConcernReviewSchema.json";
   private static final String FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE =
       "config/formatSpecializedRepliesSchema.json";
   private static final String FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE =
@@ -99,6 +106,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected final AiCostTracker costTracker;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
+  private final ResponseFormat concernReviewResponseFormat;
   private final ResponseFormat specializedRepliesResponseFormat;
   private final ResponseFormat specializedTriageResponseFormat;
   private final ResponseFormat specializedConsolidationResponseFormat;
@@ -107,6 +115,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final ResponseFormat specializedVerificationResponseFormat;
   private final List<ToolSpecification> contextTools;
   private final LangChainExecutor toolExecutor;
+  private final LangChainExecutor concernReviewToolExecutor;
   private final LangChainExecutor specializedRepliesToolExecutor;
   private final LangChainExecutor specializedTriageToolExecutor;
   private final LangChainExecutor specializedConsolidationToolExecutor;
@@ -169,6 +178,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
+    this.concernReviewResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_CONCERN_REVIEW_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
     this.specializedRepliesResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -209,6 +221,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         new LangChainExecutor(
             config,
             toolExecutorResponseFormat,
+            contextTools,
+            requireInitialToolUse,
+            gitRepoFiles,
+            costTracker);
+    this.concernReviewToolExecutor =
+        new LangChainExecutor(
+            config,
+            getProviderResponseFormat(config, contextTools, concernReviewResponseFormat),
             contextTools,
             requireInitialToolUse,
             gitRepoFiles,
@@ -320,6 +340,16 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   @VisibleForTesting
   protected ReviewRequestResult askSingleRequest(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    RawReviewRequestResult rawResult =
+        askSingleRawRequestWithFallback(changeSetData, change, patchSet);
+    return rawResult == null
+        ? null
+        : new ReviewRequestResult(
+            toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+  }
+
+  private RawReviewRequestResult askSingleRawRequestWithFallback(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     RawReviewRequestResult rawResult = askSingleRawRequest(changeSetData, change, patchSet);
     Optional<AiModelRoute> fallbackRoute =
         rawResult == null
@@ -331,10 +361,49 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           fallbackRoute.get().modelRoute());
       rawResult = askSingleRawRequest(changeSetData, change, patchSet, fallbackRoute.get());
     }
-    return rawResult == null
-        ? null
-        : new ReviewRequestResult(
-            toResponseContent(rawResult.getResponseText()), rawResult.getRequestBody());
+    return rawResult;
+  }
+
+  protected ReviewerConcerns reviewConcerns(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ReviewerConcerns existingConcerns,
+      String incrementalPatchSet)
+      throws Exception {
+    existingConcerns.normalize();
+    if (existingConcerns.getConcerns().isEmpty()) {
+      return existingConcerns;
+    }
+
+    ChangeSetData concernReviewData = changeSetData.copy();
+    concernReviewData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+    concernReviewData.setReviewAssistantStageConversationSuffix(
+        concernReviewConversationSuffix(existingConcerns));
+    concernReviewData.setConcernsToReview(existingConcerns);
+    RawReviewRequestResult rawResult =
+        askSingleRawRequestWithFallback(
+            concernReviewData, change, incrementalPatchSet == null ? "" : incrementalPatchSet);
+    if (rawResult == null || !isJsonObjectAsString(rawResult.getResponseText())) {
+      throw new IllegalStateException("Concern reviewer returned no structured response");
+    }
+
+    ReviewerConcerns response =
+        getGson()
+            .fromJson(unwrapJsonCode(rawResult.getResponseText()), ReviewerConcerns.class);
+    List<ReviewConcern> updatedConcerns =
+        ReviewConcernStatusUpdater.apply(
+            existingConcerns.getConcerns(), response == null ? null : response.getConcerns());
+    ReviewerConcerns result = new ReviewerConcerns();
+    result.setReviewer(existingConcerns.getReviewer());
+    result.setConcerns(updatedConcerns);
+    return result;
+  }
+
+  private String concernReviewConversationSuffix(ReviewerConcerns concerns) {
+    if (concerns.getReviewer() == null) {
+      return "unknown";
+    }
+    return concerns.getReviewer().getKind() + "." + concerns.getReviewer().getName();
   }
 
   protected RawReviewRequestResult askSingleRawRequest(
@@ -628,6 +697,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
       LangChainExecutor collectorExecutor =
           switch (changeSetData.getReviewAssistantStage()) {
+            case REVIEW_CONCERNS -> concernReviewToolExecutor;
             case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageToolExecutor;
             case REVIEW_SPECIALIZED_CONSOLIDATION -> specializedConsolidationToolExecutor;
             case REVIEW_SPECIALIZED_HISTORICAL_REPETITION ->
@@ -652,6 +722,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
       responseFormat =
           switch (changeSetData.getReviewAssistantStage()) {
+            case REVIEW_CONCERNS -> concernReviewResponseFormat;
             case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageResponseFormat;
             case REVIEW_SPECIALIZED_CONSOLIDATION ->
                 specializedConsolidationResponseFormat;
