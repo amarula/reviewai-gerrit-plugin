@@ -235,7 +235,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
               change,
               patchSet,
               specializedFindings,
-              triage.getConsolidationContext());
+              triage.getConsolidationContext(),
+              true);
       AiResponseContent response =
           specializedConcernLedgerOperations.nonNullResponse(collector.response());
       concernLedgerOperations()
@@ -259,7 +260,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             change,
             patchSet,
             specializedFindings,
-            triage.getConsolidationContext());
+            triage.getConsolidationContext(),
+            false);
     return specializedConcernLedgerOperations.completeFollowUp(
         specializedConcernLedgerOperations.nonNullResponse(collector.response()),
         change,
@@ -389,6 +391,23 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       List<SpecializedReviewFindings.AgentFindings> specializedFindings,
       String triageContext)
       throws Exception {
+    return askCollectorResult(
+        changeSetData,
+        change,
+        patchSet,
+        specializedFindings,
+        triageContext,
+        true);
+  }
+
+  protected CollectorResult askCollectorResult(
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet,
+      List<SpecializedReviewFindings.AgentFindings> specializedFindings,
+      String triageContext,
+      boolean includeHistoricalRepetition)
+      throws Exception {
     SpecializedReviewConcernIds.assignRawConcernIds(specializedFindings);
     Set<String> expectedConcernIds = SpecializedReviewConcernIds.rawConcernIds(specializedFindings);
     CompletableFuture<SpecializedReviewFindings> consolidationFuture =
@@ -400,22 +419,30 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
                     buildConsolidationInput(specializedFindings, triageContext),
                     CONSOLIDATION_STAGE));
     CompletableFuture<SpecializedReviewFindings.HistoricalRepetitionResult>
-        historicalRepetitionFuture =
-            stageExecutor.supplyAsync(
-                () ->
-                    askHistoricalRepetitionStage(
-                        changeSetData,
-                        change,
-                        buildHistoricalRepetitionInput(changeSetData, change, specializedFindings),
-                        expectedConcernIds));
+        historicalRepetitionFuture = null;
+    if (includeHistoricalRepetition) {
+      historicalRepetitionFuture =
+          stageExecutor.supplyAsync(
+              () ->
+                  askHistoricalRepetitionStage(
+                      changeSetData,
+                      change,
+                      buildHistoricalRepetitionInput(changeSetData, change, specializedFindings),
+                      expectedConcernIds));
+    }
     SpecializedReviewFindings consolidatedFindings = stageExecutor.join(consolidationFuture);
-    SpecializedReviewFindings.HistoricalRepetitionResult historicalRepetitionResult =
-        stageExecutor.join(historicalRepetitionFuture);
     consolidatedFindings =
         currentRunConsolidationOrFallback(
             consolidatedFindings, specializedFindings, expectedConcernIds);
-    SpecializedReviewFindings annotatedFindings =
-        applyHistoricalRepetition(consolidatedFindings, historicalRepetitionResult);
+    SpecializedReviewFindings annotatedFindings;
+    if (historicalRepetitionFuture == null) {
+      annotatedFindings =
+          SpecializedReviewRepetitionMerger.clearRepeatedAnnotations(consolidatedFindings);
+    } else {
+      annotatedFindings =
+          applyHistoricalRepetition(
+              consolidatedFindings, stageExecutor.join(historicalRepetitionFuture));
+    }
     SpecializedReviewFindings conflictResolvedFindings =
         askFindingsStage(
             changeSetData,
@@ -429,6 +456,9 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         askVerificationStages(changeSetData, change, patchSet, conflictResolvedFindings);
     AiResponseContent response = verification.response();
     inheritRepeatedAnnotations(response, conflictResolvedFindings);
+    if (!includeHistoricalRepetition) {
+      SpecializedReviewRepetitionMerger.clearRepeatedAnnotations(response);
+    }
     setRequestBody(verification.requestBody());
     return new CollectorResult(response, conflictResolvedFindings);
   }
