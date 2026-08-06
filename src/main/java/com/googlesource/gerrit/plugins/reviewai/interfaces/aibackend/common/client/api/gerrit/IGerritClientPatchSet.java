@@ -26,6 +26,9 @@ import java.util.List;
 public interface IGerritClientPatchSet {
   String getPatchSet(ChangeSetData changeSetData, GerritChange gerritChange) throws Exception;
 
+  String getIncrementalPatchSet(ChangeSetData changeSetData, GerritChange gerritChange)
+      throws Exception;
+
   boolean isDisabledUser(String authorUsername);
 
   void retrieveRevisionBase(GerritChange change);
