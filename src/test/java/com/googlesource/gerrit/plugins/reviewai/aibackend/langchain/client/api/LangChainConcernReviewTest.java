@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
@@ -40,10 +42,15 @@ import org.junit.Test;
 public class LangChainConcernReviewTest {
   private static final String RESPONSE_RESOURCE =
       "__files/langchain/concernReviewResponse.json";
+  private static final String INCREMENTAL_PATCH_RESOURCE =
+      "__files/langchain/newIssueIncrementalPatch.txt";
+  private static final String FULL_PATCH_RESOURCE =
+      "__files/langchain/newIssueFullPatch.txt";
 
   @Test
-  public void runsStatusReviewWithIsolatedStageContext() throws Exception {
-    TestClient client = new TestClient(readTestResource(RESPONSE_RESOURCE));
+  public void nonePolicyProvidesSamePatchContextAsNewIssueFinder() throws Exception {
+    TestClient client =
+        new TestClient(readTestResource(RESPONSE_RESOURCE), CodeContextPolicies.NONE);
     ConcernReviewerId reviewer =
         new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     ReviewConcern existing = new ReviewConcern();
@@ -54,9 +61,15 @@ public class LangChainConcernReviewTest {
     reviewerConcerns.setReviewer(reviewer);
     reviewerConcerns.setConcerns(List.of(existing));
 
+    String incrementalPatch = readTestResource(INCREMENTAL_PATCH_RESOURCE);
+    String fullPatch = readTestResource(FULL_PATCH_RESOURCE);
     ReviewerConcerns result =
         client.runConcernReview(
-            new ChangeSetData(1), mock(GerritChange.class), reviewerConcerns, "incremental patch");
+            new ChangeSetData(1),
+            mock(GerritChange.class),
+            reviewerConcerns,
+            incrementalPatch,
+            fullPatch);
 
     assertSame(reviewer, result.getReviewer());
     assertEquals(ConcernStatus.FIXED, result.getConcerns().getFirst().getStatus());
@@ -66,8 +79,35 @@ public class LangChainConcernReviewTest {
     assertEquals(ConcernStatus.PRESENT, existing.getStatus());
     assertEquals(ReviewAssistantStage.REVIEW_CONCERNS, client.requestData.getReviewAssistantStage());
     assertTrue(client.requestData.getForcedStagedReview());
-    assertSame(reviewerConcerns, client.requestData.getConcernsToReview());
-    assertEquals("incremental patch", client.patchSet);
+    assertSame(
+        reviewerConcerns,
+        client.requestData.getConcernWorkflowInput().getConcerns());
+    assertEquals(
+        incrementalPatch,
+        client.requestData.getConcernWorkflowInput().getIncrementalPatch());
+    assertEquals(fullPatch, client.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals("", client.patchSet);
+  }
+
+  @Test
+  public void onDemandPolicyOmitsFullPatchLikeNewIssueFinder() throws Exception {
+    TestClient client =
+        new TestClient(readTestResource(RESPONSE_RESOURCE), CodeContextPolicies.ON_DEMAND);
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS"));
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-1");
+    concerns.setConcerns(List.of(concern));
+
+    client.runConcernReview(
+        new ChangeSetData(1),
+        mock(GerritChange.class),
+        concerns,
+        readTestResource(INCREMENTAL_PATCH_RESOURCE),
+        readTestResource(FULL_PATCH_RESOURCE));
+
+    assertNull(client.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   private static String readTestResource(String resource) throws IOException {
@@ -84,8 +124,8 @@ public class LangChainConcernReviewTest {
     private ChangeSetData requestData;
     private String patchSet;
 
-    private TestClient(String response) {
-      super(configuration(), null, null, null);
+    private TestClient(String response, CodeContextPolicies policy) {
+      super(configuration(policy), null, null, null);
       this.response = response;
     }
 
@@ -93,9 +133,10 @@ public class LangChainConcernReviewTest {
         ChangeSetData data,
         GerritChange change,
         ReviewerConcerns concerns,
-        String incrementalPatchSet)
+        String incrementalPatchSet,
+        String fullPatchSet)
         throws Exception {
-      return reviewConcerns(data, change, concerns, incrementalPatchSet);
+      return reviewConcerns(data, change, concerns, incrementalPatchSet, fullPatchSet);
     }
 
     @Override
@@ -106,8 +147,9 @@ public class LangChainConcernReviewTest {
       return rawReviewRequestResult(response, "concern review request");
     }
 
-    private static Configuration configuration() {
+    private static Configuration configuration(CodeContextPolicies policy) {
       Configuration config = mock(Configuration.class);
+      when(config.getCodeContextPolicy()).thenReturn(policy);
       when(config.resolveMockAiFallbackRoute(anyString())).thenReturn(Optional.empty());
       return config;
     }

@@ -37,7 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.NewIssueFinderInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernStatusUpdater;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
@@ -402,7 +402,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ChangeSetData changeSetData,
       GerritChange change,
       ReviewerConcerns existingConcerns,
-      String incrementalPatchSet)
+      String incrementalPatchSet,
+      String fullPatchSet)
       throws Exception {
     existingConcerns.normalize();
     if (existingConcerns.getConcerns().isEmpty()) {
@@ -414,10 +415,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     concernReviewData.setForcedStagedReview(true);
     concernReviewData.setReviewAssistantStageConversationSuffix(
         reviewerConversationSuffix(existingConcerns));
-    concernReviewData.setConcernsToReview(existingConcerns);
-    RawReviewRequestResult rawResult =
-        askSingleRawRequestWithFallback(
-            concernReviewData, change, incrementalPatchSet == null ? "" : incrementalPatchSet);
+    concernReviewData.setConcernWorkflowInput(
+        concernWorkflowInput(existingConcerns, incrementalPatchSet, fullPatchSet));
+    RawReviewRequestResult rawResult = askSingleRawRequestWithFallback(concernReviewData, change, "");
     if (rawResult == null || !isJsonObjectAsString(rawResult.getResponseText())) {
       throw new IllegalStateException("Concern reviewer returned no structured response");
     }
@@ -458,19 +458,23 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String fullPatchSet)
       throws Exception {
     reviewedConcerns.normalize();
-    String fullPatchContext =
-        config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
-            ? fullPatchSet
-            : null;
-    NewIssueFinderInput input =
-        new NewIssueFinderInput(reviewedConcerns, incrementalPatchSet, fullPatchContext);
     ChangeSetData finderData = changeSetData.copy();
     finderData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     finderData.setForcedStagedReview(true);
     finderData.setReviewAssistantStageConversationSuffix(
         reviewerConversationSuffix(reviewedConcerns));
-    finderData.setNewIssueFinderInput(input);
+    finderData.setConcernWorkflowInput(
+        concernWorkflowInput(reviewedConcerns, incrementalPatchSet, fullPatchSet));
     return askSingleRawRequestWithFallback(finderData, change, "");
+  }
+
+  private ConcernWorkflowInput concernWorkflowInput(
+      ReviewerConcerns concerns, String incrementalPatchSet, String fullPatchSet) {
+    String fullPatchContext =
+        config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
+            ? fullPatchSet
+            : null;
+    return new ConcernWorkflowInput(concerns, incrementalPatchSet, fullPatchContext);
   }
 
   private String reviewerConversationSuffix(ReviewerConcerns concerns) {

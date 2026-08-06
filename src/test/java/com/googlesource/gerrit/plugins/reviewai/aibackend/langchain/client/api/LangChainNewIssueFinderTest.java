@@ -60,11 +60,11 @@ public class LangChainNewIssueFinderTest {
     assertTrue(client.requestData.getForcedStagedReview());
     assertSame(
         concerns,
-        client.requestData.getNewIssueFinderInput().getReviewedConcerns());
+        client.requestData.getConcernWorkflowInput().getConcerns());
     assertEquals(
         incrementalPatch,
-        client.requestData.getNewIssueFinderInput().getIncrementalPatch());
-    assertEquals(fullPatch, client.requestData.getNewIssueFinderInput().getFullPatch());
+        client.requestData.getConcernWorkflowInput().getIncrementalPatch());
+    assertEquals(fullPatch, client.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   @Test
@@ -76,7 +76,7 @@ public class LangChainNewIssueFinderTest {
         readTestResource(INCREMENTAL_PATCH_RESOURCE),
         readTestResource(FULL_PATCH_RESOURCE));
 
-    assertNull(client.requestData.getNewIssueFinderInput().getFullPatch());
+    assertNull(client.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   private static ReviewerConcerns reviewerConcerns() {
