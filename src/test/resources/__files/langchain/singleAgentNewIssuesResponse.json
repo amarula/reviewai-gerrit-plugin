@@ -1,0 +1,16 @@
+{
+  "replies": [
+    {
+      "concern_id": "old-present",
+      "reply": "The new fallback retries forever after a timeout.",
+      "score": -1.0,
+      "repeated": true,
+      "repeated_reason": "Untrusted repetition annotation.",
+      "repetition_reply_id": "untrusted-comment",
+      "filename": "src/Example.java",
+      "lineNumber": 64,
+      "codeSnippet": "retry();"
+    }
+  ],
+  "changeId": "change-1"
+}

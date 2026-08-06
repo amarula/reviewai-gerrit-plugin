@@ -35,6 +35,8 @@ public final class ReviewConcernReplyMapper {
     concern.setReply(reply.getReply());
     concern.setScore(reply.getScore());
     concern.setRelevance(reply.getRelevance());
+    concern.setRepeated(reply.isRepeated());
+    concern.setRepeatedReason(reply.getRepeatedReason());
     concern.setPreviousCommentId(reply.getRepetitionReplyId());
     concern.setReviewers(List.of(reviewer));
     if (hasLocation(reply)) {
@@ -56,6 +58,8 @@ public final class ReviewConcernReplyMapper {
         .reply(firstNonBlank(concern.getReply(), concern.getDescription()))
         .score(concern.getScore())
         .relevance(concern.getRelevance())
+        .repeated(Boolean.TRUE.equals(concern.getRepeated()))
+        .repeatedReason(concern.getRepeatedReason())
         .repetitionReplyId(concern.getPreviousCommentId())
         .filename(location == null ? null : location.getFilename())
         .lineNumber(location == null ? null : location.getLineNumber())
