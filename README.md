@@ -80,6 +80,9 @@ The sidebar allows users to select the AI provider and model used for the review
 When a Patch Set is submitted, ReviewAI can automatically review the change and publish findings. In this example, the
 review produces a `Code-Review -1` recommendation.
 
+See [Review Agent Architecture](docs/agent-architecture.md) for the agent-specialization levels and the concern
+lifecycle across successive Patch Sets.
+
 <kbd><img src="images/reviewai-sidebar-review.png?raw=true" alt="ReviewAI Patch Set review"></kbd>
 
 Voting is disabled by default. Enable it globally or per project with the `enabledVoting` configuration option.
@@ -133,6 +136,7 @@ See the [Command Reference](docs/commands.md) for every command, option, scope, 
 
 ## Documentation
 
+- [Review Agent Architecture](docs/agent-architecture.md)
 - [Configuration](docs/configuration.md)
 - [Command Reference](docs/commands.md)
 - [Development and Debugging](docs/development.md)
