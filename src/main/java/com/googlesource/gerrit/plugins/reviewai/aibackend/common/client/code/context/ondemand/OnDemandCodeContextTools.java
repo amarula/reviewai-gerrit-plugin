@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -38,8 +39,8 @@ public class OnDemandCodeContextTools extends ClientBase {
   public static final Set<String> FUNCTION_NAMES = Set.of(TREE, GET_CONTENT, GREP);
 
   private static final String CONTEXT_NOT_PROVIDED = "CONTEXT NOT PROVIDED";
-  private static final String COMMIT_MESSAGE_FILENAME = "/COMMIT_MSG";
-    private static final String TOPIC_CHANGE_PREFIX = "reviewai-topic-change-";
+  private static final Pattern COMMIT_MESSAGE_PATH_PATTERN =
+      Pattern.compile("^(?:reviewai-topic-change-.*)?/?COMMIT_MSG$");
   private static final int LOG_MAX_CONTENT_SIZE = 256;
 
   private final GerritChange change;
@@ -103,9 +104,7 @@ public class OnDemandCodeContextTools extends ClientBase {
   }
 
   private static boolean isCommitMessagePath(String filePath) {
-    return COMMIT_MESSAGE_FILENAME.equals(filePath)
-        || (filePath.startsWith(TOPIC_CHANGE_PREFIX)
-            && filePath.endsWith(COMMIT_MESSAGE_FILENAME));
+    return COMMIT_MESSAGE_PATH_PATTERN.matcher(filePath).matches();
   }
 
   private String grep(String string) {

@@ -89,6 +89,8 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   @Test
   public void getContentRejectsVirtualCommitMessagePaths() {
     assertEquals(
+        "CONTEXT NOT PROVIDED", tools.execute("get_content", "{\"file_path\":\"COMMIT_MSG\"}"));
+    assertEquals(
         "CONTEXT NOT PROVIDED",
         tools.execute("get_content", "{\"file_path\":\"/COMMIT_MSG\"}"));
     assertEquals(
@@ -97,6 +99,16 @@ public class OnDemandCodeContextToolsTest extends TestBase {
             "get_content",
             "{\"file_path\":\"reviewai-topic-change-1/COMMIT_MSG\"}"));
     verifyNoInteractions(gitRepoFiles);
+  }
+
+  @Test
+  public void getContentAllowsCommitMessageFilenameInRepositorySubdirectory() throws Exception {
+    String content = readTestFile(CONTEXT_FILE);
+    when(gitRepoFiles.getPatchSetFileContent(change, "docs/COMMIT_MSG")).thenReturn(content);
+
+    String output = tools.execute("get_content", "{\"file_path\":\"docs/COMMIT_MSG\"}");
+
+    assertEquals(content, output);
   }
 
   @Test
