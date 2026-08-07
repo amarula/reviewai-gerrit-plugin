@@ -44,6 +44,7 @@ public class GerritChange {
   @Setter private String topic;
   @Setter private Integer changeNumber;
   @Setter private Integer patchSetNumber;
+  @Setter private String patchSetRevision;
   // "Boolean" is used instead of "boolean" to have "getIsCommentEvent" instead of "isCommentEvent"
   // as getter method
   // (due to Lombok's magic naming convention)
@@ -69,6 +70,7 @@ public class GerritChange {
     eventType = event.getType();
     eventTimeStamp = event.eventCreatedOn;
     patchSetEvent = (PatchSetEvent) event;
+    patchSetRevision = getPatchSetAttribute().map(attribute -> attribute.revision).orElse(null);
   }
 
   public GerritChange(String fullChangeId) {
