@@ -302,6 +302,9 @@ directive = End each reply with \"Hope this helps!\"
       When SPECIALIZED_AGENTS is selected, the Sashiko prompts override custom prompts, including those set through
       `aiRelevanceRules`, `aiSystemPromptInstructions`, `ai-instructions.md`, and prompts imported from Gerrit.
 
+  See [Review Agent Architecture](agent-architecture.md) for the execution flow at each level, the concern lifecycle,
+  and the differences between initial and subsequent reviews.
+
 **NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
 costs.
 
