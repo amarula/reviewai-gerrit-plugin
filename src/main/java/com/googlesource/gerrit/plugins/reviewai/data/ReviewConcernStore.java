@@ -55,19 +55,20 @@ public final class ReviewConcernStore {
 
   public Optional<ReviewConcernLedger> load() {
     try (Connection connection = db.getConnection()) {
-      Integer schemaVersion = loadSchemaVersion(connection);
-      if (schemaVersion == null) {
+      LedgerMetadata metadata = loadLedgerMetadata(connection);
+      if (metadata == null) {
         return Optional.empty();
       }
-      if (schemaVersion != ReviewConcernLedger.CURRENT_SCHEMA_VERSION) {
+      if (metadata.schemaVersion() != ReviewConcernLedger.CURRENT_SCHEMA_VERSION) {
         log.warn(
             "Ignoring unsupported review concern ledger schema {} for change {}",
-            schemaVersion,
+            metadata.schemaVersion(),
             changeId);
         return Optional.empty();
       }
       ReviewConcernLedger ledger = new ReviewConcernLedger();
-      ledger.setSchemaVersion(schemaVersion);
+      ledger.setSchemaVersion(metadata.schemaVersion());
+      ledger.setLastReviewedCommit(metadata.lastReviewedCommit());
       ledger.setReviewers(loadReviewers(connection));
       ledger.normalize();
       return Optional.of(ledger);
@@ -84,7 +85,7 @@ public final class ReviewConcernStore {
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        upsertLedger(connection, ledger.getSchemaVersion());
+        upsertLedger(connection, ledger);
         deleteReviewerRows(connection);
         insertReviewerRows(connection, ledger.getReviewers());
         connection.commit();
@@ -109,13 +110,19 @@ public final class ReviewConcernStore {
     }
   }
 
-  private Integer loadSchemaVersion(Connection connection) throws SQLException {
+  private LedgerMetadata loadLedgerMetadata(Connection connection) throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
-            "SELECT schema_version FROM review_concern_ledgers WHERE change_id = ?")) {
+            """
+            SELECT schema_version, last_reviewed_commit
+            FROM review_concern_ledgers
+            WHERE change_id = ?
+            """)) {
       statement.setString(1, changeId);
       try (ResultSet results = statement.executeQuery()) {
-        return results.next() ? results.getInt(1) : null;
+        return results.next()
+            ? new LedgerMetadata(results.getInt(1), results.getString(2))
+            : null;
       }
     }
   }
@@ -176,18 +183,22 @@ public final class ReviewConcernStore {
     }
   }
 
-  private void upsertLedger(Connection connection, int schemaVersion) throws SQLException {
+  private void upsertLedger(Connection connection, ReviewConcernLedger ledger)
+      throws SQLException {
     String sql =
         db.getDialect()
             .upsert(
                 "review_concern_ledgers",
-                "change_id, schema_version, updated_at",
-                "?, ?, CURRENT_TIMESTAMP",
+                "change_id, schema_version, last_reviewed_commit, updated_at",
+                "?, ?, ?, CURRENT_TIMESTAMP",
                 "change_id",
-                "schema_version = EXCLUDED.schema_version, updated_at = CURRENT_TIMESTAMP");
+                "schema_version = EXCLUDED.schema_version, "
+                    + "last_reviewed_commit = EXCLUDED.last_reviewed_commit, "
+                    + "updated_at = CURRENT_TIMESTAMP");
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
       statement.setString(1, changeId);
-      statement.setInt(2, schemaVersion);
+      statement.setInt(2, ledger.getSchemaVersion());
+      statement.setString(3, ledger.getLastReviewedCommit());
       statement.executeUpdate();
     }
   }
@@ -272,6 +283,14 @@ public final class ReviewConcernStore {
     if (ledger.getSchemaVersion() != ReviewConcernLedger.CURRENT_SCHEMA_VERSION) {
       throw new IllegalArgumentException("Unsupported review concern ledger schema");
     }
+    if (ledger.getLastReviewedCommit() != null) {
+      ledger.setLastReviewedCommit(ledger.getLastReviewedCommit().trim());
+      if (ledger.getLastReviewedCommit().isEmpty()) {
+        ledger.setLastReviewedCommit(null);
+      } else if (ledger.getLastReviewedCommit().length() > 128) {
+        throw new IllegalArgumentException("Review concern commit ID is too long");
+      }
+    }
     Set<String> reviewerKeys = new HashSet<>();
     for (ReviewerConcerns reviewerConcerns : ledger.getReviewers()) {
       if (reviewerConcerns == null || reviewerConcerns.getReviewer() == null) {
@@ -308,4 +327,6 @@ public final class ReviewConcernStore {
       failure.addSuppressed(rollbackFailure);
     }
   }
+
+  private record LedgerMetadata(int schemaVersion, String lastReviewedCommit) {}
 }
