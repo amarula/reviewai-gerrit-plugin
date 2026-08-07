@@ -156,8 +156,11 @@ public class ReviewAiDb {
         "CREATE TABLE IF NOT EXISTS review_concern_ledgers ("
             + "change_id VARCHAR(512) PRIMARY KEY"
             + ", schema_version INT NOT NULL"
+            + ", last_reviewed_commit VARCHAR(128)"
             + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
             + ")",
+        "ALTER TABLE review_concern_ledgers"
+            + " ADD COLUMN IF NOT EXISTS last_reviewed_commit VARCHAR(128)",
         "CREATE TABLE IF NOT EXISTS review_concern_reviewers ("
             + "change_id VARCHAR(512) NOT NULL"
             + ", reviewer_kind VARCHAR(64) NOT NULL"
