@@ -41,6 +41,7 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -94,9 +95,10 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
   @Override
   public String getIncrementalPatchSet(ChangeSetData changeSetData, GerritChange change)
       throws Exception {
+    Optional<String> lastReviewedCommit = lastReviewedCommit(changeSetData);
     int patchSetNumber =
         change.getPatchSetAttribute().map(attribute -> attribute.number).orElse(1);
-    if (patchSetNumber <= 1) {
+    if (lastReviewedCommit.isEmpty() && patchSetNumber <= 1) {
       return getPatchSet(changeSetData, change);
     }
 
@@ -105,16 +107,38 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeApi changeApi = changeApi(change);
       RevisionApi currentRevision = changeApi.current();
-      RevisionApi previousRevision = changeApi.revision(patchSetNumber - 1);
       String formattedPatch = currentRevision.patch().asString();
+      String baseCommit;
+      if (lastReviewedCommit.isPresent()) {
+        baseCommit = lastReviewedCommit.get();
+      } else {
+        try {
+          RevisionApi previousRevision = changeApi.revision(patchSetNumber - 1);
+          CommitInfo previousCommit = previousRevision.commit(false);
+          baseCommit = previousCommit.commit;
+        } catch (Exception e) {
+          log.warn(
+              "Could not resolve the previous patch set commit. Using current patch output.",
+              e);
+          return filterPatch(formattedPatch);
+        }
+      }
       String incrementalPatch =
-          replaceDiffWithIncrementalGitDiff(
-              formattedPatch, previousRevision, currentRevision);
-      log.debug(
-          "Incremental patch retrieved for change {} between patch sets {} and {}",
-          change.getFullChangeId(),
-          patchSetNumber - 1,
-          patchSetNumber);
+          replaceDiffWithIncrementalGitDiff(formattedPatch, baseCommit, currentRevision);
+      if (lastReviewedCommit.isPresent()) {
+        log.debug(
+            "Incremental patch retrieved for change {} from reviewed commit {}"
+                + " to patch set {}",
+            change.getFullChangeId(),
+            baseCommit,
+            patchSetNumber);
+      } else {
+        log.debug(
+            "Incremental patch retrieved for change {} between patch sets {} and {}",
+            change.getFullChangeId(),
+            patchSetNumber - 1,
+            patchSetNumber);
+      }
       return filterPatch(incrementalPatch);
     }
   }
@@ -145,6 +169,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     }
     try {
       CommitInfo commit = currentRevision.commit(false);
+      recordPatchSetRevision(commit);
       String compactDiff = getCompactGitDiff(commit.commit);
       if (compactDiff.isBlank()) {
         return formattedPatch;
@@ -157,15 +182,15 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
   }
 
   private String replaceDiffWithIncrementalGitDiff(
-      String formattedPatch, RevisionApi previousRevision, RevisionApi currentRevision) {
+      String formattedPatch, String baseCommitId, RevisionApi currentRevision) {
     if (repositoryManager == null) {
       return formattedPatch;
     }
     try {
-      CommitInfo previousCommit = previousRevision.commit(false);
       CommitInfo currentCommit = currentRevision.commit(false);
+      recordPatchSetRevision(currentCommit);
       String incrementalDiff =
-          getCompactGitDiff(previousCommit.commit, currentCommit.commit);
+          getCompactGitDiff(baseCommitId, currentCommit.commit);
       if (incrementalDiff.isBlank()) {
         return "";
       }
@@ -175,6 +200,20 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
           "Could not generate incremental git diff between patch sets. Using current patch output.",
           e);
       return formattedPatch;
+    }
+  }
+
+  private Optional<String> lastReviewedCommit(ChangeSetData changeSetData) {
+    if (changeSetData == null || changeSetData.getPreviousReviewConcernLedger() == null) {
+      return Optional.empty();
+    }
+    String commit = changeSetData.getPreviousReviewConcernLedger().getLastReviewedCommit();
+    return Optional.ofNullable(commit).map(String::trim).filter(value -> !value.isEmpty());
+  }
+
+  private void recordPatchSetRevision(CommitInfo commit) {
+    if (commit != null && commit.commit != null && !commit.commit.isBlank()) {
+      change.setPatchSetRevision(commit.commit);
     }
   }
 

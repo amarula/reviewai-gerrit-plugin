@@ -29,6 +29,7 @@ import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -174,6 +175,42 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));
     Assert.assertTrue(patchSet.contains("-print('before')"));
     Assert.assertFalse(patchSet.contains("-print('base')"));
+    Assert.assertTrue(patchSet.contains("+print('after')"));
+  }
+
+  @Test
+  public void getIncrementalPatchSetUsesLastReviewedCommitAsBase() throws Exception {
+    List<RevCommit> patchSetCommits = createIncrementalPatchSetCommits();
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
+    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
+    when(repositoryManager.openRepository(any()))
+        .thenAnswer(
+            invocation ->
+                new FileRepositoryBuilder()
+                    .setGitDir(gitDir.toFile())
+                    .setMustExist(true)
+                    .build());
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getPatchContextLines()).thenReturn(3);
+    GerritChange change = getGerritChange();
+    change.setPatchSetNumber(4);
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setLastReviewedCommit(patchSetCommits.get(0).getName());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(ledger);
+
+    GerritClientPatchSetReviewAi client =
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
+    String patchSet = client.getIncrementalPatchSet(changeSetData, change);
+
+    verify(changeApi, never()).revision(3);
+    Assert.assertEquals(patchSetCommits.get(1).getName(), change.getPatchSetRevision());
     Assert.assertTrue(patchSet.contains("+print('after')"));
   }
 
