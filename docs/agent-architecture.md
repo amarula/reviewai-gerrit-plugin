@@ -61,7 +61,8 @@ therefore update the same ledger, while every other Change has a separate ledger
 The workflow uses two representations of the code update:
 
 - The **full patch** is the formatted current Patch Set supplied to the normal review workflow.
-- The **incremental patch** is the diff between the previous and current Patch Sets.
+- The **incremental patch** is the diff between the ledger's last successfully reviewed commit and the current Patch
+  Set. Legacy ledger rows without that checkpoint fall back to the immediately previous Patch Set.
 
 The incremental patch is loaded only when a ledger already exists. A missing ledger selects the initial-review path.
 
@@ -397,7 +398,7 @@ Concern data is stored in the plugin's H2-compatible database schema:
 
 | Table | Purpose |
 | --- | --- |
-| `review_concern_ledgers` | One schema-versioned ledger row per full Change ID. |
+| `review_concern_ledgers` | One schema-versioned ledger row and last-reviewed commit checkpoint per full Change ID. |
 | `review_concern_reviewers` | Ordered logical reviewers belonging to a ledger. |
 | `review_concerns` | Ordered, status-indexed concerns belonging to a reviewer. |
 
