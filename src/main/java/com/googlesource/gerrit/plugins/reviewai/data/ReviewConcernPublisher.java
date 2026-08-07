@@ -50,6 +50,12 @@ public final class ReviewConcernPublisher {
     updates
         .get(change.getFullChangeId())
         .ifPresent(
-            ledger -> new ReviewConcernStore(db, change.getFullChangeId()).save(ledger));
+            ledger -> {
+              if (change.getPatchSetRevision() != null
+                  && !change.getPatchSetRevision().isBlank()) {
+                ledger.setLastReviewedCommit(change.getPatchSetRevision());
+              }
+              new ReviewConcernStore(db, change.getFullChangeId()).save(ledger);
+            });
   }
 }

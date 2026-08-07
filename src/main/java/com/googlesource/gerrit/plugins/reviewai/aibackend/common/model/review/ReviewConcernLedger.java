@@ -27,9 +27,18 @@ public class ReviewConcernLedger {
   @SerializedName("schema_version")
   private int schemaVersion = CURRENT_SCHEMA_VERSION;
 
+  @SerializedName("last_reviewed_commit")
+  private String lastReviewedCommit;
+
   private List<ReviewerConcerns> reviewers = List.of();
 
   public void normalize() {
+    if (lastReviewedCommit != null) {
+      lastReviewedCommit = lastReviewedCommit.trim();
+      if (lastReviewedCommit.isEmpty()) {
+        lastReviewedCommit = null;
+      }
+    }
     if (reviewers == null) {
       reviewers = List.of();
     }

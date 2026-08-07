@@ -36,6 +36,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ReviewConcernStoreTest extends TestBase {
+  private static final String REVIEWED_COMMIT = "a".repeat(40);
+
   private ReviewConcernStore store;
 
   @Before
@@ -64,6 +66,7 @@ public class ReviewConcernStoreTest extends TestBase {
                 concern("concern-1", ConcernStatus.PRESENT),
                 concern("concern-2", ConcernStatus.FIXED)),
             reviewer(ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE"));
+    ledger.setLastReviewedCommit(REVIEWED_COMMIT);
 
     store.save(ledger);
 

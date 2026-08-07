@@ -30,6 +30,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ReviewConcernPublisherTest extends TestBase {
+  private static final String REVIEWED_COMMIT = "a".repeat(40);
+
   private ReviewConcernPublisher publisher;
   private GerritChange change;
 
@@ -43,6 +45,7 @@ public class ReviewConcernPublisherTest extends TestBase {
 
   @Test
   public void persistsUpdateForPublishedChange() {
+    change.setPatchSetRevision(REVIEWED_COMMIT);
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
     updates.put(change.getFullChangeId(), ledger);
@@ -55,6 +58,7 @@ public class ReviewConcernPublisherTest extends TestBase {
         new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
             .load()
             .orElseThrow();
+    assertEquals(REVIEWED_COMMIT, restored.getLastReviewedCommit());
     assertEquals(ledger, restored);
   }
 
