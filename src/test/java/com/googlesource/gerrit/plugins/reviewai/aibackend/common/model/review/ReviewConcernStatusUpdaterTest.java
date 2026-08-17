@@ -61,6 +61,25 @@ public class ReviewConcernStatusUpdaterTest {
         () -> ReviewConcernStatusUpdater.apply(List.of(existing), List.of(update, update)));
   }
 
+  @Test
+  public void appliesDismissedStatusAndAllowsLaterReassessment() {
+    ReviewConcern present = concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
+    ReviewConcern dismissed =
+        concern("concern-2", ConcernStatus.DISMISSED, "Accepted by the user");
+
+    List<ReviewConcern> results =
+        ReviewConcernStatusUpdater.apply(
+            List.of(present, dismissed),
+            List.of(
+                concern("concern-1", ConcernStatus.DISMISSED, "Risk accepted by the user"),
+                concern("concern-2", ConcernStatus.PRESENT, "The dismissal no longer applies")));
+
+    assertEquals(ConcernStatus.DISMISSED, results.get(0).getStatus());
+    assertEquals("Risk accepted by the user", results.get(0).getStatusReason());
+    assertEquals(ConcernStatus.PRESENT, results.get(1).getStatus());
+    assertEquals("The dismissal no longer applies", results.get(1).getStatusReason());
+  }
+
   private static ReviewConcern concern(String id, ConcernStatus status, String statusReason) {
     ReviewConcern concern = new ReviewConcern();
     concern.setId(id);

@@ -9,6 +9,11 @@
       "id": "old-fixed",
       "status": "FIXED",
       "status_reason": "The new guard handles the empty value."
+    },
+    {
+      "id": "old-dismissed",
+      "status": "DISMISSED",
+      "status_reason": "The accepted-risk rationale still applies."
     }
   ]
 }
