@@ -22,8 +22,12 @@ New concerns start as `PRESENT`. On later reviews, the Concern Reviewer assigns 
 | `PRESENT` | Current code still demonstrates the concern. |
 | `FIXED` | Current code demonstrates that the concern has been resolved. |
 | `UNCERTAIN` | Available evidence is insufficient to prove either `PRESENT` or `FIXED`. |
+| `DISMISSED` | A user explicitly declared the concern non-actionable under a recorded rationale. |
 
-No state is terminal. In particular, a `FIXED` concern is reassessed and can return to `PRESENT` after a regression.
+No state is terminal. In particular, a `FIXED` concern is reassessed and can return to `PRESENT` after a regression. A
+`DISMISSED` concern remains suppressed while its rationale applies, but it can return to `PRESENT` after explicit user
+feedback reopens it or concrete later code or specification evidence invalidates that rationale. Only a user-feedback
+workflow may newly assign `DISMISSED`; the Concern Reviewer cannot invent a dismissal.
 
 `ReviewConcern` is the canonical lifecycle structure and is also used by the specialized-agent finding pipeline.
 `AiReplyItem` remains the publication-facing structure expected by the existing Gerrit review path.
@@ -217,7 +221,7 @@ The Concern Reviewer receives every stored concern owned by that reviewer. It mu
 
 1. Return exactly one status update for every supplied concern.
 2. Preserve every concern ID.
-3. Reassess concerns in all prior states, including `FIXED` concerns.
+3. Reassess concerns in all prior states, including `FIXED` and `DISMISSED` concerns.
 4. Update only `status` and `status_reason`.
 5. Avoid searching for or reporting new concerns.
 
