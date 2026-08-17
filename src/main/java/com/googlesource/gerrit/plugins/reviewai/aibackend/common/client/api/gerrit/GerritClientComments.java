@@ -66,6 +66,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final ClientCommandExtension commandExtension;
 
   private String authorUsername;
+  private GerritCommentThreadIndex commentThreadIndex;
   @Getter private List<GerritComment> commentProperties;
 
   @VisibleForTesting
@@ -133,6 +134,7 @@ public class GerritClientComments extends GerritClientAccount {
     commentProperties = new ArrayList<>();
     commentMap = new HashMap<>();
     patchSetCommentMap = new HashMap<>();
+    commentThreadIndex = new GerritCommentThreadIndex(List.of());
   }
 
   public CommentData getCommentData() {
@@ -172,14 +174,14 @@ public class GerritClientComments extends GerritClientAccount {
     commentProperties.clear();
     commentMap.clear();
     patchSetCommentMap.clear();
+    commentThreadIndex = new GerritCommentThreadIndex(List.of());
   }
 
   private boolean isReplyToAssistant(GerritComment comment) {
-    if (comment.getInReplyTo() == null) {
-      return false;
-    }
-    GerritComment parent = commentMap.get(comment.getInReplyTo());
-    return parent != null && ReviewAiUser.matches(parent, changeSetData.getAiAccountId());
+    return commentThreadIndex
+        .parentOf(comment)
+        .map(parent -> ReviewAiUser.matches(parent, changeSetData.getAiAccountId()))
+        .orElse(false);
   }
 
   private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
@@ -238,6 +240,7 @@ public class GerritClientComments extends GerritClientAccount {
         }
       }
 
+      commentThreadIndex = new GerritCommentThreadIndex(commentMap.values());
       return latestComments.getOrDefault(latestChangeMessageId, null);
     }
   }
