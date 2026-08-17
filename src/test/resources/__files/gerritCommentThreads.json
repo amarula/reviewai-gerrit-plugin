@@ -1,0 +1,49 @@
+[
+  {
+    "id": "review-command",
+    "updated": "2026-08-17 10:00:00.000000000",
+    "message": "/review"
+  },
+  {
+    "id": "ai-concern",
+    "in_reply_to": "review-command",
+    "updated": "2026-08-17 10:01:00.000000000",
+    "message": "This change may leak the connection."
+  },
+  {
+    "id": "user-reply",
+    "in_reply_to": "ai-concern",
+    "updated": "2026-08-17 10:02:00.000000000",
+    "message": "The framework closes it after the callback."
+  },
+  {
+    "id": "ai-ack",
+    "in_reply_to": "user-reply",
+    "updated": "2026-08-17 10:03:00.000000000",
+    "message": "Understood."
+  },
+  {
+    "id": "sibling-reply",
+    "in_reply_to": "ai-concern",
+    "updated": "2026-08-17 10:04:00.000000000",
+    "message": "I have a separate question."
+  },
+  {
+    "id": "orphan",
+    "in_reply_to": "missing-parent",
+    "updated": "2026-08-17 10:05:00.000000000",
+    "message": "The parent is not in this response."
+  },
+  {
+    "id": "cycle-a",
+    "in_reply_to": "cycle-b",
+    "updated": "2026-08-17 10:06:00.000000000",
+    "message": "Cycle A"
+  },
+  {
+    "id": "cycle-b",
+    "in_reply_to": "cycle-a",
+    "updated": "2026-08-17 10:07:00.000000000",
+    "message": "Cycle B"
+  }
+]
