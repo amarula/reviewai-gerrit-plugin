@@ -117,10 +117,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertNull(newIssue.getRepetitionReplyId());
 
     List<ReviewConcern> stored = pendingLedger(response).getReviewers().getFirst().getConcerns();
-    assertEquals(3, stored.size());
+    assertEquals(4, stored.size());
     assertEquals(ConcernStatus.PRESENT, stored.get(0).getStatus());
     assertEquals(ConcernStatus.FIXED, stored.get(1).getStatus());
-    assertEquals(newIssue.getConcernId(), stored.get(2).getId());
+    assertEquals(ConcernStatus.DISMISSED, stored.get(2).getStatus());
+    assertEquals(newIssue.getConcernId(), stored.get(3).getId());
     assertEquals("new issue finder request", client.getRequestBody());
   }
 
@@ -139,7 +140,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(1, response.getReplies().size());
     assertEquals("old-present", response.getReplies().getFirst().getConcernId());
     assertTrue(response.getReplies().getFirst().isRepeated());
-    assertEquals(2, pendingLedger(response).getReviewers().getFirst().getConcerns().size());
+    assertEquals(3, pendingLedger(response).getReviewers().getFirst().getConcerns().size());
   }
 
   @Test
@@ -169,7 +170,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
     concerns.setConcerns(
         List.of(
             concern("old-present", ConcernStatus.PRESENT, "Old dereference"),
-            concern("old-fixed", ConcernStatus.PRESENT, "Old missing guard")));
+            concern("old-fixed", ConcernStatus.PRESENT, "Old missing guard"),
+            concern("old-dismissed", ConcernStatus.DISMISSED, "Accepted risk")));
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ledger.setReviewers(List.of(concerns));
     return ledger;
