@@ -20,6 +20,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageCleaner;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
@@ -40,6 +41,7 @@ public class AiHistory extends AiComment {
   private final Set<String> messagesExcludedFromHistory;
   private final AiHistoryMessageFilter messageFilter;
   @Getter private final HashMap<String, GerritComment> commentMap;
+  private final GerritCommentThreadIndex commentThreadIndex;
   private final HashMap<String, GerritComment> patchSetCommentMap;
   private final Set<String> patchSetCommentAdded;
   private final List<GerritComment> patchSetComments;
@@ -62,6 +64,7 @@ public class AiHistory extends AiComment {
         Set.of(Settings.GERRIT_DEFAULT_MESSAGE_DONE, localizer.getText("message.empty.review"));
     messageFilter = new AiHistoryMessageFilter();
     commentMap = commentData.getCommentMap();
+    commentThreadIndex = new GerritCommentThreadIndex(commentMap.values());
     patchSetCommentMap = commentData.getPatchSetCommentMap();
     patchSetComments = retrievePatchSetComments(gerritClientData);
     revisionBase = gerritClientData.getOneBasedRevisionBase();
@@ -137,14 +140,10 @@ public class AiHistory extends AiComment {
   private List<AiRequestMessage> retrieveMessageHistory(GerritComment currentComment) {
     List<AiRequestMessage> messageHistory = new ArrayList<>();
     log.debug("Retrieving message history for currentComment: {}", currentComment);
-    while (currentComment != null) {
-      log.debug("Processing comment: {}", currentComment);
-      addMessageToHistory(messageHistory, currentComment);
-      currentComment = commentMap.get(currentComment.getInReplyTo());
+    for (GerritComment comment : commentThreadIndex.lineage(currentComment)) {
+      log.debug("Processing comment: {}", comment);
+      addMessageToHistory(messageHistory, comment);
     }
-    // Reverse the history sequence so that the oldest message appears first and the newest message
-    // is last
-    Collections.reverse(messageHistory);
     log.debug("Final message history: {}", messageHistory);
     return messageHistory;
   }
@@ -280,10 +279,6 @@ public class AiHistory extends AiComment {
   }
 
   private boolean isReplyToAssistant(GerritComment comment) {
-    if (comment == null || comment.getInReplyTo() == null) {
-      return false;
-    }
-    GerritComment parent = commentMap.get(comment.getInReplyTo());
-    return parent != null && isFromAssistant(parent);
+    return commentThreadIndex.parentOf(comment).map(this::isFromAssistant).orElse(false);
   }
 }
