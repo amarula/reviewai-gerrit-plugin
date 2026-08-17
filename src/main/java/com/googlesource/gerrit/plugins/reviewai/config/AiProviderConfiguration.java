@@ -378,7 +378,7 @@ final class AiProviderConfiguration {
       return ollamaRoute;
     }
 
-    log.warn(
+    log.debug(
         "Cannot guess provider for AI model `{}`. It is not present in configured/default model lists for token-backed providers {}, and Ollama is not configured.",
         model,
         candidateRoutes.stream()
