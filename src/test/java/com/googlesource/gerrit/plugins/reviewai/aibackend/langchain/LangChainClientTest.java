@@ -48,6 +48,7 @@ import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import java.lang.reflect.Field;
@@ -99,6 +100,23 @@ public class LangChainClientTest {
     assertTrue(replyItemSchema.properties().containsKey("repetition_reply_id"));
     assertTrue(replyItemSchema.properties().containsKey("duplicated"));
     assertTrue(replyItemSchema.properties().containsKey("duplicated_reason"));
+  }
+
+  @Test
+  public void concernReviewResponseFormatAllowsDismissedStatus() throws Exception {
+    LangChainClient client = new LangChainClient(null, null, null, null);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+
+    ResponseFormat responseFormat =
+        getToolExecutorStructuredResponseFormat(getToolExecutor(client, changeSetData));
+
+    JsonObjectSchema root = (JsonObjectSchema) responseFormat.jsonSchema().rootElement();
+    JsonArraySchema concerns = (JsonArraySchema) root.properties().get("concerns");
+    JsonObjectSchema concern = (JsonObjectSchema) concerns.items();
+    JsonEnumSchema status = (JsonEnumSchema) concern.properties().get("status");
+    assertEquals(
+        List.of("PRESENT", "FIXED", "UNCERTAIN", "DISMISSED"), status.enumValues());
   }
 
   @Test
@@ -679,7 +697,11 @@ public class LangChainClientTest {
 
   private ResponseFormat getToolExecutorStructuredResponseFormat(LangChainClient client)
       throws Exception {
-    Object executor = getToolExecutor(client);
+    return getToolExecutorStructuredResponseFormat(getToolExecutor(client));
+  }
+
+  private ResponseFormat getToolExecutorStructuredResponseFormat(Object executor)
+      throws Exception {
     Field responseFormatField = executor.getClass().getDeclaredField("structuredResponseFormat");
     responseFormatField.setAccessible(true);
     return (ResponseFormat) responseFormatField.get(executor);

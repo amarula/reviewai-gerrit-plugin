@@ -19,5 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 public enum ConcernStatus {
   PRESENT,
   FIXED,
-  UNCERTAIN
+  UNCERTAIN,
+  DISMISSED
 }

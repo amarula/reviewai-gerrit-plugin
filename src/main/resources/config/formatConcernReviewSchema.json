@@ -13,7 +13,7 @@
             "id": { "type": "string" },
             "status": {
               "type": "string",
-              "enum": ["PRESENT", "FIXED", "UNCERTAIN"]
+              "enum": ["PRESENT", "FIXED", "UNCERTAIN", "DISMISSED"]
             },
             "status_reason": { "type": "string" }
           },
