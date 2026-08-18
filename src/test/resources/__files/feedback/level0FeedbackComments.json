@@ -1,0 +1,94 @@
+{
+  "addressedComments": [
+    {
+      "id": "user-feedback",
+      "in_reply_to": "ai-concern",
+      "message": "The null fallback is intentional for legacy callers.",
+      "filename": "src/Service.java",
+      "line": 42,
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "generic-guidance",
+      "message": "Please keep public API changes backward compatible.",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "question",
+      "message": "Can you explain the warning?",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "ca0764e7_4e6e27ab",
+      "in_reply_to": "572235ac_8274525d",
+      "message": "Skip commit message review",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    }
+  ],
+  "allComments": [
+    {
+      "id": "review-command",
+      "message": "/review",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "ai-concern",
+      "in_reply_to": "review-command",
+      "message": "The null fallback hides an invalid state.",
+      "filename": "src/Service.java",
+      "line": 42,
+      "author": { "_account_id": 1 }
+    },
+    {
+      "id": "user-feedback",
+      "in_reply_to": "ai-concern",
+      "message": "The null fallback is intentional for legacy callers.",
+      "filename": "src/Service.java",
+      "line": 42,
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "generic-guidance",
+      "message": "Please keep public API changes backward compatible.",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "question",
+      "message": "Can you explain the warning?",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "70d29130_a03c5345",
+      "message": "The commit subject `Minor fixes` is too vague for this patch.",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 1 }
+    },
+    {
+      "id": "b1b6a54f_e00e1997",
+      "in_reply_to": "70d29130_a03c5345",
+      "message": "Wouldn't it be too much broad this way?",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "572235ac_8274525d",
+      "in_reply_to": "b1b6a54f_e00e1997",
+      "message": "Yes, that subject may still be too broad. Prefer splitting the changes where practical.",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 1 }
+    },
+    {
+      "id": "ca0764e7_4e6e27ab",
+      "in_reply_to": "572235ac_8274525d",
+      "message": "Skip commit message review",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    }
+  ]
+}

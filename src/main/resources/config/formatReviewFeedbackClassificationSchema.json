@@ -1,0 +1,38 @@
+{
+  "name": "format_review_feedback_classification",
+  "description": "Classify addressed comments and update distilled review feedback.",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "classifications": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "comment_id": { "type": "string" },
+            "category": {
+              "type": "string",
+              "enum": ["GENERIC", "IRRELEVANT", "CONCERN"]
+            },
+            "concern_id": { "type": "string" }
+          },
+          "required": ["comment_id", "category", "concern_id"]
+        }
+      },
+      "generic_feedback": { "type": "string" },
+      "concern_feedback": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "concern_id": { "type": "string" },
+            "summary": { "type": "string" }
+          },
+          "required": ["concern_id", "summary"]
+        }
+      }
+    },
+    "required": ["classifications", "generic_feedback", "concern_feedback"]
+  }
+}
