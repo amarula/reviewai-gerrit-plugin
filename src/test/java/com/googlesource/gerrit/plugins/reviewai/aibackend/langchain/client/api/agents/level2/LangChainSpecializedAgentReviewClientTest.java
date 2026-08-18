@@ -22,6 +22,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -49,10 +50,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Co
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.nio.file.Files;
@@ -83,6 +86,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/newIssueIncrementalPatch.txt";
   private static final String FULL_PATCH_RESOURCE =
       "__files/langchain/newIssueFullPatch.txt";
+  private static final String FEEDBACK_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemory.json";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -111,6 +116,39 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(
         response.getReplies().getFirst().getConcernId(),
         stored.getConcerns().getFirst().getId());
+  }
+
+  @Test
+  public void reviewClassifiesFeedbackInParallelWithTriage() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage = triage(plan("CORRECTNESS", true));
+    client.classifiedFeedback = readFeedbackMemory();
+    ReviewFeedbackMemory previousFeedback = new ReviewFeedbackMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewFeedbackMemory(previousFeedback);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
+
+    client.ask(changeSetData, change(false), readTestResource(PATCH_SET_RESOURCE));
+
+    assertEquals(1, client.feedbackCalls);
+    assertSame(previousFeedback, client.feedbackAtTriage);
+    assertSame(client.classifiedFeedback, client.agentFeedback.getFirst());
+    assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
+  }
+
+  @Test
+  public void reviewWithoutPendingFeedbackSkipsClassifier() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage = triage(plan("CORRECTNESS", true));
+    ReviewFeedbackMemory memory = readFeedbackMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewFeedbackMemory(memory);
+
+    client.ask(changeSetData, change(false), readTestResource(PATCH_SET_RESOURCE));
+
+    assertEquals(0, client.feedbackCalls);
+    assertSame(memory, client.agentFeedback.getFirst());
+    assertSame(memory, changeSetData.getReviewFeedbackMemory());
   }
 
   @Test
@@ -225,6 +263,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     client.triage = triage(plan("CORRECTNESS", true));
     ChangeSetData changeSetData = new ChangeSetData(1);
+    ReviewFeedbackMemory memory = readFeedbackMemory();
+    changeSetData.setReviewFeedbackMemory(memory);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
     GerritChange change = change(true);
 
     AiResponseContent response =
@@ -235,6 +276,8 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(List.of(), client.recordedAgents);
     assertEquals("Message response", response.getReplies().getFirst().getReply());
     assertEquals("message request", client.getRequestBody());
+    assertEquals(0, client.feedbackCalls);
+    assertSame(memory, changeSetData.getReviewFeedbackMemory());
   }
 
   @Test
@@ -400,6 +443,30 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
+  public void specializedAgentPromptsIncludeDistilledFeedback() throws Exception {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    changeSetData.setSpecializedAgentName("TESTABILITY");
+    changeSetData.setSpecializedAgentInstructions("Review testability only.");
+    ReviewFeedbackMemory memory = readFeedbackMemory();
+    changeSetData.setReviewFeedbackMemory(memory);
+
+    String patchsetInstructions =
+        new TestableSpecializedPrompt(config(), changeSetData, change(false))
+            .getDefaultAiAssistantInstructions();
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setSpecializedAgentName(null);
+    String commitMessageInstructions =
+        new TestableSpecializedPrompt(config(), changeSetData, change(false))
+            .getDefaultAiAssistantInstructions();
+
+    assertTrue(patchsetInstructions.contains(memory.getGenericFeedback()));
+    assertTrue(commitMessageInstructions.contains(memory.getGenericFeedback()));
+    assertTrue(
+        commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
+  }
+
+  @Test
   public void specializedInputIncludesWholePatchset() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     SpecializedReviewTriage.AgentPlan plan = plan("TESTABILITY", true);
@@ -558,6 +625,8 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   private static Configuration config() {
     Configuration config = mock(Configuration.class);
+    when(config.getAgentSpecializationLevel())
+        .thenReturn(AgentSpecializationLevel.SPECIALIZED_AGENTS);
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getAiReviewPatchSet()).thenReturn(true);
     when(config.getGerritUserName()).thenReturn("reviewai");
@@ -577,6 +646,11 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   private static List<String> readTestResourceLines(String resourceName) throws Exception {
     return Files.readAllLines(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  private static ReviewFeedbackMemory readFeedbackMemory() throws Exception {
+    return getGson()
+        .fromJson(readTestResource(FEEDBACK_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
   }
 
   private static HashMap<String, GerritComment> mapById(List<GerritComment> comments) {
@@ -614,7 +688,11 @@ public class LangChainSpecializedAgentReviewClientTest {
     private final List<String> incrementalPatches = new ArrayList<>();
     private final List<String> fullPatches = new ArrayList<>();
     private final List<Boolean> historicalRepetitionSelections = new ArrayList<>();
+    private final List<ReviewFeedbackMemory> agentFeedback = new ArrayList<>();
     private SpecializedReviewTriage triage = triage();
+    private ReviewFeedbackMemory classifiedFeedback;
+    private ReviewFeedbackMemory feedbackAtTriage;
+    private int feedbackCalls;
     private boolean triageCalled;
     private boolean suggestClientCalled;
     private boolean messageRequestCalled;
@@ -632,6 +710,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     protected SpecializedReviewTriage askTriage(
         ChangeSetData changeSetData, GerritChange change, String patchSet) {
       triageCalled = true;
+      feedbackAtTriage = changeSetData.getReviewFeedbackMemory();
       return triage;
     }
 
@@ -649,7 +728,17 @@ public class LangChainSpecializedAgentReviewClientTest {
         String patchSet,
         SpecializedReviewTriage.AgentPlan plan) {
       recordedAgents.add(plan.getAgent());
+      agentFeedback.add(changeSetData.getReviewFeedbackMemory());
       return finding(plan.getAgent(), plan.getAgent());
+    }
+
+    @Override
+    protected ReviewFeedbackMemory reviewFeedback(
+        ChangeSetData changeSetData, GerritChange change) {
+      feedbackCalls++;
+      return classifiedFeedback == null
+          ? changeSetData.getReviewFeedbackMemory()
+          : classifiedFeedback;
     }
 
     @Override

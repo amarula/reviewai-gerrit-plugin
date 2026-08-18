@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -36,16 +35,7 @@ final class LangChainConcernWorkflowInputFactory {
         config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
             ? fullPatchSet
             : null;
-    ConcernReviewerId.Kind reviewerKind =
-        concerns == null || concerns.getReviewer() == null
-            ? null
-            : concerns.getReviewer().getKind();
-    ReviewFeedbackMemory feedbackContext =
-        (reviewerKind == ConcernReviewerId.Kind.SINGLE_AGENT
-                || reviewerKind == ConcernReviewerId.Kind.SCOPED_AGENT)
-            ? reviewFeedback
-            : null;
     return new ConcernWorkflowInput(
-        concerns, incrementalPatchSet, fullPatchContext, feedbackContext);
+        concerns, incrementalPatchSet, fullPatchContext, reviewFeedback);
   }
 }
