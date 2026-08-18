@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "generic_feedback": "Prefer focused patches with tests covering observable behavior.",
+  "concern_feedback": {
+    "concern-1": "This behavior is intentional because callers require the fallback.",
+    "concern-2": "Reassess the warning after the compatibility path is removed."
+  }
+}
