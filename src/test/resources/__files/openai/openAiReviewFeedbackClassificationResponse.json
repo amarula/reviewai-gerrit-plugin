@@ -1,0 +1,18 @@
+{
+  "id": "resp_TEST_FEEDBACK_CLASSIFICATION",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "msg_TEST_FEEDBACK_CLASSIFICATION",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\n  \"classifications\": [\n    {\n      \"comment_id\": \"79d10719_df6121b2\",\n      \"category\": \"GENERIC\",\n      \"concern_id\": \"\"\n    }\n  ],\n  \"generic_feedback\": \"Skip commit message review.\",\n  \"concern_feedback\": []\n}"
+        }
+      ]
+    }
+  ]
+}

@@ -110,11 +110,30 @@ public class GerritClientCommentsTest {
   }
 
   @Test
-  public void replyToAssistantWithoutMentionIsRetrieved() {
+  public void addressedCommentsRemainEventLocal() {
     assertTrue(client.retrieveLastComments(change, false));
 
     assertEquals(1, client.getCommentProperties().size());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
+    assertEquals(
+        "latest-reply",
+        client.getCommentData().getAddressedComments().getFirst().getId());
+
+    client.retrieveAllComments(change);
+
+    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+  }
+
+  @Test
+  public void addressedCommandIsRetainedForFeedbackClassification() {
+    latestComment().message = "/review";
+
+    assertFalse(client.retrieveLastComments(change, false));
+
+    assertTrue(client.getCommentProperties().isEmpty());
+    assertEquals(
+        "latest-reply",
+        client.getCommentData().getAddressedComments().getFirst().getId());
   }
 
   @Test
