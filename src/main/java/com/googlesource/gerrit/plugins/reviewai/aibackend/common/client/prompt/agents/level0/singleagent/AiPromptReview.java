@@ -16,7 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -24,14 +28,13 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 @Slf4j
 public class AiPromptReview extends AiPromptBase implements IAiPrompt {
@@ -70,6 +73,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     return switch (stage) {
       case REVIEW_COMMIT_MESSAGE -> staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
       case REVIEW_CODE,
+          CLASSIFY_REVIEW_FEEDBACK,
           REVIEW_CONCERNS,
           FIND_NEW_ISSUES,
           REVIEW_REITERATED,
@@ -111,6 +115,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                     () ->
                         resolveReviewInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
     sections.addAll(buildConditionLabelSections());
+    sections.addAll(buildReviewFeedbackSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
@@ -202,6 +207,27 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String buildSection(String title, String body) {
     return AiPromptSections.buildSection(title, body);
+  }
+
+  protected List<String> buildReviewFeedbackSections() {
+    if (config == null
+        || config.getAgentSpecializationLevel()
+            != AgentSpecializationLevel.SINGLE_AGENT) {
+      return List.of();
+    }
+    ReviewFeedbackMemory memory = changeSetData.getReviewFeedbackMemory();
+    if (memory == null
+        || (memory.getGenericFeedback() == null
+            && (memory.getConcernFeedback() == null
+                || memory.getConcernFeedback().isEmpty()))) {
+      return List.of();
+    }
+    return List.of(
+        buildSection(
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_REVIEW_FEEDBACK"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CONTEXT")
+                + "\n\n"
+                + getGson().toJson(memory)));
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
