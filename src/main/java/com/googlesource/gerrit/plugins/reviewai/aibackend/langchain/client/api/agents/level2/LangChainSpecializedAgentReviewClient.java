@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient;
@@ -203,10 +204,22 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
     }
     if (changeSetData.getForcedStagedReview()) {
+      if (hasPendingReviewFeedback(changeSetData)) {
+        changeSetData.setReviewFeedbackMemory(reviewFeedback(changeSetData, change));
+      }
       return super.askReview(changeSetData, change, patchSet);
     }
 
-    SpecializedReviewTriage triage = askTriage(changeSetData, change, patchSet);
+    CompletableFuture<ReviewFeedbackMemory> feedbackFuture = null;
+    if (hasPendingReviewFeedback(changeSetData)) {
+      feedbackFuture = stageExecutor.supplyAsync(() -> reviewFeedback(changeSetData, change));
+    }
+    CompletableFuture<SpecializedReviewTriage> triageFuture =
+        stageExecutor.supplyAsync(() -> askTriage(changeSetData, change, patchSet));
+    SpecializedReviewTriage triage = stageExecutor.join(triageFuture);
+    if (feedbackFuture != null) {
+      changeSetData.setReviewFeedbackMemory(stageExecutor.join(feedbackFuture));
+    }
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
     List<SpecializedReviewTriage.AgentPlan> enabledPlans =
         SpecializedReviewConcernPlanSelector.select(
@@ -269,6 +282,11 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
         followUps,
         specializedConcernLedgerOperations.verifiedUpdates(
             collector.response(), collector.verificationCandidates(), specializedFindings));
+  }
+
+  private boolean hasPendingReviewFeedback(ChangeSetData changeSetData) {
+    return changeSetData.getPendingReviewFeedbackCommentIds() != null
+        && !changeSetData.getPendingReviewFeedbackCommentIds().isEmpty();
   }
 
   @Override
