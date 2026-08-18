@@ -46,6 +46,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     List<String> sections = new ArrayList<>();
     sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
     sections.addAll(buildConditionLabelSections());
+    sections.addAll(buildReviewFeedbackSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
@@ -79,6 +80,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
             resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
+    sections.addAll(buildReviewFeedbackSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
