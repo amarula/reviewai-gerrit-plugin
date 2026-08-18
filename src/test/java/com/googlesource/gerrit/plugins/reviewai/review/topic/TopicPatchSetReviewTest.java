@@ -59,6 +59,7 @@ public class TopicPatchSetReviewTest {
     TopicReviewReplyMapper mapper = new TopicReviewReplyMapper();
     AiReplyItem ownReply =
         AiReplyItem.builder()
+            .concernId("raw-concern-1")
             .filename("reviewai-topic-change-1/src/Test.java")
             .repeated(true)
             .repetitionReplyId("raw-previous-r1")
@@ -71,6 +72,7 @@ public class TopicPatchSetReviewTest {
 
     assertTrue(mappedReply.isPresent());
     assertEquals("src/Test.java", mappedReply.get().getFilename());
+    assertEquals("raw-concern-1", mappedReply.get().getConcernId());
     assertEquals("reviewai-topic-change-1/src/Test.java", ownReply.getFilename());
     assertTrue(mappedReply.get().isRepeated());
     assertEquals("raw-previous-r1", mappedReply.get().getRepetitionReplyId());
