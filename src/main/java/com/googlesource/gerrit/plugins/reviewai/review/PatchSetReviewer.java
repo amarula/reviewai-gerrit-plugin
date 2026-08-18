@@ -65,6 +65,7 @@ public class PatchSetReviewer {
   private final TopicPatchSetReviewer topicPatchSetReviewer;
   private final TopicReviewReplyMapper topicReviewReplyMapper;
   private final ReviewConcernPublisher reviewConcernPublisher;
+  private final ReviewFeedbackLifecycle reviewFeedbackLifecycle;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -81,6 +82,7 @@ public class PatchSetReviewer {
       Localizer localizer,
       PatchSetReviewConversationRecorder conversationRecorder,
       ReviewConcernPublisher reviewConcernPublisher,
+      ReviewFeedbackLifecycle reviewFeedbackLifecycle,
       @CanonicalWebUrl @Nullable String canonicalWebUrl) {
     this.config = config;
     this.gerritClient = gerritClient;
@@ -90,6 +92,7 @@ public class PatchSetReviewer {
     this.localizer = localizer;
     this.conversationRecorder = conversationRecorder;
     this.reviewConcernPublisher = reviewConcernPublisher;
+    this.reviewFeedbackLifecycle = reviewFeedbackLifecycle;
     this.repeatedCommentReferenceFormatter =
         new RepeatedCommentReferenceFormatter(
             gerritClient, changeSetData, localizer, canonicalWebUrl);
@@ -114,6 +117,7 @@ public class PatchSetReviewer {
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    reviewFeedbackLifecycle.reset(changeSetData);
     if (!changeSetData.shouldRequestAiReview()) {
       log.debug("Skipping patch retrieval and AI request because only a system response is needed.");
       clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
@@ -133,6 +137,8 @@ public class PatchSetReviewer {
       return;
     }
     ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
+    ReviewFeedbackLifecycle.Session feedbackSession =
+        reviewFeedbackLifecycle.begin(change, changeSetData);
 
     AiResponseContent reviewReply = null;
     try {
@@ -161,13 +167,21 @@ public class PatchSetReviewer {
       reviewBatches = retrieveReviewBatches(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change);
-    Map<String, String> publishedCommentIdsByConcern =
-        clientReviewProvider
-            .get()
-            .setReviewAndGetPublishedCommentIds(
-                change, reviewBatches, changeSetData, reviewScore);
-    reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
-    conversationRecorder.record(change, reviewBatches, reviewScore);
+    Map<String, String> publishedCommentIdsByConcern;
+    try {
+      publishedCommentIdsByConcern =
+          clientReviewProvider
+              .get()
+              .setReviewAndGetPublishedCommentIds(
+                  change, reviewBatches, changeSetData, reviewScore);
+      reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
+      reviewFeedbackLifecycle.settle(
+          change, changeSetData, feedbackSession, reviewReply != null);
+      conversationRecorder.record(change, reviewBatches, reviewScore);
+    } catch (Exception e) {
+      reviewFeedbackLifecycle.release(change, feedbackSession, e);
+      throw e;
+    }
   }
 
   private void prepareConcernContext(GerritChange change) throws Exception {
@@ -178,6 +192,7 @@ public class PatchSetReviewer {
       changeSetData.setPreviousReviewConcernLedger(existingLedger.get());
       changeSetData.setIncrementalPatchSet(gerritClient.getIncrementalPatchSet(change));
     }
+    reviewFeedbackLifecycle.loadMemory(change, changeSetData);
   }
 
   public void reviewTopic(List<GerritChange> changes, boolean includeAiFailureDetails)

@@ -17,25 +17,41 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import com.google.gson.annotations.SerializedName;
-import lombok.AllArgsConstructor;
+import java.util.List;
 import lombok.Data;
 
 @Data
-@AllArgsConstructor
-public class ConcernWorkflowInput {
-  private ReviewerConcerns concerns;
+public class ReviewFeedbackClassificationResult {
+  private List<Classification> classifications = List.of();
 
-  @SerializedName("incremental_patch")
-  private String incrementalPatch;
+  @SerializedName("generic_feedback")
+  private String genericFeedback;
 
-  @SerializedName("full_patch")
-  private String fullPatch;
+  @SerializedName("concern_feedback")
+  private List<ConcernFeedback> concernFeedback = List.of();
 
-  @SerializedName("review_feedback")
-  private ReviewFeedbackMemory reviewFeedback;
+  public enum Category {
+    GENERIC,
+    IRRELEVANT,
+    CONCERN
+  }
 
-  public ConcernWorkflowInput(
-      ReviewerConcerns concerns, String incrementalPatch, String fullPatch) {
-    this(concerns, incrementalPatch, fullPatch, null);
+  @Data
+  public static class Classification {
+    @SerializedName("comment_id")
+    private String commentId;
+
+    private Category category;
+
+    @SerializedName("concern_id")
+    private String concernId;
+  }
+
+  @Data
+  public static class ConcernFeedback {
+    @SerializedName("concern_id")
+    private String concernId;
+
+    private String summary;
   }
 }
