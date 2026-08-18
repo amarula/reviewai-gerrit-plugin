@@ -21,6 +21,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import java.util.Map;
 import java.util.Optional;
 
 public final class ReviewConcernPublisher {
@@ -40,6 +41,13 @@ public final class ReviewConcernPublisher {
   }
 
   public void persist(AiResponseContent response, GerritChange change) {
+    persist(response, change, Map.of());
+  }
+
+  public void persist(
+      AiResponseContent response,
+      GerritChange change,
+      Map<String, String> publishedCommentIdsByConcern) {
     if (response == null) {
       return;
     }
@@ -51,11 +59,27 @@ public final class ReviewConcernPublisher {
         .get(change.getFullChangeId())
         .ifPresent(
             ledger -> {
+              bindPublishedCommentIds(ledger, publishedCommentIdsByConcern);
               if (change.getPatchSetRevision() != null
                   && !change.getPatchSetRevision().isBlank()) {
                 ledger.setLastReviewedCommit(change.getPatchSetRevision());
               }
               new ReviewConcernStore(db, change.getFullChangeId()).save(ledger);
             });
+  }
+
+  private void bindPublishedCommentIds(
+      ReviewConcernLedger ledger, Map<String, String> publishedCommentIdsByConcern) {
+    if (publishedCommentIdsByConcern == null || publishedCommentIdsByConcern.isEmpty()) {
+      return;
+    }
+    ledger.normalize();
+    ledger.getReviewers().stream()
+        .flatMap(reviewer -> reviewer.getConcerns().stream())
+        .forEach(
+            concern ->
+                Optional.ofNullable(publishedCommentIdsByConcern.get(concern.getId()))
+                    .filter(commentId -> !commentId.isBlank())
+                    .ifPresent(concern::setPreviousCommentId));
   }
 }

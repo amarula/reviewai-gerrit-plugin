@@ -161,8 +161,12 @@ public class PatchSetReviewer {
       reviewBatches = retrieveReviewBatches(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change);
-    clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
-    reviewConcernPublisher.persist(reviewReply, change);
+    Map<String, String> publishedCommentIdsByConcern =
+        clientReviewProvider
+            .get()
+            .setReviewAndGetPublishedCommentIds(
+                change, reviewBatches, changeSetData, reviewScore);
+    reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
@@ -212,8 +216,12 @@ public class PatchSetReviewer {
         topicReviewScores == null
             ? getReviewScore(change)
             : getReviewScore(change, topicReviewScores);
-    clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
-    reviewConcernPublisher.persist(reviewReply, change);
+    Map<String, String> publishedCommentIdsByConcern =
+        clientReviewProvider
+            .get()
+            .setReviewAndGetPublishedCommentIds(
+                change, reviewBatches, changeSetData, reviewScore);
+    reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
