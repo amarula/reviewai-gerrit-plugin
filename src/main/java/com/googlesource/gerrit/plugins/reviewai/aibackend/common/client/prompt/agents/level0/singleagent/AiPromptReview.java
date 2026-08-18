@@ -212,8 +212,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   protected List<String> buildReviewFeedbackSections() {
     AgentSpecializationLevel level =
         config == null ? null : config.getAgentSpecializationLevel();
-    if (level != AgentSpecializationLevel.SINGLE_AGENT
-        && level != AgentSpecializationLevel.SCOPED_AGENTS) {
+    if (level == null) {
       return List.of();
     }
     ReviewFeedbackMemory memory = changeSetData.getReviewFeedbackMemory();
