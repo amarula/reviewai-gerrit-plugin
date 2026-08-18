@@ -193,6 +193,28 @@ public class ReviewAiDb {
             + " ON review_concerns(change_id, concern_status)");
   }
 
+  public void initReviewFeedbackSchema() throws SQLException {
+    executeSchema(
+        "CREATE TABLE IF NOT EXISTS review_feedback_memories ("
+            + "change_id VARCHAR(512) PRIMARY KEY"
+            + ", schema_version INT NOT NULL"
+            + ", memory_json "
+            + getDialect().clobType()
+            + " NOT NULL"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ")",
+        "CREATE TABLE IF NOT EXISTS review_feedback_comments ("
+            + "change_id VARCHAR(512) NOT NULL"
+            + ", comment_id VARCHAR(255) NOT NULL"
+            + ", processing_state VARCHAR(32) NOT NULL"
+            + ", processing_token VARCHAR(36)"
+            + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ", PRIMARY KEY(change_id, comment_id)"
+            + ")",
+        "CREATE INDEX IF NOT EXISTS idx_review_feedback_comments_pending"
+            + " ON review_feedback_comments(change_id, processing_state, updated_at)");
+  }
+
   public void initReviewAgentConversationSchema() throws SQLException {
     withConnection(
         c -> {
