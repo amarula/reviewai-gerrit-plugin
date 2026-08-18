@@ -1,0 +1,31 @@
+{
+  "classifications": [
+    {
+      "comment_id": "user-feedback",
+      "category": "CONCERN",
+      "concern_id": "old-present"
+    },
+    {
+      "comment_id": "generic-guidance",
+      "category": "GENERIC",
+      "concern_id": ""
+    },
+    {
+      "comment_id": "question",
+      "category": "IRRELEVANT",
+      "concern_id": ""
+    },
+    {
+      "comment_id": "ca0764e7_4e6e27ab",
+      "category": "GENERIC",
+      "concern_id": ""
+    }
+  ],
+  "generic_feedback": "Keep public API changes backward compatible and skip commit message review.",
+  "concern_feedback": [
+    {
+      "concern_id": "old-present",
+      "summary": "The null fallback is intentional for legacy callers."
+    }
+  ]
+}

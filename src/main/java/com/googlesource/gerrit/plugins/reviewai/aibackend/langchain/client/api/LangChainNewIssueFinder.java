@@ -48,7 +48,11 @@ final class LangChainNewIssueFinder {
         conversationSuffix(reviewedConcerns));
     finderData.setConcernWorkflowInput(
         LangChainConcernWorkflowInputFactory.create(
-            config, reviewedConcerns, incrementalPatchSet, fullPatchSet));
+            config,
+            reviewedConcerns,
+            incrementalPatchSet,
+            fullPatchSet,
+            changeSetData.getReviewFeedbackMemory()));
     return requestExecutor.execute(finderData, change, "");
   }
 

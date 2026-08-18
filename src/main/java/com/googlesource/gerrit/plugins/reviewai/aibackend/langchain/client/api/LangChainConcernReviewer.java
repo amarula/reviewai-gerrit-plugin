@@ -83,7 +83,11 @@ final class LangChainConcernReviewer {
         conversationSuffix(existingConcerns));
     concernReviewData.setConcernWorkflowInput(
         LangChainConcernWorkflowInputFactory.create(
-            config, existingConcerns, incrementalPatchSet, fullPatchSet));
+            config,
+            existingConcerns,
+            incrementalPatchSet,
+            fullPatchSet,
+            changeSetData.getReviewFeedbackMemory()));
     String responseText = requestExecutor.execute(concernReviewData, change, "");
     if (responseText == null || !isJsonObjectAsString(responseText)) {
       throw new IllegalStateException("Concern reviewer returned no structured response");
