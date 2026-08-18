@@ -25,6 +25,9 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandle
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
@@ -38,6 +41,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   private final PatchSetReviewer reviewer;
   private final GerritClient gerritClient;
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
+  private final ReviewFeedbackPublisher reviewFeedbackPublisher;
   private final boolean administratorUser;
 
   EventHandlerTypeCommentAdded(
@@ -47,6 +51,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       PatchSetReviewer reviewer,
       GerritClient gerritClient,
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
+      ReviewFeedbackPublisher reviewFeedbackPublisher,
       boolean administratorUser) {
     this.config = config;
     this.changeSetData = changeSetData;
@@ -54,6 +59,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     this.reviewer = reviewer;
     this.gerritClient = gerritClient;
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
+    this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     this.administratorUser = administratorUser;
     log.debug(
         "Initialized EventHandlerTypeCommentAdded for full change ID: {}",
@@ -70,7 +76,10 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       changeSetData.setDeferredReview(true);
       return PreprocessResult.SWITCH_TO_PATCH_SET_CREATED;
     }
-    if (!gerritClient.retrieveLastComments(change, administratorUser)) {
+    boolean commentsRetrieved =
+        gerritClient.retrieveLastComments(change, administratorUser);
+    enqueueAddressedComments();
+    if (!commentsRetrieved) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());
       if (changeSetData.getForcedReview()) {
         log.info("Forcing review due to settings for full change ID: {}", change.getFullChangeId());
@@ -91,6 +100,22 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     }
     change.setIsCommentEvent(true);
     return PreprocessResult.OK;
+  }
+
+  private void enqueueAddressedComments() {
+    GerritClientData clientData = gerritClient.getClientData(change);
+    CommentData commentData = clientData == null ? null : clientData.getCommentData();
+    if (commentData == null || commentData.getAddressedComments() == null) {
+      return;
+    }
+    reviewFeedbackPublisher.enqueue(
+        change,
+        commentData.getAddressedComments().stream()
+            .filter(Objects::nonNull)
+            .map(comment -> comment.getId())
+            .filter(Objects::nonNull)
+            .filter(id -> !id.isBlank())
+            .toList());
   }
 
   @Override

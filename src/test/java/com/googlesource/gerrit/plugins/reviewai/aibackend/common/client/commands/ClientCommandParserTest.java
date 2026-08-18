@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
@@ -40,6 +41,7 @@ public class ClientCommandParserTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     Localizer localizer = localizer();
     ReviewConcernPublisher reviewConcernPublisher = mock(ReviewConcernPublisher.class);
+    ReviewFeedbackPublisher reviewFeedbackPublisher = mock(ReviewFeedbackPublisher.class);
     ClientCommandParser parser =
         new ClientCommandParser(
             mock(Configuration.class),
@@ -52,11 +54,13 @@ public class ClientCommandParserTest {
             null,
             false,
             reviewConcernPublisher,
+            reviewFeedbackPublisher,
             new DisabledClientCommandExtension());
 
     assertTrue(parser.parseCommands("/forget_thread --unknown=true"));
 
     verifyNoInteractions(reviewConcernPublisher);
+    verifyNoInteractions(reviewFeedbackPublisher);
   }
 
   @Test

@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptConcernReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptNewIssueFinder;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.feedback.AiPromptReviewFeedbackClassification;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
@@ -221,6 +222,23 @@ public class AiPromptFactoryTest {
     assertFalse(instructions.contains("# Current AI Review Condition"));
     assertFalse(instructions.contains("# Condition Labels"));
     assertFalse(instructions.contains("- Verified: +1"));
+  }
+
+  @Test
+  public void feedbackClassificationStageUsesDedicatedPrompt() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(
+        ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            commentEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    assertTrue(prompt instanceof AiPromptReviewFeedbackClassification);
   }
 
   @Test

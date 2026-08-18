@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -27,14 +28,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
@@ -42,6 +48,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +65,12 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/langchain/newIssueIncrementalPatch.txt";
   private static final String FULL_PATCH =
       "__files/langchain/newIssueFullPatch.txt";
+  private static final String FEEDBACK_COMMENTS =
+      "__files/feedback/level0FeedbackComments.json";
+  private static final String FEEDBACK_RESPONSE =
+      "__files/feedback/level0FeedbackClassificationResponse.json";
+  private static final String FEEDBACK_MEMORY =
+      "__files/feedback/reviewFeedbackMemory.json";
   private static final String CHANGE_ID = "project~change-1";
 
   @Test
@@ -123,6 +136,121 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(ConcernStatus.DISMISSED, stored.get(2).getStatus());
     assertEquals(newIssue.getConcernId(), stored.get(3).getId());
     assertEquals("new issue finder request", client.getRequestBody());
+  }
+
+  @Test
+  public void level0ClassifiesAddressedFeedbackBeforeConcernReview() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(feedbackClientData());
+    TestClient client = new TestClient(gerritClient);
+    ChangeSetData data = new ChangeSetData(1);
+    ReviewConcernLedger ledger = previousLedger();
+    ledger.getReviewers().getFirst().getConcerns().getFirst().setPreviousCommentId("ai-concern");
+    ledger.getReviewers().getFirst().getConcerns().get(1)
+        .setPreviousCommentId("70d29130_a03c5345");
+    data.setPreviousReviewConcernLedger(ledger);
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+    data.setForcedReview(true);
+    data.setPendingReviewFeedbackCommentIds(
+        List.of(
+            "user-feedback",
+            "generic-guidance",
+            "question",
+            "ca0764e7_4e6e27ab"));
+    ReviewFeedbackMemory currentMemory =
+        getGson().fromJson(readTestResource(FEEDBACK_MEMORY), ReviewFeedbackMemory.class);
+    currentMemory.setConcernFeedback(Map.of());
+    data.setReviewFeedbackMemory(currentMemory);
+
+    client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK,
+            ReviewAssistantStage.REVIEW_CONCERNS,
+            ReviewAssistantStage.FIND_NEW_ISSUES),
+        client.stages);
+    var feedbackInput = client.feedbackData.getReviewFeedbackClassificationInput();
+    assertEquals(4, feedbackInput.getComments().size());
+    assertEquals("old-present", feedbackInput.getComments().getFirst().getThreadConcernId());
+    assertEquals(
+        "user-feedback",
+        feedbackInput.getComments().getFirst().getTargetComment().getId());
+    assertEquals(
+        List.of("USER", "AI"),
+        feedbackInput.getComments().getFirst().getThreadContext().stream()
+            .map(message -> message.getRole())
+            .toList());
+    var scopeDirective = feedbackInput.getComments().get(3);
+    assertEquals("old-fixed", scopeDirective.getThreadConcernId());
+    assertEquals(
+        "Skip commit message review",
+        scopeDirective.getTargetComment().getMessage());
+    assertEquals(
+        List.of("AI", "USER", "AI"),
+        scopeDirective.getThreadContext().stream()
+            .map(message -> message.getRole())
+            .toList());
+    assertEquals(
+        "The null fallback is intentional for legacy callers.",
+        client.concernData
+            .getConcernWorkflowInput()
+            .getReviewFeedback()
+            .getConcernFeedback()
+            .get("old-present"));
+    assertEquals(
+        client.concernData.getConcernWorkflowInput().getReviewFeedback(),
+        client.finderData.getConcernWorkflowInput().getReviewFeedback());
+  }
+
+  @Test
+  public void level0DoesNotClassifyFeedbackBeforeAnsweringOrdinaryComment() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(feedbackClientData());
+    TestClient client = new TestClient(gerritClient);
+    ChangeSetData data = new ChangeSetData(1);
+    ReviewConcernLedger ledger = previousLedger();
+    ledger.getReviewers().getFirst().getConcerns().getFirst().setPreviousCommentId("ai-concern");
+    data.setPreviousReviewConcernLedger(ledger);
+
+    AiResponseContent response =
+        client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
+    assertNull(response.getPendingConcernUpdates());
+    assertNull(data.getReviewFeedbackMemory());
+  }
+
+  @Test
+  public void level0SkipsClassificationForCommandWithoutFeedback() throws Exception {
+    FeedbackCommentsFixture fixture =
+        getGson().fromJson(readTestResource(FEEDBACK_COMMENTS), FeedbackCommentsFixture.class);
+    GerritComment command = fixture.allComments.getFirst();
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    fixture.allComments.forEach(comment -> commentsById.put(comment.getId(), comment));
+    GerritClientData clientData =
+        new GerritClientData(
+            null,
+            List.of(),
+            new CommentData(
+                List.of(), List.of(command), commentsById, new HashMap<>()),
+            0);
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(clientData);
+    TestClient client = new TestClient(gerritClient);
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(previousLedger());
+    data.setForcedReview(true);
+    data.setPendingReviewFeedbackCommentIds(List.of("review-command"));
+
+    client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(
+        List.of(ReviewAssistantStage.REVIEW_CONCERNS),
+        client.stages);
   }
 
   @Test
@@ -205,15 +333,33 @@ public class LangChainSingleAgentConcernWorkflowTest {
     }
   }
 
+  private static GerritClientData feedbackClientData() throws IOException {
+    FeedbackCommentsFixture fixture =
+        getGson().fromJson(readTestResource(FEEDBACK_COMMENTS), FeedbackCommentsFixture.class);
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    fixture.allComments.forEach(comment -> commentsById.put(comment.getId(), comment));
+    return new GerritClientData(
+        null,
+        List.of(),
+        new CommentData(
+            List.of(), List.of(), commentsById, new HashMap<>()),
+        0);
+  }
+
   private static final class TestClient extends LangChainClient {
     private final List<ReviewAssistantStage> stages = new ArrayList<>();
     private final Map<ReviewAssistantStage, String> patches =
         new EnumMap<>(ReviewAssistantStage.class);
     private ChangeSetData concernData;
     private ChangeSetData finderData;
+    private ChangeSetData feedbackData;
 
     private TestClient() {
-      super(configuration(), null, null, null);
+      this(null);
+    }
+
+    private TestClient(GerritClient gerritClient) {
+      super(configuration(), null, gerritClient, null);
     }
 
     @Override
@@ -222,6 +368,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
       ReviewAssistantStage stage = changeSetData.getReviewAssistantStage();
       stages.add(stage);
       patches.put(stage, patchSet);
+      if (stage == ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK) {
+        feedbackData = changeSetData;
+        return rawReviewRequestResult(
+            readTestResource(FEEDBACK_RESPONSE), "review feedback request");
+      }
       if (stage == ReviewAssistantStage.FIND_NEW_ISSUES) {
         finderData = changeSetData;
         return rawReviewRequestResult(
@@ -244,5 +395,9 @@ public class LangChainSingleAgentConcernWorkflowTest {
       when(config.resolveMockAiFallbackRoute(anyString())).thenReturn(Optional.empty());
       return config;
     }
+  }
+
+  private static final class FeedbackCommentsFixture {
+    private List<GerritComment> allComments;
   }
 }

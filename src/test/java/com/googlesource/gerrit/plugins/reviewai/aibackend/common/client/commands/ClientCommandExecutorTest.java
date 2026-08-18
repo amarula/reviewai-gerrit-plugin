@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.Map;
@@ -48,6 +49,7 @@ public class ClientCommandExecutorTest {
   @Mock private Localizer localizer;
   @Mock private PluginChatMemoryStore chatMemoryStore;
   @Mock private ReviewConcernPublisher reviewConcernPublisher;
+  @Mock private ReviewFeedbackPublisher reviewFeedbackPublisher;
 
   @Test
   public void forgetThreadClearsLangChainMemoryForCurrentChangeAndPatchSet() {
@@ -73,6 +75,7 @@ public class ClientCommandExecutorTest {
             null,
             chatMemoryStore,
             reviewConcernPublisher,
+            reviewFeedbackPublisher,
             new DisabledClientCommandExtension());
 
     executor.executeCommand(
@@ -81,6 +84,7 @@ public class ClientCommandExecutorTest {
     verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 1);
     verify(changeDataHandler).removeValue(OpenAiConversation.getMessagesConversationKey());
     verify(reviewConcernPublisher).clear(change);
+    verify(reviewFeedbackPublisher).forget(change);
     assertEquals("forgot", changeSetData.getReviewSystemMessage());
     assertNull(changeSetData.getPreviousReviewConcernLedger());
     assertNull(changeSetData.getIncrementalPatchSet());

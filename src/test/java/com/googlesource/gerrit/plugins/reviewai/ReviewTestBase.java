@@ -59,6 +59,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -71,6 +72,7 @@ import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAcces
 import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
+import com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;
@@ -152,6 +154,8 @@ public class ReviewTestBase extends TestBase {
   @Mock protected ReviewAgentConversationStore reviewAgentConversationStore;
   @Mock protected IdentifiedUser.GenericFactory identifiedUserFactory;
   @Mock protected IdentifiedUser eventUser;
+
+  protected ReviewFeedbackPublisher reviewFeedbackPublisher;
   @Mock protected GroupCache groupCache;
   @Mock protected PermissionBackend permissionBackend;
 
@@ -361,6 +365,8 @@ public class ReviewTestBase extends TestBase {
                     bind(ClientCommandExtension.class).toInstance(getClientCommandExtension());
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(ReviewAiMetrics.class).toInstance(new ReviewAiMetrics());
+                    bind(ReviewFeedbackPublisher.class)
+                        .toInstance(reviewFeedbackPublisher);
                     bind(Path.class)
                         .annotatedWith(PluginData.class)
                         .toInstance(
@@ -397,6 +403,8 @@ public class ReviewTestBase extends TestBase {
     when(aiReviewPermission.isAiReviewConfigured(any())).thenReturn(true);
 
     localizer = new Localizer(config);
+    reviewFeedbackPublisher =
+        new ReviewFeedbackPublisher(getTestReviewAiDb());
     IGerritClientPatchSet gerritClientPatchSet = getGerritClientPatchSet();
     gerritClient =
         new GerritClient(
@@ -411,7 +419,8 @@ public class ReviewTestBase extends TestBase {
                     pluginDataHandlerProvider,
                     localizer,
                     null,
-                    null,
+                    new ReviewConcernPublisher(getTestReviewAiDb()),
+                    reviewFeedbackPublisher,
                     getClientCommandExtension()),
                 gerritClientPatchSet));
     patchSetReviewer =
@@ -425,6 +434,7 @@ public class ReviewTestBase extends TestBase {
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
             new ReviewConcernPublisher(getTestReviewAiDb()),
+            new ReviewFeedbackLifecycle(reviewFeedbackPublisher),
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);
   }
