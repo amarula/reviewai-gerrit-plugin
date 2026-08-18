@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.gerrit.extensions.api.changes.NotifyHandling;
+import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.client.Comment;
 import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
@@ -47,6 +48,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 @Slf4j
 public class GerritClientReview extends GerritClientAccount {
   private final Localizer localizer;
+  private final PublishedCommentConcernBinder concernBinder;
 
   private GerritChange change;
 
@@ -58,10 +60,20 @@ public class GerritClientReview extends GerritClientAccount {
       Localizer localizer) {
     super(config);
     this.localizer = localizer;
+    concernBinder = new PublishedCommentConcernBinder();
     log.debug("GerritClientReview initialized.");
   }
 
   public void setReview(
+      GerritChange change,
+      List<ReviewBatch> reviewBatches,
+      ChangeSetData changeSetData,
+      Integer reviewScore)
+      throws Exception {
+    setReviewAndGetPublishedCommentIds(change, reviewBatches, changeSetData, reviewScore);
+  }
+
+  public Map<String, String> setReviewAndGetPublishedCommentIds(
       GerritChange change,
       List<ReviewBatch> reviewBatches,
       ChangeSetData changeSetData,
@@ -72,24 +84,26 @@ public class GerritClientReview extends GerritClientAccount {
     ReviewInput reviewInput = buildReview(reviewBatches, changeSetData, reviewScore);
     if (reviewInput.comments == null && reviewInput.message == null && reviewInput.labels == null) {
       log.debug("No comments, messages, or labels to post for review.");
-      return;
+      return Map.of();
     }
+    concernBinder.tagReview(reviewInput, reviewBatches);
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      ReviewResult result =
+      ChangeApi changeApi =
           config
               .getGerritApi()
               .changes()
               .id(
                   change.getProjectName(),
                   change.getBranchNameKey().shortName(),
-                  change.getChangeKey().get())
-              .current()
-              .review(reviewInput);
+                  change.getChangeKey().get());
+      ReviewResult result =
+          changeApi.current().review(reviewInput);
 
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);
         throw new GerritReviewException(result.error);
       }
+      return concernBinder.bind(changeApi, reviewBatches, reviewInput.tag);
     }
   }
 
