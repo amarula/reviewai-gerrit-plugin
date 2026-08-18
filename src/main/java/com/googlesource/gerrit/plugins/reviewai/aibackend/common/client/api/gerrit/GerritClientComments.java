@@ -29,6 +29,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.Plugi
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -63,11 +64,13 @@ public class GerritClientComments extends GerritClientAccount {
   private final Localizer localizer;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewConcernPublisher reviewConcernPublisher;
+  private final ReviewFeedbackPublisher reviewFeedbackPublisher;
   private final ClientCommandExtension commandExtension;
 
   private String authorUsername;
   private GerritCommentThreadIndex commentThreadIndex;
   @Getter private List<GerritComment> commentProperties;
+  private final List<GerritComment> addressedComments;
 
   @VisibleForTesting
   public GerritClientComments(
@@ -86,6 +89,7 @@ public class GerritClientComments extends GerritClientAccount {
         localizer,
         null,
         null,
+        null,
         new DisabledClientCommandExtension());
   }
 
@@ -99,6 +103,7 @@ public class GerritClientComments extends GerritClientAccount {
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore,
       ReviewConcernPublisher reviewConcernPublisher,
+      ReviewFeedbackPublisher reviewFeedbackPublisher,
       EventBuildFeatures buildFeatures) {
     this(
         config,
@@ -109,6 +114,7 @@ public class GerritClientComments extends GerritClientAccount {
         localizer,
         chatMemoryStore,
         reviewConcernPublisher,
+        reviewFeedbackPublisher,
         buildFeatures.clientCommandExtension());
   }
 
@@ -121,6 +127,7 @@ public class GerritClientComments extends GerritClientAccount {
       Localizer localizer,
       PluginChatMemoryStore chatMemoryStore,
       ReviewConcernPublisher reviewConcernPublisher,
+      ReviewFeedbackPublisher reviewFeedbackPublisher,
       ClientCommandExtension commandExtension) {
     super(config);
     this.changeSetData = changeSetData;
@@ -130,15 +137,17 @@ public class GerritClientComments extends GerritClientAccount {
     this.localizer = localizer;
     this.chatMemoryStore = chatMemoryStore;
     this.reviewConcernPublisher = reviewConcernPublisher;
+    this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     this.commandExtension = commandExtension;
     commentProperties = new ArrayList<>();
+    addressedComments = new ArrayList<>();
     commentMap = new HashMap<>();
     patchSetCommentMap = new HashMap<>();
     commentThreadIndex = new GerritCommentThreadIndex(List.of());
   }
 
   public CommentData getCommentData() {
-    return new CommentData(commentProperties, commentMap, patchSetCommentMap);
+    return new CommentData(commentProperties, addressedComments, commentMap, patchSetCommentMap);
   }
 
   public boolean retrieveLastComments(GerritChange change, boolean administratorUser) {
@@ -172,6 +181,7 @@ public class GerritClientComments extends GerritClientAccount {
 
   private void clearCommentData() {
     commentProperties.clear();
+    addressedComments.clear();
     commentMap.clear();
     patchSetCommentMap.clear();
     commentThreadIndex = new GerritCommentThreadIndex(List.of());
@@ -259,6 +269,7 @@ public class GerritClientComments extends GerritClientAccount {
             chatMemoryStore,
             administratorUser,
             reviewConcernPublisher,
+            reviewFeedbackPublisher,
             commandExtension);
     try {
       List<GerritComment> latestComments = retrieveComments(change);
@@ -272,6 +283,7 @@ public class GerritClientComments extends GerritClientAccount {
             messageParser.isBotAddressed(commentMessage)
                 || (isReplyToAssistant(latestComment) && !latestComment.isResolved());
         if (isAddressed) {
+          addressedComments.add(latestComment);
           if (messageParser.parseCommands(commentMessage)) {
             commentProperties.clear();
             return;

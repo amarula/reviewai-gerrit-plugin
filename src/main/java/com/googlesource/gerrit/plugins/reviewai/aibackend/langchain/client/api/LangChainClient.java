@@ -36,6 +36,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -111,6 +112,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   private final LangChainExecutor toolExecutor;
   private final LangChainConcernReviewer concernReviewer;
   private final LangChainNewIssueFinder newIssueFinder;
+  private final LangChainReviewFeedbackClassifier reviewFeedbackClassifier;
   private final LangChainExecutor specializedRepliesToolExecutor;
   private final LangChainExecutor specializedTriageToolExecutor;
   private final LangChainExecutor specializedConsolidationToolExecutor;
@@ -229,6 +231,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             responseFormat ->
                 getProviderResponseFormat(config, this.contextTools, responseFormat));
     this.newIssueFinder = new LangChainNewIssueFinder(config);
+    this.reviewFeedbackClassifier =
+        new LangChainReviewFeedbackClassifier(
+            config,
+            costTracker,
+            responseFormat ->
+                getProviderResponseFormat(config, List.of(), responseFormat));
     ResponseFormat specializedToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
     this.specializedRepliesToolExecutor =
@@ -288,6 +296,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         new LangChainSingleAgentConcernWorkflow(
             config,
             concernLedgerOperations,
+            this::reviewFeedback,
             (data, change, patchSet) -> toConcernWorkflowResult(
                 askSingleRequest(data, change, patchSet)),
             this::reviewConcerns,
@@ -408,6 +417,32 @@ public class LangChainClient extends AiClientBase implements IAiClient {
               askSingleRawRequestWithFallback(requestData, requestChange, requestPatchSet);
           return rawResult == null ? null : rawResult.getResponseText();
         });
+  }
+
+  protected ReviewFeedbackMemory reviewFeedback(
+      ChangeSetData changeSetData, GerritChange change) throws Exception {
+    ReviewFeedbackMemory currentMemory = changeSetData.getReviewFeedbackMemory();
+    if (gerritClient == null
+        || changeSetData.getPendingReviewFeedbackCommentIds() == null
+        || changeSetData.getPendingReviewFeedbackCommentIds().isEmpty()) {
+      return currentMemory;
+    }
+    ReviewFeedbackMemory feedback =
+        reviewFeedbackClassifier.classify(
+            changeSetData,
+            change,
+            gerritClient.getClientData(change),
+            currentMemory,
+            this::askSingleRawResponseTextWithFallback);
+    changeSetData.setReviewFeedbackClassified(true);
+    return feedback;
+  }
+
+  private String askSingleRawResponseTextWithFallback(
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+    RawReviewRequestResult result =
+        askSingleRawRequestWithFallback(changeSetData, change, patchSet);
+    return result == null ? null : result.getResponseText();
   }
 
   protected ReviewRequestResult findNewIssueReplies(
@@ -739,6 +774,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       LangChainExecutor collectorExecutor =
           switch (changeSetData.getReviewAssistantStage()) {
             case REVIEW_CONCERNS -> concernReviewer.getToolExecutor();
+            case CLASSIFY_REVIEW_FEEDBACK -> reviewFeedbackClassifier.getExecutor();
             case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageToolExecutor;
             case REVIEW_SPECIALIZED_CONSOLIDATION -> specializedConsolidationToolExecutor;
             case REVIEW_SPECIALIZED_HISTORICAL_REPETITION ->
@@ -764,6 +800,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       responseFormat =
           switch (changeSetData.getReviewAssistantStage()) {
             case REVIEW_CONCERNS -> concernReviewer.getResponseFormat();
+            case CLASSIFY_REVIEW_FEEDBACK -> reviewFeedbackClassifier.getResponseFormat();
             case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageResponseFormat;
             case REVIEW_SPECIALIZED_CONSOLIDATION ->
                 specializedConsolidationResponseFormat;

@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,10 +31,16 @@ import com.google.gerrit.server.data.ApprovalAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType.PreprocessResult;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
+import java.util.HashMap;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -45,6 +52,7 @@ public class EventHandlerTypeCommentAddedTest {
   private GerritChange change;
   private GerritClient gerritClient;
   private AiReviewApplicabilityChecker applicabilityChecker;
+  private ReviewFeedbackPublisher reviewFeedbackPublisher;
   private EventHandlerTypeCommentAdded handler;
   private CommentAddedEvent event;
 
@@ -55,6 +63,7 @@ public class EventHandlerTypeCommentAddedTest {
     change = mock(GerritChange.class);
     gerritClient = mock(GerritClient.class);
     applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
+    reviewFeedbackPublisher = mock(ReviewFeedbackPublisher.class);
     Change eventChange = mock(Change.class);
     Project.NameKey project = Project.nameKey("test/project");
     when(eventChange.getProject()).thenReturn(project);
@@ -72,6 +81,7 @@ public class EventHandlerTypeCommentAddedTest {
             mock(PatchSetReviewer.class),
             gerritClient,
             applicabilityChecker,
+            reviewFeedbackPublisher,
             false);
   }
 
@@ -97,6 +107,28 @@ public class EventHandlerTypeCommentAddedTest {
     verify(applicabilityChecker).isApplicable(change, EXPRESSION);
     verify(changeSetData, never()).setForcedReview(true);
     verify(changeSetData, never()).setDeferredReview(true);
+  }
+
+  @Test
+  public void enqueuesAddressedCommentBeforeSwitchingToForcedReview() {
+    GerritComment comment = new GerritComment();
+    comment.setId("comment-1");
+    when(gerritClient.getClientData(change))
+        .thenReturn(
+            new GerritClientData(
+                null,
+                List.of(),
+                new CommentData(
+                    List.of(), List.of(comment), new HashMap<>(), new HashMap<>()),
+                0));
+    when(changeSetData.getForcedReview()).thenReturn(true);
+
+    assertEquals(
+        PreprocessResult.SWITCH_TO_PATCH_SET_CREATED,
+        handler.preprocessEvent());
+
+    verify(reviewFeedbackPublisher)
+        .enqueue(eq(change), eq(List.of("comment-1")));
   }
 
   @Test

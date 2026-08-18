@@ -128,6 +128,10 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     mockGerritChangeCommentsApiCall(comments);
   }
 
+  private void setupReviewCommandResponse(String reviewResponse) {
+    setupMockRequestCreateResponse(reviewResponse);
+  }
+
   private void mergeComments(
       Map<String, List<CommentInfo>> comments, Map<String, List<CommentInfo>> commentsToMerge) {
     commentsToMerge.forEach(
@@ -170,7 +174,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
 
     setupCommandCommentWithPastAiComments("/review");
     String reviewMessage = readTestFile("__files/commands/review.json");
-    setupMockRequestCreateResponse("openAiResponseRequest.json");
+    setupReviewCommandResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -179,11 +183,35 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Gson gson = OutputFormat.JSON_COMPACT.newGson();
     JsonObject actualReview = gson.toJsonTree(captor.getAllValues().get(0)).getAsJsonObject();
     JsonElement reviewTag = actualReview.remove("tag");
-    Assert.assertNotNull(reviewTag);
+    Assert.assertNotNull(actualReview.toString(), reviewTag);
     String tagPrefix = "reviewai:concerns:";
     Assert.assertTrue(reviewTag.getAsString().startsWith(tagPrefix));
     UUID.fromString(reviewTag.getAsString().substring(tagPrefix.length()));
     Assert.assertEquals(gson.fromJson(reviewMessage, JsonObject.class), actualReview);
+  }
+
+  @Test
+  public void commandReviewClassifiesGuidanceInSameComment() throws RestApiException {
+    setupCommandCommentWithPastAiComments(
+        "/review Skip commit message review");
+    setupMockRequestCreateResponse(
+        "openAiReviewFeedbackClassificationResponse.json",
+        Scenario.STARTED,
+        "feedback-classified");
+    setupMockRequestCreateResponse(
+        "openAiResponseRequest.json",
+        "feedback-classified",
+        "review-completed");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    Assert.assertEquals(
+        "Skip commit message review.",
+        reviewFeedbackPublisher
+            .load(getGerritChange())
+            .orElseThrow()
+            .getGenericFeedback());
   }
 
   @Test
@@ -193,7 +221,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         new ReviewAgentRequestStatusStore(getChangeDataHandler());
     statusStore.pending("request-1", "/review --debug");
     setupCommandCommentWithPastAiComments("/review --debug");
-    setupMockRequestCreateResponse("openAiResponseRequest.json");
+    setupReviewCommandResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -233,7 +261,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandReviewDoesNotStoreAutomaticPatchSetConversationTurn()
       throws RestApiException {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiResponseRequest.json");
+    setupReviewCommandResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -253,7 +281,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
         new ReviewAgentRequestStatusStore(getChangeDataHandler());
     statusStore.pending("request-1", "/review");
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiRepeatedReviewResponse.json");
+    setupReviewCommandResponse("openAiRepeatedReviewResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -272,7 +300,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
       throws Exception {
     setupCommandCommentWithPastAiComments(
         "/review", "__files/commands/pastAiPatchSetCommentWithConcernId.json");
-    setupMockRequestCreateResponse("openAiRepeatedCommitMessageReviewResponse.json");
+    setupReviewCommandResponse("openAiRepeatedCommitMessageReviewResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -288,7 +316,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   public void commandReviewDoesNotResolveNumericConcernIdFromChangeMessageText()
       throws Exception {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiRepeatedReviewWithNumericIdResponse.json");
+    setupReviewCommandResponse("openAiRepeatedReviewWithNumericIdResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -303,7 +331,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewDoesNotLinkChangeMessageId() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiRepeatedReviewWithChangeMessageIdResponse.json");
+    setupReviewCommandResponse("openAiRepeatedReviewWithChangeMessageIdResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -318,7 +346,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewFiltersLowRelevanceBeforeRepeatedCommentMessage() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiRepeatedLowRelevanceReviewResponse.json");
+    setupReviewCommandResponse("openAiRepeatedLowRelevanceReviewResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -332,7 +360,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewShowsRepeatedCommentReferenceWithVisibleReplies() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiRepeatedAndVisibleReviewResponse.json");
+    setupReviewCommandResponse("openAiRepeatedAndVisibleReviewResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
@@ -352,7 +380,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Test
   public void commandReviewShowsMultipleRepeatedCommentReferencesAsList() throws Exception {
     setupCommandCommentWithPastAiComments("/review");
-    setupMockRequestCreateResponse("openAiMultipleRepeatedReviewResponse.json");
+    setupReviewCommandResponse("openAiMultipleRepeatedReviewResponse.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 

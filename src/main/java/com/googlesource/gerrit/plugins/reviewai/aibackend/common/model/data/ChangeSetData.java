@@ -22,6 +22,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,10 @@ public class ChangeSetData {
   private transient ReviewConcernLedger previousReviewConcernLedger;
   private transient String incrementalPatchSet;
   private transient ConcernWorkflowInput concernWorkflowInput;
+  private transient ReviewFeedbackMemory reviewFeedbackMemory;
+  private transient ReviewFeedbackClassificationInput reviewFeedbackClassificationInput;
+  private transient List<String> pendingReviewFeedbackCommentIds = List.of();
+  private transient boolean reviewFeedbackClassified;
 
   // Command variables
   private Boolean forcedReview = false;
@@ -147,6 +153,10 @@ public class ChangeSetData {
     copy.setPreviousReviewConcernLedger(previousReviewConcernLedger);
     copy.setIncrementalPatchSet(incrementalPatchSet);
     copy.setConcernWorkflowInput(concernWorkflowInput);
+    copy.setReviewFeedbackMemory(reviewFeedbackMemory);
+    copy.setReviewFeedbackClassificationInput(reviewFeedbackClassificationInput);
+    copy.setPendingReviewFeedbackCommentIds(pendingReviewFeedbackCommentIds);
+    copy.setReviewFeedbackClassified(reviewFeedbackClassified);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);

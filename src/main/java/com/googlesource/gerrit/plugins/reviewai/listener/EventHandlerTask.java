@@ -34,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -76,6 +77,7 @@ public class EventHandlerTask implements Runnable {
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   private final ReviewAiMetrics metrics;
+  private final ReviewFeedbackPublisher reviewFeedbackPublisher;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -95,7 +97,8 @@ public class EventHandlerTask implements Runnable {
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       EventBuildFeatures buildFeatures,
-      ReviewAiMetrics metrics) {
+      ReviewAiMetrics metrics,
+      ReviewFeedbackPublisher reviewFeedbackPublisher) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -109,6 +112,7 @@ public class EventHandlerTask implements Runnable {
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
     this.metrics = metrics;
+    this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -205,6 +209,7 @@ public class EventHandlerTask implements Runnable {
               reviewer,
               gerritClient,
               aiReviewApplicabilityChecker,
+              reviewFeedbackPublisher,
               administratorUser);
     };
   }
