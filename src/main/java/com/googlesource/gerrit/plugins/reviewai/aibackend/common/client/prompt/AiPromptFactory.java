@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
@@ -37,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptConcernReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptNewIssueFinder;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.feedback.AiPromptReviewFeedbackClassification;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -47,6 +49,12 @@ public class AiPromptFactory {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
+    if (changeSetData.getReviewAssistantStage()
+        == ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK) {
+      log.debug("AiPromptFactory: Return AiPromptReviewFeedbackClassification");
+      return new AiPromptReviewFeedbackClassification(
+          config, changeSetData, change, codeContextPolicy);
+    }
     if (change.getIsCommentEvent() && !changeSetData.getForcedReview()) {
       if (changeSetData.getForcedStagedReview()) {
         log.debug("AiPromptFactory: Return AiPromptRoutedReviewAgentRequest");
@@ -75,6 +83,11 @@ public class AiPromptFactory {
             }
             log.debug("AiPromptFactory: Return AiPromptReviewCommitMessage");
             yield new AiPromptReviewCommitMessage(
+                config, changeSetData, change, codeContextPolicy);
+          }
+          case CLASSIFY_REVIEW_FEEDBACK -> {
+            log.debug("AiPromptFactory: Return AiPromptReviewFeedbackClassification");
+            yield new AiPromptReviewFeedbackClassification(
                 config, changeSetData, change, codeContextPolicy);
           }
           case REVIEW_CONCERNS -> {

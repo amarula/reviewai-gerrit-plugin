@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
@@ -32,6 +33,7 @@ final class LangChainSingleAgentConcernWorkflow {
 
   private final Configuration config;
   private final ReviewConcernLedgerOperations ledgerOperations;
+  private final FeedbackReview feedbackReview;
   private final InitialReview initialReview;
   private final ConcernReview concernReview;
   private final NewIssueReview newIssueReview;
@@ -39,26 +41,34 @@ final class LangChainSingleAgentConcernWorkflow {
   LangChainSingleAgentConcernWorkflow(
       Configuration config,
       ReviewConcernLedgerOperations ledgerOperations,
+      FeedbackReview feedbackReview,
       InitialReview initialReview,
       ConcernReview concernReview,
       NewIssueReview newIssueReview) {
     this.config = config;
     this.ledgerOperations = ledgerOperations;
+    this.feedbackReview = feedbackReview;
     this.initialReview = initialReview;
     this.concernReview = concernReview;
     this.newIssueReview = newIssueReview;
   }
 
   boolean applies(ChangeSetData changeSetData, GerritChange change) {
-    return config != null
-        && config.getAgentSpecializationLevel() == AgentSpecializationLevel.SINGLE_AGENT
+    return isConfigured()
         && (!Boolean.TRUE.equals(change.getIsCommentEvent())
             || Boolean.TRUE.equals(changeSetData.getForcedReview()));
+  }
+
+  boolean isConfigured() {
+    return config != null
+        && config.getAgentSpecializationLevel() == AgentSpecializationLevel.SINGLE_AGENT;
   }
 
   ReviewResult review(
       ChangeSetData changeSetData, GerritChange change, String fullPatchSet)
       throws Exception {
+    ReviewFeedbackMemory feedback = feedbackReview.review(changeSetData, change);
+    changeSetData.setReviewFeedbackMemory(feedback);
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
     if (previousLedger == null) {
       ReviewResult firstReview =
@@ -95,6 +105,12 @@ final class LangChainSingleAgentConcernWorkflow {
         ledgerOperations.completeFollowUp(
             newIssues.responseContent(), change, previousLedger, reviewedConcerns),
         newIssues.requestBody());
+  }
+
+  @FunctionalInterface
+  interface FeedbackReview {
+    ReviewFeedbackMemory review(ChangeSetData changeSetData, GerritChange change)
+        throws Exception;
   }
 
   @FunctionalInterface
