@@ -293,6 +293,7 @@ public class PatchSetReviewer {
         debugDetails.add(debugCodeBlocksReview.getDebugCodeBlock(replyItem, isHidden));
       }
       ReviewBatch batchMap = new ReviewBatch(reply);
+      batchMap.setConcernId(replyItem.getConcernId());
       if (change.getIsCommentEvent() && replyItem.getId() != null) {
         setCommentBatchMap(batchMap, replyItem.getId());
       } else {
