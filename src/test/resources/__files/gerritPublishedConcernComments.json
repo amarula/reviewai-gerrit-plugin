@@ -1,0 +1,24 @@
+{
+  "/PATCHSET_LEVEL": [
+    {
+      "id": "old-patchset-comment",
+      "tag": "reviewai:concerns:old-review",
+      "change_message_id": "old-review",
+      "message": "The fallback can retry forever."
+    },
+    {
+      "id": "published-patchset-comment",
+      "change_message_id": "new-review",
+      "message": "The fallback can retry forever."
+    }
+  ],
+  "src/Example.java": [
+    {
+      "id": "published-inline-comment",
+      "change_message_id": "new-review",
+      "line": 64,
+      "in_reply_to": "parent-comment",
+      "message": "Close the response before returning."
+    }
+  ]
+}
