@@ -24,6 +24,8 @@ import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
@@ -52,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_SELECTIVE_LOG_LEVEL_OVERRIDE;
@@ -174,7 +177,13 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ArgumentCaptor<ReviewInput> captor = testRequestSent();
 
     Gson gson = OutputFormat.JSON_COMPACT.newGson();
-    Assert.assertEquals(reviewMessage, gson.toJson(captor.getAllValues().get(0)));
+    JsonObject actualReview = gson.toJsonTree(captor.getAllValues().get(0)).getAsJsonObject();
+    JsonElement reviewTag = actualReview.remove("tag");
+    Assert.assertNotNull(reviewTag);
+    String tagPrefix = "reviewai:concerns:";
+    Assert.assertTrue(reviewTag.getAsString().startsWith(tagPrefix));
+    UUID.fromString(reviewTag.getAsString().substring(tagPrefix.length()));
+    Assert.assertEquals(gson.fromJson(reviewMessage, JsonObject.class), actualReview);
   }
 
   @Test
