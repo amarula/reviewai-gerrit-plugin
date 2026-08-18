@@ -24,8 +24,13 @@ import com.google.gerrit.entities.Change;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -91,5 +96,32 @@ public class ReviewConcernPublisherTest extends TestBase {
 
     assertTrue(
         new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId()).load().isEmpty());
+  }
+
+  @Test
+  public void persistsPublishedCommentIdForMatchingConcern() {
+    ReviewConcern publishedConcern = new ReviewConcern();
+    publishedConcern.setId("concern-1");
+    ReviewerConcerns reviewer = new ReviewerConcerns();
+    reviewer.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    reviewer.setConcerns(List.of(publishedConcern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewer));
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    AiResponseContent response = new AiResponseContent("");
+    response.setPendingConcernUpdates(updates);
+
+    publisher.persist(response, change, Map.of("concern-1", "published-comment-1"));
+
+    ReviewConcern restored =
+        new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
+            .load()
+            .orElseThrow()
+            .getReviewers()
+            .getFirst()
+            .getConcerns()
+            .getFirst();
+    assertEquals("published-comment-1", restored.getPreviousCommentId());
   }
 }
