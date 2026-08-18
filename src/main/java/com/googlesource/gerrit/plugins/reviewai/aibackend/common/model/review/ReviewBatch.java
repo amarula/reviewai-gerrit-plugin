@@ -27,6 +27,7 @@ import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_
 @RequiredArgsConstructor
 public class ReviewBatch {
   private String id;
+  private String concernId;
   @NonNull private String content;
   private String filename;
   private Integer line;
