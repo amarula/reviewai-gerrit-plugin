@@ -617,11 +617,19 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   private boolean agentInScope(ChangeSetData changeSetData, String agent) {
     ReviewScope scope = changeSetData.getReviewScope();
     if (isCommitMessageAgent(agent)) {
-      return config.getAiReviewCommitMessages() && scope != ReviewScope.PATCHSET;
+      return config.getAiReviewCommitMessages()
+          && scope != ReviewScope.PATCHSET
+          && !isReviewScopeDisabled(changeSetData, ReviewScope.COMMIT_MESSAGE);
     }
     return config.getAiReviewPatchSet()
         && scope != ReviewScope.COMMIT_MESSAGE
+        && !isReviewScopeDisabled(changeSetData, ReviewScope.PATCHSET)
         && SpecializedReviewAgentDefinitions.findByName(agent).isPresent();
+  }
+
+  private boolean isReviewScopeDisabled(ChangeSetData changeSetData, ReviewScope scope) {
+    return changeSetData.getReviewFeedbackMemory() != null
+        && changeSetData.getReviewFeedbackMemory().isReviewScopeDisabled(scope);
   }
 
   private List<SpecializedReviewFindings.AgentFindings> askSpecializedAgents(

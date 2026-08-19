@@ -19,14 +19,17 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 import com.google.gson.JsonParseException;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -144,21 +147,35 @@ public final class ReviewFeedbackMemoryStore {
     }
     if (memory.getConcernFeedback() == null) {
       memory.setConcernFeedback(Map.of());
-      return;
-    }
-    Map<String, String> normalizedFeedback = new LinkedHashMap<>();
-    for (Map.Entry<String, String> entry : memory.getConcernFeedback().entrySet()) {
-      String concernId = entry.getKey();
-      String summary = entry.getValue();
-      if (concernId == null || concernId.isBlank() || summary == null || summary.isBlank()) {
-        throw new IllegalArgumentException(
-            "Concern feedback requires a concern ID and a summary");
+    } else {
+      Map<String, String> normalizedFeedback = new LinkedHashMap<>();
+      for (Map.Entry<String, String> entry : memory.getConcernFeedback().entrySet()) {
+        String concernId = entry.getKey();
+        String summary = entry.getValue();
+        if (concernId == null || concernId.isBlank() || summary == null || summary.isBlank()) {
+          throw new IllegalArgumentException(
+              "Concern feedback requires a concern ID and a summary");
+        }
+        concernId = concernId.trim();
+        if (normalizedFeedback.putIfAbsent(concernId, summary.trim()) != null) {
+          throw new IllegalArgumentException(
+              "Review feedback memory contains duplicate concern IDs");
+        }
       }
-      concernId = concernId.trim();
-      if (normalizedFeedback.putIfAbsent(concernId, summary.trim()) != null) {
-        throw new IllegalArgumentException("Review feedback memory contains duplicate concern IDs");
-      }
+      memory.setConcernFeedback(normalizedFeedback);
     }
-    memory.setConcernFeedback(normalizedFeedback);
+    if (memory.getDisabledReviewScopes() == null) {
+      memory.setDisabledReviewScopes(Set.of());
+    } else {
+      EnumSet<ReviewScope> disabledReviewScopes = EnumSet.noneOf(ReviewScope.class);
+      for (ReviewScope scope : memory.getDisabledReviewScopes()) {
+        if (scope == null || scope == ReviewScope.FULL) {
+          throw new IllegalArgumentException(
+              "Review feedback memory contains an invalid disabled scope");
+        }
+        disabledReviewScopes.add(scope);
+      }
+      memory.setDisabledReviewScopes(disabledReviewScopes);
+    }
   }
 }
