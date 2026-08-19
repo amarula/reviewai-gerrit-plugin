@@ -160,7 +160,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
             "user-feedback",
             "generic-guidance",
             "question",
-            "ca0764e7_4e6e27ab"));
+            "ca0764e7_4e6e27ab",
+            "skip-testability"));
     ReviewFeedbackMemory currentMemory =
         getGson().fromJson(readTestResource(FEEDBACK_MEMORY), ReviewFeedbackMemory.class);
     currentMemory.setConcernFeedback(Map.of());
@@ -175,7 +176,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
             ReviewAssistantStage.FIND_NEW_ISSUES),
         client.stages);
     var feedbackInput = client.feedbackData.getReviewFeedbackClassificationInput();
-    assertEquals(4, feedbackInput.getComments().size());
+    assertEquals(5, feedbackInput.getComments().size());
     assertEquals("old-present", feedbackInput.getComments().getFirst().getThreadConcernId());
     assertEquals(
         "user-feedback",
@@ -208,6 +209,9 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         Set.of(ReviewScope.COMMIT_MESSAGE),
         data.getReviewFeedbackMemory().getDisabledReviewScopes());
+    assertEquals(
+        Set.of("TESTABILITY"),
+        data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
   }
 
   @Test
