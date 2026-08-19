@@ -27,6 +27,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -176,6 +178,20 @@ public final class ReviewFeedbackMemoryStore {
         disabledReviewScopes.add(scope);
       }
       memory.setDisabledReviewScopes(disabledReviewScopes);
+    }
+    if (memory.getDisabledSpecializedAgents() == null) {
+      memory.setDisabledSpecializedAgents(Set.of());
+    } else {
+      Set<String> disabledSpecializedAgents = new LinkedHashSet<>();
+      for (String agent : memory.getDisabledSpecializedAgents()) {
+        if (agent == null || agent.isBlank()) {
+          throw new IllegalArgumentException(
+              "Review feedback memory contains an invalid disabled specialized agent");
+        }
+        disabledSpecializedAgents.add(
+            agent.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_'));
+      }
+      memory.setDisabledSpecializedAgents(disabledSpecializedAgents);
     }
   }
 }
