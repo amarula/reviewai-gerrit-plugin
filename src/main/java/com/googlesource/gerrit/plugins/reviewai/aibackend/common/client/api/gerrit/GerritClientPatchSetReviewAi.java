@@ -105,7 +105,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     this.change = change;
     this.changeSetData = changeSetData;
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      ChangeApi changeApi = changeApi(change);
+      ChangeApi changeApi = change.getChangeApi(config);
       RevisionApi currentRevision = changeApi.current();
       String formattedPatch = currentRevision.patch().asString();
       String baseCommit;
@@ -145,22 +145,12 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
 
   private String getPatchFromGerrit() throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      RevisionApi currentRevision = changeApi(change).current();
+      RevisionApi currentRevision = change.getChangeApi(config).current();
       String formattedPatch = currentRevision.patch().asString();
       log.debug("Formatted Patch retrieved: {}", formattedPatch);
 
       return filterPatch(replaceDiffWithCompactGitDiff(formattedPatch, currentRevision));
     }
-  }
-
-  private ChangeApi changeApi(GerritChange change) throws Exception {
-    return config
-        .getGerritApi()
-        .changes()
-        .id(
-            change.getProjectName(),
-            change.getBranchNameKey().shortName(),
-            change.getChangeKey().get());
   }
 
   private String replaceDiffWithCompactGitDiff(String formattedPatch, RevisionApi currentRevision) {
