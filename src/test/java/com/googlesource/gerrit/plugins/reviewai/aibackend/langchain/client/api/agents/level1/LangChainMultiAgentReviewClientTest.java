@@ -22,12 +22,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -40,10 +43,13 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Co
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
@@ -79,6 +85,8 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/newIssueIncrementalPatch.txt";
   private static final String FULL_PATCH_RESOURCE =
       "__files/langchain/newIssueFullPatch.txt";
+  private static final String FEEDBACK_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemory.json";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -95,6 +103,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(
         List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_COMMIT_MESSAGE),
         client.recordedStages);
+    assertEquals(0, client.feedbackCalls);
     assertEquals(List.of(true, true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
     ReviewConcernLedger ledger =
@@ -204,6 +213,68 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(List.of(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE), client.recordedStages);
     assertEquals(List.of(true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
+  }
+
+  @Test
+  public void doesNotClassifyFeedbackBeforeRoutingComment() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ReviewFeedbackMemory memory = readFeedbackMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewFeedbackMemory(memory);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    client.ask(changeSetData, change, "patch");
+
+    assertEquals(0, client.feedbackCalls);
+    assertSame(memory, client.feedbackAtRouting);
+    assertSame(memory, client.recordedFeedback.getFirst());
+    assertSame(memory, changeSetData.getReviewFeedbackMemory());
+  }
+
+  @Test
+  public void classifiesFeedbackOnceBeforeParallelScopedReviews() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    client.classifiedFeedback = readFeedbackMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    client.ask(changeSetData, change, "patch");
+
+    assertEquals(1, client.feedbackCalls);
+    assertEquals(2, client.recordedFeedback.size());
+    assertTrue(
+        client.recordedFeedback.stream()
+            .allMatch(feedback -> feedback == client.classifiedFeedback));
+  }
+
+  @Test
+  public void scopedReviewPromptsIncludeDistilledFeedback() throws Exception {
+    Configuration config = config();
+    when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SCOPED_AGENTS);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ReviewFeedbackMemory memory = readFeedbackMemory();
+    changeSetData.setReviewFeedbackMemory(memory);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("change~1");
+    ICodeContextPolicy codeContextPolicy = mock(ICodeContextPolicy.class);
+
+    String patchsetInstructions =
+        new AiPromptReviewCode(config, changeSetData, change, codeContextPolicy)
+            .getDefaultAiAssistantInstructions();
+    String commitMessageInstructions =
+        new AiPromptReviewCommitMessage(config, changeSetData, change, codeContextPolicy)
+            .getDefaultAiAssistantInstructions();
+
+    assertTrue(patchsetInstructions.contains(memory.getGenericFeedback()));
+    assertTrue(commitMessageInstructions.contains(memory.getGenericFeedback()));
+    assertTrue(
+        commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
   }
 
   @Test
@@ -609,6 +680,11 @@ public class LangChainMultiAgentReviewClientTest {
         GsonUtils.getGson().fromJson(readTestResource(resourceName), GerritComment[].class));
   }
 
+  private static ReviewFeedbackMemory readFeedbackMemory() throws Exception {
+    return GsonUtils.getGson()
+        .fromJson(readTestResource(FEEDBACK_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
+  }
+
   private static Configuration config() {
     Configuration config = mock(Configuration.class);
     when(config.getGerritUserName()).thenReturn("reviewai");
@@ -754,6 +830,7 @@ public class LangChainMultiAgentReviewClientTest {
     private final List<Boolean> recordedForcedStagedReview = new ArrayList<>();
     private final List<Boolean> recordedSuggestModes = new ArrayList<>();
     private final List<String> recordedPatchSets = new ArrayList<>();
+    private final List<ReviewFeedbackMemory> recordedFeedback = new ArrayList<>();
     private String patchSetSuggestion = readTestResourceUnchecked(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
     private List<AiReplyItem> reviewReplies =
         List.of(reviewReply("Review issue", "a.py", 2, "return value.strip().lower()"));
@@ -761,7 +838,10 @@ public class LangChainMultiAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Commit message review issue").score(-1.0).build());
     private List<AiReplyItem> suggestionReplies = List.of();
     private ReviewAssistantStage routedStage = ReviewAssistantStage.REVIEW_CODE;
+    private ReviewFeedbackMemory classifiedFeedback;
+    private ReviewFeedbackMemory feedbackAtRouting;
     private boolean existingReviewContext;
+    private int feedbackCalls;
     private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
@@ -776,6 +856,7 @@ public class LangChainMultiAgentReviewClientTest {
       recordedForcedStagedReview.add(changeSetData.getForcedStagedReview());
       recordedSuggestModes.add(changeSetData.getSuggestMode());
       recordedPatchSets.add(patchSet);
+      recordedFeedback.add(changeSetData.getReviewFeedbackMemory());
 
       AiResponseContent response = new AiResponseContent("");
       if (changeSetData.getSuggestMode()) {
@@ -810,7 +891,17 @@ public class LangChainMultiAgentReviewClientTest {
     protected ReviewAssistantStage routeMessage(ChangeSetData changeSetData, GerritChange change)
         throws AiConnectionFailException {
       routeCalls++;
+      feedbackAtRouting = changeSetData.getReviewFeedbackMemory();
       return routedStage;
+    }
+
+    @Override
+    protected ReviewFeedbackMemory reviewFeedback(
+        ChangeSetData changeSetData, GerritChange change) {
+      feedbackCalls++;
+      return classifiedFeedback == null
+          ? changeSetData.getReviewFeedbackMemory()
+          : classifiedFeedback;
     }
   }
 
