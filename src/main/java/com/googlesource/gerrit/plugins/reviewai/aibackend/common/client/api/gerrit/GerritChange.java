@@ -19,9 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
+import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetEvent;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -75,6 +77,13 @@ public class GerritChange {
 
   public GerritChange(String fullChangeId) {
     this.fullChangeId = fullChangeId;
+  }
+
+  public ChangeApi getChangeApi(Configuration config) throws Exception {
+    return config
+        .getGerritApi()
+        .changes()
+        .id(projectName, branchNameKey.shortName(), changeKey.get());
   }
 
   public Optional<PatchSetAttribute> getPatchSetAttribute() {
