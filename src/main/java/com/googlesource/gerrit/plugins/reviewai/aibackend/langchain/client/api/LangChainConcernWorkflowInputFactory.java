@@ -36,11 +36,13 @@ final class LangChainConcernWorkflowInputFactory {
         config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
             ? fullPatchSet
             : null;
+    ConcernReviewerId.Kind reviewerKind =
+        concerns == null || concerns.getReviewer() == null
+            ? null
+            : concerns.getReviewer().getKind();
     ReviewFeedbackMemory feedbackContext =
-        concerns != null
-                && concerns.getReviewer() != null
-                && concerns.getReviewer().getKind()
-                    == ConcernReviewerId.Kind.SINGLE_AGENT
+        (reviewerKind == ConcernReviewerId.Kind.SINGLE_AGENT
+                || reviewerKind == ConcernReviewerId.Kind.SCOPED_AGENT)
             ? reviewFeedback
             : null;
     return new ConcernWorkflowInput(

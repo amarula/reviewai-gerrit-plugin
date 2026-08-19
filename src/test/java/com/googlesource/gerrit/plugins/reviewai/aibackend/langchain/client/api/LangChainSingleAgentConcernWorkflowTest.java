@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
@@ -202,6 +203,23 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         client.concernData.getConcernWorkflowInput().getReviewFeedback(),
         client.finderData.getConcernWorkflowInput().getReviewFeedback());
+  }
+
+  @Test
+  public void scopedConcernInputIncludesReviewFeedback() throws Exception {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    concerns.setConcerns(
+        List.of(concern("old-present", ConcernStatus.PRESENT, "Old dereference")));
+    ReviewFeedbackMemory memory =
+        getGson().fromJson(readTestResource(FEEDBACK_MEMORY), ReviewFeedbackMemory.class);
+
+    ConcernWorkflowInput input =
+        LangChainConcernWorkflowInputFactory.create(
+            mock(Configuration.class), concerns, "incremental patch", "full patch", memory);
+
+    assertEquals(memory, input.getReviewFeedback());
   }
 
   @Test
