@@ -66,6 +66,8 @@ Review feedback memory is the persisted, change-scoped summary of durable user g
   dismissal rationale for one known concern.
 - `disabled_review_scopes`: the effective set of `PATCHSET` and `COMMIT_MESSAGE` review scopes explicitly disabled by
   the user. A later explicit resume instruction removes the corresponding scope.
+- `disabled_specialized_agents`: individual Level 2 patchset agents disabled without suppressing the entire
+  `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.”
 
 The memory stores distilled guidance rather than raw conversations. Questions, acknowledgements, and other
 non-durable messages are not included. Generic guidance is supplied to later review agents, while concern-specific
@@ -147,8 +149,9 @@ A forced review restricted to one stage classifies before invoking that selected
 triage. If there are no pending comments, every level skips the classifier entirely and retains the current memory.
 
 Level 1 filters disabled stages before agent fan-out. Level 2 keeps classification and triage parallel, then filters
-the triage plans using the classified memory before invoking specialists. Level 0 currently receives the directive as
-prompt context but does not enforce it by changing the combined review request.
+the triage plans using both coarse scopes and fine-grained specialized-agent exclusions before invoking specialists.
+Level 0 currently receives the directive as prompt context but does not enforce it by changing the combined review
+request.
 
 The journal uses `PENDING`, `PROCESSING`, and `PROCESSED` states. Its `(change_id, comment_id)` key makes repeated Gerrit
 delivery idempotent, and processed rows remain as tombstones so the same user message is not classified again. After

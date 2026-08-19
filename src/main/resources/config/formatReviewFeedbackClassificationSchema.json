@@ -39,13 +39,28 @@
           "enum": ["PATCHSET", "COMMIT_MESSAGE"]
         },
         "uniqueItems": true
+      },
+      "disabled_specialized_agents": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "CORRECTNESS",
+            "TESTABILITY",
+            "CODE_QUALITY",
+            "DOCUMENTATION",
+            "SECURITY"
+          ]
+        },
+        "uniqueItems": true
       }
     },
     "required": [
       "classifications",
       "generic_feedback",
       "concern_feedback",
-      "disabled_review_scopes"
+      "disabled_review_scopes",
+      "disabled_specialized_agents"
     ]
   }
 }

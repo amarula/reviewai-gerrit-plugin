@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,6 +37,8 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   private static final String MEMORY_RESOURCE = "__files/feedback/reviewFeedbackMemory.json";
   private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
+  private static final String DISABLED_TESTABILITY_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemoryDisabledTestability.json";
 
   private ReviewFeedbackMemoryStore store;
 
@@ -57,6 +60,15 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   @Test
   public void storesDisabledReviewScopes() throws Exception {
     ReviewFeedbackMemory memory = loadMemory(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE);
+
+    store.save(memory);
+
+    assertEquals(memory, store.load().orElseThrow());
+  }
+
+  @Test
+  public void storesDisabledSpecializedAgents() throws Exception {
+    ReviewFeedbackMemory memory = loadMemory(DISABLED_TESTABILITY_MEMORY_RESOURCE);
 
     store.save(memory);
 
@@ -114,6 +126,10 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
     ReviewFeedbackMemory invalid = loadMemory();
     invalid.setConcernFeedback(Map.of(" ", invalid.getGenericFeedback()));
     assertRejected(() -> store.save(invalid));
+
+    ReviewFeedbackMemory invalidAgent = loadMemory();
+    invalidAgent.setDisabledSpecializedAgents(Set.of(" "));
+    assertRejected(() -> store.save(invalidAgent));
   }
 
   private static ReviewFeedbackMemory loadMemory() throws Exception {

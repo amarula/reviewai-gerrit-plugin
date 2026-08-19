@@ -26,6 +26,12 @@
       "message": "Skip commit message review",
       "filename": "/PATCHSET_LEVEL",
       "author": { "_account_id": 2 }
+    },
+    {
+      "id": "skip-testability",
+      "message": "Skip test coverage review",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
     }
   ],
   "allComments": [
@@ -87,6 +93,12 @@
       "id": "ca0764e7_4e6e27ab",
       "in_reply_to": "572235ac_8274525d",
       "message": "Skip commit message review",
+      "filename": "/PATCHSET_LEVEL",
+      "author": { "_account_id": 2 }
+    },
+    {
+      "id": "skip-testability",
+      "message": "Skip test coverage review",
       "filename": "/PATCHSET_LEVEL",
       "author": { "_account_id": 2 }
     }

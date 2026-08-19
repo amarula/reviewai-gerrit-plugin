@@ -90,6 +90,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/feedback/reviewFeedbackMemory.json";
   private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
+  private static final String DISABLED_TESTABILITY_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemoryDisabledTestability.json";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -125,9 +127,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     client.triage =
         triage(
-            plan("COMMIT_MESSAGE", true),
+            plan("TESTABILITY", true),
             plan("CORRECTNESS", true));
-    client.classifiedFeedback = readDisabledCommitMessageMemory();
+    client.classifiedFeedback = readDisabledTestabilityMemory();
     ReviewFeedbackMemory previousFeedback = new ReviewFeedbackMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(previousFeedback);
@@ -667,6 +669,13 @@ public class LangChainSpecializedAgentReviewClientTest {
     return getGson()
         .fromJson(
             readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE),
+            ReviewFeedbackMemory.class);
+  }
+
+  private static ReviewFeedbackMemory readDisabledTestabilityMemory() throws Exception {
+    return getGson()
+        .fromJson(
+            readTestResource(DISABLED_TESTABILITY_MEMORY_RESOURCE),
             ReviewFeedbackMemory.class);
   }
 

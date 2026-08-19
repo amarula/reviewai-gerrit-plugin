@@ -24,6 +24,8 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJso
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
@@ -264,6 +266,19 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException("Review feedback contains an invalid disabled scope");
     }
     memory.setDisabledReviewScopes(Set.copyOf(disabledReviewScopes));
+    Set<String> disabledSpecializedAgents = new HashSet<>();
+    if (result.getDisabledSpecializedAgents() == null) {
+      throw new IllegalStateException("Review feedback disabled specialized agents are missing");
+    }
+    for (String agent : result.getDisabledSpecializedAgents()) {
+      String normalizedAgent = SpecializedReviewAgentDefinition.normalizeName(agent);
+      if (SpecializedReviewAgentDefinitions.findByName(normalizedAgent).isEmpty()) {
+        throw new IllegalStateException(
+            "Review feedback contains an invalid disabled specialized agent");
+      }
+      disabledSpecializedAgents.add(normalizedAgent);
+    }
+    memory.setDisabledSpecializedAgents(Set.copyOf(disabledSpecializedAgents));
     return memory;
   }
 
