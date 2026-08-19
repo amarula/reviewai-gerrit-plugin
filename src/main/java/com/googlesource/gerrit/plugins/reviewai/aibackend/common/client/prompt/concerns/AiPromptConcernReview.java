@@ -20,13 +20,25 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class AiPromptConcernReview extends AiPromptBase {
+  private static final String COMMIT_MESSAGE_REVIEWER = "COMMIT_MESSAGE";
+  private static final String COMMIT_MESSAGE_ROLE_INSTRUCTIONS =
+      (String)
+          AiPrompt.getJsonPromptValues("agents/level1/commit-message/prompts")
+              .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES");
+
   public AiPromptConcernReview(
       Configuration config,
       ChangeSetData changeSetData,
@@ -38,16 +50,33 @@ public final class AiPromptConcernReview extends AiPromptBase {
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
+    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_ROLE"));
     instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW"));
   }
 
   @Override
   public String getDefaultAiAssistantInstructions() {
-    return joinWithDoubleNewLine(
-        List.of(
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_RULES"),
+    List<String> instructions = new ArrayList<>();
+    String specializedRole = specializedRoleInstructions();
+    instructions.add(
+        AiPromptSections.buildSection(
+            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_ROLE"),
+            specializedRole == null
+                ? prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_ROLE")
+                : specializedRole));
+    instructions.add(
+        AiPromptSections.buildSection(
+            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_TASK"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW")));
+    instructions.add(
+        AiPromptSections.buildSection(
+            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_RULES"),
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_RULES")));
+    instructions.add(
+        AiPromptSections.buildSection(
+            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_RESPONSE_FORMAT"),
             prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_RESPONSE_FORMAT")));
+    return joinWithDoubleNewLine(instructions);
   }
 
   @Override
@@ -60,5 +89,23 @@ public final class AiPromptConcernReview extends AiPromptBase {
   @Override
   public String getAiRequestDataPrompt() {
     return null;
+  }
+
+  private String specializedRoleInstructions() {
+    ConcernWorkflowInput workflowInput = changeSetData.getConcernWorkflowInput();
+    ReviewerConcerns concerns = workflowInput == null ? null : workflowInput.getConcerns();
+    ConcernReviewerId reviewer = concerns == null ? null : concerns.getReviewer();
+    String instructions = changeSetData.getSpecializedAgentInstructions();
+    if (reviewer == null
+        || reviewer.getKind() != ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
+      return null;
+    }
+    if (COMMIT_MESSAGE_REVIEWER.equals(reviewer.getName())) {
+      return COMMIT_MESSAGE_ROLE_INSTRUCTIONS;
+    }
+    if (instructions == null || instructions.isBlank()) {
+      return null;
+    }
+    return instructions;
   }
 }
