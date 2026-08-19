@@ -1,8 +1,8 @@
 # Review Agent Architecture
 
-ReviewAI separates the review of known concerns from the discovery of new issues. This document describes that
-workflow, the agent-specialization levels, the concern lifecycle, and the persistence rules that connect reviews of
-successive Patch Sets.
+ReviewAI separates the review of known concerns from the discovery of new issues and distills user feedback into
+durable review guidance. This document describes those workflows, the agent-specialization levels, the concern
+lifecycle, and the persistence rules that connect reviews of successive Patch Sets.
 
 For configuration values, see [Configuration](configuration.md). For commands such as `/review` and
 `/forget_thread`, see the [Command Reference](commands.md).
@@ -57,6 +57,18 @@ The concern ledger is ReviewAI's persisted record of the concerns currently trac
 concerns by logical reviewer and preserves each concern's identity, status, location, and publication data across
 successive Patch Sets. A ledger can exist even when it contains no concerns.
 
+### Review feedback memory
+
+Review feedback memory is the persisted, change-scoped summary of durable user guidance. It contains:
+
+- `generic_feedback`: recommendations that apply across the Patch Set, such as review scope or testing expectations.
+- `concern_feedback`: summaries keyed by exact concern ID, such as an accepted risk, intentional constraint, or
+  dismissal rationale for one known concern.
+
+The memory stores distilled guidance rather than raw conversations. Questions, acknowledgements, and other
+non-durable messages are not included. Generic guidance is supplied to later review agents, while concern-specific
+guidance is authoritative only for the concern with the matching ID.
+
 ### Change and Patch Set
 
 The concern ledger belongs to a Gerrit Change, not to an individual Patch Set. All Patch Sets of the same Change
@@ -95,6 +107,47 @@ ledger exists, even if the current SHA is unchanged.
 
 Ordinary conversational comment events do not use the concern workflow unless they force a review. Suggestion mode
 also follows its dedicated workflow rather than creating or updating the concern ledger.
+
+## User Feedback Classification
+
+When a user posts a comment addressed to ReviewAI, the comment collector records the addressed comment IDs in a
+change-scoped journal before parsing commands. A reply to an unresolved AI comment counts as addressed even without an
+explicit mention. The ordinary comment workflow then answers the user without running the feedback classifier.
+
+On the next eligible review, ReviewAI claims all pending IDs and loads the complete comment history. The classifier
+receives each claimed user comment as an exact target, with its preceding thread supplied separately as context. This
+prevents an older conversational exchange in the same thread from obscuring guidance in the newest message.
+
+The feedback classifier assigns every substantive addressed comment to exactly one category:
+
+| Category | Meaning | Memory update |
+| --- | --- | --- |
+| `GENERIC` | Durable guidance that applies across the Patch Set. | Merge into `generic_feedback`. |
+| `CONCERN` | Durable evidence or a decision about exactly one known concern. | Merge under that concern's exact ID. |
+| `IRRELEVANT` | A question, acknowledgement, or other non-guidance conversation. | None. |
+
+Commands and a leading AI mention are removed when checking whether a target comment has substantive content. If no
+substantive target comments remain, the classifier returns the current memory without making an AI request.
+
+For a reply in an AI concern thread, ReviewAI walks the exact `inReplyTo` lineage and compares ancestor Gerrit comment
+IDs with the comment ID persisted on each ledger concern. That match becomes a strong concern-routing hint; text or
+code location similarity is not used to infer the concern.
+
+When pending comments exist, execution order depends on the specialization level:
+
+| Level | Ordinary comment event | Patch Set or full forced review |
+| --- | --- | --- |
+| `SINGLE_AGENT` | Enqueue and answer; do not classify. | Classify before the concern or initial-review workflow. |
+| `SCOPED_AGENTS` | Enqueue, route, and answer; do not classify. | Classify once before scoped-agent fan-out. |
+| `SPECIALIZED_AGENTS` | Enqueue and answer; neither classifier nor triage runs. | Start classification and triage concurrently, join both, then invoke specialists. |
+
+A forced review restricted to one stage classifies before invoking that selected stage instead of running specialized
+triage. If there are no pending comments, every level skips the classifier entirely and retains the current memory.
+
+The journal uses `PENDING`, `PROCESSING`, and `PROCESSED` states. Its `(change_id, comment_id)` key makes repeated Gerrit
+delivery idempotent, and processed rows remain as tombstones so the same user message is not classified again. After
+a successful AI response and Gerrit publication, ReviewAI atomically saves the updated memory and marks the claim
+processed. AI or publication failures release the claim back to `PENDING` for a later review.
 
 ## Agent-Specialization Levels
 
@@ -256,7 +309,14 @@ Both concern stages use the same `ConcernWorkflowInput` structure:
     "concerns": []
   },
   "incremental_patch": "...",
-  "full_patch": "..."
+  "full_patch": "...",
+  "review_feedback": {
+    "schema_version": 1,
+    "generic_feedback": "Prefer focused tests of observable behavior.",
+    "concern_feedback": {
+      "concern-id": "This fallback is intentional for legacy callers."
+    }
+  }
 }
 ```
 
@@ -268,7 +328,8 @@ Patch selection is centralized so the stages cannot diverge:
 | `ON_DEMAND` | Included | Omitted | Model can list, search, and read repository files through tools |
 
 The full patch does not change the New Issue Finder's scope. It provides context for interpreting changes in the
-incremental patch.
+incremental patch. `review_feedback` supplies generic guidance and exact per-concern context; it does not broaden the
+review scope or authorize a concern to consume feedback belonging to another concern ID.
 
 ## Concern Lifecycle Example
 
@@ -328,8 +389,10 @@ publication. See [Repeated Comments](#repeated-comments) for the publication beh
 
 ```mermaid
 flowchart TD
+    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
     A[Full current patch] --> C[Concern Reviewer agent]
     B[Incremental patch and stored reviewer concerns] --> C
+    X --> C
     C --> D[New Issue Finder agent]
     D --> F[Review replies]
     F --> G[Build ledger update]
@@ -343,11 +406,14 @@ The two reviewer lanes can execute concurrently, while each lane preserves Conce
 
 ```mermaid
 flowchart TD
+    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
     A[Full current patch] --> P1[PATCHSET Concern Reviewer agent]
     B[Incremental patch and stored reviewer concerns] --> P1
+    X --> P1
     P1 --> P2[PATCHSET New Issue Finder agent]
     A --> C1[COMMIT_MESSAGE Concern Reviewer agent]
     B --> C1
+    X --> C1
     C1 --> C2[COMMIT_MESSAGE New Issue Finder agent]
     P2 --> N[Review replies]
     C2 --> N
@@ -365,7 +431,10 @@ reassessed.
 ```mermaid
 flowchart TD
     A[Full current patch] --> B[Triage agent]
-    B --> C[Applicable specialist reviewer lanes]
+    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
+    B --> Q[Join triage and available feedback]
+    X --> Q
+    Q --> C[Applicable specialist reviewer lanes]
     L[Incremental patch and stored specialist concerns] --> C
     C --> D1[COMMIT_MESSAGE Concern Reviewer agent]
     D1 --> E1[COMMIT_MESSAGE New Issue Finder agent]
@@ -405,13 +474,16 @@ Concern data is stored in the plugin's H2-compatible database schema:
 | `review_concern_ledgers` | One schema-versioned ledger row and last-reviewed commit checkpoint per full Change ID. |
 | `review_concern_reviewers` | Ordered logical reviewers belonging to a ledger. |
 | `review_concerns` | Ordered, status-indexed concerns belonging to a reviewer. |
+| `review_feedback_memories` | One schema-versioned generic and per-concern feedback summary per full Change ID. |
+| `review_feedback_comments` | Replay-safe processing state for each addressed user comment ID. |
 
 The complete concern is serialized in `concern_json`, while identity, order, and status are also stored in dedicated
 columns. Saving a ledger replaces its reviewer and concern rows in one transaction.
 
-Agent clients attach ledger changes to the AI response as pending updates. `PatchSetReviewer` first publishes the
-Gerrit review and then persists those updates. Consequently, an AI request failure or review-publication failure does
-not advance the ledger.
+Agent clients attach ledger changes to the AI response as pending updates and place classified feedback memory on the
+review context. `PatchSetReviewer` first publishes the Gerrit review, then persists ledger updates and completes the
+feedback claim. Completing a claim saves its memory and processed states in one transaction. An AI request failure or
+review-publication failure releases the feedback claim and does not advance its memory.
 
 The database distinguishes these states:
 
@@ -425,8 +497,9 @@ path on the next eligible review.
 
 ### Forgetting a thread
 
-`/forget_thread` clears both the conversation context and the concern ledger for the Change. The next eligible review
-therefore behaves like an initial ledger-backed review and can rebuild the ledger from its result.
+`/forget_thread` clears the conversation context, concern ledger, and review feedback memory for the Change. It also
+marks any pending or in-progress feedback rows processed while preserving comment-ID tombstones. The next eligible
+review therefore behaves like an initial ledger-backed review and can rebuild the ledger from its result.
 
 ## Scope and Operational Considerations
 
