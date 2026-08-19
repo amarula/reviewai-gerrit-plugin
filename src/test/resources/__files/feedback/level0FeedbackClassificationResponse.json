@@ -27,5 +27,6 @@
       "concern_id": "old-present",
       "summary": "The null fallback is intentional for legacy callers."
     }
-  ]
+  ],
+  "disabled_review_scopes": ["COMMIT_MESSAGE"]
 }
