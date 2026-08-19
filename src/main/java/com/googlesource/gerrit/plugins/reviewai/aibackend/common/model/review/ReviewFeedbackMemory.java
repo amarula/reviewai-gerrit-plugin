@@ -38,6 +38,9 @@ public class ReviewFeedbackMemory {
   @SerializedName("disabled_review_scopes")
   private Set<ReviewScope> disabledReviewScopes = Set.of();
 
+  @SerializedName("disabled_specialized_agents")
+  private Set<String> disabledSpecializedAgents = Set.of();
+
   public boolean isReviewScopeDisabled(ReviewScope scope) {
     return disabledReviewScopes != null && disabledReviewScopes.contains(scope);
   }
