@@ -36,6 +36,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
@@ -53,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.Test;
 
 public class LangChainSingleAgentConcernWorkflowTest {
@@ -203,6 +205,9 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         client.concernData.getConcernWorkflowInput().getReviewFeedback(),
         client.finderData.getConcernWorkflowInput().getReviewFeedback());
+    assertEquals(
+        Set.of(ReviewScope.COMMIT_MESSAGE),
+        data.getReviewFeedbackMemory().getDisabledReviewScopes());
   }
 
   @Test

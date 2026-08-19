@@ -34,6 +34,8 @@ import org.junit.Test;
 
 public class ReviewFeedbackMemoryStoreTest extends TestBase {
   private static final String MEMORY_RESOURCE = "__files/feedback/reviewFeedbackMemory.json";
+  private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
 
   private ReviewFeedbackMemoryStore store;
 
@@ -45,6 +47,16 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   @Test
   public void storesGenericAndConcernFeedback() throws Exception {
     ReviewFeedbackMemory memory = loadMemory();
+    assertTrue(memory.getDisabledReviewScopes().isEmpty());
+
+    store.save(memory);
+
+    assertEquals(memory, store.load().orElseThrow());
+  }
+
+  @Test
+  public void storesDisabledReviewScopes() throws Exception {
+    ReviewFeedbackMemory memory = loadMemory(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE);
 
     store.save(memory);
 
@@ -105,8 +117,12 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   }
 
   private static ReviewFeedbackMemory loadMemory() throws Exception {
+    return loadMemory(MEMORY_RESOURCE);
+  }
+
+  private static ReviewFeedbackMemory loadMemory(String resource) throws Exception {
     String json =
-        Files.readString(TestResourceLoader.getTestResourcePath().resolve(MEMORY_RESOURCE));
+        Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
     return getGson().fromJson(json, ReviewFeedbackMemory.class);
   }
 

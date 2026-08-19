@@ -39,6 +39,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
@@ -228,9 +229,17 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     }
     if (changeSetData.getForcedStagedReview()) {
       return askStages(
-          changeSetData, change, patchSet, List.of(changeSetData.getReviewAssistantStage()));
+          changeSetData,
+          change,
+          patchSet,
+          filterDisabledReviewStages(
+              changeSetData, List.of(changeSetData.getReviewAssistantStage())));
     }
-    return askStages(changeSetData, change, patchSet, MULTI_AGENT_ASSISTANT_STAGES);
+    return askStages(
+        changeSetData,
+        change,
+        patchSet,
+        filterDisabledReviewStages(changeSetData, MULTI_AGENT_ASSISTANT_STAGES));
   }
 
   @Override
@@ -244,6 +253,17 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       String patchSet,
       List<ReviewAssistantStage> assistantStages)
       throws Exception {
+    if (assistantStages.isEmpty()) {
+      AiResponseContent response = new AiResponseContent("");
+      response.setReplies(new ArrayList<>());
+      ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+      concernLedgerOperations()
+          .attachPendingLedger(
+              response,
+              change,
+              previousLedger == null ? new ReviewConcernLedger() : previousLedger);
+      return response;
+    }
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
     for (ReviewAssistantStage assistantStage : assistantStages) {
       reviewRequestFutures.add(
@@ -279,6 +299,28 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     AiResponseContent merged = AiResponseContentMerger.merge(aiResponseContents);
     preserveUnchangedReviewerConcerns(changeSetData, change, merged);
     return merged;
+  }
+
+  private List<ReviewAssistantStage> filterDisabledReviewStages(
+      ChangeSetData changeSetData, List<ReviewAssistantStage> assistantStages) {
+    if (changeSetData.getReviewFeedbackMemory() == null) {
+      return assistantStages;
+    }
+    return assistantStages.stream()
+        .filter(
+            stage ->
+                switch (stage) {
+                  case REVIEW_CODE ->
+                      !changeSetData
+                          .getReviewFeedbackMemory()
+                          .isReviewScopeDisabled(ReviewScope.PATCHSET);
+                  case REVIEW_COMMIT_MESSAGE ->
+                      !changeSetData
+                          .getReviewFeedbackMemory()
+                          .isReviewScopeDisabled(ReviewScope.COMMIT_MESSAGE);
+                  default -> true;
+                })
+        .toList();
   }
 
   private ReviewRequestResult askStage(

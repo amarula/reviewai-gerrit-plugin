@@ -29,6 +29,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput;
@@ -256,6 +257,13 @@ final class LangChainReviewFeedbackClassifier {
             ? null
             : genericFeedback.trim());
     memory.setConcernFeedback(concernFeedback);
+    Set<ReviewScope> disabledReviewScopes = result.getDisabledReviewScopes();
+    if (disabledReviewScopes == null
+        || disabledReviewScopes.contains(null)
+        || disabledReviewScopes.contains(ReviewScope.FULL)) {
+      throw new IllegalStateException("Review feedback contains an invalid disabled scope");
+    }
+    memory.setDisabledReviewScopes(Set.copyOf(disabledReviewScopes));
     return memory;
   }
 
