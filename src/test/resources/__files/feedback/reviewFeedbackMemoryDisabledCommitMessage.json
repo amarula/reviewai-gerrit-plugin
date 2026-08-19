@@ -2,5 +2,6 @@
   "schema_version": 1,
   "generic_feedback": "Skip reviewing commit messages.",
   "concern_feedback": {},
-  "disabled_review_scopes": ["COMMIT_MESSAGE"]
+  "disabled_review_scopes": ["COMMIT_MESSAGE"],
+  "disabled_specialized_agents": []
 }
