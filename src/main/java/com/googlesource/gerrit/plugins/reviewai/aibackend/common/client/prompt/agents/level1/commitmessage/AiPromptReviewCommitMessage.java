@@ -73,6 +73,7 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
             resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))
                 + "\n\nReturn the feedback using this plugin's mandatory JSON response format, "
                 + "not the standalone Gerrit UI Markdown code-block output format."));
+    sections.addAll(buildReviewFeedbackSections());
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
