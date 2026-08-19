@@ -31,8 +31,21 @@
           },
           "required": ["concern_id", "summary"]
         }
+      },
+      "disabled_review_scopes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["PATCHSET", "COMMIT_MESSAGE"]
+        },
+        "uniqueItems": true
       }
     },
-    "required": ["classifications", "generic_feedback", "concern_feedback"]
+    "required": [
+      "classifications",
+      "generic_feedback",
+      "concern_feedback",
+      "disabled_review_scopes"
+    ]
   }
 }

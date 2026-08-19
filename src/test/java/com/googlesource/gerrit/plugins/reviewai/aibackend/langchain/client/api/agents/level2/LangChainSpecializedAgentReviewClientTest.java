@@ -88,6 +88,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/newIssueFullPatch.txt";
   private static final String FEEDBACK_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemory.json";
+  private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
 
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
@@ -119,10 +121,13 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void reviewClassifiesFeedbackInParallelWithTriage() throws Exception {
+  public void reviewClassifiesFeedbackInParallelAndFiltersDisabledAgent() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage = triage(plan("CORRECTNESS", true));
-    client.classifiedFeedback = readFeedbackMemory();
+    client.triage =
+        triage(
+            plan("COMMIT_MESSAGE", true),
+            plan("CORRECTNESS", true));
+    client.classifiedFeedback = readDisabledCommitMessageMemory();
     ReviewFeedbackMemory previousFeedback = new ReviewFeedbackMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(previousFeedback);
@@ -132,21 +137,26 @@ public class LangChainSpecializedAgentReviewClientTest {
 
     assertEquals(1, client.feedbackCalls);
     assertSame(previousFeedback, client.feedbackAtTriage);
+    assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertSame(client.classifiedFeedback, client.agentFeedback.getFirst());
     assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
   }
 
   @Test
-  public void reviewWithoutPendingFeedbackSkipsClassifier() throws Exception {
+  public void reviewWithoutPendingFeedbackUsesPersistedDisabledScopes() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage = triage(plan("CORRECTNESS", true));
-    ReviewFeedbackMemory memory = readFeedbackMemory();
+    client.triage =
+        triage(
+            plan("COMMIT_MESSAGE", true),
+            plan("CORRECTNESS", true));
+    ReviewFeedbackMemory memory = readDisabledCommitMessageMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(memory);
 
     client.ask(changeSetData, change(false), readTestResource(PATCH_SET_RESOURCE));
 
     assertEquals(0, client.feedbackCalls);
+    assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertSame(memory, client.agentFeedback.getFirst());
     assertSame(memory, changeSetData.getReviewFeedbackMemory());
   }
@@ -651,6 +661,13 @@ public class LangChainSpecializedAgentReviewClientTest {
   private static ReviewFeedbackMemory readFeedbackMemory() throws Exception {
     return getGson()
         .fromJson(readTestResource(FEEDBACK_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
+  }
+
+  private static ReviewFeedbackMemory readDisabledCommitMessageMemory() throws Exception {
+    return getGson()
+        .fromJson(
+            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE),
+            ReviewFeedbackMemory.class);
   }
 
   private static HashMap<String, GerritComment> mapById(List<GerritComment> comments) {
