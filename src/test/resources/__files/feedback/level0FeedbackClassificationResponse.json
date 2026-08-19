@@ -19,14 +19,20 @@
       "comment_id": "ca0764e7_4e6e27ab",
       "category": "GENERIC",
       "concern_id": ""
+    },
+    {
+      "comment_id": "skip-testability",
+      "category": "GENERIC",
+      "concern_id": ""
     }
   ],
-  "generic_feedback": "Keep public API changes backward compatible and skip commit message review.",
+  "generic_feedback": "Keep public API changes backward compatible; skip commit message and test coverage review.",
   "concern_feedback": [
     {
       "concern_id": "old-present",
       "summary": "The null fallback is intentional for legacy callers."
     }
   ],
-  "disabled_review_scopes": ["COMMIT_MESSAGE"]
+  "disabled_review_scopes": ["COMMIT_MESSAGE"],
+  "disabled_specialized_agents": ["TESTABILITY"]
 }
