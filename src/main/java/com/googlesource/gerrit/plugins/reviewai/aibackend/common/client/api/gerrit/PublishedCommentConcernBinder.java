@@ -23,11 +23,13 @@ import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -42,20 +44,42 @@ final class PublishedCommentConcernBinder {
     }
   }
 
+  Optional<Set<String>> snapshotCommentIds(ChangeApi changeApi, String reviewTag) {
+    if (reviewTag == null) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(commentIds(changeApi.commentsRequest().get()));
+    } catch (Exception e) {
+      log.warn("Could not snapshot comments before publishing concern comments", e);
+      return Optional.empty();
+    }
+  }
+
   Map<String, String> bind(
-      ChangeApi changeApi, List<ReviewBatch> reviewBatches, String reviewTag) {
+      ChangeApi changeApi,
+      List<ReviewBatch> reviewBatches,
+      String reviewTag,
+      Optional<Set<String>> existingCommentIds) {
     if (reviewTag == null) {
       return Map.of();
     }
     try {
+      List<PublishedComment> allComments = publishedComments(changeApi);
       List<PublishedComment> publishedComments =
-          changeApi.commentsRequest().get().entrySet().stream()
-              .flatMap(
-                  entry ->
-                      entry.getValue().stream()
-                          .filter(comment -> reviewTag.equals(comment.tag))
-                          .map(comment -> new PublishedComment(entry.getKey(), comment)))
+          allComments.stream()
+              .filter(comment -> reviewTag.equals(comment.comment().tag))
               .collect(Collectors.toCollection(ArrayList::new));
+      if (publishedComments.isEmpty() && existingCommentIds.isPresent()) {
+        publishedComments =
+            allComments.stream()
+                .filter(comment -> !existingCommentIds.get().contains(comment.comment().id))
+                .collect(Collectors.toCollection(ArrayList::new));
+        log.warn(
+            "Published concern comments do not expose review tag {}; binding {} newly created comments",
+            reviewTag,
+            publishedComments.size());
+      }
       Map<String, String> commentIdsByConcern = new LinkedHashMap<>();
       for (ReviewBatch batch : reviewBatches) {
         if (batch.getConcernId() == null || batch.getConcernId().isBlank()) {
@@ -80,6 +104,24 @@ final class PublishedCommentConcernBinder {
       log.warn("Could not retrieve published concern comments", e);
       return Map.of();
     }
+  }
+
+  private List<PublishedComment> publishedComments(ChangeApi changeApi) throws Exception {
+    return changeApi.commentsRequest().get().entrySet().stream()
+        .flatMap(
+            entry ->
+                entry.getValue().stream().map(comment -> new PublishedComment(entry.getKey(), comment)))
+        .collect(Collectors.toCollection(ArrayList::new));
+  }
+
+  private Set<String> commentIds(Map<String, List<CommentInfo>> comments) {
+    Set<String> ids = new HashSet<>();
+    comments.values().stream()
+        .flatMap(List::stream)
+        .map(comment -> comment.id)
+        .filter(Objects::nonNull)
+        .forEach(ids::add);
+    return ids;
   }
 
   private boolean hasConcernBatches(List<ReviewBatch> reviewBatches) {
