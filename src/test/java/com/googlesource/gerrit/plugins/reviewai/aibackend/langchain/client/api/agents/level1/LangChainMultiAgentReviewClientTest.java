@@ -87,6 +87,8 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/newIssueFullPatch.txt";
   private static final String FEEDBACK_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemory.json";
+  private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
+      "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -251,6 +253,38 @@ public class LangChainMultiAgentReviewClientTest {
     assertTrue(
         client.recordedFeedback.stream()
             .allMatch(feedback -> feedback == client.classifiedFeedback));
+  }
+
+  @Test
+  public void classifiedDisabledCommitMessageScopeFiltersStageBeforeFanOut()
+      throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    client.classifiedFeedback = readDisabledCommitMessageMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    client.ask(changeSetData, change, "patch");
+
+    assertEquals(1, client.feedbackCalls);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.recordedStages);
+  }
+
+  @Test
+  public void persistedDisabledCommitMessageScopeFiltersLaterReviews() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewFeedbackMemory(readDisabledCommitMessageMemory());
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    client.ask(changeSetData, change, "patch");
+
+    assertEquals(0, client.feedbackCalls);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.recordedStages);
   }
 
   @Test
@@ -683,6 +717,13 @@ public class LangChainMultiAgentReviewClientTest {
   private static ReviewFeedbackMemory readFeedbackMemory() throws Exception {
     return GsonUtils.getGson()
         .fromJson(readTestResource(FEEDBACK_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
+  }
+
+  private static ReviewFeedbackMemory readDisabledCommitMessageMemory() throws Exception {
+    return GsonUtils.getGson()
+        .fromJson(
+            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE),
+            ReviewFeedbackMemory.class);
   }
 
   private static Configuration config() {
