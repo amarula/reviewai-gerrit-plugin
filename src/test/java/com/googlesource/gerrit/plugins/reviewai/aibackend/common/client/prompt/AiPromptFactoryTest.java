@@ -141,6 +141,70 @@ public class AiPromptFactoryTest {
             config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptConcernReview);
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("# Role\n\nYou are a concern reviewer."));
+    assertTrue(instructions.contains("# Task\n\nReassess every supplied concern"));
+    assertTrue(instructions.contains("# Mandatory Rules\n\nReturn exactly one update"));
+    assertTrue(instructions.contains("# MANDATORY Response Format\n\nReturn only JSON"));
+  }
+
+  @Test
+  public void specializedConcernReviewIncludesSpecialistRole() {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CODE_QUALITY"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+    changeSetData.setSpecializedAgentInstructions("Review code quality concerns only.");
+    changeSetData.setConcernWorkflowInput(
+        new ConcernWorkflowInput(concerns, "incremental patch", null));
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("# Role\n\nReview code quality concerns only."));
+    assertTrue(instructions.contains("# Task\n\nReassess every supplied concern"));
+    assertTrue(instructions.contains("# Mandatory Rules\n\nReturn exactly one update"));
+    assertTrue(instructions.contains("# MANDATORY Response Format\n\nReturn only JSON"));
+    assertTrue(instructions.contains("Return exactly one update for every supplied concern"));
+    assertFalse(instructions.contains("candidate issues that may deserve"));
+  }
+
+  @Test
+  public void specializedCommitMessageConcernReviewIncludesCommitMessageRole() {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "COMMIT_MESSAGE"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+    changeSetData.setConcernWorkflowInput(
+        new ConcernWorkflowInput(concerns, "incremental patch", null));
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String commitMessageRole =
+        (String)
+            AiPrompt.getJsonPromptValues("agents/level1/commit-message/prompts")
+                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES");
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("# Role\n\n" + commitMessageRole));
+    assertTrue(instructions.contains("# Task\n\nReassess every supplied concern"));
+    assertTrue(instructions.contains("# Mandatory Rules\n\nReturn exactly one update"));
+    assertTrue(instructions.contains("# MANDATORY Response Format\n\nReturn only JSON"));
+    assertTrue(instructions.contains("Return exactly one update for every supplied concern"));
+    assertFalse(instructions.contains("candidate issues that may deserve"));
   }
 
   @Test
