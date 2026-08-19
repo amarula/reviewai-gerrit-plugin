@@ -104,8 +104,9 @@ public class GerritClientReviewTest {
   }
 
   @Test
-  public void returnsPublishedCommentIdsByConcern() throws Exception {
+  public void returnsPublishedCommentIdsWhenGerritOmitsReviewTag() throws Exception {
     Map<String, List<CommentInfo>> comments = readPublishedComments();
+    Map<String, List<CommentInfo>> existingComments = existingComments(comments);
     List<ReviewBatch> batches = new ArrayList<>();
     Map<String, String> expectedCommentIds = new LinkedHashMap<>();
     comments.forEach(
@@ -125,22 +126,30 @@ public class GerritClientReviewTest {
                       expectedCommentIds.put(batch.getConcernId(), comment.id);
                     }));
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
-    when(commentsRequest.get()).thenReturn(comments);
+    when(commentsRequest.get()).thenReturn(existingComments, comments);
     when(revisionApi.review(any(ReviewInput.class)))
         .thenAnswer(
             invocation -> {
               ReviewInput input = invocation.getArgument(0);
               assertNotNull(input.tag);
-              comments.values().stream()
-                  .flatMap(List::stream)
-                  .filter(comment -> comment.tag == null)
-                  .forEach(comment -> comment.tag = input.tag);
               return reviewResult;
             });
 
     assertEquals(
         expectedCommentIds,
         client.setReviewAndGetPublishedCommentIds(change, batches, changeSetData, null));
+  }
+
+  private static Map<String, List<CommentInfo>> existingComments(
+      Map<String, List<CommentInfo>> comments) {
+    Map<String, List<CommentInfo>> existingComments = new LinkedHashMap<>();
+    comments.forEach(
+        (filename, filenameComments) ->
+            filenameComments.stream()
+                .filter(comment -> comment.tag != null)
+                .findFirst()
+                .ifPresent(comment -> existingComments.put(filename, List.of(comment))));
+    return existingComments;
   }
 
   private static Map<String, List<CommentInfo>> readPublishedComments() throws Exception {

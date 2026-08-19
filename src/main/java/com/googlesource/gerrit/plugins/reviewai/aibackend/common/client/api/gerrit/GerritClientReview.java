@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
@@ -96,6 +97,8 @@ public class GerritClientReview extends GerritClientAccount {
                   change.getProjectName(),
                   change.getBranchNameKey().shortName(),
                   change.getChangeKey().get());
+      Optional<Set<String>> existingCommentIds =
+          concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
       ReviewResult result =
           changeApi.current().review(reviewInput);
 
@@ -103,7 +106,7 @@ public class GerritClientReview extends GerritClientAccount {
         log.error("Review setting failed with status code: {}", result.error);
         throw new GerritReviewException(result.error);
       }
-      return concernBinder.bind(changeApi, reviewBatches, reviewInput.tag);
+      return concernBinder.bind(changeApi, reviewBatches, reviewInput.tag, existingCommentIds);
     }
   }
 
