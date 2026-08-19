@@ -35,6 +35,9 @@ public class ReviewFeedbackClassificationResult {
   @SerializedName("disabled_review_scopes")
   private Set<ReviewScope> disabledReviewScopes = Set.of();
 
+  @SerializedName("disabled_specialized_agents")
+  private Set<String> disabledSpecializedAgents = Set.of();
+
   public enum Category {
     GENERIC,
     IRRELEVANT,
