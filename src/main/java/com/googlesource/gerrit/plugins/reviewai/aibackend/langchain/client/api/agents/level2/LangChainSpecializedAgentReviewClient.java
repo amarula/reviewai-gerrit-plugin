@@ -624,12 +624,20 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return config.getAiReviewPatchSet()
         && scope != ReviewScope.COMMIT_MESSAGE
         && !isReviewScopeDisabled(changeSetData, ReviewScope.PATCHSET)
+        && !isSpecializedAgentDisabled(changeSetData, agent)
         && SpecializedReviewAgentDefinitions.findByName(agent).isPresent();
   }
 
   private boolean isReviewScopeDisabled(ChangeSetData changeSetData, ReviewScope scope) {
     return changeSetData.getReviewFeedbackMemory() != null
         && changeSetData.getReviewFeedbackMemory().isReviewScopeDisabled(scope);
+  }
+
+  private boolean isSpecializedAgentDisabled(ChangeSetData changeSetData, String agent) {
+    ReviewFeedbackMemory memory = changeSetData.getReviewFeedbackMemory();
+    return memory != null
+        && memory.getDisabledSpecializedAgents() != null
+        && memory.getDisabledSpecializedAgents().contains(normalizedAgentName(agent));
   }
 
   private List<SpecializedReviewFindings.AgentFindings> askSpecializedAgents(
