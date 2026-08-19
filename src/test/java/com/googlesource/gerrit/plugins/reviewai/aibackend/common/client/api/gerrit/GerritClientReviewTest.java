@@ -62,9 +62,11 @@ public class GerritClientReviewTest {
   @Mock private GerritApi gerritApi;
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
+  @Mock private ChangeApi refreshedChangeApi;
   @Mock private RevisionApi revisionApi;
   @Mock private ReviewResult reviewResult;
   @Mock private CommentsRequest commentsRequest;
+  @Mock private CommentsRequest refreshedCommentsRequest;
 
   private GerritClientReview client;
   private GerritChange change;
@@ -78,7 +80,8 @@ public class GerritClientReviewTest {
     changeSetData = new ChangeSetData(1);
     when(config.getGerritApi()).thenReturn(gerritApi);
     when(gerritApi.changes()).thenReturn(changes);
-    when(changes.id("project", "main", "I1234567890")).thenReturn(changeApi);
+    when(changes.id("project", "main", "I1234567890"))
+        .thenReturn(changeApi, refreshedChangeApi);
     when(changeApi.current()).thenReturn(revisionApi);
     when(revisionApi.review(any(ReviewInput.class))).thenReturn(reviewResult);
     client = new GerritClientReview(config, pluginDataHandlerProvider, localizer);
@@ -104,8 +107,9 @@ public class GerritClientReviewTest {
   }
 
   @Test
-  public void returnsPublishedCommentIdsByConcern() throws Exception {
+  public void returnsPublishedCommentIdsWhenGerritOmitsReviewTag() throws Exception {
     Map<String, List<CommentInfo>> comments = readPublishedComments();
+    Map<String, List<CommentInfo>> existingComments = existingComments(comments);
     List<ReviewBatch> batches = new ArrayList<>();
     Map<String, String> expectedCommentIds = new LinkedHashMap<>();
     comments.forEach(
@@ -125,22 +129,32 @@ public class GerritClientReviewTest {
                       expectedCommentIds.put(batch.getConcernId(), comment.id);
                     }));
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
-    when(commentsRequest.get()).thenReturn(comments);
+    when(commentsRequest.get()).thenReturn(existingComments);
+    when(refreshedChangeApi.commentsRequest()).thenReturn(refreshedCommentsRequest);
+    when(refreshedCommentsRequest.get()).thenReturn(comments);
     when(revisionApi.review(any(ReviewInput.class)))
         .thenAnswer(
             invocation -> {
               ReviewInput input = invocation.getArgument(0);
               assertNotNull(input.tag);
-              comments.values().stream()
-                  .flatMap(List::stream)
-                  .filter(comment -> comment.tag == null)
-                  .forEach(comment -> comment.tag = input.tag);
               return reviewResult;
             });
 
     assertEquals(
         expectedCommentIds,
         client.setReviewAndGetPublishedCommentIds(change, batches, changeSetData, null));
+  }
+
+  private static Map<String, List<CommentInfo>> existingComments(
+      Map<String, List<CommentInfo>> comments) {
+    Map<String, List<CommentInfo>> existingComments = new LinkedHashMap<>();
+    comments.forEach(
+        (filename, filenameComments) ->
+            filenameComments.stream()
+                .filter(comment -> comment.tag != null)
+                .findFirst()
+                .ifPresent(comment -> existingComments.put(filename, List.of(comment))));
+    return existingComments;
   }
 
   private static Map<String, List<CommentInfo>> readPublishedComments() throws Exception {
