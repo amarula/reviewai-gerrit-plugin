@@ -17,7 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import com.google.gson.annotations.SerializedName;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import java.util.Map;
+import java.util.Set;
 import lombok.Data;
 
 @Data
@@ -32,4 +34,11 @@ public class ReviewFeedbackMemory {
 
   @SerializedName("concern_feedback")
   private Map<String, String> concernFeedback = Map.of();
+
+  @SerializedName("disabled_review_scopes")
+  private Set<ReviewScope> disabledReviewScopes = Set.of();
+
+  public boolean isReviewScopeDisabled(ReviewScope scope) {
+    return disabledReviewScopes != null && disabledReviewScopes.contains(scope);
+  }
 }
