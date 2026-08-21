@@ -53,7 +53,26 @@ class SpecializedReviewFindings {
 
     static AgentFindings from(String agent, SpecializedReviewFindings findings) {
       findings.normalize();
-      return new AgentFindings(agent, findings.getConcerns(), findings.getDismissedConcerns());
+      String owner =
+          SpecializedReviewConcernOwnership.canonicalOwner(agent).orElse("");
+      return new AgentFindings(
+          owner,
+          inScope(owner, findings.getConcerns()),
+          inScope(owner, findings.getDismissedConcerns()));
+    }
+
+    private static List<ReviewConcern> inScope(
+        String owner, List<ReviewConcern> concerns) {
+      if (owner.isEmpty()) {
+        return List.of();
+      }
+      return concerns.stream()
+          .filter(
+              concern ->
+                  SpecializedReviewConcernOwnership.canonicalOwner(concern.getType())
+                      .filter(owner::equals)
+                      .isPresent())
+          .toList();
     }
   }
 
