@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
@@ -36,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public class LangChainConcernReviewTest {
@@ -124,6 +126,40 @@ public class LangChainConcernReviewTest {
         });
 
     assertNull(capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+  }
+
+  @Test
+  public void providesCurrentConditionLabelsToConcernReviewer() throws Exception {
+    Configuration config = mock(Configuration.class);
+    LangChainConcernReviewer concernReviewer = concernReviewer(config);
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-1");
+    concerns.setConcerns(List.of(concern));
+    Map<String, GerritConditionLabel> conditionLabels =
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setConditionLabels(conditionLabels);
+    CapturedRequest capturedRequest = new CapturedRequest();
+
+    concernReviewer.review(
+        changeSetData,
+        mock(GerritChange.class),
+        concerns,
+        readTestResource(INCREMENTAL_PATCH_RESOURCE),
+        readTestResource(FULL_PATCH_RESOURCE),
+        (requestData, change, patchSet) -> {
+          capturedRequest.requestData = requestData;
+          return readTestResource(RESPONSE_RESOURCE);
+        });
+
+    assertEquals(
+        conditionLabels,
+        capturedRequest.requestData.getConditionLabels());
   }
 
   private static LangChainConcernReviewer concernReviewer(Configuration config) {
