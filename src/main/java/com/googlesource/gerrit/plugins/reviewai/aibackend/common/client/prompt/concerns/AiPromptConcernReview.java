@@ -64,6 +64,9 @@ public final class AiPromptConcernReview extends AiPromptBase {
             specializedRole == null
                 ? prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_ROLE")
                 : specializedRole));
+    if (!isCommitMessageReviewer()) {
+      instructions.addAll(buildConditionLabelSections());
+    }
     instructions.add(
         AiPromptSections.buildSection(
             prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_TASK"),
@@ -92,9 +95,7 @@ public final class AiPromptConcernReview extends AiPromptBase {
   }
 
   private String specializedRoleInstructions() {
-    ConcernWorkflowInput workflowInput = changeSetData.getConcernWorkflowInput();
-    ReviewerConcerns concerns = workflowInput == null ? null : workflowInput.getConcerns();
-    ConcernReviewerId reviewer = concerns == null ? null : concerns.getReviewer();
+    ConcernReviewerId reviewer = reviewer();
     String instructions = changeSetData.getSpecializedAgentInstructions();
     if (reviewer == null
         || reviewer.getKind() != ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
@@ -107,5 +108,16 @@ public final class AiPromptConcernReview extends AiPromptBase {
       return null;
     }
     return instructions;
+  }
+
+  private boolean isCommitMessageReviewer() {
+    ConcernReviewerId reviewer = reviewer();
+    return reviewer != null && COMMIT_MESSAGE_REVIEWER.equals(reviewer.getName());
+  }
+
+  private ConcernReviewerId reviewer() {
+    ConcernWorkflowInput workflowInput = changeSetData.getConcernWorkflowInput();
+    ReviewerConcerns concerns = workflowInput == null ? null : workflowInput.getConcerns();
+    return concerns == null ? null : concerns.getReviewer();
   }
 }
