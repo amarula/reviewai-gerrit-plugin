@@ -223,8 +223,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       setRequestBody(reviewRequestResult == null ? null : reviewRequestResult.getRequestBody());
       return reviewRequestResult == null ? null : reviewRequestResult.getResponseContent();
     }
-    if (changeSetData.getPendingReviewFeedbackCommentIds() != null
-        && !changeSetData.getPendingReviewFeedbackCommentIds().isEmpty()) {
+    if (shouldClassifyReviewFeedback(changeSetData)) {
       changeSetData.setReviewFeedbackMemory(reviewFeedback(changeSetData, change));
     }
     if (changeSetData.getForcedStagedReview()) {
