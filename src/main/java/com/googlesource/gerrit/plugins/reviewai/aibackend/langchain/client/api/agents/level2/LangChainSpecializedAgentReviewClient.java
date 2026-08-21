@@ -465,6 +465,10 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     consolidatedFindings =
         currentRunConsolidationOrFallback(
             consolidatedFindings, specializedFindings, expectedConcernIds);
+    SpecializedReviewConcernOwnership.retainSupportedOwners(
+        consolidatedFindings,
+        specializedFindings,
+        disabledSpecializedAgents(changeSetData));
     SpecializedReviewFindings annotatedFindings;
     if (historicalRepetitionFuture == null) {
       annotatedFindings =
@@ -653,6 +657,13 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     return memory != null
         && memory.getDisabledSpecializedAgents() != null
         && memory.getDisabledSpecializedAgents().contains(normalizedAgentName(agent));
+  }
+
+  private Set<String> disabledSpecializedAgents(ChangeSetData changeSetData) {
+    ReviewFeedbackMemory memory = changeSetData.getReviewFeedbackMemory();
+    return memory == null || memory.getDisabledSpecializedAgents() == null
+        ? Set.of()
+        : memory.getDisabledSpecializedAgents();
   }
 
   private List<SpecializedReviewFindings.AgentFindings> askSpecializedAgents(

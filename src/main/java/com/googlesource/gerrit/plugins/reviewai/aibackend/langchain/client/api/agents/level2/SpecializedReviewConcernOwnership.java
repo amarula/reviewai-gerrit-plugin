@@ -82,6 +82,44 @@ final class SpecializedReviewConcernOwnership {
     }
   }
 
+  static void retainSupportedOwners(
+      SpecializedReviewFindings findings,
+      List<SpecializedReviewFindings.AgentFindings> rawFindings,
+      Set<String> disabledOwners) {
+    findings.normalize();
+    Map<String, Set<String>> sourceOwnersByRawConcernId = new LinkedHashMap<>();
+    for (SpecializedReviewFindings.AgentFindings agentFindings : rawFindings) {
+      String sourceOwner = canonicalOwner(agentFindings.getAgent()).orElse("");
+      for (ReviewConcern concern : agentFindings.getConcerns()) {
+        for (String rawConcernId : SpecializedReviewConcernIds.rawConcernIds(concern)) {
+          sourceOwnersByRawConcernId
+              .computeIfAbsent(rawConcernId, unused -> new LinkedHashSet<>())
+              .add(sourceOwner);
+        }
+      }
+    }
+    Set<String> canonicalDisabledOwners =
+        disabledOwners.stream()
+            .map(SpecializedReviewConcernOwnership::canonicalOwner)
+            .flatMap(Optional::stream)
+            .collect(java.util.stream.Collectors.toSet());
+    findings.setConcerns(
+        findings.getConcerns().stream()
+            .filter(
+                concern -> {
+                  Optional<String> owner = canonicalOwner(concern.getOwnerAgent());
+                  if (owner.isEmpty() || canonicalDisabledOwners.contains(owner.get())) {
+                    return false;
+                  }
+                  concern.setOwnerAgent(owner.get());
+                  return SpecializedReviewConcernIds.rawConcernIds(concern).stream()
+                      .map(sourceOwnersByRawConcernId::get)
+                      .filter(sourceOwners -> sourceOwners != null)
+                      .anyMatch(sourceOwners -> sourceOwners.contains(owner.get()));
+                })
+            .toList());
+  }
+
   private static ConcernReviewerId ownerReviewer(
       ReviewConcern concern, ConcernReviewerId currentReviewer) {
     if (currentReviewer == null

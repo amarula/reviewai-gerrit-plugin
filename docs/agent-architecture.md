@@ -284,6 +284,12 @@ Triage selects from the commit-message, correctness, testability, code-quality, 
 subject to review scope and configuration. Selected specialists execute concurrently. Consolidation and historical
 repetition matching also start independently before their results are merged.
 
+Each specialist has an exclusive semantic boundary. Its prompt requires every returned concern and dismissed concern
+to use that specialist's exact canonical type (`CORRECTNESS`, `TESTABILITY`, `CODE_QUALITY`, `DOCUMENTATION`,
+`SECURITY`, or `COMMIT_MESSAGE`). ReviewAI deterministically discards raw items with a different or unrecognized type
+before consolidation. Consequently, mentioning that a correctness bug needs a regression test does not allow the
+testability agent to submit the bug as its own concern.
+
 Historical repetition matching is retained on this path for backward compatibility because no concern ledger exists
 yet. It compares current findings with eligible historical Gerrit comments and can mark a finding as repeated.
 
@@ -291,7 +297,9 @@ Only verified findings that can be associated with their source specialist are s
 association failure is logged and leaves that finding out of the ledger. Consolidation assigns each concern exactly
 one canonical `owner_agent` according to its substantive scope. Conflict resolution must preserve that owner. The
 verified concern is stored only in the owner's ledger lane, while all associated source specialists remain available
-in the concern's `reviewers` provenance list.
+in the concern's `reviewers` provenance list. After consolidation, ReviewAI also rejects a concern when its owner is
+disabled or none of its merged raw findings came from that owner. This prevents an active specialist or the collector
+from recreating a concern for a specialist excluded by user feedback or a validating Condition Label.
 
 ## Follow-Up Review
 
