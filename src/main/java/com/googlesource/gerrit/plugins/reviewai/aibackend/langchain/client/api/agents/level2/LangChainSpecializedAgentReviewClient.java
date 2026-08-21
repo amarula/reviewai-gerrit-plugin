@@ -221,6 +221,9 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       changeSetData.setReviewFeedbackMemory(stageExecutor.join(feedbackFuture));
     }
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+    if (previousLedger != null) {
+      specializedConcernLedgerOperations.normalizeOwnership(previousLedger);
+    }
     List<SpecializedReviewTriage.AgentPlan> enabledPlans =
         SpecializedReviewConcernPlanSelector.select(
             enabledPlans(changeSetData, triage),
@@ -479,6 +482,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             CONFLICT_RESOLUTION_STAGE);
     conflictResolvedFindings =
         currentRunConflictResolutionOrFallback(conflictResolvedFindings, annotatedFindings);
+    SpecializedReviewConcernOwnership.preserveOwners(
+        conflictResolvedFindings, annotatedFindings);
     copyRepeatedAnnotations(conflictResolvedFindings, annotatedFindings);
     VerificationStageResult verification =
         askVerificationStages(changeSetData, change, patchSet, conflictResolvedFindings);
