@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -72,6 +73,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/feedback/level0FeedbackComments.json";
   private static final String FEEDBACK_RESPONSE =
       "__files/feedback/level0FeedbackClassificationResponse.json";
+  private static final String LABEL_FEEDBACK_RESPONSE =
+      "__files/feedback/labelFeedbackClassificationResponse.json";
   private static final String FEEDBACK_MEMORY =
       "__files/feedback/reviewFeedbackMemory.json";
   private static final String CHANGE_ID = "project~change-1";
@@ -211,6 +214,32 @@ public class LangChainSingleAgentConcernWorkflowTest {
         data.getReviewFeedbackMemory().getDisabledReviewScopes());
     assertEquals(
         Set.of("TESTABILITY"),
+        data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+  }
+
+  @Test
+  public void level0ClassifiesConditionLabelsWithoutComments() throws Exception {
+    TestClient client = new TestClient();
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(previousLedger());
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+    data.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+
+    client.ask(data, change(false), readTestResource(FULL_PATCH));
+
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK,
+            ReviewAssistantStage.REVIEW_CONCERNS,
+            ReviewAssistantStage.FIND_NEW_ISSUES),
+        client.stages);
+    assertTrue(
+        client.feedbackData.getReviewFeedbackClassificationInput().getComments().isEmpty());
+    assertEquals(
+        Set.of("CORRECTNESS"),
         data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
   }
 
@@ -398,7 +427,14 @@ public class LangChainSingleAgentConcernWorkflowTest {
       if (stage == ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK) {
         feedbackData = changeSetData;
         return rawReviewRequestResult(
-            readTestResource(FEEDBACK_RESPONSE), "review feedback request");
+            readTestResource(
+                changeSetData
+                        .getReviewFeedbackClassificationInput()
+                        .getComments()
+                        .isEmpty()
+                    ? LABEL_FEEDBACK_RESPONSE
+                    : FEEDBACK_RESPONSE),
+            "review feedback request");
       }
       if (stage == ReviewAssistantStage.FIND_NEW_ISSUES) {
         finderData = changeSetData;
@@ -419,6 +455,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
       when(config.getAgentSpecializationLevel())
           .thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
       when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+      when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
       when(config.resolveMockAiFallbackRoute(anyString())).thenReturn(Optional.empty());
       return config;
     }
