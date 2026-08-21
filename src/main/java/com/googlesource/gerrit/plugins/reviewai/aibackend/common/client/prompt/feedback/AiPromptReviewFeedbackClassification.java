@@ -24,6 +24,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
@@ -43,11 +44,13 @@ public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
 
   @Override
   public String getDefaultAiAssistantInstructions() {
-    return joinWithDoubleNewLine(
-        List.of(
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CATEGORIES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_MEMORY")));
+    List<String> instructions =
+        new ArrayList<>(
+            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK")));
+    instructions.addAll(buildConditionLabelSections());
+    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CATEGORIES"));
+    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_MEMORY"));
+    return joinWithDoubleNewLine(instructions);
   }
 
   @Override
