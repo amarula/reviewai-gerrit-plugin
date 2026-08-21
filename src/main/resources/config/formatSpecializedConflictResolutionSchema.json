@@ -15,6 +15,17 @@
               "type": "array",
               "items": { "type": "string" }
             },
+            "owner_agent": {
+              "type": "string",
+              "enum": [
+                "COMMIT_MESSAGE",
+                "CORRECTNESS",
+                "TESTABILITY",
+                "CODE_QUALITY",
+                "DOCUMENTATION",
+                "SECURITY"
+              ]
+            },
             "type": { "type": "string" },
             "description": { "type": "string" },
             "reasoning": { "type": "string" },
@@ -38,6 +49,7 @@
           "required": [
             "id",
             "merged_concern_ids",
+            "owner_agent",
             "type",
             "description",
             "reasoning",

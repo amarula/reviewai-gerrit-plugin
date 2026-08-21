@@ -29,6 +29,10 @@ public class ReviewConcern {
   private String statusReason;
 
   private String type;
+
+  @SerializedName("owner_agent")
+  private String ownerAgent;
+
   private String description;
   private String reasoning;
   private Boolean preexisting;
@@ -72,6 +76,7 @@ public class ReviewConcern {
     copy.setStatus(status);
     copy.setStatusReason(statusReason);
     copy.setType(type);
+    copy.setOwnerAgent(ownerAgent);
     copy.setDescription(description);
     copy.setReasoning(reasoning);
     copy.setPreexisting(preexisting);

@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import java.util.ArrayList;
@@ -138,6 +139,7 @@ final class SpecializedReviewConcernIds {
     copy.setId(concern.getId());
     copy.setMergedConcernIds(List.copyOf(concern.getMergedConcernIds()));
     copy.setType(concern.getType());
+    copy.setOwnerAgent(concern.getOwnerAgent());
     copy.setDescription(concern.getDescription());
     copy.setReasoning(concern.getReasoning());
     copy.setPreexisting(concern.getPreexisting());
@@ -178,7 +180,15 @@ final class SpecializedReviewConcernIds {
     List<ReviewConcern> concerns = new ArrayList<>();
     List<ReviewConcern> dismissedConcerns = new ArrayList<>();
     for (SpecializedReviewFindings.AgentFindings agentFindings : specializedFindings) {
-      agentFindings.getConcerns().forEach(concern -> concerns.add(consolidatedCopy(concern)));
+      agentFindings
+          .getConcerns()
+          .forEach(
+              concern -> {
+                ReviewConcern copy = consolidatedCopy(concern);
+                copy.setOwnerAgent(
+                    SpecializedReviewAgentDefinition.normalizeName(agentFindings.getAgent()));
+                concerns.add(copy);
+              });
       agentFindings
           .getDismissedConcerns()
           .forEach(concern -> dismissedConcerns.add(copyConcern(concern)));
