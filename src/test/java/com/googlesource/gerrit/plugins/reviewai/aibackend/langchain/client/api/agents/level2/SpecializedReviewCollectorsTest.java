@@ -68,12 +68,14 @@ public class SpecializedReviewCollectorsTest {
     assertTrue(consolidation.contains("Deduplication and Consolidation"));
     assertTrue(consolidation.contains("Merge overlapping concerns"));
     assertTrue(consolidation.contains("merged_concern_ids"));
+    assertTrue(consolidation.contains("owner_agent"));
     assertFalse(consolidation.contains("duplicated"));
     assertTrue(historicalRepetition.contains("Historical repeated-comment check"));
     assertTrue(historicalRepetition.contains("past review comments"));
     assertFalse(historicalRepetition.contains("repetition_reply_id"));
     assertTrue(conflict.contains("Concern/dismissed-concern conflict resolution"));
     assertTrue(conflict.contains("dismissed_concern"));
+    assertTrue(conflict.contains("owner_agent"));
     assertTrue(conflict.contains("Do not reinterpret historical repetition annotations"));
     assertFalse(conflict.contains("repetition_reply_id"));
     assertTrue(verification.contains("Verification and severity estimation"));
@@ -352,6 +354,22 @@ public class SpecializedReviewCollectorsTest {
   }
 
   @Test
+  public void conflictResolutionCannotChangeOwnerAgent() {
+    SpecializedReviewFindings annotatedFindings =
+        consolidatedConcern("c-raw-current-r1", List.of("raw-current-r1"));
+    SpecializedReviewFindings conflictResolvedFindings =
+        consolidatedConcern("c-raw-current-r1", List.of("raw-current-r1"));
+    conflictResolvedFindings.getConcerns().getFirst().setOwnerAgent("SECURITY");
+
+    SpecializedReviewConcernOwnership.preserveOwners(
+        conflictResolvedFindings, annotatedFindings);
+
+    assertEquals(
+        "CORRECTNESS",
+        conflictResolvedFindings.getConcerns().getFirst().getOwnerAgent());
+  }
+
+  @Test
   public void staleConsolidationIdsFallBackToCurrentRawConcerns() {
     RecordingCollectorClient client = new RecordingCollectorClient(config());
     String currentRawId = "raw-current-r1";
@@ -497,7 +515,9 @@ public class SpecializedReviewCollectorsTest {
 
   private static SpecializedReviewFindings consolidatedConcern(
       String id, List<String> mergedConcernIds) {
-    return findings(id, mergedConcernIds, "Issue");
+    SpecializedReviewFindings findings = findings(id, mergedConcernIds, "Issue");
+    findings.getConcerns().getFirst().setOwnerAgent("CORRECTNESS");
+    return findings;
   }
 
   private static SpecializedReviewFindings findings(
