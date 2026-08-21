@@ -230,15 +230,28 @@ public class AiPromptFactoryTest {
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(
         ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
-            mock(Configuration.class),
+            config,
             changeSetData,
             commentEventChange(),
             mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptReviewFeedbackClassification);
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertTrue(instructions.contains("# Current AI Review Condition"));
+    assertTrue(instructions.contains("label:Verified=+1"));
+    assertTrue(instructions.contains("# Condition Labels"));
+    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Description: CI verification"));
+    assertTrue(instructions.contains("conclusive current Condition Labels evidence"));
   }
 
   @Test

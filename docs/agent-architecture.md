@@ -88,7 +88,9 @@ Review feedback memory is the persisted, change-scoped summary of durable user g
   the user. A later explicit resume instruction removes the corresponding scope. On a review where a scope is
   disabled, its non-dismissed tracked concerns become `SKIPPED`: they were not reassessed for that Patch Set.
 - `disabled_specialized_agents`: individual Level 2 patchset agents disabled without suppressing the entire
-  `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.”
+  `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.” An exclusion can also be derived for the
+  current review from a positive Condition Label whose configured description conclusively establishes that the
+  agent's full review scope has already been validated.
 
 The memory stores distilled guidance rather than raw conversations. Questions, acknowledgements, and other
 non-durable messages are not included. Generic guidance is supplied to later review agents, while concern-specific
@@ -143,6 +145,13 @@ On the next eligible review, ReviewAI claims all pending IDs and loads the compl
 receives each claimed user comment as an exact target, with its preceding thread supplied separately as context. This
 prevents an older conversational exchange in the same thread from obscuring guidance in the newest message.
 
+The classifier also receives the configured AI review condition and the current values and descriptions of every
+Condition Label referenced by that condition. Condition Labels can trigger the classifier even when there are no
+pending user comments; in that case, the classification input contains an empty `comments` array and the request only
+recomputes specialized-agent exclusions. A positive label may disable an agent only when its configured description
+directly and conclusively covers that agent's complete review scope. The classifier must not infer semantics from a
+label name alone or treat a partial check as validation of an entire specialist scope.
+
 The feedback classifier assigns every substantive addressed comment to exactly one category:
 
 | Category | Meaning | Memory update |
@@ -152,13 +161,15 @@ The feedback classifier assigns every substantive addressed comment to exactly o
 | `IRRELEVANT` | A question, acknowledgement, or other non-guidance conversation. | None. |
 
 Commands and a leading AI mention are removed when checking whether a target comment has substantive content. If no
-substantive target comments remain, the classifier returns the current memory without making an AI request.
+substantive target comments and no Condition Labels remain, the classifier returns the current memory without making
+an AI request. With Condition Labels present, it still runs so label-derived exclusions can be added, retained, or
+removed from the current review context.
 
 For a reply in an AI concern thread, ReviewAI walks the exact `inReplyTo` lineage and compares ancestor Gerrit comment
 IDs with the comment ID persisted on each ledger concern. That match becomes a strong concern-routing hint; text or
 code location similarity is not used to infer the concern.
 
-When pending comments exist, execution order depends on the specialization level:
+When pending comments or Condition Labels exist, execution order depends on the specialization level:
 
 | Level | Ordinary comment event | Patch Set or full forced review |
 | --- | --- | --- |
@@ -167,7 +178,8 @@ When pending comments exist, execution order depends on the specialization level
 | `SPECIALIZED_AGENTS` | Enqueue and answer; neither classifier nor triage runs. | Start classification and triage concurrently, join both, then invoke specialists. |
 
 A forced review restricted to one stage classifies before invoking that selected stage instead of running specialized
-triage. If there are no pending comments, every level skips the classifier entirely and retains the current memory.
+triage. Every level skips the classifier only when there are neither pending comments nor Condition Labels, retaining
+the current memory unchanged.
 
 Level 1 filters disabled stages before agent fan-out. Level 2 keeps classification and triage parallel, then filters
 the triage plans using both coarse scopes and fine-grained specialized-agent exclusions before invoking specialists.
@@ -178,6 +190,10 @@ The journal uses `PENDING`, `PROCESSING`, and `PROCESSED` states. Its `(change_i
 delivery idempotent, and processed rows remain as tombstones so the same user message is not classified again. After
 a successful AI response and Gerrit publication, ReviewAI atomically saves the updated memory and marks the claim
 processed. AI or publication failures release the claim back to `PENDING` for a later review.
+
+A label-only classification has no feedback-journal claim. Its updated memory is applied to agent selection and
+prompts during the current review, but it is not persisted by the feedback lifecycle. The next eligible review loads
+persisted user guidance and recomputes label-derived exclusions from the then-current label state.
 
 ## Agent-Specialization Levels
 
@@ -419,7 +435,7 @@ publication. See [Repeated Comments](#repeated-comments) for the publication beh
 
 ```mermaid
 flowchart TD
-    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
+    R[Feedback comments or Condition Labels] -. when available .-> X[Feedback classifier agent]
     A[Full current patch] --> C[Concern Reviewer agent]
     B[Incremental patch and stored reviewer concerns] --> C
     X --> C
@@ -436,7 +452,7 @@ The two reviewer lanes can execute concurrently, while each lane preserves Conce
 
 ```mermaid
 flowchart TD
-    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
+    R[Feedback comments or Condition Labels] -. when available .-> X[Feedback classifier agent]
     A[Full current patch] --> P1[PATCHSET Concern Reviewer agent]
     B[Incremental patch and stored reviewer concerns] --> P1
     X --> P1
@@ -461,7 +477,7 @@ reassessed.
 ```mermaid
 flowchart TD
     A[Full current patch] --> B[Triage agent]
-    R[Pending feedback comments] -. when non-empty .-> X[Feedback classifier agent]
+    R[Feedback comments or Condition Labels] -. when available .-> X[Feedback classifier agent]
     B --> Q[Join triage and available feedback]
     X --> Q
     Q --> C[Applicable specialist reviewer lanes]

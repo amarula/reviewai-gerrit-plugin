@@ -422,20 +422,32 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected ReviewFeedbackMemory reviewFeedback(
       ChangeSetData changeSetData, GerritChange change) throws Exception {
     ReviewFeedbackMemory currentMemory = changeSetData.getReviewFeedbackMemory();
-    if (gerritClient == null
-        || changeSetData.getPendingReviewFeedbackCommentIds() == null
-        || changeSetData.getPendingReviewFeedbackCommentIds().isEmpty()) {
+    boolean hasPendingComments =
+        changeSetData.getPendingReviewFeedbackCommentIds() != null
+            && !changeSetData.getPendingReviewFeedbackCommentIds().isEmpty();
+    if (!shouldClassifyReviewFeedback(changeSetData)
+        || (hasPendingComments && gerritClient == null)) {
       return currentMemory;
     }
     ReviewFeedbackMemory feedback =
         reviewFeedbackClassifier.classify(
             changeSetData,
             change,
-            gerritClient.getClientData(change),
+            gerritClient == null ? null : gerritClient.getClientData(change),
             currentMemory,
             this::askSingleRawResponseTextWithFallback);
     changeSetData.setReviewFeedbackClassified(true);
     return feedback;
+  }
+
+  protected boolean shouldClassifyReviewFeedback(ChangeSetData changeSetData) {
+    boolean hasPendingComments =
+        changeSetData.getPendingReviewFeedbackCommentIds() != null
+            && !changeSetData.getPendingReviewFeedbackCommentIds().isEmpty();
+    boolean hasConditionLabels =
+        changeSetData.getConditionLabels() != null
+            && !changeSetData.getConditionLabels().isEmpty();
+    return hasPendingComments || hasConditionLabels;
   }
 
   private String askSingleRawResponseTextWithFallback(

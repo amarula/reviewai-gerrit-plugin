@@ -83,7 +83,9 @@ final class LangChainReviewFeedbackClassifier {
       RequestExecutor requestExecutor)
       throws Exception {
     ReviewFeedbackClassificationInput input = buildInput(changeSetData, clientData, currentMemory);
-    if (input.getComments().isEmpty()) {
+    if (input.getComments().isEmpty()
+        && (changeSetData.getConditionLabels() == null
+            || changeSetData.getConditionLabels().isEmpty())) {
       return input.getCurrentMemory();
     }
 

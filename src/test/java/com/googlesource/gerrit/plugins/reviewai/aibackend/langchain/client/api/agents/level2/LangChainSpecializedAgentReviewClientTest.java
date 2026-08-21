@@ -40,6 +40,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -141,6 +142,27 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertSame(previousFeedback, client.feedbackAtTriage);
     assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertSame(client.classifiedFeedback, client.agentFeedback.getFirst());
+    assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
+  }
+
+  @Test
+  public void reviewClassifiesConditionLabelsWithoutPendingFeedback() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage =
+        triage(
+            plan("TESTABILITY", true),
+            plan("CORRECTNESS", true));
+    client.classifiedFeedback = readDisabledTestabilityMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+
+    client.ask(changeSetData, change(false), readTestResource(PATCH_SET_RESOURCE));
+
+    assertEquals(1, client.feedbackCalls);
+    assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
   }
 
