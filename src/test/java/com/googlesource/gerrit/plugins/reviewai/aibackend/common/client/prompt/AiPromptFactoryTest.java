@@ -157,15 +157,18 @@ public class AiPromptFactoryTest {
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
     changeSetData.setSpecializedAgentInstructions("Review code quality concerns only.");
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
-            mock(Configuration.class),
-            changeSetData,
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertTrue(instructions.contains("# Role\n\nReview code quality concerns only."));
@@ -173,7 +176,14 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("# Mandatory Rules\n\nReturn exactly one update"));
     assertTrue(instructions.contains("# MANDATORY Response Format\n\nReturn only JSON"));
     assertTrue(instructions.contains("Return exactly one update for every supplied concern"));
+    assertTrue(instructions.contains("# Current AI Review Condition"));
+    assertTrue(instructions.contains("label:Verified=+1"));
+    assertTrue(instructions.contains("# Condition Labels"));
+    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Description: CI verification"));
     assertFalse(instructions.contains("candidate issues that may deserve"));
+    String request = prompt.getDefaultAiThreadReviewMessage("");
+    assertFalse(request.contains("condition_labels"));
   }
 
   @Test
@@ -184,15 +194,18 @@ public class AiPromptFactoryTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
-            mock(Configuration.class),
-            changeSetData,
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     String commitMessageRole =
         (String)
@@ -205,6 +218,9 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("# MANDATORY Response Format\n\nReturn only JSON"));
     assertTrue(instructions.contains("Return exactly one update for every supplied concern"));
     assertFalse(instructions.contains("candidate issues that may deserve"));
+    assertFalse(instructions.contains("# Current AI Review Condition"));
+    assertFalse(instructions.contains("# Condition Labels"));
+    assertFalse(instructions.contains("- Verified: +1"));
   }
 
   @Test
@@ -215,15 +231,18 @@ public class AiPromptFactoryTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
-            mock(Configuration.class),
-            changeSetData,
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptNewIssueFinder);
     Map<String, Object> prompts =
@@ -233,6 +252,35 @@ public class AiPromptFactoryTest {
             .getDefaultAiAssistantInstructions()
             .contains(
                 (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
+    assertTrue(prompt.getDefaultAiAssistantInstructions().contains("# Condition Labels"));
+    assertTrue(prompt.getDefaultAiAssistantInstructions().contains("- Verified: +1"));
+  }
+
+  @Test
+  public void commitMessageNewIssueFinderOmitsConditionLabels() {
+    ReviewerConcerns concerns = new ReviewerConcerns();
+    concerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+    changeSetData.setConcernWorkflowInput(
+        new ConcernWorkflowInput(concerns, "incremental patch", null));
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+    assertFalse(instructions.contains("# Current AI Review Condition"));
+    assertFalse(instructions.contains("# Condition Labels"));
+    assertFalse(instructions.contains("- Verified: +1"));
   }
 
   @Test
