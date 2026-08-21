@@ -38,6 +38,7 @@ public class ReviewConcernTest {
     concern.setId("concern-1");
     concern.setStatus(ConcernStatus.FIXED);
     concern.setStatusReason("A guard now rejects null.");
+    concern.setOwnerAgent("CORRECTNESS");
     concern.setRepeated(true);
     concern.setRepeatedReason("The same problem was reported before.");
     concern.setPreviousCommentId("comment-1");
@@ -54,6 +55,7 @@ public class ReviewConcernTest {
     restored.normalize();
 
     assertTrue(serializedObject.has("past_comment_id"));
+    assertEquals("CORRECTNESS", serializedObject.get("owner_agent").getAsString());
     assertFalse(serializedObject.has("previous_comment_id"));
     assertEquals(concern, restored);
   }

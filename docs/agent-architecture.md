@@ -52,8 +52,9 @@ as `FIXED` or automatically resolve its Gerrit thread.
 `ReviewConcern` is the canonical lifecycle structure and is also used by the specialized-agent finding pipeline.
 `AiReplyItem` remains the publication-facing structure expected by the existing Gerrit review path.
 `ReviewConcernReplyMapper` handles this boundary for the single and scoped workflows and when publishing repeated
-concerns; Level 2 maps verified collector findings to concerns while retaining their specialist ownership. This keeps
-lifecycle state centralized without requiring the Gerrit output API to become the persistence model.
+concerns; Level 2 maps verified collector findings to concerns while retaining their semantic owner and source-agent
+provenance. This keeps lifecycle state centralized without requiring the Gerrit output API to become the persistence
+model.
 
 ### Logical reviewer
 
@@ -68,8 +69,10 @@ A reviewer ID contains a kind and name:
 | `SCOPED_AGENTS` | `SCOPED_AGENT` | `PATCHSET`, `COMMIT_MESSAGE` |
 | `SPECIALIZED_AGENTS` | `SPECIALIZED_AGENT` | `COMMIT_MESSAGE`, `CORRECTNESS`, `TESTABILITY`, `CODE_QUALITY`, `DOCUMENTATION`, `SECURITY` |
 
-Each reviewer owns a separate list of concerns. This prevents a correctness agent, for example, from silently changing
-the state of a concern owned by the security agent.
+Each reviewer owns a separate list of concerns. Level 2 concerns carry one canonical `owner_agent`, which controls
+their ledger lane and follow-up routing. Their `reviewers` list separately records every source agent whose raw finding
+contributed to the consolidated concern. This prevents a correctness concern reported by several agents from being
+reassessed through each source agent's lane.
 
 ### Concern ledger
 
@@ -285,7 +288,10 @@ Historical repetition matching is retained on this path for backward compatibili
 yet. It compares current findings with eligible historical Gerrit comments and can mark a finding as repeated.
 
 Only verified findings that can be associated with their source specialist are stored in the Level 2 ledger. An
-association failure is logged and leaves that finding out of the ledger.
+association failure is logged and leaves that finding out of the ledger. Consolidation assigns each concern exactly
+one canonical `owner_agent` according to its substantive scope. Conflict resolution must preserve that owner. The
+verified concern is stored only in the owner's ledger lane, while all associated source specialists remain available
+in the concern's `reviewers` provenance list.
 
 ## Follow-Up Review
 
@@ -365,6 +371,11 @@ Both concern stages use the same `ConcernWorkflowInput` structure:
   }
 }
 ```
+
+Every Level 2 concern inside `concerns` also includes its canonical `owner_agent`. Legacy Level 2 concerns without the
+field are normalized before follow-up routing: a recognized concern `type` is used first, followed by an unambiguous
+single source reviewer and finally the existing ledger lane. Duplicate legacy copies that resolve to the same owner
+and concern ID are collapsed.
 
 Patch selection is centralized so the stages cannot diverge:
 
