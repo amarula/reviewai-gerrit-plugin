@@ -68,6 +68,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 
 public class LangChainSpecializedAgentReviewClientTest {
@@ -543,6 +544,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(fieldDefinitions.contains("`concerns`"));
     assertTrue(fieldDefinitions.contains("`dismissed_concerns`"));
     assertTrue(fieldDefinitions.contains("`type`"));
+    assertTrue(fieldDefinitions.contains("exactly `TESTABILITY`"));
     assertTrue(fieldDefinitions.contains("`description`"));
     assertTrue(fieldDefinitions.contains("`reasoning`"));
     assertTrue(fieldDefinitions.contains("`preexisting`"));
@@ -559,6 +561,25 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
+  public void specializedPatchsetAgentPromptEnforcesExclusiveScope() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    changeSetData.setSpecializedAgentName("CODE_QUALITY");
+    changeSetData.setSpecializedAgentInstructions("Review code quality only.");
+
+    String instructions =
+        new TestableSpecializedPrompt(config(), changeSetData, change(false))
+            .getDefaultAiAssistantInstructions();
+
+    assertTrue(instructions.contains("# Strict Specialist Boundary"));
+    assertTrue(instructions.contains("You are the CODE_QUALITY specialist"));
+    assertTrue(instructions.contains("primary subject belongs to CODE_QUALITY"));
+    assertTrue(instructions.contains("type` must be exactly `CODE_QUALITY`"));
+    assertTrue(instructions.contains("\"type\":\"CODE_QUALITY\""));
+    assertFalse(instructions.contains("\"type\":\"Correctness\""));
+  }
+
+  @Test
   public void commitMessageSpecialistFieldDefinitionsRequireCommitMessageLocation() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
@@ -572,6 +593,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(fieldDefinitions.contains("# Field Definitions"));
     assertTrue(fieldDefinitions.contains("`concerns`"));
     assertTrue(fieldDefinitions.contains("`dismissed_concerns`"));
+    assertTrue(fieldDefinitions.contains("exactly `COMMIT_MESSAGE`"));
     assertTrue(fieldDefinitions.contains("exact commit-message filename"));
     assertTrue(fieldDefinitions.contains("Every commit-message reply MUST identify"));
     assertTrue(fieldDefinitions.contains("/COMMIT_MSG"));
@@ -603,9 +625,31 @@ public class LangChainSpecializedAgentReviewClientTest {
             .getDefaultAiAssistantInstructions();
 
     assertTrue(patchsetInstructions.contains(memory.getGenericFeedback()));
+    assertTrue(patchsetInstructions.contains("disabled_specialized_agents"));
+    assertTrue(patchsetInstructions.contains("mandatory exclusions"));
+    assertTrue(patchsetInstructions.contains("TESTABILITY"));
     assertTrue(commitMessageInstructions.contains(memory.getGenericFeedback()));
     assertTrue(
         commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
+  }
+
+  @Test
+  public void specializedAgentPromptIncludesDisabledOnlyFeedbackMemory() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    changeSetData.setSpecializedAgentName("CODE_QUALITY");
+    changeSetData.setSpecializedAgentInstructions("Review code quality only.");
+    ReviewFeedbackMemory memory = new ReviewFeedbackMemory();
+    memory.setDisabledSpecializedAgents(Set.of("CORRECTNESS"));
+    changeSetData.setReviewFeedbackMemory(memory);
+
+    String instructions =
+        new TestableSpecializedPrompt(config(), changeSetData, change(false))
+            .getDefaultAiAssistantInstructions();
+
+    assertTrue(instructions.contains("# Distilled User Review Feedback"));
+    assertTrue(instructions.contains("disabled_specialized_agents"));
+    assertTrue(instructions.contains("CORRECTNESS"));
   }
 
   @Test

@@ -18,6 +18,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.MapUtils.isEmpty;
 
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
@@ -218,8 +220,9 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     ReviewFeedbackMemory memory = changeSetData.getReviewFeedbackMemory();
     if (memory == null
         || (memory.getGenericFeedback() == null
-            && (memory.getConcernFeedback() == null
-                || memory.getConcernFeedback().isEmpty()))) {
+            && isEmpty(memory.getConcernFeedback())
+            && isEmpty(memory.getDisabledReviewScopes())
+            && isEmpty(memory.getDisabledSpecializedAgents()))) {
       return List.of();
     }
     return List.of(
