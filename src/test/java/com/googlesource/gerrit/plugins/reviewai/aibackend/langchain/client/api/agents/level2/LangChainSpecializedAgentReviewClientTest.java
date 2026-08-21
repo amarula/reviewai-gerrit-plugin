@@ -23,6 +23,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernLedgerOperations;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
@@ -121,6 +123,112 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(
         response.getReplies().getFirst().getConcernId(),
         stored.getConcerns().getFirst().getId());
+  }
+
+  @Test
+  public void verifiedConcernIsStoredOnlyUnderItsOwnerAgent() {
+    ReviewConcern codeQualityConcern =
+        finding("Code Quality", "Shared issue").getConcerns().getFirst();
+    codeQualityConcern.setId("raw-r1");
+    ReviewConcern correctnessConcern =
+        finding("Correctness", "Shared issue").getConcerns().getFirst();
+    correctnessConcern.setId("raw-r2");
+    List<SpecializedReviewFindings.AgentFindings> rawFindings =
+        List.of(
+            SpecializedReviewFindings.AgentFindings.from(
+                "CODE_QUALITY", findings(codeQualityConcern)),
+            SpecializedReviewFindings.AgentFindings.from(
+                "CORRECTNESS", findings(correctnessConcern)));
+    ReviewConcern verifiedConcern =
+        finding("Correctness", "Shared issue").getConcerns().getFirst();
+    verifiedConcern.setId("c-raw-r1");
+    verifiedConcern.setMergedConcernIds(List.of("raw-r1", "raw-r2"));
+    verifiedConcern.setOwnerAgent("CORRECTNESS");
+    SpecializedReviewFindings verifiedFindings = findings(verifiedConcern);
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(
+        List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
+    SpecializedReviewConcernLedgerOperations operations =
+        new SpecializedReviewConcernLedgerOperations(
+            new ReviewConcernLedgerOperations());
+
+    ReviewConcernLedger updates =
+        operations.verifiedUpdates(response, verifiedFindings, rawFindings);
+
+    assertEquals(1, updates.getReviewers().size());
+    ReviewerConcerns owned =
+        reviewer(
+            updates,
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "CORRECTNESS");
+    assertEquals(1, owned.getConcerns().size());
+    assertEquals("CORRECTNESS", owned.getConcerns().getFirst().getOwnerAgent());
+    assertEquals(2, owned.getConcerns().getFirst().getReviewers().size());
+  }
+
+  @Test
+  public void verifiedConcernRequiresOwnerAgent() {
+    ReviewConcern rawConcern =
+        finding("Correctness", "Issue").getConcerns().getFirst();
+    rawConcern.setId("raw-r1");
+    ReviewConcern verifiedConcern = rawConcern.copy();
+    verifiedConcern.setId("c-raw-r1");
+    verifiedConcern.setMergedConcernIds(List.of("raw-r1"));
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(
+        List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
+    SpecializedReviewConcernLedgerOperations operations =
+        new SpecializedReviewConcernLedgerOperations(
+            new ReviewConcernLedgerOperations());
+
+    IllegalStateException thrown =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                operations.verifiedUpdates(
+                    response,
+                    findings(verifiedConcern),
+                    List.of(
+                        SpecializedReviewFindings.AgentFindings.from(
+                            "CORRECTNESS", findings(rawConcern)))));
+
+    assertEquals(
+        "Verified specialized concern has no valid owner_agent",
+        thrown.getMessage());
+  }
+
+  @Test
+  public void legacySharedConcernMovesToSemanticOwnerLane() {
+    ReviewConcern concern = storedConcern("shared", ConcernStatus.PRESENT);
+    concern.setType("Correctness");
+    concern.setReviewers(
+        List.of(
+            new ConcernReviewerId(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CODE_QUALITY"),
+            new ConcernReviewerId(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(
+        List.of(
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+                "CODE_QUALITY",
+                concern.copy()),
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+                "CORRECTNESS",
+                concern.copy())));
+
+    SpecializedReviewConcernOwnership.normalizeLedger(ledger);
+
+    assertEquals(1, ledger.getReviewers().size());
+    ReviewerConcerns owned =
+        reviewer(
+            ledger,
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "CORRECTNESS");
+    assertEquals(1, owned.getConcerns().size());
+    assertEquals("CORRECTNESS", owned.getConcerns().getFirst().getOwnerAgent());
   }
 
   @Test
@@ -843,6 +951,11 @@ public class LangChainSpecializedAgentReviewClientTest {
         boolean includeHistoricalRepetition) {
       specializedFindings.forEach(finding -> collectorAgents.add(finding.getAgent()));
       historicalRepetitionSelections.add(includeHistoricalRepetition);
+      specializedFindings.forEach(
+          findings ->
+              findings
+                  .getConcerns()
+                  .forEach(concern -> concern.setOwnerAgent(findings.getAgent())));
       SpecializedReviewFindings verifiedFindings = new SpecializedReviewFindings();
       verifiedFindings.setConcerns(
           specializedFindings.stream()
@@ -940,6 +1053,13 @@ public class LangChainSpecializedAgentReviewClientTest {
     location.setCodeSnippet("return value;");
     concern.setLocations(List.of(location));
     findings.setConcerns(List.of(concern));
+    findings.setDismissedConcerns(List.of());
+    return findings;
+  }
+
+  private static SpecializedReviewFindings findings(ReviewConcern... concerns) {
+    SpecializedReviewFindings findings = new SpecializedReviewFindings();
+    findings.setConcerns(List.of(concerns));
     findings.setDismissedConcerns(List.of());
     return findings;
   }
