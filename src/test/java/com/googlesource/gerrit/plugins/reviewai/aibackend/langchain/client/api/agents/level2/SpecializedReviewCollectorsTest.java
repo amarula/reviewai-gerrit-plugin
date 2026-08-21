@@ -370,6 +370,60 @@ public class SpecializedReviewCollectorsTest {
   }
 
   @Test
+  public void specializedAgentFindingsDiscardItemsOutsideAgentScope() {
+    ReviewConcern correctness =
+        concern("raw-correctness", List.of(), "Correctness issue", "src/Test.java");
+    ReviewConcern codeQuality =
+        concern("raw-code-quality", List.of(), "Code quality issue", "src/Test.java");
+    codeQuality.setType("Code Quality");
+    ReviewConcern dismissedCorrectness =
+        concern("dismissed-correctness", List.of(), "Dismissed issue", "src/Test.java");
+    SpecializedReviewFindings findings = findings(List.of(correctness, codeQuality));
+    findings.setDismissedConcerns(List.of(dismissedCorrectness));
+
+    SpecializedReviewFindings.AgentFindings scoped =
+        SpecializedReviewFindings.AgentFindings.from("CODE_QUALITY", findings);
+
+    assertEquals(List.of(codeQuality), scoped.getConcerns());
+    assertTrue(scoped.getDismissedConcerns().isEmpty());
+  }
+
+  @Test
+  public void consolidationCannotAssignOwnerWithoutMatchingSourceAgent() {
+    ReviewConcern rawCodeQuality =
+        concern("raw-code-quality", List.of(), "Code quality issue", "src/Test.java");
+    rawCodeQuality.setType("Code Quality");
+    List<SpecializedReviewFindings.AgentFindings> rawFindings =
+        List.of(
+            SpecializedReviewFindings.AgentFindings.from(
+                "CODE_QUALITY", findings(List.of(rawCodeQuality))));
+    SpecializedReviewFindings consolidated =
+        consolidatedConcern("c-raw-code-quality", List.of("raw-code-quality"));
+
+    SpecializedReviewConcernOwnership.retainSupportedOwners(
+        consolidated, rawFindings, Set.of());
+
+    assertTrue(consolidated.getConcerns().isEmpty());
+  }
+
+  @Test
+  public void consolidationCannotRestoreDisabledOwner() {
+    ReviewConcern rawCorrectness =
+        concern("raw-correctness", List.of(), "Correctness issue", "src/Test.java");
+    List<SpecializedReviewFindings.AgentFindings> rawFindings =
+        List.of(
+            SpecializedReviewFindings.AgentFindings.from(
+                "CORRECTNESS", findings(List.of(rawCorrectness))));
+    SpecializedReviewFindings consolidated =
+        consolidatedConcern("c-raw-correctness", List.of("raw-correctness"));
+
+    SpecializedReviewConcernOwnership.retainSupportedOwners(
+        consolidated, rawFindings, Set.of("CORRECTNESS"));
+
+    assertTrue(consolidated.getConcerns().isEmpty());
+  }
+
+  @Test
   public void staleConsolidationIdsFallBackToCurrentRawConcerns() {
     RecordingCollectorClient client = new RecordingCollectorClient(config());
     String currentRawId = "raw-current-r1";
@@ -542,6 +596,7 @@ public class SpecializedReviewCollectorsTest {
     concern.setDescription(description);
     concern.setReasoning("Reasoning");
     concern.setPreexisting(false);
+    concern.setOwnerAgent("CORRECTNESS");
     ConcernLocation location = new ConcernLocation();
     location.setFilename(filename);
     location.setLineNumber(42);

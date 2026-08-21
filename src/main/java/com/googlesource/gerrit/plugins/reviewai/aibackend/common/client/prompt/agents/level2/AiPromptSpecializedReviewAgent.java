@@ -45,6 +45,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
 
     List<String> sections = new ArrayList<>();
     sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
+    sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildConditionLabelSections());
     sections.addAll(buildReviewFeedbackSections());
     sections.add(
@@ -66,11 +67,15 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT")));
+            String.format(
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT"),
+                expectedOwnerAgent())));
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES")));
+            String.format(
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
+                expectedOwnerAgent())));
     return joinWithDoubleNewLine(sections);
   }
 
@@ -80,6 +85,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
             resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
+    sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildReviewFeedbackSections());
     sections.add(
         buildSection(
@@ -108,16 +114,36 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT")));
+            String.format(
+                prompt(
+                    "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT"),
+                expectedOwnerAgent())));
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES")));
+            String.format(
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
+                expectedOwnerAgent())));
     return joinWithDoubleNewLine(sections);
   }
 
   private String getSpecializationInstructions() {
     return changeSetData.getSpecializedAgentInstructions();
+  }
+
+  private String buildStrictSpecialistBoundarySection() {
+    return buildSection(
+        prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_STRICT_SPECIALIST_BOUNDARY"),
+        String.format(
+            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_STRICT_SCOPE"),
+            expectedOwnerAgent()));
+  }
+
+  private String expectedOwnerAgent() {
+    return changeSetData.getSpecializedAgentName() == null
+        ? "COMMIT_MESSAGE"
+        : SpecializedReviewAgentDefinition.normalizeName(
+            changeSetData.getSpecializedAgentName());
   }
 
   private String getSpecializedReplyFieldDefinitions(boolean includeInlineLocationFields) {
@@ -127,7 +153,9 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
             : "`locations`: array with the exact commit-message filename from the patch input; ";
     return "`concerns`: array of candidate issues that may deserve a final review comment; "
         + "`dismissed_concerns`: array of investigated candidate issues that do not apply; "
-        + "`type`: concise category such as Correctness, Testability, Code Quality, Documentation, Security, or Commit Message; "
+        + "`type`: exactly `"
+        + expectedOwnerAgent()
+        + "`; this machine-enforced field identifies the concern's semantic scope; "
         + "`description`: precise statement of the candidate issue; "
         + "`reasoning`: evidence, triggering condition, and why the issue matters; "
         + "`preexisting`: true only when the concern existed before this patch; "
