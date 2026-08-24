@@ -34,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAcc
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewHistory;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessage;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessageStatus;
+import com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel;
 
@@ -69,6 +70,7 @@ public class Module extends LifecycleModule {
           @Override
           protected void configure() {
             get(ChangeResource.CHANGE_KIND, "ai-review-history").to(AiReviewHistory.class);
+            get(ChangeResource.CHANGE_KIND, "ai-review-threads").to(AiReviewThreads.class);
             get(ChangeResource.CHANGE_KIND, "ai-review-agent-model").to(ReviewAgentModel.class);
             post(ChangeResource.CHANGE_KIND, "ai-review-message").to(AiReviewMessage.class);
             post(ChangeResource.CHANGE_KIND, "ai-review-message-status")
