@@ -58,6 +58,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -422,6 +423,7 @@ public class ReviewTestBase extends TestBase {
             getOpenAIClient(),
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
+            new ReviewConcernPublisher(getTestReviewAiDb()),
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);
   }
