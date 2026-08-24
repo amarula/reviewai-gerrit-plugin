@@ -20,6 +20,7 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public final class ReviewFeedbackPublisher {
@@ -36,6 +37,10 @@ public final class ReviewFeedbackPublisher {
 
   public void enqueue(GerritChange change, Collection<String> commentIds) {
     store(change).enqueue(commentIds);
+  }
+
+  public List<ReviewFeedbackStore.FeedbackComment> listComments(GerritChange change) {
+    return store(change).listComments();
   }
 
   public ReviewFeedbackStore.Claim claimPending(GerritChange change) {
