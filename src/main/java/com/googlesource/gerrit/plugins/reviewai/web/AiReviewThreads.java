@@ -31,13 +31,17 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -60,15 +64,18 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
   private final AiReviewPermission aiReviewPermission;
   private final ReviewConcernPublisher reviewConcernPublisher;
+  private final ReviewFeedbackPublisher reviewFeedbackPublisher;
 
   @Inject
   AiReviewThreads(
       ConfigCreator configCreator,
       AiReviewPermission aiReviewPermission,
-      ReviewConcernPublisher reviewConcernPublisher) {
+      ReviewConcernPublisher reviewConcernPublisher,
+      ReviewFeedbackPublisher reviewFeedbackPublisher) {
     this.configCreator = configCreator;
     this.aiReviewPermission = aiReviewPermission;
     this.reviewConcernPublisher = reviewConcernPublisher;
+    this.reviewFeedbackPublisher = reviewFeedbackPublisher;
   }
 
   @Override
@@ -89,6 +96,10 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       GerritChange gerritChange =
           new GerritChange(resource.getProject(), change.getDest(), change.getKey());
       reviewConcernPublisher.load(gerritChange).ifPresent(ledger -> annotateWithLedger(output, ledger));
+      annotateWithFeedback(
+          output,
+          reviewFeedbackPublisher.load(gerritChange).orElse(null),
+          reviewFeedbackPublisher.listComments(gerritChange));
       return Response.ok(output);
     }
   }
@@ -139,6 +150,62 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
               .distinct()
               .toList();
     }
+  }
+
+  static void annotateWithFeedback(
+      Output output,
+      ReviewFeedbackMemory feedbackMemory,
+      List<ReviewFeedbackStore.FeedbackComment> feedbackComments) {
+    if (feedbackMemory != null) {
+      output.feedbackMemory = new FeedbackMemoryInfo(feedbackMemory);
+    }
+    output.feedbackComments = feedbackComments.stream().map(FeedbackCommentInfo::new).toList();
+    Map<String, String> feedbackStatesByCommentId = new HashMap<>();
+    for (ReviewFeedbackStore.FeedbackComment comment : feedbackComments) {
+      feedbackStatesByCommentId.put(comment.commentId(), comment.processingState());
+    }
+    Map<String, String> concernIdsByCommentId = concernIdsByCommentId(output.concernLedger);
+    for (ThreadInfo thread : output.threads) {
+      Map<String, ThreadComment> commentsById = new HashMap<>();
+      thread.comments.forEach(comment -> commentsById.put(comment.id, comment));
+      for (ThreadComment comment : thread.comments) {
+        comment.feedbackState = feedbackStatesByCommentId.get(comment.id);
+        if (comment.feedbackState != null) {
+          comment.threadConcernId = threadConcernId(comment, commentsById, concernIdsByCommentId);
+        }
+      }
+    }
+  }
+
+  private static Map<String, String> concernIdsByCommentId(LedgerInfo ledger) {
+    if (ledger == null) {
+      return Map.of();
+    }
+    Map<String, String> concernIds = new HashMap<>();
+    for (ReviewerInfo reviewer : ledger.reviewers) {
+      for (ConcernInfo concern : reviewer.concerns) {
+        if (concern.previousCommentId != null && !concern.previousCommentId.isBlank()) {
+          concernIds.putIfAbsent(concern.previousCommentId, concern.id);
+        }
+      }
+    }
+    return concernIds;
+  }
+
+  private static String threadConcernId(
+      ThreadComment comment,
+      Map<String, ThreadComment> commentsById,
+      Map<String, String> concernIdsByCommentId) {
+    Set<String> visitedIds = new HashSet<>();
+    ThreadComment current = comment;
+    while (current != null && visitedIds.add(current.id)) {
+      String concernId = concernIdsByCommentId.get(current.id);
+      if (concernId != null) {
+        return concernId;
+      }
+      current = commentsById.get(current.inReplyTo);
+    }
+    return null;
   }
 
   private static Collection<GerritComment> flatten(
@@ -217,6 +284,12 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
 
     @SerializedName("concern_ledger")
     public LedgerInfo concernLedger;
+
+    @SerializedName("feedback_memory")
+    public FeedbackMemoryInfo feedbackMemory;
+
+    @SerializedName("feedback_comments")
+    public List<FeedbackCommentInfo> feedbackComments = List.of();
   }
 
   public static class ThreadInfo {
@@ -254,6 +327,12 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
     public String tag;
     public boolean autogenerated;
     public String message;
+
+    @SerializedName("feedback_state")
+    public String feedbackState;
+
+    @SerializedName("thread_concern_id")
+    public String threadConcernId;
   }
 
   public static class LedgerInfo {
@@ -328,6 +407,44 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       filename = location.getFilename();
       lineNumber = location.getLineNumber();
       codeSnippet = location.getCodeSnippet();
+    }
+  }
+
+  public static class FeedbackMemoryInfo {
+    @SerializedName("schema_version")
+    public int schemaVersion;
+
+    @SerializedName("generic_feedback")
+    public String genericFeedback;
+
+    @SerializedName("concern_feedback")
+    public Map<String, String> concernFeedback;
+
+    @SerializedName("disabled_review_scopes")
+    public Set<ReviewScope> disabledReviewScopes;
+
+    @SerializedName("disabled_specialized_agents")
+    public Set<String> disabledSpecializedAgents;
+
+    FeedbackMemoryInfo(ReviewFeedbackMemory memory) {
+      schemaVersion = memory.getSchemaVersion();
+      genericFeedback = memory.getGenericFeedback();
+      concernFeedback = memory.getConcernFeedback();
+      disabledReviewScopes = memory.getDisabledReviewScopes();
+      disabledSpecializedAgents = memory.getDisabledSpecializedAgents();
+    }
+  }
+
+  public static class FeedbackCommentInfo {
+    @SerializedName("comment_id")
+    public String commentId;
+
+    @SerializedName("processing_state")
+    public String processingState;
+
+    FeedbackCommentInfo(ReviewFeedbackStore.FeedbackComment comment) {
+      commentId = comment.commentId();
+      processingState = comment.processingState();
     }
   }
 }

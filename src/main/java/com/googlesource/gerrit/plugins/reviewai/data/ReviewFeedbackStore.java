@@ -51,6 +51,29 @@ public final class ReviewFeedbackStore {
     return memoryStore.load();
   }
 
+  public List<FeedbackComment> listComments() {
+    try (Connection connection = db.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                SELECT comment_id, processing_state
+                FROM review_feedback_comments
+                WHERE change_id = ?
+                ORDER BY updated_at, comment_id
+                """)) {
+      statement.setString(1, changeId);
+      try (ResultSet results = statement.executeQuery()) {
+        List<FeedbackComment> comments = new ArrayList<>();
+        while (results.next()) {
+          comments.add(new FeedbackComment(results.getString(1), results.getString(2)));
+        }
+        return comments;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to list review feedback for change " + changeId, e);
+    }
+  }
+
   public void enqueue(Collection<String> commentIds) {
     Set<String> normalizedIds = normalizeCommentIds(commentIds);
     if (normalizedIds.isEmpty()) {
@@ -265,4 +288,6 @@ public final class ReviewFeedbackStore {
       return commentIds.isEmpty();
     }
   }
+
+  public record FeedbackComment(String commentId, String processingState) {}
 }

@@ -27,10 +27,13 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -74,6 +77,40 @@ public class AiReviewThreadsTest {
   @Test
   public void annotatesThreadsOnlyThroughPublishedConcernCommentIds() {
     AiReviewThreads.Output output = AiReviewThreads.buildOutput(comments, AI_ACCOUNT_ID);
+
+    AiReviewThreads.annotateWithLedger(output, ledgerForAiConcern());
+
+    assertEquals("abc123", output.concernLedger.lastReviewedCommit);
+    assertEquals("CORRECTNESS", output.concernLedger.reviewers.get(0).name);
+    assertEquals("ai-concern", output.concernLedger.reviewers.get(0).concerns.get(0).previousCommentId);
+    assertEquals(List.of("concern-1"), output.threads.get(0).concernIds);
+  }
+
+  @Test
+  public void exposesFeedbackStateAndClassifierConcernRouting() {
+    AiReviewThreads.Output output = AiReviewThreads.buildOutput(comments, AI_ACCOUNT_ID);
+    AiReviewThreads.annotateWithLedger(output, ledgerForAiConcern());
+    ReviewFeedbackMemory memory = new ReviewFeedbackMemory();
+    memory.setGenericFeedback("Focus on resource lifecycles.");
+    memory.setConcernFeedback(Map.of("concern-1", "The framework owns this connection."));
+
+    AiReviewThreads.annotateWithFeedback(
+        output,
+        memory,
+        List.of(new ReviewFeedbackStore.FeedbackComment("user-reply", "PENDING")));
+
+    assertEquals("Focus on resource lifecycles.", output.feedbackMemory.genericFeedback);
+    assertEquals("PENDING", output.feedbackComments.get(0).processingState);
+    AiReviewThreads.ThreadComment reply =
+        output.threads.get(0).comments.stream()
+            .filter(comment -> "user-reply".equals(comment.id))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("PENDING", reply.feedbackState);
+    assertEquals("concern-1", reply.threadConcernId);
+  }
+
+  private static ReviewConcernLedger ledgerForAiConcern() {
     ReviewConcern concern = new ReviewConcern();
     concern.setId("concern-1");
     concern.setOwnerAgent("CORRECTNESS");
@@ -85,13 +122,7 @@ public class AiReviewThreadsTest {
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ledger.setLastReviewedCommit("abc123");
     ledger.setReviewers(List.of(reviewer));
-
-    AiReviewThreads.annotateWithLedger(output, ledger);
-
-    assertEquals("abc123", output.concernLedger.lastReviewedCommit);
-    assertEquals("CORRECTNESS", output.concernLedger.reviewers.get(0).name);
-    assertEquals("ai-concern", output.concernLedger.reviewers.get(0).concerns.get(0).previousCommentId);
-    assertEquals(List.of("concern-1"), output.threads.get(0).concernIds);
+    return ledger;
   }
 
   private void setAuthor(String id, int accountId, String name) {
