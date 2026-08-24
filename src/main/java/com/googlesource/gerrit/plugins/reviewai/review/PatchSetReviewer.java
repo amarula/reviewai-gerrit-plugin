@@ -21,6 +21,7 @@ import com.google.inject.Provider;
 import com.google.gerrit.server.config.CanonicalWebUrl;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
@@ -63,6 +64,7 @@ public class PatchSetReviewer {
   private final RepeatedCommentReferenceFormatter repeatedCommentReferenceFormatter;
   private final TopicPatchSetReviewer topicPatchSetReviewer;
   private final TopicReviewReplyMapper topicReviewReplyMapper;
+  private final ReviewConcernPublisher reviewConcernPublisher;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -78,6 +80,7 @@ public class PatchSetReviewer {
       IAiClient openAiClient,
       Localizer localizer,
       PatchSetReviewConversationRecorder conversationRecorder,
+      ReviewConcernPublisher reviewConcernPublisher,
       @CanonicalWebUrl @Nullable String canonicalWebUrl) {
     this.config = config;
     this.gerritClient = gerritClient;
@@ -86,6 +89,7 @@ public class PatchSetReviewer {
     this.openAiClient = openAiClient;
     this.localizer = localizer;
     this.conversationRecorder = conversationRecorder;
+    this.reviewConcernPublisher = reviewConcernPublisher;
     this.repeatedCommentReferenceFormatter =
         new RepeatedCommentReferenceFormatter(
             gerritClient, changeSetData, localizer, canonicalWebUrl);
@@ -157,6 +161,7 @@ public class PatchSetReviewer {
     }
     Integer reviewScore = getReviewScore(change);
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
+    reviewConcernPublisher.persist(reviewReply, change);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
@@ -197,6 +202,7 @@ public class PatchSetReviewer {
             ? getReviewScore(change)
             : getReviewScore(change, topicReviewScores);
     clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, reviewScore);
+    reviewConcernPublisher.persist(reviewReply, change);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
