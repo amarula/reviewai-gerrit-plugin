@@ -71,6 +71,12 @@ public class PluginDataHandlerProvider extends PluginDataHandlerBaseProvider
     return super.get(changeKey);
   }
 
+  public PluginDataHandler getChangeScope(GerritChange change) {
+    String targetChangeKey = change.getChangeKey().toString();
+    log.debug("Accessing PluginDataHandler for change scope: {}", targetChangeKey);
+    return super.get(targetChangeKey);
+  }
+
   public PluginDataHandler getAssistantsWorkspace() {
     log.debug("Accessing PluginDataHandler for assistants workspace: {}", assistantsWorkspace);
     return super.get(assistantsWorkspace);
