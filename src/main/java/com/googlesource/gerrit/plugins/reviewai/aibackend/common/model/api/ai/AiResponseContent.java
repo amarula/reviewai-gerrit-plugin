@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -27,5 +28,6 @@ import java.util.List;
 public class AiResponseContent {
   private List<AiReplyItem> replies;
   private String changeId;
+  private transient PendingReviewConcernUpdates pendingConcernUpdates;
   @NonNull private String messageContent;
 }
