@@ -24,6 +24,10 @@ import static org.junit.Assert.assertTrue;
 import com.google.gson.reflect.TypeToken;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
@@ -65,6 +69,29 @@ public class AiReviewThreadsTest {
     assertEquals(
         List.of("review-command", "ai-concern", "user-reply", "ai-ack", "sibling-reply"),
         thread.comments.stream().map(comment -> comment.id).toList());
+  }
+
+  @Test
+  public void annotatesThreadsOnlyThroughPublishedConcernCommentIds() {
+    AiReviewThreads.Output output = AiReviewThreads.buildOutput(comments, AI_ACCOUNT_ID);
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-1");
+    concern.setOwnerAgent("CORRECTNESS");
+    concern.setPreviousCommentId("ai-concern");
+    ReviewerConcerns reviewer = new ReviewerConcerns();
+    reviewer.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS"));
+    reviewer.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setLastReviewedCommit("abc123");
+    ledger.setReviewers(List.of(reviewer));
+
+    AiReviewThreads.annotateWithLedger(output, ledger);
+
+    assertEquals("abc123", output.concernLedger.lastReviewedCommit);
+    assertEquals("CORRECTNESS", output.concernLedger.reviewers.get(0).name);
+    assertEquals("ai-concern", output.concernLedger.reviewers.get(0).concerns.get(0).previousCommentId);
+    assertEquals(List.of("concern-1"), output.threads.get(0).concernIds);
   }
 
   private void setAuthor(String id, int accountId, String name) {
