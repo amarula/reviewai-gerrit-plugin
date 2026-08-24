@@ -73,6 +73,26 @@ public class ReviewFeedbackStoreTest extends TestBase {
   }
 
   @Test
+  public void listsFeedbackCommentsWithoutChangingTheirState() {
+    store.enqueue(List.of("comment-1", "comment-2"));
+
+    assertEquals(
+        List.of(
+            new ReviewFeedbackStore.FeedbackComment("comment-1", "PENDING"),
+            new ReviewFeedbackStore.FeedbackComment("comment-2", "PENDING")),
+        store.listComments());
+
+    ReviewFeedbackStore.Claim claim = store.claimPending();
+
+    assertEquals(
+        List.of(
+            new ReviewFeedbackStore.FeedbackComment("comment-1", "PROCESSING"),
+            new ReviewFeedbackStore.FeedbackComment("comment-2", "PROCESSING")),
+        store.listComments());
+    store.release(claim);
+  }
+
+  @Test
   public void staleClaimDoesNotReplaceMemory() {
     store.enqueue(List.of("comment-1"));
     ReviewFeedbackStore.Claim claim = store.claimPending();
