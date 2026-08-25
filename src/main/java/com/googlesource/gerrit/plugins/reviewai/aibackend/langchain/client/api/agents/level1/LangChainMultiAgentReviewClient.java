@@ -261,7 +261,10 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
           .attachPendingLedger(
               response,
               change,
-              previousLedger == null ? new ReviewConcernLedger() : previousLedger);
+              previousLedger == null
+                  ? new ReviewConcernLedger()
+                  : concernLedgerOperations().markDisabledScopeConcernsSkipped(
+                      previousLedger, changeSetData.getReviewFeedbackMemory()));
       return response;
     }
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
@@ -408,7 +411,9 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         .attachPendingLedger(
             response,
             change,
-            concernLedgerOperations().mergeReviewerUpdates(previousLedger, reviewerUpdates));
+            concernLedgerOperations().markDisabledScopeConcernsSkipped(
+                concernLedgerOperations().mergeReviewerUpdates(previousLedger, reviewerUpdates),
+                changeSetData.getReviewFeedbackMemory()));
   }
 
   @VisibleForTesting

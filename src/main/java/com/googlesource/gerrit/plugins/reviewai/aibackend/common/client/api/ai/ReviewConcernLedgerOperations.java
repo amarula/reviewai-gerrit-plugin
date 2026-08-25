@@ -24,7 +24,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Co
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -40,6 +42,42 @@ public final class ReviewConcernLedgerOperations {
         .filter(entry -> reviewer.equals(entry.getReviewer()))
         .findFirst()
         .orElseGet(() -> emptyReviewerConcerns(reviewer));
+  }
+
+  /** Marks concerns in disabled scopes as unassessed for the current patch set. */
+  public ReviewConcernLedger markDisabledScopeConcernsSkipped(
+      ReviewConcernLedger ledger, ReviewFeedbackMemory feedback) {
+    if (ledger == null
+        || feedback == null
+        || feedback.getDisabledReviewScopes() == null
+        || feedback.getDisabledReviewScopes().isEmpty()) {
+      return ledger;
+    }
+    ledger.normalize();
+    List<ReviewerConcerns> reviewers = new ArrayList<>();
+    for (ReviewerConcerns reviewerConcerns : ledger.getReviewers()) {
+      ReviewerConcerns updatedReviewer = new ReviewerConcerns();
+      updatedReviewer.setReviewer(reviewerConcerns.getReviewer());
+      List<ReviewConcern> concerns = new ArrayList<>();
+      for (ReviewConcern concern : reviewerConcerns.getConcerns()) {
+        ReviewConcern updatedConcern = concern.copy();
+        ReviewScope scope = reviewScope(reviewerConcerns.getReviewer(), concern);
+        if (scope != null
+            && feedback.isReviewScopeDisabled(scope)
+            && concern.getStatus() != ConcernStatus.DISMISSED) {
+          updatedConcern.setStatus(ConcernStatus.SKIPPED);
+          updatedConcern.setStatusReason(skippedScopeReason(scope));
+        }
+        concerns.add(updatedConcern);
+      }
+      updatedReviewer.setConcerns(concerns);
+      reviewers.add(updatedReviewer);
+    }
+    ReviewConcernLedger updatedLedger = new ReviewConcernLedger();
+    updatedLedger.setSchemaVersion(ledger.getSchemaVersion());
+    updatedLedger.setLastReviewedCommit(ledger.getLastReviewedCommit());
+    updatedLedger.setReviewers(reviewers);
+    return updatedLedger;
   }
 
   public AiResponseContent initializeLedger(
@@ -178,6 +216,58 @@ public final class ReviewConcernLedgerOperations {
     ReviewerConcerns concerns = new ReviewerConcerns();
     concerns.setReviewer(reviewer);
     return concerns;
+  }
+
+  private ReviewScope reviewScope(ConcernReviewerId reviewer, ReviewConcern concern) {
+    if (reviewer == null || reviewer.getKind() == null) {
+      return null;
+    }
+    return switch (reviewer.getKind()) {
+      case SCOPED_AGENT -> scopedAgentScope(reviewer.getName());
+      case SPECIALIZED_AGENT ->
+          "COMMIT_MESSAGE".equals(reviewer.getName())
+              ? ReviewScope.COMMIT_MESSAGE
+              : ReviewScope.PATCHSET;
+      case SINGLE_AGENT -> singleAgentScope(concern);
+    };
+  }
+
+  private ReviewScope scopedAgentScope(String reviewerName) {
+    if ("PATCHSET".equals(reviewerName)) {
+      return ReviewScope.PATCHSET;
+    }
+    if ("COMMIT_MESSAGE".equals(reviewerName)) {
+      return ReviewScope.COMMIT_MESSAGE;
+    }
+    return null;
+  }
+
+  private ReviewScope singleAgentScope(ReviewConcern concern) {
+    boolean hasCommitMessageLocation = false;
+    boolean hasPatchSetLocation = false;
+    for (var location : concern.getLocations()) {
+      String filename = location.getFilename();
+      if (filename == null || filename.isBlank()) {
+        continue;
+      }
+      if (filename.endsWith("/COMMIT_MSG")) {
+        hasCommitMessageLocation = true;
+      } else {
+        hasPatchSetLocation = true;
+      }
+    }
+    if (hasCommitMessageLocation == hasPatchSetLocation) {
+      return null;
+    }
+    return hasCommitMessageLocation ? ReviewScope.COMMIT_MESSAGE : ReviewScope.PATCHSET;
+  }
+
+  private String skippedScopeReason(ReviewScope scope) {
+    return switch (scope) {
+      case PATCHSET -> "Patch-set review skipped because its scope is disabled.";
+      case COMMIT_MESSAGE -> "Commit-message review skipped because its scope is disabled.";
+      case FULL -> throw new IllegalArgumentException("The full review scope cannot be disabled");
+    };
   }
 
   private ReviewConcernLedger replaceReviewer(

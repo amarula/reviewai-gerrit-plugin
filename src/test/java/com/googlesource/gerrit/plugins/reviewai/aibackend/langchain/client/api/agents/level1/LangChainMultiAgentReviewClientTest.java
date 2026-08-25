@@ -161,6 +161,34 @@ public class LangChainMultiAgentReviewClientTest {
   }
 
   @Test
+  public void disabledCommitMessageScopeMarksStoredConcernsSkipped() throws Exception {
+    ConcernRecordingLangChainMultiAgentReviewClient client =
+        new ConcernRecordingLangChainMultiAgentReviewClient();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(scopedLedger());
+    changeSetData.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH_RESOURCE));
+    changeSetData.setReviewFeedbackMemory(readDisabledCommitMessageMemory());
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(false);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(FULL_PATCH_RESOURCE));
+
+    assertEquals(List.of("review-PATCHSET", "find-PATCHSET"), client.concernEvents);
+    ReviewConcernLedger ledger =
+        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    ReviewConcern commitConcern =
+        reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE")
+            .getConcerns()
+            .getFirst();
+    assertEquals(ConcernStatus.SKIPPED, commitConcern.getStatus());
+    assertEquals(
+        "Commit-message review skipped because its scope is disabled.",
+        commitConcern.getStatusReason());
+  }
+
+  @Test
   public void forcedScopedReviewBypassesParallelSplit() throws Exception {
     RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
