@@ -15,19 +15,39 @@ A concern is a review finding with a stable ID and lifecycle state. It retains t
 republish the finding, including its description, reviewer ownership, locations, status reason, original reply, score,
 and repetition metadata.
 
-New concerns start as `PRESENT`. On later reviews, the Concern Reviewer assigns one of these states:
+New concerns start as `PRESENT`. Tracked concerns use these lifecycle states:
 
 | Status | Meaning |
 | --- | --- |
 | `PRESENT` | Current code still demonstrates the concern. |
 | `FIXED` | Current code demonstrates that the concern has been resolved. |
 | `UNCERTAIN` | Available evidence is insufficient to prove either `PRESENT` or `FIXED`. |
+| `SKIPPED` | The concern was deliberately not reassessed because its review scope was disabled. |
 | `DISMISSED` | A user explicitly declared the concern non-actionable under a recorded rationale. |
 
 No state is terminal. In particular, a `FIXED` concern is reassessed and can return to `PRESENT` after a regression. A
 `DISMISSED` concern remains suppressed while its rationale applies, but it can return to `PRESENT` after explicit user
 feedback reopens it or concrete later code or specification evidence invalidates that rationale. Only a user-feedback
-workflow may newly assign `DISMISSED`; the Concern Reviewer cannot invent a dismissal.
+workflow may newly assign `DISMISSED`; the Concern Reviewer cannot invent a dismissal. `SKIPPED` is assigned
+deterministically by the client, not by the Concern Reviewer. When its scope is enabled again, the Concern Reviewer
+reassesses it and returns an evidence-based state.
+
+#### `DISMISSED` versus `SKIPPED`
+
+Both states suppress a concern from normal repeated-comment publication, but they record different decisions:
+
+| Dimension | `DISMISSED` | `SKIPPED` |
+| --- | --- | --- |
+| Scope | One specific concern. | Every applicable concern owned by a disabled review scope. |
+| Meaning | The concern was considered and explicitly declared non-actionable, such as an accepted risk or intentional constraint. | No conclusion was reached because the concern was deliberately not reassessed. |
+| Assignment | The user-feedback workflow records an explicit concern-level rationale. | The client assigns it when feedback disables the concern's review scope. |
+| Duration | Remains suppressed while its recorded rationale applies. | Remains suppressed while the scope is disabled. |
+| Reactivation | Explicit user feedback reopens it, or later evidence invalidates the dismissal rationale. | Enabling the scope causes the Concern Reviewer to reassess it. |
+
+For example, “this null behavior is intentional; do not report it again” dismisses that specific concern. “Skip
+reviewing commit messages” does not reject each known commit-message concern; it marks them `SKIPPED` until
+commit-message review is enabled again. Neither state proves that the concern was fixed, so neither should be treated
+as `FIXED` or automatically resolve its Gerrit thread.
 
 `ReviewConcern` is the canonical lifecycle structure and is also used by the specialized-agent finding pipeline.
 `AiReplyItem` remains the publication-facing structure expected by the existing Gerrit review path.
@@ -65,7 +85,8 @@ Review feedback memory is the persisted, change-scoped summary of durable user g
 - `concern_feedback`: summaries keyed by exact concern ID, such as an accepted risk, intentional constraint, or
   dismissal rationale for one known concern.
 - `disabled_review_scopes`: the effective set of `PATCHSET` and `COMMIT_MESSAGE` review scopes explicitly disabled by
-  the user. A later explicit resume instruction removes the corresponding scope.
+  the user. A later explicit resume instruction removes the corresponding scope. On a review where a scope is
+  disabled, its non-dismissed tracked concerns become `SKIPPED`: they were not reassessed for that Patch Set.
 - `disabled_specialized_agents`: individual Level 2 patchset agents disabled without suppressing the entire
   `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.”
 

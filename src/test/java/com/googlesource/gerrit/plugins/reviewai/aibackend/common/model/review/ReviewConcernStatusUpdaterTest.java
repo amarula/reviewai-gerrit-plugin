@@ -80,6 +80,31 @@ public class ReviewConcernStatusUpdaterTest {
     assertEquals("The dismissal no longer applies", results.get(1).getStatusReason());
   }
 
+  @Test
+  public void allowsSkippedConcernToBeReassessedWhenScopeIsEnabled() {
+    ReviewConcern skipped =
+        concern("concern-1", ConcernStatus.SKIPPED, "Commit-message review was skipped");
+
+    ReviewConcern result =
+        ReviewConcernStatusUpdater.apply(
+                List.of(skipped),
+                List.of(concern("concern-1", ConcernStatus.PRESENT, "Still actionable")))
+            .getFirst();
+
+    assertEquals(ConcernStatus.PRESENT, result.getStatus());
+    assertEquals("Still actionable", result.getStatusReason());
+  }
+
+  @Test
+  public void rejectsSkippedStatusFromConcernReviewer() {
+    ReviewConcern existing = concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
+    ReviewConcern skipped = concern("concern-1", ConcernStatus.SKIPPED, "Scope disabled");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewConcernStatusUpdater.apply(List.of(existing), List.of(skipped)));
+  }
+
   private static ReviewConcern concern(String id, ConcernStatus status, String statusReason) {
     ReviewConcern concern = new ReviewConcern();
     concern.setId(id);

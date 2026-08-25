@@ -20,5 +20,6 @@ public enum ConcernStatus {
   PRESENT,
   FIXED,
   UNCERTAIN,
+  SKIPPED,
   DISMISSED
 }

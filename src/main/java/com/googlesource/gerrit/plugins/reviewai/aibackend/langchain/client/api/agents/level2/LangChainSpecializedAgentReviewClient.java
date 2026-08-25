@@ -234,7 +234,10 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
           .attachPendingLedger(
               response,
               change,
-              previousLedger == null ? new ReviewConcernLedger() : previousLedger);
+              previousLedger == null
+                  ? new ReviewConcernLedger()
+                  : concernLedgerOperations().markDisabledScopeConcernsSkipped(
+                      previousLedger, changeSetData.getReviewFeedbackMemory()));
       return response;
     }
 
@@ -275,13 +278,25 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
             specializedFindings,
             triage.getConsolidationContext(),
             false);
-    return specializedConcernLedgerOperations.completeFollowUp(
+    AiResponseContent response = specializedConcernLedgerOperations.completeFollowUp(
         specializedConcernLedgerOperations.nonNullResponse(collector.response()),
         change,
         previousLedger,
         followUps,
         specializedConcernLedgerOperations.verifiedUpdates(
             collector.response(), collector.verificationCandidates(), specializedFindings));
+    response
+        .getPendingConcernUpdates()
+        .get(change.getFullChangeId())
+        .ifPresent(
+            ledger ->
+                concernLedgerOperations()
+                    .attachPendingLedger(
+                        response,
+                        change,
+                        concernLedgerOperations().markDisabledScopeConcernsSkipped(
+                            ledger, changeSetData.getReviewFeedbackMemory())));
+    return response;
   }
 
   private boolean hasPendingReviewFeedback(ChangeSetData changeSetData) {

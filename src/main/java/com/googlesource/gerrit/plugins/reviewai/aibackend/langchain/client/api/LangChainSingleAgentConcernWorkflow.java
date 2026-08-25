@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
+import java.util.List;
 
 final class LangChainSingleAgentConcernWorkflow {
   private static final ConcernReviewerId REVIEWER =
@@ -91,6 +92,13 @@ final class LangChainSingleAgentConcernWorkflow {
             existingConcerns,
             changeSetData.getIncrementalPatchSet(),
             fullPatchSet);
+    ReviewConcernLedger reviewedLedger = new ReviewConcernLedger();
+    reviewedLedger.setReviewers(List.of(reviewedConcerns));
+    reviewedConcerns =
+        ledgerOperations
+            .markDisabledScopeConcernsSkipped(reviewedLedger, feedback)
+            .getReviewers()
+            .getFirst();
     ReviewResult newIssues =
         newIssueReview.review(
             changeSetData,

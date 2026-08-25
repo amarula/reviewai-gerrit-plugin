@@ -103,7 +103,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void concernReviewResponseFormatAllowsDismissedStatus() throws Exception {
+  public void concernReviewResponseFormatExcludesClientAssignedSkippedStatus() throws Exception {
     LangChainClient client = new LangChainClient(null, null, null, null);
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);

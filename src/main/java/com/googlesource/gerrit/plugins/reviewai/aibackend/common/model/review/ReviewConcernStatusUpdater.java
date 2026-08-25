@@ -40,6 +40,10 @@ public final class ReviewConcernStatusUpdater {
                 throw new IllegalArgumentException(
                     "Concern status is required for " + existing.getId());
               }
+              if (update.getStatus() == ConcernStatus.SKIPPED) {
+                throw new IllegalArgumentException(
+                    "SKIPPED can only be assigned by disabled-scope handling");
+              }
               ReviewConcern updated = existing.copy();
               updated.setStatus(update.getStatus());
               updated.setStatusReason(update.getStatusReason());
