@@ -220,6 +220,20 @@ public class AiReviewPermissionTest extends TestBase {
   }
 
   @Test
+  public void isAiReviewConfiguredReturnsFalseWhenOnlyDenyRuleExists() {
+    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY));
+
+    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+  }
+
+  @Test
+  public void isAiReviewConfiguredReturnsFalseWhenOnlyBlockRuleExists() {
+    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.BLOCK));
+
+    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+  }
+
+  @Test
   public void isAiReviewConfiguredReturnsFalseWhenNoPermissionExists() {
     AccessSection accessSection = AccessSection.builder("refs/heads/*").build();
     setupMatchingAccessSection(accessSection);

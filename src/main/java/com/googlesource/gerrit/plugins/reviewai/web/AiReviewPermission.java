@@ -72,7 +72,7 @@ public class AiReviewPermission {
                   projectState.getAllSections().stream()
                       .anyMatch(
                           sectionMatcher ->
-                              getAiReviewPermission(sectionMatcher.getSection()) != null))
+                              hasAiReviewAllow(getAiReviewPermission(sectionMatcher.getSection()))))
           .orElse(false);
     } catch (RuntimeException e) {
       log.warn(
@@ -175,6 +175,12 @@ public class AiReviewPermission {
         .filter(candidate -> isAiReviewPermissionName(candidate.getName()))
         .findFirst()
         .orElse(null);
+  }
+
+  private boolean hasAiReviewAllow(Permission permission) {
+    return permission != null
+        && permission.getRules().stream()
+            .anyMatch(rule -> rule.getAction() == PermissionRule.Action.ALLOW);
   }
 
   private boolean isAiReviewPermissionName(String permissionName) {
