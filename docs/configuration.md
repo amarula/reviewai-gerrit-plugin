@@ -238,7 +238,8 @@ directive = End each reply with \"Hope this helps!\"
 - `enabledFileExtensions`: This limits the reviewed files to the given types. Default file extensions are "py, java, js,
   ts, html, css, cs, cpp, c, h, php, rb, swift, kt, r, jl, go, scala, pl, pm, rs, dart, lua, sh, vb, bat".
 
-  **NOTE**: Extensions without a leading dot (e.g., 'py') are also accepted.
+  **NOTE**: Extensions without a leading dot (e.g., 'py') are also accepted. Exact file names (e.g., 'Jenkinsfile',
+  'Makefile', 'CMakeLists.txt') can also be listed to include extensionless or specific files.
 - `enabledVoting`: Initially disabled (false). If set to true, allows AI to cast a vote on each reviewed Patch Set by
   assigning a score.
 - `convertNeutralReviewScoreToPositive`: Enabled by default (true). When enabled, a neutral final review score (`0`)
