@@ -101,7 +101,11 @@ class LangChainExecutor {
           requestMessages.size());
       response =
           AiModelRequestLimiter.chat(
-              config, model, buildChatRequest(requestMessages, ToolChoice.AUTO));
+              config,
+              model,
+              buildChatRequest(
+                  requestMessages,
+                  iteration == maxToolResponseRounds ? ToolChoice.NONE : ToolChoice.AUTO));
       recordCost(response);
       aiMessage = response != null ? response.aiMessage() : null;
       logAiMessageToolRequests("tool-continuation-" + iteration, aiMessage);

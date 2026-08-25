@@ -39,6 +39,7 @@ import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
@@ -135,6 +136,46 @@ public class LangChainExecutorTest {
     assertEquals(72_000L, metrics.nanoUsd);
   }
 
+  @Test
+  public void disablesToolsForContinuationAfterLastAllowedToolRound() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiMaxToolResponseRounds()).thenReturn(3);
+
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("project~branch~change");
+    GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null)).thenReturn(List.of());
+    RecordingChatModel model =
+        new RecordingChatModel(
+            AiMessage.from(List.of(toolRequest("call_1"))),
+            AiMessage.from(List.of(toolRequest("call_2"))),
+            AiMessage.from(List.of(toolRequest("call_3"))),
+            AiMessage.from("done"));
+    ChatMemory memory =
+        TokenWindowChatMemory.builder()
+            .id("review")
+            .maxTokens(1000, new TestTokenCountEstimator())
+            .build();
+    memory.add(UserMessage.from("review"));
+
+    AiMessage result =
+        new LangChainExecutor(
+                config,
+                null,
+                List.of(treeToolSpecification()),
+                true,
+                gitRepoFiles,
+                null)
+            .execute(model, change, memory);
+
+    assertEquals("done", result.text());
+    assertEquals(4, model.requests.size());
+    assertEquals(ToolChoice.AUTO, model.requests.get(1).toolChoice());
+    assertEquals(ToolChoice.AUTO, model.requests.get(2).toolChoice());
+    assertEquals(ToolChoice.NONE, model.requests.get(3).toolChoice());
+    assertTrue(hasToolResult(model.requests.get(3).messages(), "call_3"));
+  }
+
   private static ToolExecutionRequest toolRequest(String id) {
     return ToolExecutionRequest.builder().id(id).name("tree").arguments("{}").build();
   }
@@ -160,6 +201,13 @@ public class LangChainExecutorTest {
         .filter(ToolExecutionResultMessage.class::isInstance)
         .map(ToolExecutionResultMessage.class::cast)
         .anyMatch(message -> id.equals(message.id()) && output.equals(message.text()));
+  }
+
+  private static boolean hasToolResult(List<ChatMessage> messages, String id) {
+    return messages.stream()
+        .filter(ToolExecutionResultMessage.class::isInstance)
+        .map(ToolExecutionResultMessage.class::cast)
+        .anyMatch(message -> id.equals(message.id()));
   }
 
   private String readTestResource(String resourceName) throws Exception {
