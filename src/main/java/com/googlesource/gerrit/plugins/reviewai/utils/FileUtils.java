@@ -60,7 +60,9 @@ public class FileUtils {
 
   public static boolean matchesExtensionList(String filename, List<String> extensions) {
     boolean matches =
-        extensions.contains(getExtension(filename)) || extensions.contains(getBasename(filename));
+        extensions.contains(getExtension(filename))
+            || extensions.contains(getBasename(filename))
+            || extensions.contains(stripLeadingDot(getBasename(filename)));
     log.debug("Filename '{}' matches extension list: {}", filename, matches);
     return matches;
   }
@@ -82,5 +84,9 @@ public class FileUtils {
   private static String getBasename(String filename) {
     int lastSlashIndex = filename.lastIndexOf('/');
     return lastSlashIndex == -1 ? filename : filename.substring(lastSlashIndex + 1);
+  }
+
+  private static String stripLeadingDot(String name) {
+    return name.startsWith(".") ? name.substring(1) : name;
   }
 }

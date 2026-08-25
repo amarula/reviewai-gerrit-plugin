@@ -44,6 +44,17 @@ public class FileUtilsTest {
   }
 
   @Test
+  public void matchesDotfileByDotStrippedBasename() {
+    // ".gitignore" is normalized to "gitignore" by the config parser.
+    assertTrue(FileUtils.matchesExtensionList(".gitignore", List.of("gitignore")));
+  }
+
+  @Test
+  public void matchesDotfileInNestedDirectory() {
+    assertTrue(FileUtils.matchesExtensionList(".github/.gitignore", List.of("gitignore")));
+  }
+
+  @Test
   public void doesNotMatchExtensionlessFileWhenOnlyExtensionsConfigured() {
     assertFalse(FileUtils.matchesExtensionList("Jenkinsfile", List.of("py", "java")));
   }
