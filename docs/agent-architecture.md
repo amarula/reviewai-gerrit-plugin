@@ -46,8 +46,9 @@ Both states suppress a concern from normal repeated-comment publication, but the
 
 For example, “this null behavior is intentional; do not report it again” dismisses that specific concern. “Skip
 reviewing commit messages” does not reject each known commit-message concern; it marks them `SKIPPED` until
-commit-message review is enabled again. Neither state proves that the concern was fixed, so neither should be treated
-as `FIXED` or automatically resolve its Gerrit thread.
+commit-message review is enabled again. Neither state proves that the concern was fixed. Gerrit still displays
+`DISMISSED` and `SKIPPED` threads as resolved because they are not currently actionable. If either concern later
+returns to `PRESENT`, ReviewAI publishes a new root comment rather than reopening the historical thread.
 
 `ReviewConcern` is the canonical lifecycle structure and is also used by the specialized-agent finding pipeline.
 `AiReplyItem` remains the publication-facing structure expected by the existing Gerrit review path.

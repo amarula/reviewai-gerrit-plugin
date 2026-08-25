@@ -25,6 +25,7 @@ import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewInput.CommentInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
+import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -33,11 +34,16 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewEx
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,6 +78,74 @@ public class GerritClientReview extends GerritClientAccount {
       Integer reviewScore)
       throws Exception {
     setReviewAndGetPublishedCommentIds(change, reviewBatches, changeSetData, reviewScore);
+  }
+
+  /**
+   * Resolves open root threads that were published by ReviewAI and are no longer actionable.
+   *
+   * <p>Gerrit resolves a thread by publishing a reply whose {@code unresolved} field is false.
+   * Unbound comments and comments outside ReviewAI's tagged concern threads are intentionally left
+   * untouched.
+   */
+  public void resolveInactiveConcernThreads(GerritChange change, AiResponseContent response) {
+    if (response == null || response.getPendingConcernUpdates() == null) {
+      return;
+    }
+    List<ReviewConcern> inactiveConcerns =
+        response.getPendingConcernUpdates().get(change.getFullChangeId()).stream()
+            .flatMap(ledger -> ledger.getReviewers().stream())
+            .flatMap(reviewer -> reviewer.getConcerns().stream())
+            .filter(concern -> concern.getStatus().shouldResolveGerritThread())
+            .filter(concern -> concern.getPreviousCommentId() != null)
+            .filter(concern -> !concern.getPreviousCommentId().isBlank())
+            .toList();
+    if (inactiveConcerns.isEmpty()) {
+      return;
+    }
+
+    try (ManualRequestContext ignored = config.openRequestContext()) {
+      ChangeApi changeApi = change.getChangeApi(config);
+      Map<String, List<CommentInfo>> comments = changeApi.commentsRequest().get();
+      Map<String, CommentInfo> commentsById = new LinkedHashMap<>();
+      Map<String, String> filenamesByCommentId = new HashMap<>();
+      comments.forEach(
+          (filename, fileComments) ->
+              fileComments.forEach(
+                  comment -> {
+                    if (comment.id != null) {
+                      commentsById.put(comment.id, comment);
+                      filenamesByCommentId.put(comment.id, filename);
+                    }
+                  }));
+
+      ReviewInput resolutionReview = ReviewInput.create();
+      Map<String, List<CommentInput>> resolutionComments = new LinkedHashMap<>();
+      Set<String> resolvedCommentIds = new HashSet<>();
+      for (ReviewConcern concern : inactiveConcerns) {
+        CommentInfo comment = commentsById.get(concern.getPreviousCommentId());
+        if (!isOpenReviewAiRootComment(comment) || !resolvedCommentIds.add(comment.id)) {
+          continue;
+        }
+        CommentInput resolution = new CommentInput();
+        resolution.message = resolutionMessage(concern);
+        resolution.inReplyTo = comment.id;
+        resolution.line = comment.line;
+        resolution.unresolved = false;
+        resolutionComments
+            .computeIfAbsent(filenamesByCommentId.get(comment.id), unused -> new ArrayList<>())
+            .add(resolution);
+      }
+      if (resolutionComments.isEmpty()) {
+        return;
+      }
+      resolutionReview.comments = resolutionComments;
+      ReviewResult result = changeApi.current().review(resolutionReview);
+      if (!Strings.isNullOrEmpty(result.error)) {
+        log.warn("Could not resolve inactive ReviewAI concern threads: {}", result.error);
+      }
+    } catch (Exception e) {
+      log.warn("Could not resolve inactive ReviewAI concern threads", e);
+    }
   }
 
   public Map<String, String> setReviewAndGetPublishedCommentIds(
@@ -231,5 +305,26 @@ public class GerritClientReview extends GerritClientAccount {
     }
     log.debug("Review comments processed.");
     return comments;
+  }
+
+  private boolean isOpenReviewAiRootComment(CommentInfo comment) {
+    return PublishedCommentConcernBinder.isTaggedConcernComment(comment)
+        && comment.inReplyTo == null
+        && Boolean.TRUE.equals(comment.unresolved);
+  }
+
+  private String resolutionMessage(ReviewConcern concern) {
+    String reason = concern.getStatusReason();
+    String fallback =
+        switch (concern.getStatus()) {
+          case FIXED -> "the concern is fixed in the current patch set.";
+          case DISMISSED -> "the concern was dismissed as non-actionable.";
+          case SKIPPED -> "the concern's review scope is disabled.";
+          case PRESENT, UNCERTAIN ->
+              throw new IllegalArgumentException(
+                  "Cannot resolve concern with status " + concern.getStatus());
+        };
+    return "Resolved by ReviewAI (" + concern.getStatus() + "): "
+        + (reason == null || reason.isBlank() ? fallback : reason);
   }
 }

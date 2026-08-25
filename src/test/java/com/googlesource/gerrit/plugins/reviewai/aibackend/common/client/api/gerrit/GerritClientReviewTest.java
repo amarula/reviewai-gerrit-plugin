@@ -17,10 +17,12 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.google.common.reflect.TypeToken;
@@ -36,8 +38,14 @@ import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.json.OutputFormat;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
@@ -48,6 +56,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.mockito.ArgumentCaptor;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -143,6 +152,115 @@ public class GerritClientReviewTest {
     assertEquals(
         expectedCommentIds,
         client.setReviewAndGetPublishedCommentIds(change, batches, changeSetData, null));
+  }
+
+  @Test
+  public void resolvesAnOpenTaggedRootCommentForAFixedConcern() throws Exception {
+    CommentInfo comment = new CommentInfo();
+    comment.id = "ai-concern";
+    comment.tag = "reviewai:concerns:review-1";
+    comment.line = 42;
+    comment.unresolved = true;
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get()).thenReturn(Map.of("src/Example.java", List.of(comment)));
+
+    client.resolveInactiveConcernThreads(
+        change,
+        concernResponse(
+            concern(
+                "ai-concern", ConcernStatus.FIXED, "The guard now handles the input.")));
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    ReviewInput.CommentInput resolution =
+        reviewInputCaptor.getValue().comments.get("src/Example.java").getFirst();
+    assertEquals("ai-concern", resolution.inReplyTo);
+    assertEquals(Integer.valueOf(42), resolution.line);
+    assertFalse(resolution.unresolved);
+    assertEquals(
+        "Resolved by ReviewAI (FIXED): The guard now handles the input.", resolution.message);
+  }
+
+  @Test
+  public void resolvesDismissedAndSkippedConcernThreads() throws Exception {
+    CommentInfo dismissedComment = openTaggedComment("dismissed-comment");
+    CommentInfo skippedComment = openTaggedComment("skipped-comment");
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get())
+        .thenReturn(
+            Map.of("src/Example.java", List.of(dismissedComment, skippedComment)));
+
+    client.resolveInactiveConcernThreads(
+        change,
+        concernResponse(
+            concern(
+                "dismissed-comment", ConcernStatus.DISMISSED, "The risk was accepted."),
+            concern(
+                "skipped-comment",
+                ConcernStatus.SKIPPED,
+                "Patch-set review skipped because its scope is disabled.")));
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    List<ReviewInput.CommentInput> resolutions =
+        reviewInputCaptor.getValue().comments.get("src/Example.java");
+    assertEquals(2, resolutions.size());
+    assertEquals("dismissed-comment", resolutions.get(0).inReplyTo);
+    assertEquals(
+        "Resolved by ReviewAI (DISMISSED): The risk was accepted.",
+        resolutions.get(0).message);
+    assertEquals("skipped-comment", resolutions.get(1).inReplyTo);
+    assertEquals(
+        "Resolved by ReviewAI (SKIPPED): Patch-set review skipped because its scope is disabled.",
+        resolutions.get(1).message);
+  }
+
+  @Test
+  public void leavesUnboundOrNonRootCommentsUntouched() throws Exception {
+    CommentInfo comment = new CommentInfo();
+    comment.id = "ai-reply";
+    comment.inReplyTo = "human-comment";
+    comment.tag = "reviewai:concerns:review-1";
+    comment.unresolved = true;
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get()).thenReturn(Map.of("src/Example.java", List.of(comment)));
+
+    client.resolveInactiveConcernThreads(
+        change,
+        concernResponse(
+            concern("ai-reply", ConcernStatus.FIXED, "The guard now handles the input.")));
+
+    verify(revisionApi, never()).review(any(ReviewInput.class));
+  }
+
+  private static CommentInfo openTaggedComment(String commentId) {
+    CommentInfo comment = new CommentInfo();
+    comment.id = commentId;
+    comment.tag = "reviewai:concerns:review-1";
+    comment.unresolved = true;
+    return comment;
+  }
+
+  private static ReviewConcern concern(
+      String commentId, ConcernStatus status, String statusReason) {
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-" + commentId);
+    concern.setStatus(status);
+    concern.setStatusReason(statusReason);
+    concern.setPreviousCommentId(commentId);
+    return concern;
+  }
+
+  private static AiResponseContent concernResponse(ReviewConcern... concerns) {
+    ReviewerConcerns reviewer = new ReviewerConcerns();
+    reviewer.setConcerns(List.of(concerns));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewer));
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put("project~main~I1234567890", ledger);
+    AiResponseContent response = new AiResponseContent("");
+    response.setPendingConcernUpdates(updates);
+    return response;
   }
 
   private static Map<String, List<CommentInfo>> existingComments(

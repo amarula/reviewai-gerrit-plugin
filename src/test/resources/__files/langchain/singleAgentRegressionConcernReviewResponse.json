@@ -1,0 +1,19 @@
+{
+  "concerns": [
+    {
+      "id": "old-present",
+      "status": "PRESENT",
+      "status_reason": "The dereference remains reachable."
+    },
+    {
+      "id": "old-fixed",
+      "status": "PRESENT",
+      "status_reason": "The guard was removed."
+    },
+    {
+      "id": "old-dismissed",
+      "status": "DISMISSED",
+      "status_reason": "The accepted-risk rationale still applies."
+    }
+  ]
+}

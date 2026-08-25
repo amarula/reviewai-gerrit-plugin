@@ -166,7 +166,8 @@ public class LangChainSpecializedAgentReviewClientTest {
                 .lineNumber(42)
                 .build()));
     SpecializedReviewConcernLedgerOperations operations =
-        new SpecializedReviewConcernLedgerOperations(new ReviewConcernLedgerOperations());
+        new SpecializedReviewConcernLedgerOperations(
+            new ReviewConcernLedgerOperations(localizer()));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(
@@ -214,7 +215,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations());
+            new ReviewConcernLedgerOperations(localizer()));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(response, verifiedFindings, rawFindings);
@@ -243,7 +244,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations());
+            new ReviewConcernLedgerOperations(localizer()));
 
     IllegalStateException thrown =
         assertThrows(
@@ -315,6 +316,43 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(List.of("CORRECTNESS"), client.recordedAgents);
     assertSame(client.classifiedFeedback, client.agentFeedback.getFirst());
     assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
+  }
+
+  @Test
+  public void reviewMarksStoredConcernsForDisabledSpecializedAgentSkipped() throws Exception {
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config());
+    client.triage =
+        triage(
+            plan("TESTABILITY", true),
+            plan("CORRECTNESS", true));
+    client.classifiedFeedback = readDisabledTestabilityMemory();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(ledgerWithTestabilityConcerns());
+    changeSetData.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH_RESOURCE));
+    changeSetData.setReviewFeedbackMemory(new ReviewFeedbackMemory());
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
+
+    AiResponseContent response =
+        client.ask(changeSetData, change(false), readTestResource(FULL_PATCH_RESOURCE));
+
+    assertEquals(
+        List.of("review-CORRECTNESS", "find-CORRECTNESS"),
+        client.concernEvents);
+    ReviewerConcerns testability =
+        reviewer(
+            pendingLedger(response),
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "TESTABILITY");
+    assertEquals(2, testability.getConcerns().size());
+    assertTrue(
+        testability.getConcerns().stream()
+            .allMatch(concern -> concern.getStatus() == ConcernStatus.SKIPPED));
+    assertTrue(
+        testability.getConcerns().stream()
+            .allMatch(
+                concern ->
+                    "TESTABILITY review skipped because its specialized agent is disabled."
+                        .equals(concern.getStatusReason())));
   }
 
   @Test
@@ -931,6 +969,8 @@ public class LangChainSpecializedAgentReviewClientTest {
     when(localizer.getText("plugin.warning.label")).thenReturn("**WARNING**");
     when(localizer.getText("plugin.error.label")).thenReturn("**ERROR**");
     when(localizer.getText("message.empty.review")).thenReturn("");
+    when(localizer.getText("message.review.concern.specialized.agent.skipped"))
+        .thenReturn("%s review skipped because its specialized agent is disabled.");
     return localizer;
   }
 
@@ -961,7 +1001,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     private boolean messageRequestCalled;
 
     RecordingSpecializedClient(Configuration config) {
-      super(config, null, null, null, Runnable::run);
+      super(config, null, null, localizer(), Runnable::run);
     }
 
     RecordingSpecializedClient(
@@ -1119,12 +1159,36 @@ public class LangChainSpecializedAgentReviewClientTest {
     return ledger;
   }
 
+  private static ReviewConcernLedger ledgerWithTestabilityConcerns() {
+    ReviewerConcerns testabilityConcerns =
+        reviewerConcerns(
+            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+            "TESTABILITY",
+            List.of(
+                storedConcern("testability-old-1", ConcernStatus.PRESENT),
+                storedConcern("testability-old-2", ConcernStatus.PRESENT)));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(
+        List.of(
+            reviewerConcerns(
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
+                "CORRECTNESS",
+                storedConcern("correctness-old", ConcernStatus.PRESENT)),
+            testabilityConcerns));
+    return ledger;
+  }
+
   private static ReviewerConcerns reviewerConcerns(
       ConcernReviewerId.Kind kind, String name, ReviewConcern concern) {
-    ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(new ConcernReviewerId(kind, name));
-    concerns.setConcerns(List.of(concern));
-    return concerns;
+    return reviewerConcerns(kind, name, List.of(concern));
+  }
+
+  private static ReviewerConcerns reviewerConcerns(
+      ConcernReviewerId.Kind kind, String name, List<ReviewConcern> reviewConcerns) {
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setReviewer(new ConcernReviewerId(kind, name));
+    reviewerConcerns.setConcerns(reviewConcerns);
+    return reviewerConcerns;
   }
 
   private static ReviewConcern storedConcern(String id, ConcernStatus status) {

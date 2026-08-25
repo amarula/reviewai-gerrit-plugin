@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 final class PublishedCommentConcernBinder {
-  private static final String CONCERN_REVIEW_TAG_PREFIX = "reviewai:concerns:";
+  static final String CONCERN_REVIEW_TAG_PREFIX = "reviewai:concerns:";
 
   void tagReview(ReviewInput reviewInput, List<ReviewBatch> reviewBatches) {
     if (reviewInput.comments != null && hasConcernBatches(reviewBatches)) {
@@ -127,6 +127,12 @@ final class PublishedCommentConcernBinder {
   private boolean hasConcernBatches(List<ReviewBatch> reviewBatches) {
     return reviewBatches.stream()
         .anyMatch(batch -> batch.getConcernId() != null && !batch.getConcernId().isBlank());
+  }
+
+  static boolean isTaggedConcernComment(CommentInfo comment) {
+    return comment != null
+        && comment.tag != null
+        && comment.tag.startsWith(CONCERN_REVIEW_TAG_PREFIX);
   }
 
   private boolean matches(ReviewBatch batch, PublishedComment publishedComment) {

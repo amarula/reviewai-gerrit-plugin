@@ -179,6 +179,7 @@ public class PatchSetReviewer {
               .setReviewAndGetPublishedCommentIds(
                   change, reviewBatches, changeSetData, reviewScore);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
+      clientReviewProvider.get().resolveInactiveConcernThreads(change, reviewReply);
       reviewFeedbackLifecycle.settle(
           change, changeSetData, feedbackSession, reviewReply != null);
       conversationRecorder.record(change, reviewBatches, reviewScore);
@@ -241,6 +242,7 @@ public class PatchSetReviewer {
             .setReviewAndGetPublishedCommentIds(
                 change, reviewBatches, changeSetData, reviewScore);
     reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
+    clientReviewProvider.get().resolveInactiveConcernThreads(change, reviewReply);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 

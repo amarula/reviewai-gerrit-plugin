@@ -96,7 +96,7 @@ final class LangChainSingleAgentConcernWorkflow {
     reviewedLedger.setReviewers(List.of(reviewedConcerns));
     reviewedConcerns =
         ledgerOperations
-            .markDisabledScopeConcernsSkipped(reviewedLedger, feedback)
+            .markDisabledConcernsSkipped(reviewedLedger, feedback)
             .getReviewers()
             .getFirst();
     ReviewResult newIssues =

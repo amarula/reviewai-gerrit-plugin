@@ -157,13 +157,19 @@ final class SpecializedReviewConcernLedgerOperations {
     ReviewConcernLedger ledger = ledgerOperations.mergeReviewerUpdates(previousLedger, updates);
 
     Set<String> repeatedConcernIds = new LinkedHashSet<>();
-    List<AiReplyItem> replies =
-        followUps.stream()
-            .flatMap(followUp -> followUp.reviewedConcerns().getConcerns().stream())
-            .filter(concern -> concern.getStatus() == ConcernStatus.PRESENT)
-            .filter(concern -> repeatedConcernIds.add(concern.getId()))
-            .map(ledgerOperations::toRepeatedReply)
-            .collect(Collectors.toCollection(ArrayList::new));
+    List<AiReplyItem> replies = new ArrayList<>();
+    for (AgentFollowUp followUp : followUps) {
+      ReviewerConcerns reviewed = followUp.reviewedConcerns();
+      for (ReviewConcern concern : reviewed.getConcerns()) {
+        if (concern.getStatus() != ConcernStatus.PRESENT
+            || !repeatedConcernIds.add(concern.getId())) {
+          continue;
+        }
+        replies.add(
+            ledgerOperations.toPresentReply(
+                previousLedger, reviewed.getReviewer(), concern));
+      }
+    }
     replies.addAll(response.getReplies());
     response.setReplies(replies);
     ledgerOperations.attachPendingLedger(response, change, ledger);

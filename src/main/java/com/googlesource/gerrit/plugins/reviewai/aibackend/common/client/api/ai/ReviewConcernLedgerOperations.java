@@ -27,14 +27,22 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class ReviewConcernLedgerOperations {
+  private final Localizer localizer;
+
+  public ReviewConcernLedgerOperations(Localizer localizer) {
+    this.localizer = localizer;
+  }
+
   public ReviewerConcerns reviewerConcerns(
       ReviewConcernLedger ledger, ConcernReviewerId reviewer) {
     ledger.normalize();
@@ -44,13 +52,10 @@ public final class ReviewConcernLedgerOperations {
         .orElseGet(() -> emptyReviewerConcerns(reviewer));
   }
 
-  /** Marks concerns in disabled scopes as unassessed for the current patch set. */
-  public ReviewConcernLedger markDisabledScopeConcernsSkipped(
+  /** Marks concerns owned by disabled scopes or specialized agents as unassessed. */
+  public ReviewConcernLedger markDisabledConcernsSkipped(
       ReviewConcernLedger ledger, ReviewFeedbackMemory feedback) {
-    if (ledger == null
-        || feedback == null
-        || feedback.getDisabledReviewScopes() == null
-        || feedback.getDisabledReviewScopes().isEmpty()) {
+    if (ledger == null || feedback == null || !hasDisabledReviews(feedback)) {
       return ledger;
     }
     ledger.normalize();
@@ -61,12 +66,11 @@ public final class ReviewConcernLedgerOperations {
       List<ReviewConcern> concerns = new ArrayList<>();
       for (ReviewConcern concern : reviewerConcerns.getConcerns()) {
         ReviewConcern updatedConcern = concern.copy();
-        ReviewScope scope = reviewScope(reviewerConcerns.getReviewer(), concern);
-        if (scope != null
-            && feedback.isReviewScopeDisabled(scope)
-            && concern.getStatus() != ConcernStatus.DISMISSED) {
+        String skippedReason =
+            skippedReason(feedback, reviewerConcerns.getReviewer(), concern);
+        if (skippedReason != null && concern.getStatus() != ConcernStatus.DISMISSED) {
           updatedConcern.setStatus(ConcernStatus.SKIPPED);
-          updatedConcern.setStatusReason(skippedScopeReason(scope));
+          updatedConcern.setStatusReason(skippedReason);
         }
         concerns.add(updatedConcern);
       }
@@ -127,7 +131,10 @@ public final class ReviewConcernLedgerOperations {
     List<AiReplyItem> replies =
         reviewedConcerns.getConcerns().stream()
             .filter(concern -> concern.getStatus() == ConcernStatus.PRESENT)
-            .map(this::toRepeatedReply)
+            .map(
+                concern ->
+                    toPresentReply(
+                        previousLedger, reviewedConcerns.getReviewer(), concern))
             .collect(Collectors.toCollection(ArrayList::new));
     if (response.getReplies() != null) {
       replies.addAll(response.getReplies());
@@ -170,6 +177,42 @@ public final class ReviewConcernLedgerOperations {
       repeatedConcern.setPreviousCommentId(concern.getId());
     }
     return ReviewConcernReplyMapper.toReply(repeatedConcern);
+  }
+
+  public AiReplyItem toPresentReply(
+      ReviewConcernLedger previousLedger, ConcernReviewerId reviewer, ReviewConcern concern) {
+    Optional<ConcernStatus> previousStatus = previousStatus(previousLedger, reviewer, concern);
+    if (previousStatus.filter(ConcernStatus::shouldResolveGerritThread).isEmpty()) {
+      return toRepeatedReply(concern);
+    }
+    ReviewConcern reactivatedConcern = concern.copy();
+    reactivatedConcern.setRepeated(false);
+    reactivatedConcern.setRepeatedReason(null);
+    AiReplyItem reply = ReviewConcernReplyMapper.toReply(reactivatedConcern);
+    reply.setReply(reactivationHeading(previousStatus.orElseThrow()) + "\n\n" + reply.getReply());
+    return reply;
+  }
+
+  private Optional<ConcernStatus> previousStatus(
+      ReviewConcernLedger previousLedger, ConcernReviewerId reviewer, ReviewConcern concern) {
+    if (previousLedger == null || reviewer == null || concern == null || concern.getId() == null) {
+      return Optional.empty();
+    }
+    return reviewerConcerns(previousLedger, reviewer).getConcerns().stream()
+        .filter(previous -> concern.getId().equals(previous.getId()))
+        .map(ReviewConcern::getStatus)
+        .findFirst();
+  }
+
+  private String reactivationHeading(ConcernStatus previousStatus) {
+    return switch (previousStatus) {
+      case FIXED -> "Regression of a previously fixed AI concern:";
+      case DISMISSED -> "Previously dismissed AI concern is actionable again:";
+      case SKIPPED -> "Previously skipped AI concern is actionable after review resumed:";
+      case PRESENT, UNCERTAIN ->
+          throw new IllegalArgumentException(
+              "Cannot reactivate concern from " + previousStatus);
+    };
   }
 
   private ReviewerConcerns mapNewConcerns(
@@ -268,6 +311,30 @@ public final class ReviewConcernLedgerOperations {
       case COMMIT_MESSAGE -> "Commit-message review skipped because its scope is disabled.";
       case FULL -> throw new IllegalArgumentException("The full review scope cannot be disabled");
     };
+  }
+
+  private boolean hasDisabledReviews(ReviewFeedbackMemory feedback) {
+    return (feedback.getDisabledReviewScopes() != null
+            && !feedback.getDisabledReviewScopes().isEmpty())
+        || (feedback.getDisabledSpecializedAgents() != null
+            && !feedback.getDisabledSpecializedAgents().isEmpty());
+  }
+
+  private String skippedReason(
+      ReviewFeedbackMemory feedback, ConcernReviewerId reviewer, ReviewConcern concern) {
+    ReviewScope scope = reviewScope(reviewer, concern);
+    if (scope != null && feedback.isReviewScopeDisabled(scope)) {
+      return skippedScopeReason(scope);
+    }
+    if (reviewer != null
+        && reviewer.getKind() == ConcernReviewerId.Kind.SPECIALIZED_AGENT
+        && feedback.getDisabledSpecializedAgents() != null
+        && feedback.getDisabledSpecializedAgents().contains(reviewer.getName())) {
+      return String.format(
+          localizer.getText("message.review.concern.specialized.agent.skipped"),
+          reviewer.getName());
+    }
+    return null;
   }
 
   private ReviewConcernLedger replaceReviewer(

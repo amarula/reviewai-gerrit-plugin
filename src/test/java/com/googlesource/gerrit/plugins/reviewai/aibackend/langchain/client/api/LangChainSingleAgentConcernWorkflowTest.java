@@ -31,6 +31,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -142,6 +143,31 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(ConcernStatus.DISMISSED, stored.get(2).getStatus());
     assertEquals(newIssue.getConcernId(), stored.get(3).getId());
     assertEquals("new issue finder request", client.getRequestBody());
+  }
+
+  @Test
+  public void regressionOfAFixedConcernIsPublishedAsANewComment() throws Exception {
+    TestClient client = new TestClient();
+    client.concernReviewResponse = "__files/langchain/singleAgentRegressionConcernReviewResponse.json";
+    ChangeSetData data = new ChangeSetData(1);
+    ReviewConcernLedger ledger = previousLedger();
+    ReviewConcern oldFixed = ledger.getReviewers().getFirst().getConcerns().get(1);
+    oldFixed.setStatus(ConcernStatus.FIXED);
+    oldFixed.setPreviousCommentId("fixed-ai-comment");
+    data.setPreviousReviewConcernLedger(ledger);
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+
+    AiResponseContent response =
+        client.ask(data, change(false), readTestResource(FULL_PATCH));
+
+    AiReplyItem regression =
+        response.getReplies().stream()
+            .filter(reply -> "old-fixed".equals(reply.getConcernId()))
+            .findFirst()
+            .orElseThrow();
+    assertFalse(regression.isRepeated());
+    assertEquals("fixed-ai-comment", regression.getRepetitionReplyId());
+    assertTrue(regression.getReply().startsWith("Regression of a previously fixed AI concern:"));
   }
 
   @Test
@@ -409,6 +435,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     private ChangeSetData concernData;
     private ChangeSetData finderData;
     private ChangeSetData feedbackData;
+    private String concernReviewResponse = CONCERN_REVIEW_RESPONSE;
 
     private TestClient() {
       this(null);
@@ -444,7 +471,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
       if (stage == ReviewAssistantStage.REVIEW_CONCERNS) {
         concernData = changeSetData;
         return rawReviewRequestResult(
-            readTestResource(CONCERN_REVIEW_RESPONSE), "concern review request");
+            readTestResource(concernReviewResponse), "concern review request");
       }
       return rawReviewRequestResult(
           readTestResource(FIRST_REVIEW_RESPONSE), "first review request");

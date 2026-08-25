@@ -291,7 +291,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             requireInitialToolUse,
             gitRepoFiles,
             costTracker);
-    this.concernLedgerOperations = new ReviewConcernLedgerOperations();
+    this.concernLedgerOperations = new ReviewConcernLedgerOperations(localizer);
     this.singleAgentConcernWorkflow =
         new LangChainSingleAgentConcernWorkflow(
             config,
