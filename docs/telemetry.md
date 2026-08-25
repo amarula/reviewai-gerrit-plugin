@@ -16,8 +16,8 @@ Prometheus can scrape that endpoint periodically and store historical samples in
 
 ### Install the Gerrit Prometheus reporter
 
-Install a `metrics-reporter-prometheus` plugin build that matches your Gerrit version and copy it into the Gerrit site
-plugin directory:
+Download a `metrics-reporter-prometheus` plugin build that matches your Gerrit version from
+https://gerrit-ci.gerritforge.com/plugin-manager/ and copy it into the Gerrit site plugin directory:
 
 ```bash
 cp metrics-reporter-prometheus.jar "$GERRIT_SITE/plugins/metrics-reporter-prometheus.jar"
