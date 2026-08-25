@@ -83,6 +83,9 @@ review produces a `Code-Review -1` recommendation.
 See [Review Agent Architecture](docs/agent-architecture.md) for the agent-specialization levels and the concern
 lifecycle across successive Patch Sets.
 
+See [CI Integration](docs/ci-integration.md) to defer reviews until Jenkins, SonarQube, or another CI system has
+voted on the Patch Set.
+
 <kbd><img src="images/reviewai-sidebar-review.png?raw=true" alt="ReviewAI Patch Set review"></kbd>
 
 Voting is disabled by default. Enable it globally or per project with the `enabledVoting` configuration option.
