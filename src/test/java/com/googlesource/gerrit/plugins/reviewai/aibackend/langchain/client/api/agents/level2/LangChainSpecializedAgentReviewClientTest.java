@@ -127,6 +127,69 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
+  public void verifiedConcernsAtTheSameLocationAreStoredUnderTheirOwnAgents() {
+    ReviewConcern correctnessRawConcern =
+        finding("Correctness", "Syntax error").getConcerns().getFirst();
+    correctnessRawConcern.setId("raw-r1");
+    ReviewConcern testabilityRawConcern =
+        finding("Testability", "Missing regression test").getConcerns().getFirst();
+    testabilityRawConcern.setId("raw-r2");
+    List<SpecializedReviewFindings.AgentFindings> rawFindings =
+        List.of(
+            SpecializedReviewFindings.AgentFindings.from(
+                "CORRECTNESS", findings(correctnessRawConcern)),
+            SpecializedReviewFindings.AgentFindings.from(
+                "TESTABILITY", findings(testabilityRawConcern)));
+
+    ReviewConcern correctnessVerifiedConcern = correctnessRawConcern.copy();
+    correctnessVerifiedConcern.setId("c-raw-r1");
+    correctnessVerifiedConcern.setMergedConcernIds(List.of("raw-r1"));
+    correctnessVerifiedConcern.setOwnerAgent("CORRECTNESS");
+    ReviewConcern testabilityVerifiedConcern = testabilityRawConcern.copy();
+    testabilityVerifiedConcern.setId("c-raw-r2");
+    testabilityVerifiedConcern.setMergedConcernIds(List.of("raw-r2"));
+    testabilityVerifiedConcern.setOwnerAgent("TESTABILITY");
+
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(
+        List.of(
+            AiReplyItem.builder()
+                .reply("Syntax error reply")
+                .score(-1.0)
+                .filename("src/Test.java")
+                .lineNumber(42)
+                .build(),
+            AiReplyItem.builder()
+                .reply("Missing test reply")
+                .score(-0.5)
+                .filename("src/Test.java")
+                .lineNumber(42)
+                .build()));
+    SpecializedReviewConcernLedgerOperations operations =
+        new SpecializedReviewConcernLedgerOperations(new ReviewConcernLedgerOperations());
+
+    ReviewConcernLedger updates =
+        operations.verifiedUpdates(
+            response,
+            findings(correctnessVerifiedConcern, testabilityVerifiedConcern),
+            rawFindings);
+
+    assertEquals(2, updates.getReviewers().size());
+    assertEquals(
+        "c-raw-r1",
+        reviewer(updates, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")
+            .getConcerns()
+            .getFirst()
+            .getId());
+    assertEquals(
+        "c-raw-r2",
+        reviewer(updates, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "TESTABILITY")
+            .getConcerns()
+            .getFirst()
+            .getId());
+  }
+
+  @Test
   public void verifiedConcernIsStoredOnlyUnderItsOwnerAgent() {
     ReviewConcern codeQualityConcern =
         finding("Code Quality", "Shared issue").getConcerns().getFirst();

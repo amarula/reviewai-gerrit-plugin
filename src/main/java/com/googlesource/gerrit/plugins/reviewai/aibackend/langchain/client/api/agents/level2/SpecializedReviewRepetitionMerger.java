@@ -152,13 +152,16 @@ final class SpecializedReviewRepetitionMerger {
       List<ReviewConcern> concerns,
       int replyIndex,
       int replyCount) {
+    // The verification stage returns one reply for each supplied concern in the same order. Use
+    // that unambiguous mapping before location matching: multiple agents can validly report
+    // distinct concerns on the same source line.
+    if (replyCount == concerns.size() && replyIndex < concerns.size()) {
+      return Optional.of(concerns.get(replyIndex));
+    }
     Optional<ReviewConcern> locationMatch =
         concerns.stream().filter(concern -> matchesAnyLocation(reply, concern)).findFirst();
     if (locationMatch.isPresent()) {
       return locationMatch;
-    }
-    if (replyCount == concerns.size() && replyIndex < concerns.size()) {
-      return Optional.of(concerns.get(replyIndex));
     }
     return Optional.empty();
   }
