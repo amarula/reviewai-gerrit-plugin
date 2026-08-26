@@ -76,6 +76,9 @@ public class OnDemandCodeContextTools extends ClientBase {
             case GREP -> grep(getString(argumentObject, "string"));
             default -> "";
           };
+    } catch (FileNotFoundException e) {
+      log.debug("File not found while executing on-demand code context tool {}", toolName, e);
+      response = CONTEXT_NOT_PROVIDED;
     } catch (Exception e) {
       log.warn("Error executing on-demand code context tool {}", toolName, e);
       response = CONTEXT_NOT_PROVIDED;
