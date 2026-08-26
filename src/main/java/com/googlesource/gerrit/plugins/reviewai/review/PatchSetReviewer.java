@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
@@ -66,6 +67,7 @@ public class PatchSetReviewer {
   private final TopicReviewReplyMapper topicReviewReplyMapper;
   private final ReviewConcernPublisher reviewConcernPublisher;
   private final ReviewFeedbackLifecycle reviewFeedbackLifecycle;
+  private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
 
   private GerritCommentRange gerritCommentRange;
   private List<ReviewBatch> reviewBatches;
@@ -83,6 +85,7 @@ public class PatchSetReviewer {
       PatchSetReviewConversationRecorder conversationRecorder,
       ReviewConcernPublisher reviewConcernPublisher,
       ReviewFeedbackLifecycle reviewFeedbackLifecycle,
+      AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       @CanonicalWebUrl @Nullable String canonicalWebUrl) {
     this.config = config;
     this.gerritClient = gerritClient;
@@ -93,6 +96,7 @@ public class PatchSetReviewer {
     this.conversationRecorder = conversationRecorder;
     this.reviewConcernPublisher = reviewConcernPublisher;
     this.reviewFeedbackLifecycle = reviewFeedbackLifecycle;
+    this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.repeatedCommentReferenceFormatter =
         new RepeatedCommentReferenceFormatter(
             gerritClient, changeSetData, localizer, canonicalWebUrl);
@@ -367,8 +371,14 @@ public class PatchSetReviewer {
       return new AiResponseContent(String.format(SPLIT_REVIEW_MSG, config.getMaxReviewLines()));
     }
 
+    boolean aiReviewConditionMet =
+        !changeSetData.getForcedReview()
+            || aiReviewApplicabilityChecker.isApplicable(change, config.getAiReviewApplicableIf());
+    changeSetData.setAiReviewConditionMet(aiReviewConditionMet);
     changeSetData.setConditionLabels(
-        gerritClient.getConditionLabels(change, config.getAiReviewApplicableIf()));
+        aiReviewConditionMet
+            ? gerritClient.getConditionLabels(change, config.getAiReviewApplicableIf())
+            : Map.of());
     return openAiClient.ask(changeSetData, change, patchSet);
   }
 

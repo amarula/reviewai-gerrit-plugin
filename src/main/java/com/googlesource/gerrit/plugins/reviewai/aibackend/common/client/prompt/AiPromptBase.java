@@ -119,6 +119,9 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   }
 
   protected List<String> buildConditionLabelSections() {
+    if (Boolean.FALSE.equals(changeSetData.getAiReviewConditionMet())) {
+      return List.of();
+    }
     String applicableIf = config.getAiReviewApplicableIf();
     if (applicableIf == null || applicableIf.isBlank()) {
       return List.of();

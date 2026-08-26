@@ -399,6 +399,30 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void reviewPromptOmitsConditionContextWhenForcedReviewConditionIsNotMet() {
+    Configuration config = mock(Configuration.class);
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified>=1");
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedReview(true);
+    changeSetData.setAiReviewConditionMet(false);
+    changeSetData.setConditionLabels(
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(List.of(), "CI verification")));
+    AiPromptReview prompt =
+        new AiPromptReview(
+            config,
+            changeSetData,
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertFalse(instructions.contains("Current AI Review Condition"));
+    assertFalse(instructions.contains("Condition Labels"));
+  }
+
+  @Test
   public void specializedReviewPromptsIncludeConditionLabelsExceptCommitMessage() {
     String applicableIf = "label:Verified=+1";
     Configuration config = mock(Configuration.class);
