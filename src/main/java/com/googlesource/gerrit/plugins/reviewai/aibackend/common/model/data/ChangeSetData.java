@@ -54,6 +54,7 @@ public class ChangeSetData {
   private String reviewAssistantStageConversationSuffix;
   private GerritPermittedVotingRange permittedVotingRange;
   private Boolean deferredReview = false;
+  private Boolean aiReviewConditionMet = true;
   private Map<String, GerritConditionLabel> conditionLabels;
   private transient ReviewConcernLedger previousReviewConcernLedger;
   private transient String incrementalPatchSet;
@@ -147,6 +148,7 @@ public class ChangeSetData {
     copy.setReviewAssistantStageConversationSuffix(reviewAssistantStageConversationSuffix);
     copy.setPermittedVotingRange(permittedVotingRange);
     copy.setDeferredReview(deferredReview);
+    copy.setAiReviewConditionMet(aiReviewConditionMet);
     if (conditionLabels != null) {
       copy.setConditionLabels(new HashMap<>(conditionLabels));
     }

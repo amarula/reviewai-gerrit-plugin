@@ -66,6 +66,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
@@ -165,6 +166,7 @@ public class ReviewTestBase extends TestBase {
   protected ChangeSetData changeSetData;
   protected GerritClient gerritClient;
   protected PatchSetReviewer patchSetReviewer;
+  protected AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   protected ConfigCreator mockConfigCreator;
   protected JsonObject aiRequestBody;
   protected Localizer localizer;
@@ -423,6 +425,8 @@ public class ReviewTestBase extends TestBase {
                     reviewFeedbackPublisher,
                     getClientCommandExtension()),
                 gerritClientPatchSet));
+    aiReviewApplicabilityChecker = mock(AiReviewApplicabilityChecker.class);
+    when(aiReviewApplicabilityChecker.isApplicable(any(), anyString())).thenReturn(true);
     patchSetReviewer =
         new PatchSetReviewer(
             gerritClient,
@@ -435,6 +439,7 @@ public class ReviewTestBase extends TestBase {
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
             new ReviewConcernPublisher(getTestReviewAiDb()),
             new ReviewFeedbackLifecycle(reviewFeedbackPublisher),
+            aiReviewApplicabilityChecker,
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);
   }
