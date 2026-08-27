@@ -20,14 +20,20 @@ import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.gerrit.entities.BranchNameKey;
+import com.google.gerrit.entities.Project;
+import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Set;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -85,6 +91,41 @@ public class GitRepoFilesTest extends TestBase {
       assertEquals(
           patchSetCommit.getTree(),
           new GitRepoFiles().getPatchSetRevTree(git.getRepository(), change));
+    }
+  }
+
+  @Test
+  public void getPatchSetChangedFilesReturnsPathsChangedByPatchSet() throws Exception {
+    try (Git git = createRepository()) {
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Files.writeString(workTree.resolve("modified.py"), "original\n");
+      Files.writeString(workTree.resolve("deleted.py"), "to be deleted\n");
+      git.add().addFilepattern(".").call();
+      git.commit().setMessage("Base files").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(workTree.resolve("modified.py"), "modified\n");
+      Files.writeString(workTree.resolve("added.py"), "new file\n");
+      git.rm().addFilepattern("deleted.py").call();
+      git.add().addFilepattern("modified.py").call();
+      git.add().addFilepattern("added.py").call();
+      RevCommit patchSetCommit =
+          git.commit().setMessage("Patch set").setAuthor("Test", "test@example.com").call();
+
+      RefUpdate patchSetRef = git.getRepository().updateRef(PATCH_SET_REF);
+      patchSetRef.setNewObjectId(patchSetCommit);
+      assertEquals(RefUpdate.Result.NEW, patchSetRef.update());
+
+      GerritChange change = getGerritChange();
+      change.setChangeNumber(CHANGE_NUMBER);
+      change.setPatchSetNumber(PATCH_SET_NUMBER);
+
+      GitRepositoryManager repositoryManager = mock(GitRepositoryManager.class);
+      when(repositoryManager.openRepository(any(Project.NameKey.class)))
+          .thenReturn(git.getRepository());
+
+      assertEquals(
+          Set.of("added.py", "deleted.py", "modified.py"),
+          new GitRepoFiles(repositoryManager).getPatchSetChangedFiles(change));
     }
   }
 

@@ -25,12 +25,16 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git.FileEntry;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -272,6 +276,41 @@ public class GitRepoFiles {
             .orElseThrow(() -> new IOException("Patch set number is not available"));
     String patchSetRef = PatchSet.id(Change.id(changeNumber), patchSetNumber).toRefName();
     return getRevTree(repository, patchSetRef, "Patch set");
+  }
+
+  public Set<String> getPatchSetChangedFiles(GerritChange change) throws IOException {
+    int changeNumber =
+        change
+            .getChangeNumber()
+            .orElseThrow(() -> new IOException("Change number is not available"));
+    int patchSetNumber =
+        change
+            .getPatchSetAttribute()
+            .map(attribute -> attribute.number)
+            .orElseThrow(() -> new IOException("Patch set number is not available"));
+    String patchSetRef = PatchSet.id(Change.id(changeNumber), patchSetNumber).toRefName();
+
+    try (Repository repository = openRepository(change);
+        RevWalk revWalk = new RevWalk(repository)) {
+      ObjectId commitId = repository.resolve(patchSetRef);
+      if (commitId == null) {
+        throw new IOException("Patch set not found: " + patchSetRef);
+      }
+      RevCommit commit = revWalk.parseCommit(commitId);
+      ObjectId baseTreeId = commit.getParentCount() == 0 ? null : commit.getParent(0).getId();
+
+      Set<String> changedFiles = new HashSet<>();
+      try (DiffFormatter diffFormatter = new DiffFormatter(new ByteArrayOutputStream())) {
+        diffFormatter.setRepository(repository);
+        for (DiffEntry entry : diffFormatter.scan(baseTreeId, commit.getTree())) {
+          changedFiles.add(
+              entry.getChangeType() == DiffEntry.ChangeType.DELETE
+                  ? entry.getOldPath()
+                  : entry.getNewPath());
+        }
+      }
+      return changedFiles;
+    }
   }
 
   private RevTree getRevTree(Repository repository, String ref, String refType) throws IOException {
