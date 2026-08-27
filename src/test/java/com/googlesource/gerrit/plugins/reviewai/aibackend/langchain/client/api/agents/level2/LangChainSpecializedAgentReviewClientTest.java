@@ -167,7 +167,7 @@ public class LangChainSpecializedAgentReviewClientTest {
                 .build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(
@@ -188,6 +188,82 @@ public class LangChainSpecializedAgentReviewClientTest {
             .getConcerns()
             .getFirst()
             .getId());
+  }
+
+  @Test
+  public void verifiedUpdatesSkipsDuplicatedConflictingAndIrrelevantReplies() {
+    ReviewConcern relevantRawConcern =
+        finding("Correctness", "Relevant concern").getConcerns().getFirst();
+    relevantRawConcern.setId("raw-r1");
+    ReviewConcern irrelevantRawConcern =
+        finding("Correctness", "Irrelevant concern").getConcerns().getFirst();
+    irrelevantRawConcern.setId("raw-r2");
+    ReviewConcern duplicatedRawConcern =
+        finding("Correctness", "Duplicated concern").getConcerns().getFirst();
+    duplicatedRawConcern.setId("raw-r3");
+    ReviewConcern conflictingRawConcern =
+        finding("Correctness", "Conflicting concern").getConcerns().getFirst();
+    conflictingRawConcern.setId("raw-r4");
+
+    ReviewConcern relevantVerifiedConcern = relevantRawConcern.copy();
+    relevantVerifiedConcern.setId("c-raw-r1");
+    relevantVerifiedConcern.setMergedConcernIds(List.of("raw-r1"));
+    relevantVerifiedConcern.setOwnerAgent("CORRECTNESS");
+    ReviewConcern irrelevantVerifiedConcern = irrelevantRawConcern.copy();
+    irrelevantVerifiedConcern.setId("c-raw-r2");
+    irrelevantVerifiedConcern.setMergedConcernIds(List.of("raw-r2"));
+    irrelevantVerifiedConcern.setOwnerAgent("CORRECTNESS");
+    ReviewConcern duplicatedVerifiedConcern = duplicatedRawConcern.copy();
+    duplicatedVerifiedConcern.setId("c-raw-r3");
+    duplicatedVerifiedConcern.setMergedConcernIds(List.of("raw-r3"));
+    duplicatedVerifiedConcern.setOwnerAgent("CORRECTNESS");
+    ReviewConcern conflictingVerifiedConcern = conflictingRawConcern.copy();
+    conflictingVerifiedConcern.setId("c-raw-r4");
+    conflictingVerifiedConcern.setMergedConcernIds(List.of("raw-r4"));
+    conflictingVerifiedConcern.setOwnerAgent("CORRECTNESS");
+
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(
+        List.of(
+            AiReplyItem.builder().reply("Relevant reply").relevance(0.9).build(),
+            AiReplyItem.builder().reply("Irrelevant reply").relevance(0.3).build(),
+            AiReplyItem.builder()
+                .reply("Duplicated reply")
+                .relevance(0.9)
+                .duplicated(true)
+                .build(),
+            AiReplyItem.builder()
+                .reply("Conflicting reply")
+                .relevance(0.9)
+                .conflicting(true)
+                .build()));
+    Configuration config = mock(Configuration.class);
+    when(config.getFilterCommentsRelevanceThreshold()).thenReturn(0.6);
+    SpecializedReviewConcernLedgerOperations operations =
+        new SpecializedReviewConcernLedgerOperations(
+            new ReviewConcernLedgerOperations(localizer(), config));
+
+    ReviewConcernLedger updates =
+        operations.verifiedUpdates(
+            response,
+            findings(
+                relevantVerifiedConcern,
+                irrelevantVerifiedConcern,
+                duplicatedVerifiedConcern,
+                conflictingVerifiedConcern),
+            List.of(
+                SpecializedReviewFindings.AgentFindings.from(
+                    "CORRECTNESS",
+                    findings(
+                        relevantRawConcern,
+                        irrelevantRawConcern,
+                        duplicatedRawConcern,
+                        conflictingRawConcern))));
+
+    ReviewerConcerns stored =
+        reviewer(updates, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
+    assertEquals(1, stored.getConcerns().size());
+    assertEquals("c-raw-r1", stored.getConcerns().getFirst().getId());
   }
 
   @Test
@@ -215,7 +291,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(response, verifiedFindings, rawFindings);
@@ -244,7 +320,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     IllegalStateException thrown =
         assertThrows(

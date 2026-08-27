@@ -22,7 +22,9 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
@@ -30,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
 import java.util.Set;
@@ -136,10 +139,48 @@ public class ReviewConcernLedgerOperationsTest {
     return concern;
   }
 
+  @Test
+  public void initializeLedgerSkipsDuplicatedConflictingAndIrrelevantReplies() {
+    Configuration config = mock(Configuration.class);
+    when(config.getFilterCommentsRelevanceThreshold()).thenReturn(0.6);
+
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(
+        List.of(
+            AiReplyItem.builder().reply("Relevant concern").score(-1.0).relevance(0.9).build(),
+            AiReplyItem.builder().reply("Low relevance").score(-1.0).relevance(0.3).build(),
+            AiReplyItem.builder()
+                .reply("Duplicated concern")
+                .score(-1.0)
+                .relevance(0.9)
+                .duplicated(true)
+                .build(),
+            AiReplyItem.builder()
+                .reply("Conflicting concern")
+                .score(-1.0)
+                .relevance(0.9)
+                .conflicting(true)
+                .build()));
+
+    ReviewConcernLedgerOperations operations =
+        new ReviewConcernLedgerOperations(mock(Localizer.class), config);
+    operations.initializeLedger(
+        response,
+        new GerritChange("project~branch~change"),
+        new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+
+    ReviewConcernLedger ledger =
+        response.getPendingConcernUpdates().get("project~branch~change").orElseThrow();
+    assertEquals(1, ledger.getReviewers().getFirst().getConcerns().size());
+    assertEquals(
+        "Relevant concern",
+        ledger.getReviewers().getFirst().getConcerns().getFirst().getDescription());
+  }
+
   private static ReviewConcernLedgerOperations ledgerOperations() {
     Localizer localizer = mock(Localizer.class);
     when(localizer.getText("message.review.concern.specialized.agent.skipped"))
         .thenReturn("%s review skipped because its specialized agent is disabled.");
-    return new ReviewConcernLedgerOperations(localizer);
+    return new ReviewConcernLedgerOperations(localizer, mock(Configuration.class));
   }
 }
