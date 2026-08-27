@@ -66,6 +66,14 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       "__files/openai/contextPatchOriginal.py";
   private static final String CONTEXT_PATCH_MODIFIED_FILE =
       "__files/openai/contextPatchModified.py";
+  private static final String REBASE_SAME_FILE_BASE_FILE =
+      "__files/openai/rebaseSameFileBase.py";
+  private static final String REBASE_SAME_FILE_PREVIOUS_FILE =
+      "__files/openai/rebaseSameFilePrevious.py";
+  private static final String REBASE_SAME_FILE_UPSTREAM_FILE =
+      "__files/openai/rebaseSameFileUpstream.py";
+  private static final String REBASE_SAME_FILE_CURRENT_FILE =
+      "__files/openai/rebaseSameFileCurrent.py";
 
   @Mock private Configuration config;
   @Mock private GitRepositoryManager repositoryManager;
@@ -217,38 +225,41 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
   @Test
   public void getIncrementalPatchSetExcludesChangesFromARebase() throws Exception {
     List<RevCommit> patchSetCommits = createRebasedIncrementalPatchSetCommits();
-    when(config.getGerritApi()).thenReturn(gerritApi);
-    when(gerritApi.changes()).thenReturn(changes);
-    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
-        .thenReturn(changeApi);
-    when(changeApi.current()).thenReturn(revisionApi);
-    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
-    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
-    when(repositoryManager.openRepository(any()))
-        .thenAnswer(
-            invocation ->
-                new FileRepositoryBuilder()
-                    .setGitDir(gitDir.toFile())
-                    .setMustExist(true)
-                    .build());
-    when(config.getAiReviewCommitMessages()).thenReturn(true);
-    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
-    when(config.getPatchContextLines()).thenReturn(3);
-    GerritChange change = getGerritChange();
-    change.setPatchSetNumber(2);
-    ReviewConcernLedger ledger = new ReviewConcernLedger();
-    ledger.setLastReviewedCommit(patchSetCommits.get(0).getName());
-    ChangeSetData changeSetData = new ChangeSetData(1);
-    changeSetData.setPreviousReviewConcernLedger(ledger);
-
-    GerritClientPatchSetReviewAi client =
-        new GerritClientPatchSetReviewAi(config, repositoryManager);
-    String patchSet = client.getIncrementalPatchSet(changeSetData, change);
+    String patchSet = reviewRebasedIncrementalPatch(patchSetCommits);
 
     Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
     Assert.assertTrue(patchSet.contains("-print('before')"));
     Assert.assertTrue(patchSet.contains("+print('after')"));
     Assert.assertFalse(patchSet.contains("hw_crypto.py"));
+  }
+
+  @Test
+  public void getIncrementalPatchSetExcludesUpstreamHunkFromChangedFile() throws Exception {
+    List<RevCommit> patchSetCommits = createSameFileRebasedIncrementalPatchSetCommits();
+    String patchSet = reviewRebasedIncrementalPatch(patchSetCommits);
+
+    Assert.assertTrue(patchSet.contains("-reviewed = 'before'"));
+    Assert.assertTrue(patchSet.contains("+reviewed = 'after'"));
+    Assert.assertFalse(patchSet.contains("upstream = 'merged'"));
+  }
+
+  @Test
+  public void getIncrementalPatchSetRemainsEmptyWhenEmptyChangeIsRebased() throws Exception {
+    List<RevCommit> patchSetCommits =
+        createRebasedEmptyCurrentPatchSetCommits(REBASE_SAME_FILE_BASE_FILE);
+
+    Assert.assertEquals("", reviewRebasedIncrementalPatch(patchSetCommits));
+  }
+
+  @Test
+  public void getIncrementalPatchSetShowsDroppedChangeWithoutUpstreamHunk() throws Exception {
+    List<RevCommit> patchSetCommits =
+        createRebasedEmptyCurrentPatchSetCommits(REBASE_SAME_FILE_PREVIOUS_FILE);
+    String patchSet = reviewRebasedIncrementalPatch(patchSetCommits);
+
+    Assert.assertTrue(patchSet.contains("-reviewed = 'before'"));
+    Assert.assertTrue(patchSet.contains("+reviewed = 'base'"));
+    Assert.assertFalse(patchSet.contains("upstream = 'merged'"));
   }
 
   @Test
@@ -328,6 +339,74 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     }
   }
 
+  private List<RevCommit> createSameFileRebasedIncrementalPatchSetCommits() throws Exception {
+    try (Git git = Git.init().setDirectory(tempFolder.newFolder("same-file-rebase-repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Path changedFile = workTree.resolve("allowed.py");
+
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_BASE_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit base =
+          git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_PREVIOUS_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit previousPatchSet =
+          git.commit().setMessage("Patch set 1").setAuthor("Test", "test@example.com").call();
+
+      git.branchCreate().setName("same-file-upstream").setStartPoint(base.getName()).call();
+      git.checkout().setName("same-file-upstream").call();
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_UPSTREAM_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      git.commit().setMessage("upstream change").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_CURRENT_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit currentPatchSet =
+          git.commit().setMessage("Patch set 2").setAuthor("Test", "test@example.com").call();
+
+      return List.of(previousPatchSet, currentPatchSet);
+    }
+  }
+
+  private List<RevCommit> createRebasedEmptyCurrentPatchSetCommits(String previousPatchFile)
+      throws Exception {
+    try (Git git = Git.init().setDirectory(tempFolder.newFolder("empty-rebase-repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Path changedFile = workTree.resolve("allowed.py");
+
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_BASE_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit base =
+          git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(changedFile, readResource(previousPatchFile));
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit previousPatchSet =
+          git.commit()
+              .setMessage("Patch set 1")
+              .setAuthor("Test", "test@example.com")
+              .setAllowEmpty(true)
+              .call();
+
+      git.branchCreate().setName("empty-change-upstream").setStartPoint(base.getName()).call();
+      git.checkout().setName("empty-change-upstream").call();
+      Files.writeString(changedFile, readResource(REBASE_SAME_FILE_UPSTREAM_FILE));
+      git.add().addFilepattern("allowed.py").call();
+      git.commit().setMessage("upstream change").setAuthor("Test", "test@example.com").call();
+      RevCommit currentPatchSet =
+          git.commit()
+              .setMessage("Patch set 2")
+              .setAuthor("Test", "test@example.com")
+              .setAllowEmpty(true)
+              .call();
+
+      return List.of(previousPatchSet, currentPatchSet);
+    }
+  }
+
   private List<RevCommit> createCommitMessageOnlyPatchSetCommits() throws Exception {
     try (Git git =
         Git.init().setDirectory(tempFolder.newFolder("commit-message-only-repo")).call()) {
@@ -351,6 +430,36 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     CommitInfo commitInfo = new CommitInfo();
     commitInfo.commit = commit.getName();
     return commitInfo;
+  }
+
+  private String reviewRebasedIncrementalPatch(List<RevCommit> patchSetCommits) throws Exception {
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
+    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
+    when(repositoryManager.openRepository(any()))
+        .thenAnswer(
+            invocation ->
+                new FileRepositoryBuilder()
+                    .setGitDir(gitDir.toFile())
+                    .setMustExist(true)
+                    .build());
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getPatchContextLines()).thenReturn(3);
+    GerritChange change = getGerritChange();
+    change.setPatchSetNumber(2);
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setLastReviewedCommit(patchSetCommits.get(0).getName());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(ledger);
+
+    GerritClientPatchSetReviewAi client =
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
+    return client.getIncrementalPatchSet(changeSetData, change);
   }
 
   private RevCommit createRenameCommit() throws Exception {
@@ -440,5 +549,9 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
   private String getContextPatchModified() throws Exception {
     return Files.readString(TEST_RESOURCES_PATH.resolve(CONTEXT_PATCH_MODIFIED_FILE));
+  }
+
+  private String readResource(String resourceFile) throws Exception {
+    return Files.readString(TEST_RESOURCES_PATH.resolve(resourceFile));
   }
 }
