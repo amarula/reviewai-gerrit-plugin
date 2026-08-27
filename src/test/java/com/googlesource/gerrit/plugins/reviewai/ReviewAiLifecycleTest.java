@@ -20,6 +20,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.gerrit.extensions.registration.DynamicSet;
 import com.google.gerrit.extensions.registration.Extension;
@@ -28,6 +29,7 @@ import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.EventListener;
 import com.google.inject.Provider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import org.junit.Test;
 
@@ -217,11 +219,13 @@ public class ReviewAiLifecycleTest {
       DynamicSet<EventListener> eventListeners,
       ReviewAiExecutors executors,
       ReviewAiDb reviewAiDb) {
+    when(executors.getAgentExecutor()).thenReturn(command -> command.run());
     return new ReviewAiLifecycle(
         executors,
         MOCK_LISTENER_PROVIDER,
         eventListeners,
         reviewAiDb,
+        mock(ReviewConcernSanitizer.class),
         PLUGIN_NAME,
         TargetEventListener.class.getName());
   }

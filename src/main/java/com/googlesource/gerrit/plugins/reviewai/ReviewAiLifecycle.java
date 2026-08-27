@@ -26,6 +26,7 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -48,6 +49,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
   private final Provider<GerritListener> gerritListenerProvider;
   private final DynamicSet<EventListener> eventListeners;
   private final ReviewAiDb reviewAiDb;
+  private final ReviewConcernSanitizer reviewConcernSanitizer;
   private final String pluginName;
   private final String listenerClassName;
   private RegistrationHandle listenerHandle;
@@ -58,12 +60,14 @@ public class ReviewAiLifecycle implements LifecycleListener {
       Provider<GerritListener> gerritListenerProvider,
       DynamicSet<EventListener> eventListeners,
       ReviewAiDb reviewAiDb,
+      ReviewConcernSanitizer reviewConcernSanitizer,
       @PluginName String pluginName) {
     this(
         reviewAiExecutors,
         gerritListenerProvider,
         eventListeners,
         reviewAiDb,
+        reviewConcernSanitizer,
         pluginName,
         GerritListener.class.getName());
   }
@@ -73,12 +77,14 @@ public class ReviewAiLifecycle implements LifecycleListener {
       Provider<GerritListener> gerritListenerProvider,
       DynamicSet<EventListener> eventListeners,
       ReviewAiDb reviewAiDb,
+      ReviewConcernSanitizer reviewConcernSanitizer,
       String pluginName,
       String listenerClassName) {
     this.reviewAiExecutors = reviewAiExecutors;
     this.gerritListenerProvider = gerritListenerProvider;
     this.eventListeners = eventListeners;
     this.reviewAiDb = reviewAiDb;
+    this.reviewConcernSanitizer = reviewConcernSanitizer;
     this.pluginName = pluginName;
     this.listenerClassName = listenerClassName;
   }
@@ -101,6 +107,17 @@ public class ReviewAiLifecycle implements LifecycleListener {
     GerritListener listener = gerritListenerProvider.get();
     listenerHandle = eventListeners.add(pluginName, listener);
     log.info("Registered GerritListener for plugin '{}'", pluginName);
+
+    reviewAiExecutors
+        .getAgentExecutor()
+        .execute(
+            () -> {
+              try {
+                reviewConcernSanitizer.sanitize();
+              } catch (Exception e) {
+                log.error("Review concern sanitization failed", e);
+              }
+            });
   }
 
   @Override
