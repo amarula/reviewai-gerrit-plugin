@@ -59,8 +59,16 @@ public class ReviewConcernSanitizer {
     int removed = 0;
     try (ManualRequestContext ignored = requestContext.open()) {
       for (String changeId : changeIds) {
-        if (removeIfClosed(changeId)) {
-          removed++;
+        try {
+          if (removeIfClosed(changeId)) {
+            removed++;
+          }
+        } catch (RuntimeException e) {
+          log.warn(
+              "Could not clear review concern ledger for change {} (database unavailable); aborting sanitization",
+              changeId,
+              e);
+          break;
         }
       }
     }
@@ -75,21 +83,25 @@ public class ReviewConcernSanitizer {
       return false;
     }
     String changeKey = changeId.substring(separator + 1);
+
+    boolean shouldClear;
     try {
       ChangeInfo info = gerritApi.changes().id(changeKey).get();
-      if (info.status == ChangeStatus.MERGED || info.status == ChangeStatus.ABANDONED) {
-        new ReviewConcernStore(db, changeId).clear();
-        log.info("Removed review concern ledger for {} change {}", info.status, changeId);
-        return true;
-      }
+      shouldClear = info.status == ChangeStatus.MERGED || info.status == ChangeStatus.ABANDONED;
     } catch (ResourceNotFoundException e) {
-      new ReviewConcernStore(db, changeId).clear();
-      log.info("Removed review concern ledger for missing change {}", changeId);
-      return true;
+      shouldClear = true;
     } catch (Exception e) {
       log.warn(
           "Could not resolve status of change {}; keeping its review concern ledger", changeId, e);
+      return false;
     }
-    return false;
+
+    if (!shouldClear) {
+      return false;
+    }
+
+    ReviewConcernStore.clear(db, changeId);
+    log.info("Removed review concern ledger for change {}", changeId);
+    return true;
   }
 }
