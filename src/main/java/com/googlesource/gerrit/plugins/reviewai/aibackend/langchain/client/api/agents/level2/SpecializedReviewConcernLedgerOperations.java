@@ -65,6 +65,9 @@ final class SpecializedReviewConcernLedgerOperations {
       if (reply == null || reply.getReply() == null || reply.getReply().isBlank()) {
         continue;
       }
+      if (!ledgerOperations.isConcernWorthy(reply)) {
+        continue;
+      }
       Optional<ReviewConcern> matchedConcern =
           SpecializedReviewRepetitionMerger.matchedConcernForReply(
               reply, verificationCandidates.getConcerns(), i, replies.size());
