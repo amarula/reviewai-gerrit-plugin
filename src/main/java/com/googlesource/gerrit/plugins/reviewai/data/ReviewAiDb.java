@@ -28,10 +28,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -191,6 +194,19 @@ public class ReviewAiDb {
             + ")",
         "CREATE INDEX IF NOT EXISTS idx_review_concerns_change_status"
             + " ON review_concerns(change_id, concern_status)");
+  }
+
+  public List<String> listReviewConcernChangeIds() throws SQLException {
+    try (Connection connection = getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement("SELECT change_id FROM review_concern_ledgers");
+        ResultSet results = statement.executeQuery()) {
+      List<String> changeIds = new ArrayList<>();
+      while (results.next()) {
+        changeIds.add(results.getString(1));
+      }
+      return changeIds;
+    }
   }
 
   public void initReviewFeedbackSchema() throws SQLException {
