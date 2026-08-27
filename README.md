@@ -11,6 +11,10 @@ can continue the discussion in Gerrit comments by mentioning `@{gerritUserName}`
 (provided that `gerritEmailAddress` is in the form `gerritUserName@<any_email_domain>`), trigger reviews with
 `/review`, and view command help with `/help` or `/help <command>`.
 
+## Commercial Support
+
+For commercial support, please contact Amarula Solutions at https://www.amarulasolutions.com/quotation/
+
 ## Getting Started
 
 ### Build
