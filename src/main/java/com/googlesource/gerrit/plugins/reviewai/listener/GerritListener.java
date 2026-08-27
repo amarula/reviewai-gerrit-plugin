@@ -23,11 +23,9 @@ import com.google.gerrit.server.config.GerritInstanceId;
 import com.google.gerrit.server.events.*;
 import com.google.gerrit.server.project.NoSuchProjectException;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Objects;
@@ -41,7 +39,7 @@ public class GerritListener implements EventListener {
   private final EventHandlerExecutor evenHandlerExecutor;
   private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   private final LoggingConfigurator loggingConfigurator;
-  private final ReviewConcernPublisher reviewConcernPublisher;
+  private final ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler;
 
   @Inject
   public GerritListener(
@@ -49,13 +47,13 @@ public class GerritListener implements EventListener {
       EventHandlerExecutor evenHandlerExecutor,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
       LoggingConfigurator loggingConfigurator,
-      ReviewConcernPublisher reviewConcernPublisher,
+      ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler,
       @GerritInstanceId @Nullable String myInstanceId) {
     this.configCreator = configCreator;
     this.evenHandlerExecutor = evenHandlerExecutor;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     this.loggingConfigurator = loggingConfigurator;
-    this.reviewConcernPublisher = reviewConcernPublisher;
+    this.reviewConcernLifecycleEventHandler = reviewConcernLifecycleEventHandler;
     this.myInstanceId = myInstanceId;
     log.debug("GerritListener initialized with instance ID: {}", myInstanceId);
   }
@@ -67,8 +65,7 @@ public class GerritListener implements EventListener {
       log.debug("Ignore event from another instance: {}", event.instanceId);
       return;
     }
-    if (isChangeLifecycleEvent(event)) {
-      clearConcernLedger(event);
+    if (reviewConcernLifecycleEventHandler.handle(event)) {
       return;
     }
     if (!EVENT_CLASS_MAP.containsValue(event.getClass())) {
@@ -99,24 +96,6 @@ public class GerritListener implements EventListener {
       evenHandlerExecutor.execute(config, patchSetEvent);
     } catch (NoSuchProjectException e) {
       log.error("Project not found: {}", projectNameKey, e);
-    }
-  }
-
-  private static boolean isChangeLifecycleEvent(Event event) {
-    return event instanceof ChangeMergedEvent || event instanceof ChangeAbandonedEvent;
-  }
-
-  private void clearConcernLedger(Event event) {
-    GerritChange change = new GerritChange(event);
-    log.debug(
-        "Clearing review concern ledger for change {} on event {}",
-        change.getFullChangeId(),
-        event.getType());
-    try {
-      reviewConcernPublisher.clear(change);
-    } catch (Exception e) {
-      log.error(
-          "Failed to clear review concern ledger for change {}", change.getFullChangeId(), e);
     }
   }
 }

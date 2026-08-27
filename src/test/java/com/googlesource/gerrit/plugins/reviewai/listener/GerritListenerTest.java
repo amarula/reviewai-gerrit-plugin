@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,14 +25,11 @@ import com.google.gerrit.entities.Change;
 import com.google.gerrit.server.events.ChangeAbandonedEvent;
 import com.google.gerrit.server.events.ChangeMergedEvent;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -45,7 +41,7 @@ public class GerritListenerTest extends TestBase {
   @Mock private EventHandlerExecutor eventHandlerExecutor;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private LoggingConfigurator loggingConfigurator;
-  @Mock private ReviewConcernPublisher reviewConcernPublisher;
+  @Mock private ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler;
   @Mock private Change change;
 
   private GerritListener listener;
@@ -62,29 +58,31 @@ public class GerritListenerTest extends TestBase {
             eventHandlerExecutor,
             pluginDataHandlerBaseProvider,
             loggingConfigurator,
-            reviewConcernPublisher,
+            reviewConcernLifecycleEventHandler,
             INSTANCE_ID);
   }
 
   @Test
-  public void clearsConcernLedgerOnMerge() {
+  public void delegatesMergeToConcernLifecycleHandler() {
     ChangeMergedEvent event = new ChangeMergedEvent(change);
     event.instanceId = INSTANCE_ID;
+    when(reviewConcernLifecycleEventHandler.handle(event)).thenReturn(true);
 
     listener.onEvent(event);
 
-    assertClearedForCurrentChange();
+    verify(reviewConcernLifecycleEventHandler).handle(event);
     verify(eventHandlerExecutor, never()).execute(any(), any());
   }
 
   @Test
-  public void clearsConcernLedgerOnAbandon() {
+  public void delegatesAbandonToConcernLifecycleHandler() {
     ChangeAbandonedEvent event = new ChangeAbandonedEvent(change);
     event.instanceId = INSTANCE_ID;
+    when(reviewConcernLifecycleEventHandler.handle(event)).thenReturn(true);
 
     listener.onEvent(event);
 
-    assertClearedForCurrentChange();
+    verify(reviewConcernLifecycleEventHandler).handle(event);
     verify(eventHandlerExecutor, never()).execute(any(), any());
   }
 
@@ -95,12 +93,6 @@ public class GerritListenerTest extends TestBase {
 
     listener.onEvent(event);
 
-    verify(reviewConcernPublisher, never()).clear(any());
-  }
-
-  private void assertClearedForCurrentChange() {
-    ArgumentCaptor<GerritChange> captor = ArgumentCaptor.forClass(GerritChange.class);
-    verify(reviewConcernPublisher).clear(captor.capture());
-    assertEquals("myProject~myBranchName~myChangeId", captor.getValue().getFullChangeId());
+    verify(reviewConcernLifecycleEventHandler, never()).handle(any());
   }
 }
