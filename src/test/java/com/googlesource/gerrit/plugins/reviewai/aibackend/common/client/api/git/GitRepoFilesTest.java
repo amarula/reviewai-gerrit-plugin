@@ -29,10 +29,12 @@ import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Set;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -126,6 +128,37 @@ public class GitRepoFilesTest extends TestBase {
       assertEquals(
           Set.of("added.py", "deleted.py", "modified.py"),
           new GitRepoFiles(repositoryManager).getPatchSetChangedFiles(change));
+    }
+  }
+
+  @Test
+  public void grepPatchSetFiltersExactPathContainingColon() throws Exception {
+    try (Git git = createRepository()) {
+      String changedPath = "specialized:branch.py";
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Files.copy(SPECIALIZED_BRANCH_CONTENT, workTree.resolve(changedPath));
+      git.add().addFilepattern(changedPath).call();
+      RevCommit patchSetCommit =
+          git.commit().setMessage("Add changed file").setAuthor("Test", "test@example.com").call();
+
+      RefUpdate patchSetRef = git.getRepository().updateRef(PATCH_SET_REF);
+      patchSetRef.setNewObjectId(patchSetCommit);
+      assertEquals(RefUpdate.Result.NEW, patchSetRef.update());
+
+      GerritChange change = getGerritChange();
+      change.setChangeNumber(CHANGE_NUMBER);
+      change.setPatchSetNumber(PATCH_SET_NUMBER);
+
+      GitRepositoryManager repositoryManager = mock(GitRepositoryManager.class);
+      when(repositoryManager.openRepository(any(Project.NameKey.class)))
+          .thenReturn(git.getRepository());
+      Configuration config = mock(Configuration.class);
+      when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+
+      assertEquals(
+          List.of(changedPath + ":1: specialized branch content"),
+          new GitRepoFiles(repositoryManager)
+              .grepPatchSet(config, change, "specialized", Set.of(changedPath)));
     }
   }
 

@@ -146,24 +146,12 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (string == null || string.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    List<String> matches = gitRepoFiles.grepPatchSet(config, change, string);
+    Set<String> changed = changedFiles();
+    List<String> matches = gitRepoFiles.grepPatchSet(config, change, string, changed);
     if (matches == null || matches.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    Set<String> changed = changedFiles();
-    if (changed != null) {
-      matches = matches.stream().filter(match -> isChangedFileMatch(match, changed)).toList();
-      if (matches.isEmpty()) {
-        return CONTEXT_NOT_PROVIDED;
-      }
-    }
     return String.join("\n", matches);
-  }
-
-  private static boolean isChangedFileMatch(String match, Set<String> changedFiles) {
-    int colon = match.indexOf(':');
-    String path = colon < 0 ? match : match.substring(0, colon);
-    return changedFiles.contains(path);
   }
 
   private static JsonObject parseArguments(String arguments) {

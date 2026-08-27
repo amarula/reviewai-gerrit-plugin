@@ -120,7 +120,10 @@ public class GitRepoFiles {
   }
 
   public List<String> grepPatchSet(
-      Configuration config, GerritChange change, String searchString) {
+      Configuration config,
+      GerritChange change,
+      String searchString,
+      Set<String> includedPaths) {
     log.debug("Searching repository for string: {}", searchString);
     enabledFileExtensions = config.getEnabledFileExtensions();
     if (searchString == null || searchString.isEmpty()) {
@@ -130,7 +133,8 @@ public class GitRepoFiles {
       return withRepositoryTreeReader(
           change,
           this::getPatchSetRevTree,
-          (repository, tree, reader) -> grepTree(repository, tree, reader, searchString));
+          (repository, tree, reader) ->
+              grepTree(repository, tree, reader, searchString, includedPaths));
     } catch (IOException e) {
       throw new RuntimeException("Failed to search repository", e);
     }
@@ -160,12 +164,16 @@ public class GitRepoFiles {
   }
 
   private List<String> grepTree(
-      Repository repository, RevTree tree, ObjectReader reader, String searchString)
+      Repository repository,
+      RevTree tree,
+      ObjectReader reader,
+      String searchString,
+      Set<String> includedPaths)
       throws IOException {
     return collectMatchingFiles(
         repository,
         tree,
-        path -> true,
+        path -> includedPaths == null || includedPaths.contains(path),
         (matches, path, treeWalk) -> {
           String content = getContent(reader, treeWalk);
           addGrepMatches(matches, path, content, searchString);
