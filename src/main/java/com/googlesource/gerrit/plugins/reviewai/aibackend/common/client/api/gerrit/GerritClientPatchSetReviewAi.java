@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -41,7 +42,9 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -180,7 +183,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
       CommitInfo currentCommit = currentRevision.commit(false);
       recordPatchSetRevision(currentCommit);
       String incrementalDiff =
-          getCompactGitDiff(baseCommitId, currentCommit.commit);
+          getCompactGitDiff(baseCommitId, currentCommit.commit, changedFilesOf(currentCommit.commit));
       if (incrementalDiff.isBlank()) {
         return "";
       }
@@ -230,7 +233,8 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     }
   }
 
-  private String getCompactGitDiff(String baseCommitId, String commitId) throws Exception {
+  private String getCompactGitDiff(
+      String baseCommitId, String commitId, Set<String> changedFiles) throws Exception {
     try (Repository repository = repositoryManager.openRepository(change.getProjectNameKey());
         RevWalk revWalk = new RevWalk(repository);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -240,9 +244,39 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
       diffFormatter.setRepository(repository);
       diffFormatter.setDetectRenames(true);
       diffFormatter.setContext(config.getPatchContextLines());
-      diffFormatter.format(baseCommit.getTree(), commit.getTree());
+      // Restrict the incremental diff to the files this patch set touches relative to its own base,
+      // so a rebase onto a branch that already contains another change doesn't leak that change's
+      // files into the incremental patch.
+      if (changedFiles.isEmpty()) {
+        diffFormatter.format(baseCommit.getTree(), commit.getTree());
+      } else {
+        for (DiffEntry entry : diffFormatter.scan(baseCommit.getTree(), commit.getTree())) {
+          if (changedFiles.contains(entry.getNewPath())
+              || changedFiles.contains(entry.getOldPath())) {
+            diffFormatter.format(entry);
+          }
+        }
+      }
       diffFormatter.flush();
       return outputStream.toString(StandardCharsets.UTF_8);
+    }
+  }
+
+  private Set<String> changedFilesOf(String commitId) throws Exception {
+    try (Repository repository = repositoryManager.openRepository(change.getProjectNameKey());
+        RevWalk revWalk = new RevWalk(repository);
+        DiffFormatter diffFormatter = new DiffFormatter(new ByteArrayOutputStream())) {
+      RevCommit commit = revWalk.parseCommit(ObjectId.fromString(commitId));
+      ObjectId baseTreeId = commit.getParentCount() == 0 ? null : commit.getParent(0).getId();
+      diffFormatter.setRepository(repository);
+      Set<String> changedFiles = new HashSet<>();
+      for (DiffEntry entry : diffFormatter.scan(baseTreeId, commit.getTree())) {
+        changedFiles.add(
+            entry.getChangeType() == DiffEntry.ChangeType.DELETE
+                ? entry.getOldPath()
+                : entry.getNewPath());
+      }
+      return changedFiles;
     }
   }
 

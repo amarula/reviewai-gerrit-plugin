@@ -215,6 +215,43 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
   }
 
   @Test
+  public void getIncrementalPatchSetExcludesChangesFromARebase() throws Exception {
+    List<RevCommit> patchSetCommits = createRebasedIncrementalPatchSetCommits();
+    when(config.getGerritApi()).thenReturn(gerritApi);
+    when(gerritApi.changes()).thenReturn(changes);
+    when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
+        .thenReturn(changeApi);
+    when(changeApi.current()).thenReturn(revisionApi);
+    when(revisionApi.patch()).thenReturn(BinaryResult.create(getIncrementalCurrentPatch()));
+    when(revisionApi.commit(false)).thenReturn(commitInfo(patchSetCommits.get(1)));
+    when(repositoryManager.openRepository(any()))
+        .thenAnswer(
+            invocation ->
+                new FileRepositoryBuilder()
+                    .setGitDir(gitDir.toFile())
+                    .setMustExist(true)
+                    .build());
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getPatchContextLines()).thenReturn(3);
+    GerritChange change = getGerritChange();
+    change.setPatchSetNumber(2);
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setLastReviewedCommit(patchSetCommits.get(0).getName());
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(ledger);
+
+    GerritClientPatchSetReviewAi client =
+        new GerritClientPatchSetReviewAi(config, repositoryManager);
+    String patchSet = client.getIncrementalPatchSet(changeSetData, change);
+
+    Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
+    Assert.assertTrue(patchSet.contains("-print('before')"));
+    Assert.assertTrue(patchSet.contains("+print('after')"));
+    Assert.assertFalse(patchSet.contains("hw_crypto.py"));
+  }
+
+  @Test
   public void getIncrementalPatchSetIsEmptyWhenOnlyCommitMessageChanges() throws Exception {
     List<RevCommit> patchSetCommits = createCommitMessageOnlyPatchSetCommits();
     when(config.getGerritApi()).thenReturn(gerritApi);
@@ -259,6 +296,34 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       git.add().addFilepattern("allowed.py").call();
       RevCommit currentPatchSet =
           git.commit().setMessage("Patch set 3").setAuthor("Test", "test@example.com").call();
+      return List.of(previousPatchSet, currentPatchSet);
+    }
+  }
+
+  private List<RevCommit> createRebasedIncrementalPatchSetCommits() throws Exception {
+    try (Git git = Git.init().setDirectory(tempFolder.newFolder("rebased-repo")).call()) {
+      gitDir = git.getRepository().getDirectory().toPath();
+      Path workTree = git.getRepository().getWorkTree().toPath();
+
+      RevCommit base =
+          git.commit().setAllowEmpty(true).setMessage("base").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(workTree.resolve("allowed.py"), "print('before')\n");
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit previousPatchSet =
+          git.commit().setMessage("Patch set 1").setAuthor("Test", "test@example.com").call();
+
+      git.branchCreate().setName("merged-change").setStartPoint(base.getName()).call();
+      git.checkout().setName("merged-change").call();
+      Files.writeString(workTree.resolve("hw_crypto.py"), "hw crypto\n");
+      git.add().addFilepattern("hw_crypto.py").call();
+      git.commit().setMessage("merged change").setAuthor("Test", "test@example.com").call();
+
+      Files.writeString(workTree.resolve("allowed.py"), "print('after')\n");
+      git.add().addFilepattern("allowed.py").call();
+      RevCommit currentPatchSet =
+          git.commit().setMessage("Patch set 2").setAuthor("Test", "test@example.com").call();
+
       return List.of(previousPatchSet, currentPatchSet);
     }
   }
