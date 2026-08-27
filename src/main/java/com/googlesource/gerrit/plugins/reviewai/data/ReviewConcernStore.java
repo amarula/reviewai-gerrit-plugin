@@ -99,6 +99,10 @@ public final class ReviewConcernStore {
   }
 
   public void clear() {
+    clear(db, changeId);
+  }
+
+  public static void clear(ReviewAiDb db, String changeId) {
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
