@@ -67,6 +67,7 @@ public class LangChainExecutorTest {
     String compressedTreeOutput = readTestResource(COMPRESSED_TREE_OUTPUT_RESOURCE).stripTrailing();
     GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
     when(gitRepoFiles.getPatchSetFileTree(config, change, null)).thenReturn(largeTree, largeTree);
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     ToolExecutionRequest firstToolRequest = toolRequest("call_1");
     ToolExecutionRequest secondToolRequest = toolRequest("call_2");

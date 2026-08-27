@@ -39,6 +39,8 @@ public class OnDemandCodeContextTools extends ClientBase {
   public static final Set<String> FUNCTION_NAMES = Set.of(TREE, GET_CONTENT, GREP);
 
   private static final String CONTEXT_NOT_PROVIDED = "CONTEXT NOT PROVIDED";
+  private static final String PREEXISTING_CONTEXT_MARKER =
+      "NOTE: This file is pre-existing repository context and is NOT part of the current change.\n\n";
   private static final Pattern COMMIT_MESSAGE_PATH_PATTERN =
       Pattern.compile("^(?:reviewai-topic-change-.*)?/?COMMIT_MSG$");
   private static final int LOG_MAX_CONTENT_SIZE = 256;
@@ -46,6 +48,8 @@ public class OnDemandCodeContextTools extends ClientBase {
   private final GerritChange change;
   private final GitRepoFiles gitRepoFiles;
   private final TreeOutputCompressor treeOutputCompressor;
+  private Set<String> changedFiles;
+  private boolean changedFilesResolved;
 
   public OnDemandCodeContextTools(
       Configuration config, GerritChange change, GitRepoFiles gitRepoFiles) {
@@ -53,6 +57,22 @@ public class OnDemandCodeContextTools extends ClientBase {
     this.change = change;
     this.gitRepoFiles = gitRepoFiles;
     this.treeOutputCompressor = new TreeOutputCompressor();
+  }
+
+  private Set<String> changedFiles() {
+    if (!changedFilesResolved) {
+      changedFilesResolved = true;
+      try {
+        changedFiles = gitRepoFiles.getPatchSetChangedFiles(change);
+      } catch (Exception e) {
+        log.warn(
+            "Could not resolve changed files for change {}; on-demand tools will not be scoped to the change",
+            getChangeId(),
+            e);
+        changedFiles = null;
+      }
+    }
+    return changedFiles;
   }
 
   public String execute(String toolName, String arguments) {
@@ -96,6 +116,13 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (paths == null || paths.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
+    Set<String> changed = changedFiles();
+    if (changed != null) {
+      paths = paths.stream().filter(changed::contains).toList();
+      if (paths.isEmpty()) {
+        return CONTEXT_NOT_PROVIDED;
+      }
+    }
     return treeOutputCompressor.format(paths, subdir);
   }
 
@@ -103,7 +130,12 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (filePath == null || filePath.isBlank() || isCommitMessagePath(filePath)) {
       return CONTEXT_NOT_PROVIDED;
     }
-    return gitRepoFiles.getPatchSetFileContent(change, filePath);
+    String content = gitRepoFiles.getPatchSetFileContent(change, filePath);
+    Set<String> changed = changedFiles();
+    if (changed != null && !changed.contains(filePath)) {
+      return PREEXISTING_CONTEXT_MARKER + content;
+    }
+    return content;
   }
 
   private static boolean isCommitMessagePath(String filePath) {
@@ -118,7 +150,20 @@ public class OnDemandCodeContextTools extends ClientBase {
     if (matches == null || matches.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
+    Set<String> changed = changedFiles();
+    if (changed != null) {
+      matches = matches.stream().filter(match -> isChangedFileMatch(match, changed)).toList();
+      if (matches.isEmpty()) {
+        return CONTEXT_NOT_PROVIDED;
+      }
+    }
     return String.join("\n", matches);
+  }
+
+  private static boolean isChangedFileMatch(String match, Set<String> changedFiles) {
+    int colon = match.indexOf(':');
+    String path = colon < 0 ? match : match.substring(0, colon);
+    return changedFiles.contains(path);
   }
 
   private static JsonObject parseArguments(String arguments) {

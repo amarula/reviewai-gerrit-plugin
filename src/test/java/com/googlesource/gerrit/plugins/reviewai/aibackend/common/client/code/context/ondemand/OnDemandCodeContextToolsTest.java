@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -59,6 +60,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void treeReturnsRepositoryPathsFromSubdir() throws Exception {
     List<String> paths = readTestFileLines(SMALL_TREE_FILE);
     when(gitRepoFiles.getPatchSetFileTree(config, change, "src")).thenReturn(paths);
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     String output = tools.execute("tree", "{\"subdir\":\"src\"}");
 
@@ -69,6 +71,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void treeCompressesLargeRepositoryPaths() throws Exception {
     when(gitRepoFiles.getPatchSetFileTree(config, change, null))
         .thenReturn(readTestFileLines(LARGE_TREE_FILE));
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     String output = tools.execute("tree", "{}");
 
@@ -80,6 +83,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void getContentReturnsFileContentFromProjectRoot() throws Exception {
     String content = readTestFile(CONTEXT_FILE);
     when(gitRepoFiles.getPatchSetFileContent(change, "context.py")).thenReturn(content);
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     String output = tools.execute("get_content", "{\"file_path\":\"context.py\"}");
 
@@ -105,6 +109,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void getContentAllowsCommitMessageFilenameInRepositorySubdirectory() throws Exception {
     String content = readTestFile(CONTEXT_FILE);
     when(gitRepoFiles.getPatchSetFileContent(change, "docs/COMMIT_MSG")).thenReturn(content);
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     String output = tools.execute("get_content", "{\"file_path\":\"docs/COMMIT_MSG\"}");
 
@@ -116,10 +121,45 @@ public class OnDemandCodeContextToolsTest extends TestBase {
     String firstLine = readTestFile(CONTEXT_FILE).split("\\R", 2)[0];
     String match = "context.py:1: " + firstLine;
     when(gitRepoFiles.grepPatchSet(config, change, "typing")).thenReturn(List.of(match));
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 
     assertEquals(match, output);
+  }
+
+  @Test
+  public void treeFiltersToChangedFiles() throws Exception {
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null))
+        .thenReturn(List.of("changed.py", "pre_existing.py"));
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+
+    String output = tools.execute("tree", "{}");
+
+    assertEquals("changed.py", output);
+  }
+
+  @Test
+  public void getContentMarksPreexistingFiles() throws Exception {
+    String content = readTestFile(CONTEXT_FILE);
+    when(gitRepoFiles.getPatchSetFileContent(change, "context.py")).thenReturn(content);
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+
+    String output = tools.execute("get_content", "{\"file_path\":\"context.py\"}");
+
+    assertTrue(output.startsWith("NOTE: This file is pre-existing repository context"));
+    assertTrue(output.endsWith(content));
+  }
+
+  @Test
+  public void grepFiltersToChangedFiles() throws Exception {
+    when(gitRepoFiles.grepPatchSet(config, change, "typing"))
+        .thenReturn(List.of("changed.py:1: match", "pre_existing.py:2: other"));
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+
+    String output = tools.execute("grep", "{\"string\":\"typing\"}");
+
+    assertEquals("changed.py:1: match", output);
   }
 
   @Test
