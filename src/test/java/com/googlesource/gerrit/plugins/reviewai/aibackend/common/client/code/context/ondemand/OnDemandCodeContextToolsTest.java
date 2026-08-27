@@ -120,8 +120,8 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void grepReturnsMatches() throws Exception {
     String firstLine = readTestFile(CONTEXT_FILE).split("\\R", 2)[0];
     String match = "context.py:1: " + firstLine;
-    when(gitRepoFiles.grepPatchSet(config, change, "typing")).thenReturn(List.of(match));
     when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", null)).thenReturn(List.of(match));
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 
@@ -153,13 +153,27 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
   @Test
   public void grepFiltersToChangedFiles() throws Exception {
-    when(gitRepoFiles.grepPatchSet(config, change, "typing"))
-        .thenReturn(List.of("changed.py:1: match", "pre_existing.py:2: other"));
     when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", Set.of("changed.py")))
+        .thenReturn(List.of("changed.py:1: match"));
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 
     assertEquals("changed.py:1: match", output);
+  }
+
+  @Test
+  public void grepPreservesColonInChangedFilePath() throws Exception {
+    String match = "schemas/v1:beta.py:1: match";
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("schemas/v1:beta.py"));
+    when(
+            gitRepoFiles.grepPatchSet(
+                config, change, "typing", Set.of("schemas/v1:beta.py")))
+        .thenReturn(List.of(match));
+
+    String output = tools.execute("grep", "{\"string\":\"typing\"}");
+
+    assertEquals(match, output);
   }
 
   @Test
