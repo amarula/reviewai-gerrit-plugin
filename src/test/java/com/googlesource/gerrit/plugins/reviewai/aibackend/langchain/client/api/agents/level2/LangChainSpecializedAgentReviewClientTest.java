@@ -167,7 +167,7 @@ public class LangChainSpecializedAgentReviewClientTest {
                 .build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(
@@ -215,7 +215,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     ReviewConcernLedger updates =
         operations.verifiedUpdates(response, verifiedFindings, rawFindings);
@@ -244,7 +244,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(AiReplyItem.builder().reply("Verified review").score(-1.0).build()));
     SpecializedReviewConcernLedgerOperations operations =
         new SpecializedReviewConcernLedgerOperations(
-            new ReviewConcernLedgerOperations(localizer()));
+            new ReviewConcernLedgerOperations(localizer(), mock(Configuration.class)));
 
     IllegalStateException thrown =
         assertThrows(

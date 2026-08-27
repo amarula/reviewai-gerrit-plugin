@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,9 +39,11 @@ import java.util.stream.Collectors;
 
 public final class ReviewConcernLedgerOperations {
   private final Localizer localizer;
+  private final Configuration config;
 
-  public ReviewConcernLedgerOperations(Localizer localizer) {
+  public ReviewConcernLedgerOperations(Localizer localizer, Configuration config) {
     this.localizer = localizer;
+    this.config = config;
   }
 
   public ReviewerConcerns reviewerConcerns(
@@ -227,6 +230,9 @@ public final class ReviewConcernLedgerOperations {
         if (reply == null || reply.getReply() == null || reply.getReply().isBlank()) {
           continue;
         }
+        if (!isConcernWorthy(reply)) {
+          continue;
+        }
         String concernId = reply.getConcernId();
         if (concernId == null || concernId.isBlank() || usedIds.contains(concernId)) {
           concernId = newConcernId(usedIds);
@@ -245,6 +251,13 @@ public final class ReviewConcernLedgerOperations {
     reviewerConcerns.setReviewer(reviewer);
     reviewerConcerns.setConcerns(concerns);
     return reviewerConcerns;
+  }
+
+  private boolean isConcernWorthy(AiReplyItem reply) {
+    boolean irrelevant =
+        reply.getRelevance() != null
+            && reply.getRelevance() < config.getFilterCommentsRelevanceThreshold();
+    return !reply.isDuplicated() && !reply.isConflicting() && !irrelevant;
   }
 
   private String newConcernId(Set<String> usedIds) {
