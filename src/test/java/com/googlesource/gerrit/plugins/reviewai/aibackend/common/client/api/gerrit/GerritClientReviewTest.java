@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -93,6 +94,18 @@ public class GerritClientReviewTest {
         .thenReturn(changeApi, refreshedChangeApi);
     when(changeApi.current()).thenReturn(revisionApi);
     when(revisionApi.review(any(ReviewInput.class))).thenReturn(reviewResult);
+    lenient()
+        .when(localizer.getText("message.review.concern.resolution"))
+        .thenReturn("Resolved by ReviewAI (%s): %s");
+    lenient()
+        .when(localizer.getText("message.review.concern.resolution.fixed"))
+        .thenReturn("the concern is fixed in the current patch set.");
+    lenient()
+        .when(localizer.getText("message.review.concern.resolution.dismissed"))
+        .thenReturn("the concern was dismissed as non-actionable.");
+    lenient()
+        .when(localizer.getText("message.review.concern.resolution.skipped"))
+        .thenReturn("the concern's review scope is disabled.");
     client = new GerritClientReview(config, pluginDataHandlerProvider, localizer);
   }
 
@@ -193,12 +206,8 @@ public class GerritClientReviewTest {
     client.resolveInactiveConcernThreads(
         change,
         concernResponse(
-            concern(
-                "dismissed-comment", ConcernStatus.DISMISSED, "The risk was accepted."),
-            concern(
-                "skipped-comment",
-                ConcernStatus.SKIPPED,
-                "Patch-set review skipped because its scope is disabled.")));
+            concern("dismissed-comment", ConcernStatus.DISMISSED, null),
+            concern("skipped-comment", ConcernStatus.SKIPPED, null)));
 
     ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
     verify(revisionApi).review(reviewInputCaptor.capture());
@@ -207,11 +216,11 @@ public class GerritClientReviewTest {
     assertEquals(2, resolutions.size());
     assertEquals("dismissed-comment", resolutions.get(0).inReplyTo);
     assertEquals(
-        "Resolved by ReviewAI (DISMISSED): The risk was accepted.",
+        "Resolved by ReviewAI (DISMISSED): the concern was dismissed as non-actionable.",
         resolutions.get(0).message);
     assertEquals("skipped-comment", resolutions.get(1).inReplyTo);
     assertEquals(
-        "Resolved by ReviewAI (SKIPPED): Patch-set review skipped because its scope is disabled.",
+        "Resolved by ReviewAI (SKIPPED): the concern's review scope is disabled.",
         resolutions.get(1).message);
   }
 

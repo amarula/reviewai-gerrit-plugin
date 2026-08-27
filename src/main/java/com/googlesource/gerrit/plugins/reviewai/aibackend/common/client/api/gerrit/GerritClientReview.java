@@ -317,14 +317,16 @@ public class GerritClientReview extends GerritClientAccount {
     String reason = concern.getStatusReason();
     String fallback =
         switch (concern.getStatus()) {
-          case FIXED -> "the concern is fixed in the current patch set.";
-          case DISMISSED -> "the concern was dismissed as non-actionable.";
-          case SKIPPED -> "the concern's review scope is disabled.";
+          case FIXED -> localizer.getText("message.review.concern.resolution.fixed");
+          case DISMISSED -> localizer.getText("message.review.concern.resolution.dismissed");
+          case SKIPPED -> localizer.getText("message.review.concern.resolution.skipped");
           case PRESENT, UNCERTAIN ->
               throw new IllegalArgumentException(
                   "Cannot resolve concern with status " + concern.getStatus());
         };
-    return "Resolved by ReviewAI (" + concern.getStatus() + "): "
-        + (reason == null || reason.isBlank() ? fallback : reason);
+    return String.format(
+        localizer.getText("message.review.concern.resolution"),
+        concern.getStatus(),
+        reason == null || reason.isBlank() ? fallback : reason);
   }
 }
