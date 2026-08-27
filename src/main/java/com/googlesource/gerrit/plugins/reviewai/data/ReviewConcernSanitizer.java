@@ -82,11 +82,9 @@ public class ReviewConcernSanitizer {
       log.warn("Skipping review concern ledger with malformed change id: {}", changeId);
       return false;
     }
-    String changeKey = changeId.substring(separator + 1);
-
     boolean shouldClear;
     try {
-      ChangeInfo info = gerritApi.changes().id(changeKey).get();
+      ChangeInfo info = gerritApi.changes().id(changeId).get();
       shouldClear = info.status == ChangeStatus.MERGED || info.status == ChangeStatus.ABANDONED;
     } catch (ResourceNotFoundException e) {
       shouldClear = true;

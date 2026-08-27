@@ -52,7 +52,8 @@ public class ReviewConcernSanitizerTest extends TestBase {
   }
 
   @Test
-  public void removesMergedAbandonedAndMissingLedgersKeepsOpenOnes() throws Exception {
+  public void removesMergedAbandonedAndMissingLedgersKeepsOpenOnesUsingFullChangeIds()
+      throws Exception {
     new ReviewConcernStore(db, "p~main~Imerged").save(new ReviewConcernLedger());
     new ReviewConcernStore(db, "p~main~Iabandoned").save(new ReviewConcernLedger());
     new ReviewConcernStore(db, "p~main~Inew").save(new ReviewConcernLedger());
@@ -63,10 +64,10 @@ public class ReviewConcernSanitizerTest extends TestBase {
     ChangeApi newApi = changeApiWithStatus(ChangeStatus.NEW);
 
     when(gerritApi.changes()).thenReturn(changes);
-    when(changes.id("Imerged")).thenReturn(mergedApi);
-    when(changes.id("Iabandoned")).thenReturn(abandonedApi);
-    when(changes.id("Inew")).thenReturn(newApi);
-    when(changes.id("Imissing")).thenThrow(new ResourceNotFoundException("gone"));
+    when(changes.id("p~main~Imerged")).thenReturn(mergedApi);
+    when(changes.id("p~main~Iabandoned")).thenReturn(abandonedApi);
+    when(changes.id("p~main~Inew")).thenReturn(newApi);
+    when(changes.id("p~main~Imissing")).thenThrow(new ResourceNotFoundException("gone"));
 
     assertEquals(3, sanitizer.sanitize());
     assertEquals(List.of("p~main~Inew"), db.listReviewConcernChangeIds());
