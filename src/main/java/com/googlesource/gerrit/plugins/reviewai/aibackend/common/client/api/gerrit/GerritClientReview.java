@@ -77,19 +77,20 @@ public class GerritClientReview extends GerritClientAccount {
       ChangeSetData changeSetData,
       Integer reviewScore)
       throws Exception {
-    setReviewAndGetPublishedCommentIds(change, reviewBatches, changeSetData, reviewScore);
+    setReviewAndGetPublishedCommentIds(change, reviewBatches, changeSetData, reviewScore, null);
   }
 
   /**
-   * Resolves open root threads that were published by ReviewAI and are no longer actionable.
+   * Collects replies that resolve open root threads published by ReviewAI and no longer actionable.
    *
    * <p>Gerrit resolves a thread by publishing a reply whose {@code unresolved} field is false.
    * Unbound comments and comments outside ReviewAI's tagged concern threads are intentionally left
    * untouched.
    */
-  public void resolveInactiveConcernThreads(GerritChange change, AiResponseContent response) {
+  private Map<String, List<CommentInput>> getInactiveConcernResolutionComments(
+      GerritChange change, ChangeApi changeApi, AiResponseContent response) {
     if (response == null || response.getPendingConcernUpdates() == null) {
-      return;
+      return Map.of();
     }
     List<ReviewConcern> inactiveConcerns =
         response.getPendingConcernUpdates().get(change.getFullChangeId()).stream()
@@ -100,11 +101,10 @@ public class GerritClientReview extends GerritClientAccount {
             .filter(concern -> !concern.getPreviousCommentId().isBlank())
             .toList();
     if (inactiveConcerns.isEmpty()) {
-      return;
+      return Map.of();
     }
 
-    try (ManualRequestContext ignored = config.openRequestContext()) {
-      ChangeApi changeApi = change.getChangeApi(config);
+    try {
       Map<String, List<CommentInfo>> comments = changeApi.commentsRequest().get();
       Map<String, CommentInfo> commentsById = new LinkedHashMap<>();
       Map<String, String> filenamesByCommentId = new HashMap<>();
@@ -118,7 +118,6 @@ public class GerritClientReview extends GerritClientAccount {
                     }
                   }));
 
-      ReviewInput resolutionReview = ReviewInput.create();
       Map<String, List<CommentInput>> resolutionComments = new LinkedHashMap<>();
       Set<String> resolvedCommentIds = new HashSet<>();
       for (ReviewConcern concern : inactiveConcerns) {
@@ -135,16 +134,10 @@ public class GerritClientReview extends GerritClientAccount {
             .computeIfAbsent(filenamesByCommentId.get(comment.id), unused -> new ArrayList<>())
             .add(resolution);
       }
-      if (resolutionComments.isEmpty()) {
-        return;
-      }
-      resolutionReview.comments = resolutionComments;
-      ReviewResult result = changeApi.current().review(resolutionReview);
-      if (!Strings.isNullOrEmpty(result.error)) {
-        log.warn("Could not resolve inactive ReviewAI concern threads: {}", result.error);
-      }
+      return resolutionComments;
     } catch (Exception e) {
-      log.warn("Could not resolve inactive ReviewAI concern threads", e);
+      log.warn("Could not collect inactive ReviewAI concern thread resolutions", e);
+      return Map.of();
     }
   }
 
@@ -154,16 +147,29 @@ public class GerritClientReview extends GerritClientAccount {
       ChangeSetData changeSetData,
       Integer reviewScore)
       throws Exception {
+    return setReviewAndGetPublishedCommentIds(
+        change, reviewBatches, changeSetData, reviewScore, null);
+  }
+
+  public Map<String, String> setReviewAndGetPublishedCommentIds(
+      GerritChange change,
+      List<ReviewBatch> reviewBatches,
+      ChangeSetData changeSetData,
+      Integer reviewScore,
+      AiResponseContent response)
+      throws Exception {
     log.debug("Setting review for change ID: {}", change.getFullChangeId());
     this.change = change;
     ReviewInput reviewInput = buildReview(reviewBatches, changeSetData, reviewScore);
-    if (reviewInput.comments == null && reviewInput.message == null && reviewInput.labels == null) {
-      log.debug("No comments, messages, or labels to post for review.");
-      return Map.of();
-    }
-    concernBinder.tagReview(reviewInput, reviewBatches);
     try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeApi changeApi = change.getChangeApi(config);
+      appendConcernResolutionComments(
+          reviewInput, getInactiveConcernResolutionComments(change, changeApi, response));
+      if (reviewInput.comments == null && reviewInput.message == null && reviewInput.labels == null) {
+        log.debug("No comments, messages, or labels to post for review.");
+        return Map.of();
+      }
+      concernBinder.tagReview(reviewInput, reviewBatches);
       Optional<Set<String>> existingCommentIds =
           concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
       ReviewResult result =
@@ -177,6 +183,21 @@ public class GerritClientReview extends GerritClientAccount {
       return concernBinder.bind(
           refreshedChangeApi, reviewBatches, reviewInput.tag, existingCommentIds);
     }
+  }
+
+  private static void appendConcernResolutionComments(
+      ReviewInput reviewInput, Map<String, List<CommentInput>> resolutionComments) {
+    if (resolutionComments.isEmpty()) {
+      return;
+    }
+    if (reviewInput.comments == null) {
+      reviewInput.comments = new LinkedHashMap<>();
+    }
+    resolutionComments.forEach(
+        (filename, comments) ->
+            reviewInput.comments
+                .computeIfAbsent(filename, unused -> new ArrayList<>())
+                .addAll(comments));
   }
 
   public void setReview(
