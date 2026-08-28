@@ -85,6 +85,23 @@ final class LangChainSingleAgentConcernWorkflow {
 
     ReviewerConcerns existingConcerns =
         ledgerOperations.reviewerConcerns(previousLedger, REVIEWER);
+    existingConcerns.normalize();
+    if (existingConcerns.getConcerns().isEmpty()
+        && (changeSetData.getIncrementalPatchSet() == null
+            || changeSetData.getIncrementalPatchSet().isBlank())) {
+      if (!Boolean.TRUE.equals(changeSetData.getForcedReview())) {
+        return null;
+      }
+      ReviewResult forcedReview =
+          initialReview.review(changeSetData, change, fullPatchSet);
+      if (forcedReview == null) {
+        return null;
+      }
+      return new ReviewResult(
+          ledgerOperations.completeFollowUp(
+              forcedReview.responseContent(), change, previousLedger, existingConcerns),
+          forcedReview.requestBody());
+    }
     ReviewerConcerns reviewedConcerns =
         concernReview.review(
             changeSetData,

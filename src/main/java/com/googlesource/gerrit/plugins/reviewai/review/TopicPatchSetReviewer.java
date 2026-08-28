@@ -120,6 +120,11 @@ class TopicPatchSetReviewer {
               : publicErrorMessage);
     }
 
+    if (reviewReply == null && changeSetData.getReviewSystemMessage() == null) {
+      log.debug("Skipping Gerrit topic review publication because no AI review was performed.");
+      return;
+    }
+
     List<Double> topicReviewScores = patchSetReviewer.getReviewScores(reviewReply);
     for (TopicReviewPatchSet patchSet : patchSets) {
       patchSetReviewer.publishTopicReviewPart(
