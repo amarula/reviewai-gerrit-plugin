@@ -19,11 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.google.common.reflect.TypeToken;
@@ -168,7 +168,7 @@ public class GerritClientReviewTest {
   }
 
   @Test
-  public void resolvesAnOpenTaggedRootCommentForAFixedConcern() throws Exception {
+  public void publishesMainReviewAndFixedConcernResolutionTogether() throws Exception {
     CommentInfo comment = new CommentInfo();
     comment.id = "ai-concern";
     comment.tag = "reviewai:concerns:review-1";
@@ -176,17 +176,22 @@ public class GerritClientReviewTest {
     comment.unresolved = true;
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
     when(commentsRequest.get()).thenReturn(Map.of("src/Example.java", List.of(comment)));
+    changeSetData.setReviewRepeatedCommentsMessage("My previous comment still holds");
 
-    client.resolveInactiveConcernThreads(
+    client.setReviewAndGetPublishedCommentIds(
         change,
+        List.of(new ReviewBatch("Review comment")),
+        changeSetData,
+        null,
         concernResponse(
-            concern(
-                "ai-concern", ConcernStatus.FIXED, "The guard now handles the input.")));
+            concern("ai-concern", ConcernStatus.FIXED, "The guard now handles the input.")));
 
     ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
     verify(revisionApi).review(reviewInputCaptor.capture());
-    ReviewInput.CommentInput resolution =
-        reviewInputCaptor.getValue().comments.get("src/Example.java").getFirst();
+    ReviewInput reviewInput = reviewInputCaptor.getValue();
+    assertEquals("My previous comment still holds", reviewInput.message);
+    assertEquals("Review comment", reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().message);
+    ReviewInput.CommentInput resolution = reviewInput.comments.get("src/Example.java").getFirst();
     assertEquals("ai-concern", resolution.inReplyTo);
     assertEquals(Integer.valueOf(42), resolution.line);
     assertFalse(resolution.unresolved);
@@ -202,15 +207,20 @@ public class GerritClientReviewTest {
     when(commentsRequest.get())
         .thenReturn(
             Map.of("src/Example.java", List.of(dismissedComment, skippedComment)));
+    changeSetData.setReviewSystemMessage("Main review message");
 
-    client.resolveInactiveConcernThreads(
+    client.setReviewAndGetPublishedCommentIds(
         change,
+        List.of(),
+        changeSetData,
+        null,
         concernResponse(
             concern("dismissed-comment", ConcernStatus.DISMISSED, null),
             concern("skipped-comment", ConcernStatus.SKIPPED, null)));
 
     ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
     verify(revisionApi).review(reviewInputCaptor.capture());
+    assertEquals("Main review message", reviewInputCaptor.getValue().message);
     List<ReviewInput.CommentInput> resolutions =
         reviewInputCaptor.getValue().comments.get("src/Example.java");
     assertEquals(2, resolutions.size());
@@ -233,13 +243,20 @@ public class GerritClientReviewTest {
     comment.unresolved = true;
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
     when(commentsRequest.get()).thenReturn(Map.of("src/Example.java", List.of(comment)));
+    changeSetData.setReviewSystemMessage("Main review message");
 
-    client.resolveInactiveConcernThreads(
+    client.setReviewAndGetPublishedCommentIds(
         change,
+        List.of(),
+        changeSetData,
+        null,
         concernResponse(
             concern("ai-reply", ConcernStatus.FIXED, "The guard now handles the input.")));
 
-    verify(revisionApi, never()).review(any(ReviewInput.class));
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    assertEquals("Main review message", reviewInputCaptor.getValue().message);
+    assertNull(reviewInputCaptor.getValue().comments);
   }
 
   private static CommentInfo openTaggedComment(String commentId) {
