@@ -354,6 +354,38 @@ public class LangChainSingleAgentConcernWorkflowTest {
   }
 
   @Test
+  public void emptyIncrementalPatchAndNoSingleAgentConcernsSkipsReview() throws Exception {
+    TestClient client = new TestClient();
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(specializedLedger());
+    data.setIncrementalPatchSet("");
+
+    AiResponseContent response =
+        client.ask(data, change(false), readTestResource(FULL_PATCH));
+
+    assertNull(response);
+    assertTrue(client.stages.isEmpty());
+    assertNull(client.getRequestBody());
+  }
+
+  @Test
+  public void forcedReviewWithoutIncrementalWorkRunsFullReview() throws Exception {
+    TestClient client = new TestClient();
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(specializedLedger());
+    data.setIncrementalPatchSet("");
+    data.setForcedReview(true);
+
+    AiResponseContent response =
+        client.ask(data, change(false), readTestResource(FULL_PATCH));
+
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
+    assertNotNull(response);
+    assertEquals("first review request", client.getRequestBody());
+    assertEquals(2, pendingLedger(response).getReviewers().size());
+  }
+
+  @Test
   public void commentRequestDoesNotEnterConcernWorkflow() throws Exception {
     TestClient client = new TestClient();
     ChangeSetData data = new ChangeSetData(1);
@@ -384,6 +416,17 @@ public class LangChainSingleAgentConcernWorkflowTest {
             concern("old-dismissed", ConcernStatus.DISMISSED, "Accepted risk")));
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ledger.setReviewers(List.of(concerns));
+    return ledger;
+  }
+
+  private static ReviewConcernLedger specializedLedger() {
+    ReviewerConcerns specializedConcerns = new ReviewerConcerns();
+    specializedConcerns.setReviewer(
+        new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS"));
+    specializedConcerns.setConcerns(
+        List.of(concern("specialized-concern", ConcernStatus.PRESENT, "Existing concern")));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(specializedConcerns));
     return ledger;
   }
 

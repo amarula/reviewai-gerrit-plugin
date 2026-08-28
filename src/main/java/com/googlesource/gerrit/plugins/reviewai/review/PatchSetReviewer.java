@@ -167,10 +167,15 @@ public class PatchSetReviewer {
                   localizer, "message.openai.connection.error", e)
               : publicErrorMessage);
     }
+    if (reviewReply == null && changeSetData.getReviewSystemMessage() == null) {
+      reviewFeedbackLifecycle.settle(change, changeSetData, feedbackSession, false);
+      log.debug("Skipping Gerrit review publication because no AI review was performed.");
+      return;
+    }
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change);
     }
-    Integer reviewScore = getReviewScore(change);
+    Integer reviewScore = getReviewScore(change, reviewReply);
     Map<String, String> publishedCommentIdsByConcern;
     try {
       publishedCommentIdsByConcern =
@@ -233,9 +238,11 @@ public class PatchSetReviewer {
       reviewBatches = retrieveReviewBatches(reviewReply, change, topicFilenamePrefix);
     }
     Integer reviewScore =
-        topicReviewScores == null
-            ? getReviewScore(change)
-            : getReviewScore(change, topicReviewScores);
+        reviewReply == null
+            ? null
+            : topicReviewScores == null
+                ? getReviewScore(change)
+                : getReviewScore(change, topicReviewScores);
     Map<String, String> publishedCommentIdsByConcern =
         clientReviewProvider
             .get()
@@ -386,6 +393,10 @@ public class PatchSetReviewer {
 
   private Integer getReviewScore(GerritChange change) {
     return getReviewScore(change, reviewScores);
+  }
+
+  Integer getReviewScore(GerritChange change, AiResponseContent reviewReply) {
+    return reviewReply == null ? null : getReviewScore(change);
   }
 
   private Integer getReviewScore(GerritChange change, List<Double> scores) {
