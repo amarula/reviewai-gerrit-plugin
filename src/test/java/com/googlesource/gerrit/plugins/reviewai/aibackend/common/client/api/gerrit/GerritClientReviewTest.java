@@ -53,6 +53,7 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewEx
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -235,6 +236,57 @@ public class GerritClientReviewTest {
   }
 
   @Test
+  public void doesNotResolveAnAlreadyResolvedConcernThread() throws Exception {
+    CommentInfo root = openTaggedComment("ai-concern");
+    root.setUpdated(Instant.parse("2026-08-27T10:00:00Z"));
+    CommentInfo resolution = reply("resolution", root.id, false, "2026-08-27T10:01:00Z");
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get())
+        .thenReturn(Map.of("src/Example.java", List.of(root, resolution)));
+    changeSetData.setReviewSystemMessage("Main review message");
+
+    client.setReviewAndGetPublishedCommentIds(
+        change,
+        List.of(),
+        changeSetData,
+        null,
+        concernResponse(
+            concern("ai-concern", ConcernStatus.FIXED, "The guard now handles the input.")));
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    assertNull(reviewInputCaptor.getValue().comments);
+  }
+
+  @Test
+  public void resolvesAConcernThreadReopenedAfterResolution() throws Exception {
+    CommentInfo root = openTaggedComment("ai-concern");
+    root.setUpdated(Instant.parse("2026-08-27T10:00:00Z"));
+    CommentInfo resolution = reply("resolution", root.id, false, "2026-08-27T10:01:00Z");
+    CommentInfo reopeningReply =
+        reply("reopening-reply", resolution.id, true, "2026-08-27T10:02:00Z");
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get())
+        .thenReturn(Map.of("src/Example.java", List.of(root, resolution, reopeningReply)));
+    changeSetData.setReviewSystemMessage("Main review message");
+
+    client.setReviewAndGetPublishedCommentIds(
+        change,
+        List.of(),
+        changeSetData,
+        null,
+        concernResponse(
+            concern("ai-concern", ConcernStatus.FIXED, "The guard now handles the input.")));
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    ReviewInput.CommentInput resolutionComment =
+        reviewInputCaptor.getValue().comments.get("src/Example.java").getFirst();
+    assertEquals(root.id, resolutionComment.inReplyTo);
+    assertFalse(resolutionComment.unresolved);
+  }
+
+  @Test
   public void leavesUnboundOrNonRootCommentsUntouched() throws Exception {
     CommentInfo comment = new CommentInfo();
     comment.id = "ai-reply";
@@ -264,6 +316,16 @@ public class GerritClientReviewTest {
     comment.id = commentId;
     comment.tag = "reviewai:concerns:review-1";
     comment.unresolved = true;
+    return comment;
+  }
+
+  private static CommentInfo reply(
+      String commentId, String inReplyTo, boolean unresolved, String updated) {
+    CommentInfo comment = new CommentInfo();
+    comment.id = commentId;
+    comment.inReplyTo = inReplyTo;
+    comment.unresolved = unresolved;
+    comment.setUpdated(Instant.parse(updated));
     return comment;
   }
 

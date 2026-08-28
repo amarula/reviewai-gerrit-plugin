@@ -41,12 +41,15 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
@@ -108,6 +111,7 @@ public class GerritClientReview extends GerritClientAccount {
       Map<String, List<CommentInfo>> comments = changeApi.commentsRequest().get();
       Map<String, CommentInfo> commentsById = new LinkedHashMap<>();
       Map<String, String> filenamesByCommentId = new HashMap<>();
+      Map<String, List<CommentInfo>> commentsByParentId = new HashMap<>();
       comments.forEach(
           (filename, fileComments) ->
               fileComments.forEach(
@@ -116,13 +120,19 @@ public class GerritClientReview extends GerritClientAccount {
                       commentsById.put(comment.id, comment);
                       filenamesByCommentId.put(comment.id, filename);
                     }
+                    if (comment.inReplyTo != null) {
+                      commentsByParentId
+                          .computeIfAbsent(comment.inReplyTo, unused -> new ArrayList<>())
+                          .add(comment);
+                    }
                   }));
 
       Map<String, List<CommentInput>> resolutionComments = new LinkedHashMap<>();
       Set<String> resolvedCommentIds = new HashSet<>();
       for (ReviewConcern concern : inactiveConcerns) {
         CommentInfo comment = commentsById.get(concern.getPreviousCommentId());
-        if (!isOpenReviewAiRootComment(comment) || !resolvedCommentIds.add(comment.id)) {
+        if (!isOpenReviewAiRootThread(comment, commentsByParentId)
+            || !resolvedCommentIds.add(comment.id)) {
           continue;
         }
         CommentInput resolution = new CommentInput();
@@ -328,10 +338,31 @@ public class GerritClientReview extends GerritClientAccount {
     return comments;
   }
 
-  private boolean isOpenReviewAiRootComment(CommentInfo comment) {
-    return PublishedCommentConcernBinder.isTaggedConcernComment(comment)
-        && comment.inReplyTo == null
-        && Boolean.TRUE.equals(comment.unresolved);
+  private boolean isOpenReviewAiRootThread(
+      CommentInfo root, Map<String, List<CommentInfo>> commentsByParentId) {
+    if (!PublishedCommentConcernBinder.isTaggedConcernComment(root) || root.inReplyTo != null) {
+      return false;
+    }
+
+    Comparator<CommentInfo> threadOrder =
+        Comparator.comparing(
+                (CommentInfo comment) -> comment.updated,
+                Comparator.nullsFirst(Comparator.naturalOrder()))
+            .thenComparing(
+                comment -> comment.id, Comparator.nullsFirst(Comparator.naturalOrder()));
+    Queue<CommentInfo> unvisited = new PriorityQueue<>(threadOrder);
+    Set<String> visitedCommentIds = new HashSet<>();
+    CommentInfo latest = root;
+    unvisited.add(root);
+    while (!unvisited.isEmpty()) {
+      CommentInfo comment = unvisited.remove();
+      if (comment.id != null && !visitedCommentIds.add(comment.id)) {
+        continue;
+      }
+      latest = comment;
+      unvisited.addAll(commentsByParentId.getOrDefault(comment.id, List.of()));
+    }
+    return Boolean.TRUE.equals(latest.unresolved);
   }
 
   private String resolutionMessage(ReviewConcern concern) {
