@@ -257,7 +257,9 @@ public class GerritClientReview extends GerritClientAccount {
           SystemMessageFormatter.getPrefixedSystemMessage(
               localizer, changeSetData.getReviewRepeatedCommentsMessage()));
     }
-    if (emptyComments && changeSetData.getReviewRepeatedCommentsMessage() == null) {
+    if (emptyComments
+        && changeSetData.getReviewRepeatedCommentsMessage() == null
+        && !shouldSuppressEmptyReviewMessage(changeSetData)) {
       messages.add(SystemMessageFormatter.getPrefixedSystemMessage(localizer, systemMessage));
     }
     SystemMessageFormatter.appendConfigurationWarningMessages(config, localizer, messages);
@@ -266,6 +268,13 @@ public class GerritClientReview extends GerritClientAccount {
       reviewInput.message(joinWithDoubleNewLine(messages));
     }
     log.debug("System messages for review set: {}", messages);
+  }
+
+  private boolean shouldSuppressEmptyReviewMessage(ChangeSetData changeSetData) {
+    // A re-review with no incremental code change produces no new issues; do not post the
+    // generic "no update" comment in that case.
+    String incrementalPatchSet = changeSetData.getIncrementalPatchSet();
+    return incrementalPatchSet != null && incrementalPatchSet.isBlank();
   }
 
   private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
