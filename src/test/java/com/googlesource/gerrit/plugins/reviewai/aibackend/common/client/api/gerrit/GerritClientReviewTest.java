@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -107,6 +108,9 @@ public class GerritClientReviewTest {
     lenient()
         .when(localizer.getText("message.review.concern.resolution.skipped"))
         .thenReturn("the concern's review scope is disabled.");
+    lenient()
+        .when(localizer.getText("message.empty.review"))
+        .thenReturn("No update to show for this Change Set");
     client = new GerritClientReview(config, pluginDataHandlerProvider, localizer);
   }
 
@@ -115,6 +119,24 @@ public class GerritClientReviewTest {
     client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
 
     verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void blankIncrementalPatchSetSuppressesEmptyReviewMessage() throws Exception {
+    changeSetData.setIncrementalPatchSet("");
+
+    client.setReview(change, List.of(), changeSetData);
+
+    verify(revisionApi, never()).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void reviewWithoutIncrementalPatchPostsEmptyReviewMessage() throws Exception {
+    client.setReview(change, List.of(), changeSetData);
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    assertEquals("No update to show for this Change Set", reviewInputCaptor.getValue().message);
   }
 
   @Test
