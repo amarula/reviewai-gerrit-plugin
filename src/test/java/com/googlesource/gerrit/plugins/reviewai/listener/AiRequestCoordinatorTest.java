@@ -1,0 +1,201 @@
+/*
+ * Copyright (c) 2026. Amarula Solutions
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.googlesource.gerrit.plugins.reviewai.listener;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
+import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+public class AiRequestCoordinatorTest extends TestBase {
+  private static final String CHANGE_ID = "project~branch~change";
+  private static final long LEASE_MILLIS = TimeUnit.MINUTES.toMillis(1);
+  private static final long RECOVERY_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(1);
+
+  private AiRequestStore store;
+  private ScheduledExecutorService requestExecutor;
+  private ScheduledExecutorService leaseExecutor;
+  private AiRequestCoordinator coordinator;
+
+  @Before
+  public void setUp() {
+    store = new AiRequestStore(getTestReviewAiDb());
+    requestExecutor = Executors.newScheduledThreadPool(2);
+    leaseExecutor = Executors.newSingleThreadScheduledExecutor();
+    coordinator =
+        new AiRequestCoordinator(
+            store,
+            requestExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
+    coordinator.start(request -> {});
+  }
+
+  @After
+  public void tearDown() {
+    coordinator.stop();
+  }
+
+  @Test
+  public void processesRequestsForSameChangeOneAtATime() throws Exception {
+    CountDownLatch firstStarted = new CountDownLatch(1);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    CountDownLatch completed = new CountDownLatch(2);
+    AtomicInteger active = new AtomicInteger();
+    AtomicInteger maximumActive = new AtomicInteger();
+    List<String> processingOrder = new CopyOnWriteArrayList<>();
+
+    coordinator.admit(
+        message("request-1", "event-1"),
+        request -> {
+          enter(request, active, maximumActive, processingOrder);
+          firstStarted.countDown();
+          releaseFirst.await();
+          leave(active, completed);
+        });
+    assertTrue(firstStarted.await(5, TimeUnit.SECONDS));
+
+    coordinator.admit(
+        message("request-2", "event-2"),
+        request -> {
+          enter(request, active, maximumActive, processingOrder);
+          leave(active, completed);
+        });
+
+    assertEquals(List.of("request-1"), processingOrder);
+    releaseFirst.countDown();
+    assertTrue(completed.await(5, TimeUnit.SECONDS));
+
+    assertEquals(1, maximumActive.get());
+    assertEquals(List.of("request-1", "request-2"), processingOrder);
+    awaitState("request-1", AiRequest.State.COMPLETED);
+    awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  @Test
+  public void processesQueuedRequestAfterCoordinatorRecreation() throws Exception {
+    coordinator.stop();
+    store.admit(message("request-1", "event-1"));
+    CountDownLatch processed = new CountDownLatch(1);
+    requestExecutor = Executors.newScheduledThreadPool(2);
+    leaseExecutor = Executors.newSingleThreadScheduledExecutor();
+    coordinator =
+        new AiRequestCoordinator(
+            store,
+            requestExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
+
+    coordinator.start(request -> processed.countDown());
+
+    assertTrue(processed.await(5, TimeUnit.SECONDS));
+    awaitState("request-1", AiRequest.State.COMPLETED);
+  }
+
+  @Test
+  public void abandonsExpiredOwnerAndProcessesNextRequest() throws Exception {
+    coordinator.stop();
+    store.admit(message("request-1", "event-1"));
+    assertEquals(
+        "request-1", store.claimNext(CHANGE_ID, "old-owner", 0L).orElseThrow().requestId());
+    store.admit(message("request-2", "event-2"));
+    CountDownLatch processed = new CountDownLatch(1);
+    requestExecutor = Executors.newScheduledThreadPool(2);
+    leaseExecutor = Executors.newSingleThreadScheduledExecutor();
+    coordinator =
+        new AiRequestCoordinator(
+            store,
+            requestExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
+
+    coordinator.start(request -> processed.countDown());
+
+    assertTrue(processed.await(5, TimeUnit.SECONDS));
+    assertEquals(AiRequest.State.ABANDONED, store.get("request-1").orElseThrow().state());
+    awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  @Test
+  public void failureReleasesLaneForNextRequest() throws Exception {
+    CountDownLatch processed = new CountDownLatch(1);
+    coordinator.admit(
+        message("request-1", "event-1"),
+        request -> {
+          throw new IllegalStateException(AiRequest.State.FAILED.name());
+        });
+    coordinator.admit(
+        message("request-2", "event-2"), request -> processed.countDown());
+
+    assertTrue(processed.await(5, TimeUnit.SECONDS));
+    awaitState("request-1", AiRequest.State.FAILED);
+    awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  private AiRequestSubmission message(String requestId, String sourceEventId) {
+    return new AiRequestSubmission(
+        requestId,
+        CHANGE_ID,
+        sourceEventId,
+        AiRequest.Kind.MESSAGE,
+        AiRequest.AdmissionPolicy.QUEUE,
+        GsonUtils.getGson().toJson(Map.of()));
+  }
+
+  private static void enter(
+      AiRequest request,
+      AtomicInteger active,
+      AtomicInteger maximumActive,
+      List<String> processingOrder) {
+    processingOrder.add(request.requestId());
+    maximumActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+  }
+
+  private static void leave(AtomicInteger active, CountDownLatch completed) {
+    active.decrementAndGet();
+    completed.countDown();
+  }
+
+  private void awaitState(String requestId, AiRequest.State expected) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (System.nanoTime() < deadline) {
+      if (store.get(requestId).map(AiRequest::state).orElse(null) == expected) {
+        return;
+      }
+      Thread.yield();
+    }
+    assertEquals(expected, store.get(requestId).orElseThrow().state());
+  }
+}

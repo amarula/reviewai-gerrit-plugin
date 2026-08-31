@@ -32,6 +32,8 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandle
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
@@ -82,6 +84,11 @@ public class EventHandlerTask implements Runnable {
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
   private CurrentUser eventUser;
+  private ReviewAgentEventRequestStatusUpdater.PendingRequest pendingRequest;
+  private String sourceEventId;
+  private boolean preparationAttempted;
+  private boolean prepared;
+  private boolean commentAddressed;
 
   @Inject
   EventHandlerTask(
@@ -125,16 +132,38 @@ public class EventHandlerTask implements Runnable {
 
   @VisibleForTesting
   public Result execute() {
+    return execute(null);
+  }
+
+  public Result execute(String requestedSourceEventId) {
+    Preparation preparation = prepareForIntake(requestedSourceEventId);
+    return preparation.decision().disposition() == AiRequestIntakeDecision.Disposition.IGNORE
+        ? Result.NOT_SUPPORTED
+        : executePrepared();
+  }
+
+  public Preparation prepareForIntake(String requestedSourceEventId) {
+    if (preparationAttempted) {
+      throw new IllegalStateException("Event handler task is already prepared");
+    }
+    preparationAttempted = true;
     log.debug("Starting event processing for change ID: {}", change.getFullChangeId());
-    ReviewAgentEventRequestStatusUpdater.PendingRequest reviewAgentRequest =
-        reviewAgentRequestStatusUpdater.getPendingRequest();
+    pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest();
+    sourceEventId = requestedSourceEventId;
     if (!preProcessEvent()) {
       log.debug(
           "Preprocessing event not supported or failed for event type: {}", change.getEventType());
-      reviewAgentRequest.completeNoUpdate();
-      return Result.NOT_SUPPORTED;
+      pendingRequest.completeNoUpdate();
+      return new Preparation(AiRequestIntakeDecision.ignored(), sourceEventId);
     }
+    prepared = true;
+    return new Preparation(classify(), sourceEventId);
+  }
 
+  public Result executePrepared() {
+    if (!prepared) {
+      throw new IllegalStateException("Event handler task must be prepared before execution");
+    }
     ReviewAiMetrics.MetricTimer reviewRunTimer = metrics.startReviewRun(change.getEventType());
     try {
       log.debug("Processing event for change ID:: {}", change.getFullChangeId());
@@ -144,14 +173,20 @@ public class EventHandlerTask implements Runnable {
     } catch (Exception e) {
       reviewRunTimer.fail();
       log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);
-      reviewAgentRequest.fail(e.getMessage());
+      pendingRequest.fail(e.getMessage());
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
       return Result.FAILURE;
     }
-    reviewAgentRequest.completeReview();
+    pendingRequest.completeReview();
     return Result.OK;
+  }
+
+  public void discardPrepared() {
+    if (pendingRequest != null) {
+      pendingRequest.completeNoUpdate();
+    }
   }
 
   private boolean preProcessEvent() {
@@ -171,7 +206,9 @@ public class EventHandlerTask implements Runnable {
     while (true) {
       eventHandlerType = getEventHandlerType();
       log.debug("Event handler type resolved for event: {}", eventType);
-      switch (eventHandlerType.preprocessEvent()) {
+      IEventHandlerType.PreprocessResult preprocessResult = eventHandlerType.preprocessEvent();
+      captureCommentEventContext();
+      switch (preprocessResult) {
         case EXIT -> {
           log.debug("Exiting event handler preprocessing for event type: {}", eventType);
           return false;
@@ -186,6 +223,33 @@ public class EventHandlerTask implements Runnable {
     }
     log.debug("Preprocessing completed successfully for event type: {}", eventType);
     return true;
+  }
+
+  private AiRequestIntakeDecision classify() {
+    if (change.getPatchSetEvent() instanceof PatchSetCreatedEvent) {
+      return AiRequestIntakeClassifier.patchSetReview();
+    }
+    return AiRequestIntakeClassifier.comment(
+        commentAddressed,
+        Boolean.TRUE.equals(changeSetData.getDeferredReview()),
+        changeSetData);
+  }
+
+  private void captureCommentEventContext() {
+    if (!(change.getPatchSetEvent() instanceof CommentAddedEvent)) {
+      return;
+    }
+    GerritClientData clientData = gerritClient.getClientData(change);
+    CommentData commentData = clientData == null ? null : clientData.getCommentData();
+    if (commentData != null) {
+      if (sourceEventId == null) {
+        sourceEventId = commentData.getSourceChangeMessageId();
+      }
+      commentAddressed =
+          commentAddressed
+              || commentData.getAddressedComments() != null
+                  && !commentData.getAddressedComments().isEmpty();
+    }
   }
 
   private IEventHandlerType getEventHandlerType() {
@@ -210,7 +274,8 @@ public class EventHandlerTask implements Runnable {
               gerritClient,
               aiReviewApplicabilityChecker,
               reviewFeedbackPublisher,
-              administratorUser);
+              administratorUser,
+              sourceEventId);
     };
   }
 
@@ -269,5 +334,7 @@ public class EventHandlerTask implements Runnable {
       return Optional.empty();
     }
   }
+
+  public record Preparation(AiRequestIntakeDecision decision, String sourceEventId) {}
 
 }

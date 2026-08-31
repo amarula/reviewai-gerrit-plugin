@@ -30,6 +30,7 @@ import com.google.gerrit.server.events.EventListener;
 import com.google.inject.Provider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
+import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerExecutor;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import org.junit.Test;
 
@@ -105,6 +106,30 @@ public class ReviewAiLifecycleTest {
     lifecycle.stop();
 
     verify(executors).shutdown();
+  }
+
+  @Test
+  public void startsAndStopsDurableRequestExecutor() {
+    DynamicSet<EventListener> eventListeners = new DynamicSet<>();
+    ReviewAiExecutors executors = mock(ReviewAiExecutors.class);
+    EventHandlerExecutor eventHandlerExecutor = mock(EventHandlerExecutor.class);
+    when(executors.getAgentExecutor()).thenReturn(command -> command.run());
+    ReviewAiLifecycle lifecycle =
+        new ReviewAiLifecycle(
+            executors,
+            eventHandlerExecutor,
+            MOCK_LISTENER_PROVIDER,
+            eventListeners,
+            mock(ReviewAiDb.class),
+            mock(ReviewConcernSanitizer.class),
+            PLUGIN_NAME,
+            TargetEventListener.class.getName());
+
+    lifecycle.start();
+    lifecycle.stop();
+
+    verify(eventHandlerExecutor).start();
+    verify(eventHandlerExecutor).stop();
   }
 
   @Test
@@ -222,6 +247,7 @@ public class ReviewAiLifecycleTest {
     when(executors.getAgentExecutor()).thenReturn(command -> command.run());
     return new ReviewAiLifecycle(
         executors,
+        mock(EventHandlerExecutor.class),
         MOCK_LISTENER_PROVIDER,
         eventListeners,
         reviewAiDb,

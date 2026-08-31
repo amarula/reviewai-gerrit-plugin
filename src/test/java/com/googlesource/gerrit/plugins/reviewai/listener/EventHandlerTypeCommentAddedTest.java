@@ -141,6 +141,28 @@ public class EventHandlerTypeCommentAddedTest {
   }
 
   @Test
+  public void reloadsPersistedCommentByExactChangeMessageId() {
+    String changeMessageId = "change-message-id";
+    handler =
+        new EventHandlerTypeCommentAdded(
+            config,
+            changeSetData,
+            change,
+            mock(PatchSetReviewer.class),
+            gerritClient,
+            applicabilityChecker,
+            reviewFeedbackPublisher,
+            false,
+            changeMessageId);
+    when(gerritClient.retrieveComments(change, false, changeMessageId)).thenReturn(true);
+
+    assertEquals(PreprocessResult.OK, handler.preprocessEvent());
+
+    verify(gerritClient).retrieveComments(change, false, changeMessageId);
+    verify(gerritClient, never()).retrieveComments(change, false);
+  }
+
+  @Test
   public void existingAiVoteDoesNotPreventReviewAfterConditionLabelChanges() {
     event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
     when(gerritClient.getCodeReviewValue(change)).thenReturn(1);
