@@ -231,6 +231,34 @@ public class ReviewAiDb {
             + " ON review_feedback_comments(change_id, processing_state, updated_at)");
   }
 
+  public void initAiRequestSchema() throws SQLException {
+    executeSchema(
+        "CREATE TABLE IF NOT EXISTS ai_requests ("
+            + getDialect().autoIncrementPk("queue_sequence")
+            + ", request_id VARCHAR(255) NOT NULL UNIQUE"
+            + ", change_id VARCHAR(512) NOT NULL"
+            + ", source_event_id VARCHAR(255)"
+            + ", request_kind VARCHAR(32) NOT NULL"
+            + ", admission_policy VARCHAR(32) NOT NULL"
+            + ", request_state VARCHAR(32) NOT NULL"
+            + ", payload_json " + getDialect().clobType() + " NOT NULL"
+            + ", owner_id VARCHAR(255)"
+            + ", lease_expires_at_millis BIGINT"
+            + ", result_text " + getDialect().clobType()
+            + ", created_at_millis BIGINT NOT NULL"
+            + ", updated_at_millis BIGINT NOT NULL"
+            + ")",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_requests_source_event"
+            + " ON ai_requests(change_id, source_event_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ai_requests_change_queue"
+            + " ON ai_requests(change_id, request_state, queue_sequence)",
+        "CREATE TABLE IF NOT EXISTS ai_request_lanes ("
+            + "change_id VARCHAR(512) PRIMARY KEY"
+            + ", active_request_id VARCHAR(255)"
+            + ", updated_at_millis BIGINT NOT NULL DEFAULT 0"
+            + ")");
+  }
+
   public void initReviewAgentConversationSchema() throws SQLException {
     withConnection(
         c -> {
