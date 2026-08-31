@@ -43,6 +43,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   private final ReviewFeedbackPublisher reviewFeedbackPublisher;
   private final boolean administratorUser;
+  private final String sourceChangeMessageId;
 
   EventHandlerTypeCommentAdded(
       Configuration config,
@@ -53,6 +54,28 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
       boolean administratorUser) {
+    this(
+        config,
+        changeSetData,
+        change,
+        reviewer,
+        gerritClient,
+        aiReviewApplicabilityChecker,
+        reviewFeedbackPublisher,
+        administratorUser,
+        null);
+  }
+
+  EventHandlerTypeCommentAdded(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      PatchSetReviewer reviewer,
+      GerritClient gerritClient,
+      AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
+      ReviewFeedbackPublisher reviewFeedbackPublisher,
+      boolean administratorUser,
+      String sourceChangeMessageId) {
     this.config = config;
     this.changeSetData = changeSetData;
     this.change = change;
@@ -61,6 +84,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     this.administratorUser = administratorUser;
+    this.sourceChangeMessageId = sourceChangeMessageId;
     log.debug(
         "Initialized EventHandlerTypeCommentAdded for full change ID: {}",
         change.getFullChangeId());
@@ -77,7 +101,10 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       return PreprocessResult.SWITCH_TO_PATCH_SET_CREATED;
     }
     boolean commentsRetrieved =
-        gerritClient.retrieveComments(change, administratorUser);
+        sourceChangeMessageId == null
+            ? gerritClient.retrieveComments(change, administratorUser)
+            : gerritClient.retrieveComments(
+                change, administratorUser, sourceChangeMessageId);
     enqueueAddressedComments();
     if (!commentsRetrieved) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());

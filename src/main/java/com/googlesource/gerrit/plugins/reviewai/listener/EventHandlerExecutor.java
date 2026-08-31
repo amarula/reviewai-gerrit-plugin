@@ -16,45 +16,55 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
-import com.google.gerrit.extensions.annotations.PluginName;
-import com.google.gerrit.server.config.PluginConfigFactory;
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.events.Event;
+import com.google.gerrit.server.events.PatchSetEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
-import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.Injector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.concurrent.ScheduledExecutorService;
 
 @Singleton
 @Slf4j
 public class EventHandlerExecutor {
   private final Injector injector;
-  private final ScheduledExecutorService executor;
+  private final AiRequestCoordinator coordinator;
+  private final ConfigCreator configCreator;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
   private final EventBuildFeatures buildFeatures;
 
   @Inject
   EventHandlerExecutor(
       Injector injector,
-      WorkQueue workQueue,
-      @PluginName String pluginName,
-      PluginConfigFactory pluginConfigFactory,
+      AiRequestCoordinator coordinator,
+      ConfigCreator configCreator,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
       AiAdministratorAccess aiAdministratorAccess,
       ClientCommandExtension clientCommandExtension) {
     this.injector = injector;
+    this.coordinator = coordinator;
+    this.configCreator = configCreator;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     this.buildFeatures = new EventBuildFeatures(aiAdministratorAccess, clientCommandExtension);
-    int maximumPoolSize =
-        pluginConfigFactory.getFromGerritConfig(pluginName).getInt("maximumPoolSize", 2);
-    this.executor = workQueue.createQueue(maximumPoolSize, "AI request executor");
-    log.debug("EventHandlerExecutor initialized with maximum pool size: {}", maximumPoolSize);
+  }
+
+  public void start() {
+    coordinator.start(this::processPersistedRequest);
+  }
+
+  public void stop() {
+    coordinator.stop();
   }
 
   public void execute(Configuration config, Event event) {
@@ -62,11 +72,83 @@ public class EventHandlerExecutor {
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
       topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
     }
+    coordinator.submitIntake(() -> intake(config, (PatchSetEvent) event));
+  }
+
+  private void intake(Configuration config, PatchSetEvent event) {
+    EventHandlerTask task = createTask(config, event);
+    try {
+      EventHandlerTask.Preparation preparation = task.prepareForIntake(null);
+      AiRequestIntakeDecision decision = preparation.decision();
+      switch (decision.disposition()) {
+        case IGNORE -> log.debug("Ignoring event {} after preprocessing", event.getType());
+        case DIRECT -> task.executePrepared();
+        case PERSIST -> admit(event, task, preparation, decision);
+      }
+    } catch (RuntimeException e) {
+      log.error("Failed to intake event {}", event.getType(), e);
+      task.discardPrepared();
+    }
+  }
+
+  private void admit(
+      PatchSetEvent event,
+      EventHandlerTask task,
+      EventHandlerTask.Preparation preparation,
+      AiRequestIntakeDecision decision) {
+    String sourceEventId = resolveSourceEventId(event, preparation.sourceEventId());
+    AiRequestDescriptor descriptor = AiRequestDescriptor.from(event, sourceEventId);
+    AiRequestSubmission submission =
+        new AiRequestSubmission(
+            UUID.randomUUID().toString(),
+            new GerritChange(event).getFullChangeId(),
+            sourceEventId,
+            decision.kind(),
+            decision.admissionPolicy(),
+            descriptor.toJson());
+    AiRequestStore.Admission admission =
+        coordinator.admit(submission, ignored -> requireSuccessful(task.executePrepared()));
+    if (admission.duplicate() || admission.request().state() == AiRequest.State.REJECTED) {
+      task.discardPrepared();
+    }
+    log.debug(
+        "AI request {} admitted with state {}",
+        admission.request().requestId(),
+        admission.request().state());
+  }
+
+  private void processPersistedRequest(AiRequest request) throws Exception {
+    AiRequestDescriptor descriptor = AiRequestDescriptor.fromJson(request.payloadJson());
+    PatchSetEvent event = descriptor.toEvent();
+    if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
+      topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
+    }
+    Configuration config =
+        configCreator.createConfig(
+            Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
+    requireSuccessful(createTask(config, event).execute(descriptor.sourceEventId()));
+  }
+
+  private EventHandlerTask createTask(Configuration config, Event event) {
     GerritEventContextModule contextModule =
         new GerritEventContextModule(config, event, buildFeatures);
-    EventHandlerTask task =
-        injector.createChildInjector(contextModule).getInstance(EventHandlerTask.class);
-    executor.execute(task);
-    log.debug("Task submitted to executor for event: {}", event);
+    return injector.createChildInjector(contextModule).getInstance(EventHandlerTask.class);
+  }
+
+  private static String resolveSourceEventId(PatchSetEvent event, String sourceEventId) {
+    if (sourceEventId != null && !sourceEventId.isBlank()) {
+      return sourceEventId;
+    }
+    return String.join(
+        ":",
+        new GerritChange(event).getPatchSetEventKey(),
+        event.getType(),
+        String.valueOf(event.eventCreatedOn));
+  }
+
+  private static void requireSuccessful(EventHandlerTask.Result result) {
+    if (result == EventHandlerTask.Result.FAILURE) {
+      throw new IllegalStateException("Gerrit event handler failed");
+    }
   }
 }

@@ -27,6 +27,7 @@ import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
+import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerExecutor;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 public class ReviewAiLifecycle implements LifecycleListener {
   private final ReviewAiExecutors reviewAiExecutors;
+  private final EventHandlerExecutor eventHandlerExecutor;
   private final Provider<GerritListener> gerritListenerProvider;
   private final DynamicSet<EventListener> eventListeners;
   private final ReviewAiDb reviewAiDb;
@@ -57,6 +59,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
   @Inject
   ReviewAiLifecycle(
       ReviewAiExecutors reviewAiExecutors,
+      EventHandlerExecutor eventHandlerExecutor,
       Provider<GerritListener> gerritListenerProvider,
       DynamicSet<EventListener> eventListeners,
       ReviewAiDb reviewAiDb,
@@ -64,6 +67,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
       @PluginName String pluginName) {
     this(
         reviewAiExecutors,
+        eventHandlerExecutor,
         gerritListenerProvider,
         eventListeners,
         reviewAiDb,
@@ -74,6 +78,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
 
   ReviewAiLifecycle(
       ReviewAiExecutors reviewAiExecutors,
+      EventHandlerExecutor eventHandlerExecutor,
       Provider<GerritListener> gerritListenerProvider,
       DynamicSet<EventListener> eventListeners,
       ReviewAiDb reviewAiDb,
@@ -81,6 +86,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
       String pluginName,
       String listenerClassName) {
     this.reviewAiExecutors = reviewAiExecutors;
+    this.eventHandlerExecutor = eventHandlerExecutor;
     this.gerritListenerProvider = gerritListenerProvider;
     this.eventListeners = eventListeners;
     this.reviewAiDb = reviewAiDb;
@@ -92,6 +98,8 @@ public class ReviewAiLifecycle implements LifecycleListener {
   @Override
   public void start() {
     log.info("Starting ReviewAI lifecycle");
+
+    eventHandlerExecutor.start();
 
     List<String> staleListeners = findExistingReviewAiListeners();
     if (!staleListeners.isEmpty()) {
@@ -130,6 +138,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
       listenerHandle = null;
     }
 
+    eventHandlerExecutor.stop();
     reviewAiExecutors.shutdown();
     reviewAiDb.stopManagedTcpServerIfOwner();
   }

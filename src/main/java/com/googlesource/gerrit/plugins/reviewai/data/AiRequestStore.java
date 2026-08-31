@@ -257,6 +257,26 @@ public class AiRequestStore {
     }
   }
 
+  public boolean hasQueuedRequest(String changeId) {
+    requireNonBlank(changeId, "changeId");
+    try (Connection connection = db.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                SELECT COUNT(*)
+                FROM ai_requests
+                WHERE change_id = ? AND request_state = ?
+                """)) {
+      statement.setString(1, changeId);
+      statement.setString(2, AiRequest.State.QUEUED.name());
+      try (ResultSet results = statement.executeQuery()) {
+        return results.next() && results.getLong(1) > 0;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to inspect queued AI requests for " + changeId, e);
+    }
+  }
+
   private boolean finish(
       String requestId, String ownerId, AiRequest.State state, String resultText) {
     requireNonBlank(requestId, "requestId");
