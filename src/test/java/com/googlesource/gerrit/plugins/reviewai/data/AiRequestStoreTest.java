@@ -72,6 +72,27 @@ public class AiRequestStoreTest extends TestBase {
   }
 
   @Test
+  public void requestsRunningReviewSupersessionAndRejectsIncomingReview() {
+    store.admit(review("review-1", "patch-set-1"));
+    assertEquals(
+        "review-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+
+    AiRequest requested =
+        store
+            .requestSupersession(CHANGE_ID, "Superseded by patch set 2")
+            .orElseThrow();
+    AiRequestStore.Admission incoming = store.admit(review("review-2", "patch-set-2"));
+
+    assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, requested.state());
+    assertEquals(AiRequest.State.REJECTED, incoming.request().state());
+    assertTrue(store.renewLease("review-1", OWNER, LEASE + 1));
+    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+    assertTrue(store.complete("review-1", OWNER, null));
+    assertEquals(AiRequest.State.SUPERSEDED, store.get("review-1").orElseThrow().state());
+    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+  }
+
+  @Test
   public void deduplicatesReplayedSourceEvent() {
     AiRequestStore.Admission initial = store.admit(message("request-1", "event-1"));
 

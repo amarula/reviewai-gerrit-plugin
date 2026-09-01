@@ -142,13 +142,14 @@ public class AiRequestStore {
                 """
                 UPDATE ai_requests
                 SET lease_expires_at_millis = ?, updated_at_millis = ?
-                WHERE request_id = ? AND request_state = ? AND owner_id = ?
+                WHERE request_id = ? AND request_state IN (?, ?) AND owner_id = ?
                 """)) {
       statement.setLong(1, leaseExpiresAtMillis);
       statement.setLong(2, System.currentTimeMillis());
       statement.setString(3, requestId);
       statement.setString(4, AiRequest.State.RUNNING.name());
-      statement.setString(5, ownerId);
+      statement.setString(5, AiRequest.State.SUPERSEDE_REQUESTED.name());
+      statement.setString(6, ownerId);
       return statement.executeUpdate() == 1;
     } catch (SQLException e) {
       throw new RuntimeException("Failed to renew AI request lease " + requestId, e);
@@ -167,6 +168,57 @@ public class AiRequestStore {
     return finish(requestId, ownerId, AiRequest.State.FAILED, failureText);
   }
 
+  public Optional<AiRequest> requestSupersession(String changeId, String resultText) {
+    requireNonBlank(changeId, "changeId");
+    try (Connection connection = db.getConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        String activeRequestId = ensureAndLockLane(connection, changeId);
+        if (activeRequestId == null) {
+          connection.commit();
+          return Optional.empty();
+        }
+        Optional<AiRequest> active = getForUpdate(connection, activeRequestId);
+        if (active.isEmpty()
+            || active.get().kind() != AiRequest.Kind.REVIEW
+            || active.get().state() != AiRequest.State.RUNNING) {
+          connection.commit();
+          return Optional.empty();
+        }
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                UPDATE ai_requests
+                SET request_state = ?, result_text = ?, updated_at_millis = ?
+                WHERE request_id = ? AND request_state = ?
+                """)) {
+          statement.setString(1, AiRequest.State.SUPERSEDE_REQUESTED.name());
+          statement.setString(2, resultText);
+          statement.setLong(3, System.currentTimeMillis());
+          statement.setString(4, activeRequestId);
+          statement.setString(5, AiRequest.State.RUNNING.name());
+          if (statement.executeUpdate() != 1) {
+            throw new IllegalStateException("Running AI review could not request supersession");
+          }
+        }
+        AiRequest requested = get(connection, activeRequestId).orElseThrow();
+        connection.commit();
+        return Optional.of(requested);
+      } catch (SQLException | RuntimeException e) {
+        rollback(connection, e);
+        throw e;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to request AI review supersession for " + changeId, e);
+    }
+  }
+
+  public boolean isSupersessionRequested(String requestId) {
+    return get(requestId)
+        .map(request -> request.state() == AiRequest.State.SUPERSEDE_REQUESTED)
+        .orElse(false);
+  }
+
   public int abandonExpired(long expiredBeforeMillis, String failureText) {
     return abandonExpiredRequests(expiredBeforeMillis, failureText).size();
   }
@@ -180,11 +232,12 @@ public class AiRequestStore {
                 """
                 SELECT request_id
                 FROM ai_requests
-                WHERE request_state = ? AND lease_expires_at_millis <= ?
+                WHERE request_state IN (?, ?) AND lease_expires_at_millis <= ?
                 ORDER BY queue_sequence
                 """)) {
       statement.setString(1, AiRequest.State.RUNNING.name());
-      statement.setLong(2, expiredBeforeMillis);
+      statement.setString(2, AiRequest.State.SUPERSEDE_REQUESTED.name());
+      statement.setLong(3, expiredBeforeMillis);
       try (ResultSet results = statement.executeQuery()) {
         while (results.next()) {
           expiredRequestIds.add(results.getString(1));
@@ -306,12 +359,19 @@ public class AiRequestStore {
         ensureAndLockLane(connection, existing.get().changeId());
         Optional<AiRequest> request = getForUpdate(connection, requestId);
         if (request.isEmpty()
-            || request.get().state() != AiRequest.State.RUNNING
+            || (request.get().state() != AiRequest.State.RUNNING
+                && request.get().state() != AiRequest.State.SUPERSEDE_REQUESTED)
             || !ownerId.equals(request.get().ownerId())) {
           connection.commit();
           return false;
         }
-        updateTerminalRequest(connection, requestId, state, resultText);
+        boolean supersessionRequested =
+            request.get().state() == AiRequest.State.SUPERSEDE_REQUESTED;
+        updateTerminalRequest(
+            connection,
+            requestId,
+            supersessionRequested ? AiRequest.State.SUPERSEDED : state,
+            supersessionRequested ? request.get().resultText() : resultText);
         releaseLane(connection, request.get().changeId(), requestId);
         connection.commit();
         return true;
@@ -336,13 +396,18 @@ public class AiRequestStore {
         ensureAndLockLane(connection, existing.get().changeId());
         Optional<AiRequest> request = getForUpdate(connection, requestId);
         if (request.isEmpty()
-            || request.get().state() != AiRequest.State.RUNNING
+            || (request.get().state() != AiRequest.State.RUNNING
+                && request.get().state() != AiRequest.State.SUPERSEDE_REQUESTED)
             || request.get().leaseExpiresAtMillis() == null
             || request.get().leaseExpiresAtMillis() > expiredBeforeMillis) {
           connection.commit();
           return false;
         }
-        updateTerminalRequest(connection, requestId, AiRequest.State.ABANDONED, failureText);
+        AiRequest.State terminalState =
+            request.get().state() == AiRequest.State.SUPERSEDE_REQUESTED
+                ? AiRequest.State.SUPERSEDED
+                : AiRequest.State.ABANDONED;
+        updateTerminalRequest(connection, requestId, terminalState, failureText);
         releaseLane(connection, request.get().changeId(), requestId);
         connection.commit();
         return true;
@@ -387,11 +452,12 @@ public class AiRequestStore {
             """
             SELECT COUNT(*)
             FROM ai_requests
-            WHERE change_id = ? AND request_state IN (?, ?)
+            WHERE change_id = ? AND request_state IN (?, ?, ?)
             """)) {
       statement.setString(1, changeId);
       statement.setString(2, AiRequest.State.QUEUED.name());
       statement.setString(3, AiRequest.State.RUNNING.name());
+      statement.setString(4, AiRequest.State.SUPERSEDE_REQUESTED.name());
       try (ResultSet results = statement.executeQuery()) {
         if (!results.next()) {
           throw new IllegalStateException("Could not determine AI request lane occupancy");

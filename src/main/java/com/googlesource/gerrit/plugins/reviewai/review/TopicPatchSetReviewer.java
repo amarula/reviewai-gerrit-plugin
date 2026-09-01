@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicPatchSetReviewMerger;
@@ -102,6 +103,8 @@ class TopicPatchSetReviewer {
           patchSetReviewer.getReviewReply(
               primaryChange, topicPatchSetReviewMerger.buildMergedPatchSet(patchSets));
       log.debug("AI final response for topic review: {}", reviewReply);
+    } catch (AiRequestSupersededException e) {
+      throw e;
     } catch (Exception e) {
       log.error(
           "AI request failed for topic review rooted at `{}`. domain=`{}`, model=`{}`. Cause: {}",

@@ -269,15 +269,11 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
     for (ReviewAssistantStage assistantStage : assistantStages) {
       reviewRequestFutures.add(
-          CompletableFuture.supplyAsync(
-              () -> {
-                try {
-                  return askStage(changeSetData, change, patchSet, assistantStage);
-                } catch (Exception e) {
-                  throw new CompletionException(e);
-                }
-              },
-              executor));
+          changeSetData
+              .getAiRequestCancellation()
+              .supplyAsync(
+                  () -> askStage(changeSetData, change, patchSet, assistantStage),
+                  executor));
     }
 
     List<AiResponseContent> aiResponseContents = new ArrayList<>();

@@ -63,6 +63,7 @@ public class ChangeSetData {
   private transient ReviewFeedbackClassificationInput reviewFeedbackClassificationInput;
   private transient List<String> pendingReviewFeedbackCommentIds = List.of();
   private transient boolean reviewFeedbackClassified;
+  private transient AiRequestCancellation aiRequestCancellation = new AiRequestCancellation();
 
   // Command variables
   private Boolean forcedReview = false;
@@ -159,6 +160,7 @@ public class ChangeSetData {
     copy.setReviewFeedbackClassificationInput(reviewFeedbackClassificationInput);
     copy.setPendingReviewFeedbackCommentIds(pendingReviewFeedbackCommentIds);
     copy.setReviewFeedbackClassified(reviewFeedbackClassified);
+    copy.setAiRequestCancellation(aiRequestCancellation);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
     copy.setReplyFilterEnabled(replyFilterEnabled);

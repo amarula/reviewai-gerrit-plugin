@@ -31,12 +31,14 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
@@ -192,12 +194,15 @@ public class EventHandlerTask implements Runnable {
       throw new IllegalStateException("Event handler task must be prepared before execution");
     }
     ReviewAiMetrics.MetricTimer reviewRunTimer = metrics.startReviewRun(change.getEventType());
-    try {
+    AiRequestCancellation cancellation = AiRequestCancellation.current();
+    changeSetData.setAiRequestCancellation(cancellation);
+    try (AiRequestCancellation.Work ignored = cancellation.beginWork()) {
+      cancellation.throwIfSupersessionRequested();
       log.debug("Processing event for change ID:: {}", change.getFullChangeId());
       processor.process();
       log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
       reviewRunTimer.complete();
-    } catch (StalePatchSetException e) {
+    } catch (StalePatchSetException | AiRequestSupersededException e) {
       reviewRunTimer.complete();
       log.info(
           "Skipping superseded patch set review for {}: {}",

@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
@@ -175,6 +177,48 @@ public class LangChainExecutorTest {
     assertEquals(ToolChoice.AUTO, model.requests.get(2).toolChoice());
     assertEquals(ToolChoice.NONE, model.requests.get(3).toolChoice());
     assertTrue(hasToolResult(model.requests.get(3).messages(), "call_3"));
+  }
+
+  @Test
+  public void completesToolExchangeAfterReviewIsSuperseded() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiMaxToolResponseRounds()).thenReturn(3);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
+    AiRequestCancellation cancellation = new AiRequestCancellation();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setAiRequestCancellation(cancellation);
+    RecordingChatModel model =
+        new RecordingChatModel(
+            AiMessage.from(List.of(toolRequest("call_1"))), AiMessage.from("done")) {
+          @Override
+          public ChatResponse chat(ChatRequest request) {
+            ChatResponse response = super.chat(request);
+            cancellation.requestSupersession("Superseded by patch set 2");
+            return response;
+          }
+        };
+    ChatMemory memory =
+        TokenWindowChatMemory.builder()
+            .id("review")
+            .maxTokens(1000, new TestTokenCountEstimator())
+            .build();
+    memory.add(UserMessage.from("review"));
+
+    AiMessage result =
+        new LangChainExecutor(
+                config,
+                null,
+                List.of(treeToolSpecification()),
+                true,
+                gitRepoFiles,
+                null)
+            .execute(model, change, changeSetData, memory);
+
+    assertEquals("done", result.text());
+    assertEquals(2, model.requests.size());
+    assertTrue(hasToolResult(model.requests.get(1).messages(), "call_1"));
+    assertTrue(cancellation.isSupersessionRequested());
   }
 
   private static ToolExecutionRequest toolRequest(String id) {

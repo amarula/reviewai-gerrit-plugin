@@ -45,6 +45,7 @@ public record AiRequest(
   public enum State {
     QUEUED,
     RUNNING,
+    SUPERSEDE_REQUESTED,
     COMPLETED,
     FAILED,
     REJECTED,
