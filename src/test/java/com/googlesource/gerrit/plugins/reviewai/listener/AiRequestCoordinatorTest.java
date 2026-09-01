@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -131,6 +132,8 @@ public class AiRequestCoordinatorTest extends TestBase {
         "request-1", store.claimNext(CHANGE_ID, "old-owner", 0L).orElseThrow().requestId());
     store.admit(message("request-2", "event-2"));
     CountDownLatch processed = new CountDownLatch(1);
+    CountDownLatch recovered = new CountDownLatch(1);
+    AtomicReference<String> recoveredRequestId = new AtomicReference<>();
     requestExecutor = Executors.newScheduledThreadPool(2);
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
@@ -141,9 +144,16 @@ public class AiRequestCoordinatorTest extends TestBase {
             LEASE_MILLIS,
             RECOVERY_INTERVAL_MILLIS);
 
-    coordinator.start(request -> processed.countDown());
+    coordinator.start(
+        request -> processed.countDown(),
+        request -> {
+          recoveredRequestId.set(request.requestId());
+          recovered.countDown();
+        });
 
+    assertTrue(recovered.await(5, TimeUnit.SECONDS));
     assertTrue(processed.await(5, TimeUnit.SECONDS));
+    assertEquals("request-1", recoveredRequestId.get());
     assertEquals(AiRequest.State.ABANDONED, store.get("request-1").orElseThrow().state());
     awaitState("request-2", AiRequest.State.COMPLETED);
   }

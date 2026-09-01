@@ -153,14 +153,15 @@ public class EventHandlerTask implements Runnable {
     }
     preparationAttempted = true;
     log.debug("Starting event processing for change ID: {}", change.getFullChangeId());
-    pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest();
     sourceEventId = requestedSourceEventId;
     if (!preProcessEvent()) {
+      pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest(sourceEventId);
       log.debug(
           "Preprocessing event not supported or failed for event type: {}", change.getEventType());
       pendingRequest.completeNoUpdate();
       return new Preparation(AiRequestIntakeDecision.ignored(), sourceEventId);
     }
+    pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest(sourceEventId);
     prepared = true;
     return new Preparation(classify(), sourceEventId);
   }
@@ -174,6 +175,14 @@ public class EventHandlerTask implements Runnable {
         SystemMessageFormatter.getLocalizedWarningMessage(
             localizer, "message.ai.request.in.progress"));
     return executePrepared(() -> reviewer.review(change, isAdministratorUser(eventUser)));
+  }
+
+  public void failPendingRequest(String requestedSourceEventId) {
+    reviewAgentRequestStatusUpdater
+        .getPendingRequest(requestedSourceEventId)
+        .fail(
+            SystemMessageFormatter.getLocalizedWarningMessage(
+                localizer, "message.ai.request.interrupted"));
   }
 
   private Result executePrepared(EventProcessor processor) {
@@ -213,7 +222,6 @@ public class EventHandlerTask implements Runnable {
       return false;
     }
     eventUser = getEventUser();
-
     if (!isReviewEnabled(change)) {
       log.debug("Review not enabled for event type: {}", eventType);
       return false;

@@ -50,6 +50,10 @@ class ReviewAgentEventRequestStatusUpdater {
   }
 
   PendingRequest getPendingRequest() {
+    return getPendingRequest(null);
+  }
+
+  PendingRequest getPendingRequest(String sourceEventId) {
     if (!(change.getPatchSetEvent() instanceof CommentAddedEvent)) {
       return PendingRequest.empty();
     }
@@ -61,8 +65,11 @@ class ReviewAgentEventRequestStatusUpdater {
         config.getGerritUserEmail())) {
       return PendingRequest.empty();
     }
-    return new PendingRequest(
-        statusStore, statusStore.getLatestPendingRequestId(), localizer, changeSetData);
+    Optional<String> requestId =
+        sourceEventId == null || sourceEventId.isBlank()
+            ? statusStore.getLatestPendingRequestId()
+            : statusStore.getPendingRequestIdForEvent(sourceEventId);
+    return new PendingRequest(statusStore, requestId, localizer, changeSetData);
   }
 
   static class PendingRequest {

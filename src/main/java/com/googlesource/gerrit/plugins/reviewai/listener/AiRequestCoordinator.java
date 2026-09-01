@@ -53,6 +53,7 @@ public class AiRequestCoordinator {
   private final Set<String> scheduledChanges = ConcurrentHashMap.newKeySet();
 
   private volatile RequestProcessor persistedProcessor;
+  private volatile RecoveryProcessor recoveryProcessor;
   private volatile ScheduledFuture<?> recoveryTask;
   private volatile boolean stopping;
 
@@ -92,7 +93,14 @@ public class AiRequestCoordinator {
   }
 
   public synchronized void start(RequestProcessor processor) {
+    start(processor, ignored -> {});
+  }
+
+  public synchronized void start(
+      RequestProcessor processor, RecoveryProcessor recoveredRequestProcessor) {
     persistedProcessor = Objects.requireNonNull(processor, "processor");
+    recoveryProcessor =
+        Objects.requireNonNull(recoveredRequestProcessor, "recoveredRequestProcessor");
     if (recoveryTask != null) {
       return;
     }
@@ -239,11 +247,21 @@ public class AiRequestCoordinator {
   }
 
   private void recover() {
-    int abandoned = store.abandonExpired(System.currentTimeMillis(), "AI request lease expired");
-    if (abandoned > 0) {
-      log.warn("Abandoned {} expired AI request(s)", abandoned);
+    var abandoned =
+        store.abandonExpiredRequests(System.currentTimeMillis(), "AI request lease expired");
+    if (!abandoned.isEmpty()) {
+      log.warn("Abandoned {} expired AI request(s)", abandoned.size());
+      abandoned.forEach(this::notifyRecovery);
     }
     store.listQueuedChangeIds(Integer.MAX_VALUE).forEach(this::schedule);
+  }
+
+  private void notifyRecovery(AiRequest request) {
+    try {
+      recoveryProcessor.recover(request);
+    } catch (Exception e) {
+      log.error("Failed to report recovery of AI request {}", request.requestId(), e);
+    }
   }
 
   private long leaseExpiration() {
@@ -270,5 +288,10 @@ public class AiRequestCoordinator {
   @FunctionalInterface
   public interface RequestProcessor {
     void process(AiRequest request) throws Exception;
+  }
+
+  @FunctionalInterface
+  public interface RecoveryProcessor {
+    void recover(AiRequest request) throws Exception;
   }
 }

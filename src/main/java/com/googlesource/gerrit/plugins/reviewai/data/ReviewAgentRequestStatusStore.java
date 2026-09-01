@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -91,6 +92,26 @@ public class ReviewAgentRequestStatusStore {
 
   public synchronized Optional<String> getPendingRequestId(String preferredRequestId) {
     Map<String, RequestStatus> statuses = getStatuses();
+    Optional<String> preferred = getPreferredPendingRequestId(statuses, preferredRequestId);
+    return preferred.isPresent() ? preferred : getLatestPendingRequestId(statuses);
+  }
+
+  public synchronized Optional<String> getPendingRequestIdForEvent(String sourceEventId) {
+    Map<String, RequestStatus> statuses = getStatuses();
+    Optional<String> preferred = getPreferredPendingRequestId(statuses, sourceEventId);
+    if (preferred.isPresent()) {
+      return preferred;
+    }
+    List<String> pendingIds =
+        statuses.values().stream()
+            .filter(status -> STATUS_PENDING.equals(status.status))
+            .map(status -> status.requestId)
+            .toList();
+    return pendingIds.size() == 1 ? Optional.of(pendingIds.getFirst()) : Optional.empty();
+  }
+
+  private Optional<String> getPreferredPendingRequestId(
+      Map<String, RequestStatus> statuses, String preferredRequestId) {
     if (preferredRequestId != null && !preferredRequestId.isBlank()) {
       RequestStatus preferred = statuses.get(preferredRequestId);
       if (preferred != null && STATUS_PENDING.equals(preferred.status)) {
@@ -106,7 +127,7 @@ public class ReviewAgentRequestStatusStore {
         return movedRequestId;
       }
     }
-    return getLatestPendingRequestId(statuses);
+    return Optional.empty();
   }
 
   private Optional<String> getLatestPendingRequestId(Map<String, RequestStatus> statuses) {
