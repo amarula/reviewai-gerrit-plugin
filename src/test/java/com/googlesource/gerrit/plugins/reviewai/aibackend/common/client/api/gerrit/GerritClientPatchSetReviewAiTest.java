@@ -48,6 +48,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -127,7 +128,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(gerritApi.changes()).thenReturn(changes);
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
         .thenReturn(changeApi);
-    when(changeApi.current()).thenReturn(revisionApi);
+    when(changeApi.revision("revision-3")).thenReturn(revisionApi);
     when(revisionApi.patch()).thenReturn(BinaryResult.create(getMixedExtensionPatch()));
     when(config.getAiReviewCommitMessages()).thenReturn(false);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
@@ -136,10 +137,14 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     DiffInfo diffInfo = new DiffInfo();
     diffInfo.content = new ArrayList<>();
     when(fileApi.diff(0)).thenReturn(diffInfo);
+    GerritChange change = getGerritChange();
+    change.setPatchSetRevision("revision-3");
 
     GerritClientPatchSetReviewAi client = new GerritClientPatchSetReviewAi(config);
-    String patchSet = client.getPatchSet(new ChangeSetData(1), getGerritChange());
+    String patchSet = client.getPatchSet(new ChangeSetData(1), change);
 
+    verify(changeApi, times(2)).revision("revision-3");
+    verify(changeApi, never()).current();
     Assert.assertTrue(patchSet.contains("diff --git a/allowed.py b/allowed.py"));
     Assert.assertFalse(patchSet.contains("diff --git a/ignored.txt b/ignored.txt"));
     Assert.assertFalse(patchSet.contains("ignored change"));
@@ -508,6 +513,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
         .thenReturn(changeApi);
     when(changeApi.current()).thenReturn(revisionApi);
+    when(changeApi.revision(commit.getName())).thenReturn(revisionApi);
     when(revisionApi.patch()).thenReturn(BinaryResult.create(formattedPatch));
 
     CommitInfo commitInfo = new CommitInfo();

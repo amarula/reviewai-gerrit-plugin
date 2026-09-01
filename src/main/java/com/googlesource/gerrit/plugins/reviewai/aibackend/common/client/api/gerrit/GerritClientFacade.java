@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GerritClientFacade {
+  private final Configuration config;
   private final ChangeSetData changeSetData;
   private final GerritClientDetail gerritClientDetail;
   private final GerritClientComments gerritClientComments;
@@ -42,10 +44,17 @@ public class GerritClientFacade {
       ChangeSetData changeSetData,
       GerritClientComments gerritClientComments,
       IGerritClientPatchSet gerritClientPatchSet) {
+    this.config = config;
     gerritClientDetail = new GerritClientDetail(config, changeSetData);
     this.gerritClientPatchSet = gerritClientPatchSet;
     this.changeSetData = changeSetData;
     this.gerritClientComments = gerritClientComments;
+  }
+
+  public void requireCurrentRevision(GerritChange change) throws Exception {
+    try (ManualRequestContext ignored = config.openRequestContext()) {
+      change.requireCurrentRevision(change.getChangeApi(config));
+    }
   }
 
   public GerritPermittedVotingRange getPermittedVotingRange(GerritChange change) {

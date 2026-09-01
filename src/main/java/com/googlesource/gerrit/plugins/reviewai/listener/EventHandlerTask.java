@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,7 @@ public class EventHandlerTask implements Runnable {
   public enum Result {
     OK,
     NOT_SUPPORTED,
+    SUPERSEDED,
     FAILURE
   }
 
@@ -195,6 +197,14 @@ public class EventHandlerTask implements Runnable {
       processor.process();
       log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
       reviewRunTimer.complete();
+    } catch (StalePatchSetException e) {
+      reviewRunTimer.complete();
+      log.info(
+          "Skipping superseded patch set review for {}: {}",
+          change.getFullChangeId(),
+          e.getMessage());
+      pendingRequest.completeNoUpdate();
+      return Result.SUPERSEDED;
     } catch (Exception e) {
       reviewRunTimer.fail();
       log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);

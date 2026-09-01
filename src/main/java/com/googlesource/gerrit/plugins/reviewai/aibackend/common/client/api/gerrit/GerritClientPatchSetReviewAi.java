@@ -108,8 +108,8 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     this.changeSetData = changeSetData;
     try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeApi changeApi = change.getChangeApi(config);
-      RevisionApi currentRevision = changeApi.current();
-      String formattedPatch = currentRevision.patch().asString();
+      RevisionApi targetRevision = change.getRevisionApi(changeApi);
+      String formattedPatch = targetRevision.patch().asString();
       String baseCommit;
       if (lastReviewedCommit.isPresent()) {
         baseCommit = lastReviewedCommit.get();
@@ -126,7 +126,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
         }
       }
       String incrementalPatch =
-          replaceDiffWithIncrementalGitDiff(formattedPatch, baseCommit, currentRevision);
+          replaceDiffWithIncrementalGitDiff(formattedPatch, baseCommit, targetRevision);
       if (lastReviewedCommit.isPresent()) {
         log.debug(
             "Incremental patch retrieved for change {} from reviewed commit {}"
@@ -147,11 +147,11 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
 
   private String getPatchFromGerrit() throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      RevisionApi currentRevision = change.getChangeApi(config).current();
-      String formattedPatch = currentRevision.patch().asString();
+      RevisionApi targetRevision = change.getRevisionApi(change.getChangeApi(config));
+      String formattedPatch = targetRevision.patch().asString();
       log.debug("Formatted Patch retrieved: {}", formattedPatch);
 
-      return filterPatch(replaceDiffWithCompactGitDiff(formattedPatch, currentRevision));
+      return filterPatch(replaceDiffWithCompactGitDiff(formattedPatch, targetRevision));
     }
   }
 
