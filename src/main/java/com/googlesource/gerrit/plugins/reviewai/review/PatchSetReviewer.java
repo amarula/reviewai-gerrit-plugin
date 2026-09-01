@@ -22,6 +22,7 @@ import com.google.gerrit.server.config.CanonicalWebUrl;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
@@ -149,6 +150,9 @@ public class PatchSetReviewer {
     try {
       reviewReply = getReviewReply(change, patchSet);
       log.debug("AI final response: {}", reviewReply);
+    } catch (AiRequestSupersededException e) {
+      reviewFeedbackLifecycle.release(change, feedbackSession, e);
+      throw e;
     } catch (Exception e) {
       log.error(
           "AI request failed for change `{}`. domain=`{}`, model=`{}`, requestBody={}. Cause: {}",
@@ -387,7 +391,9 @@ public class PatchSetReviewer {
         aiReviewConditionMet
             ? gerritClient.getConditionLabels(change, config.getAiReviewApplicableIf())
             : Map.of());
-    return openAiClient.ask(changeSetData, change, patchSet);
+    AiResponseContent response = openAiClient.ask(changeSetData, change, patchSet);
+    changeSetData.getAiRequestCancellation().throwIfSupersessionRequested();
+    return response;
   }
 
   private Integer getReviewScore(GerritChange change) {

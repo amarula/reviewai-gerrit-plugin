@@ -212,10 +212,13 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
     CompletableFuture<ReviewFeedbackMemory> feedbackFuture = null;
     if (shouldClassifyReviewFeedback(changeSetData)) {
-      feedbackFuture = stageExecutor.supplyAsync(() -> reviewFeedback(changeSetData, change));
+      feedbackFuture =
+          stageExecutor.supplyAsync(
+              changeSetData, () -> reviewFeedback(changeSetData, change));
     }
     CompletableFuture<SpecializedReviewTriage> triageFuture =
-        stageExecutor.supplyAsync(() -> askTriage(changeSetData, change, patchSet));
+        stageExecutor.supplyAsync(
+            changeSetData, () -> askTriage(changeSetData, change, patchSet));
     SpecializedReviewTriage triage = stageExecutor.join(triageFuture);
     if (feedbackFuture != null) {
       changeSetData.setReviewFeedbackMemory(stageExecutor.join(feedbackFuture));
@@ -443,6 +446,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     Set<String> expectedConcernIds = SpecializedReviewConcernIds.rawConcernIds(specializedFindings);
     CompletableFuture<SpecializedReviewFindings> consolidationFuture =
         stageExecutor.supplyAsync(
+            changeSetData,
             () ->
                 askFindingsStage(
                     changeSetData,
@@ -454,6 +458,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     if (includeHistoricalRepetition) {
       historicalRepetitionFuture =
           stageExecutor.supplyAsync(
+              changeSetData,
               () ->
                   askHistoricalRepetitionStage(
                       changeSetData,
@@ -529,6 +534,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
               SpecializedReviewTopicVerification.verificationConversationSuffix(topicPatch));
       futures.add(
           stageExecutor.supplyAsync(
+              changeSetData,
               () ->
                   new VerificationStageResult(
                       askVerificationStage(verificationData, change, verificationInput),
@@ -676,6 +682,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     for (SpecializedReviewTriage.AgentPlan plan : enabledPlans) {
       futures.add(
           stageExecutor.supplyAsync(
+              changeSetData,
               () -> {
                 SpecializedReviewFindings findings =
                     askSpecializedAgent(changeSetData, change, patchSet, plan);
@@ -703,6 +710,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
     for (SpecializedReviewTriage.AgentPlan plan : plans) {
       futures.add(
           stageExecutor.supplyAsync(
+              changeSetData,
               () ->
                   askSpecializedAgentFollowUp(
                       changeSetData, change, fullPatchSet, plan, previousLedger)));

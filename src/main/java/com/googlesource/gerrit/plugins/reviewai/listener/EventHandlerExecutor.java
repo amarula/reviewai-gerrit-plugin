@@ -70,14 +70,38 @@ public class EventHandlerExecutor {
 
   public void execute(Configuration config, Event event) {
     log.debug("Executing event handler for event: {}", event);
+    Injector eventInjector = createEventInjector(config, event);
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
+      requestActiveReviewSupersession(eventInjector, config, patchSetCreatedEvent);
       topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
     }
-    coordinator.submitIntake(() -> intake(config, (PatchSetEvent) event));
+    coordinator.submitIntake(() -> intake(eventInjector, (PatchSetEvent) event));
   }
 
-  private void intake(Configuration config, PatchSetEvent event) {
-    EventHandlerTask task = createTask(config, event);
+  private void requestActiveReviewSupersession(
+      Injector eventInjector, Configuration config, PatchSetCreatedEvent event) {
+    GerritChange currentChange = new GerritChange(event);
+    long patchSetNumber =
+        currentChange.getPatchSetAttribute().map(patchSet -> (long) patchSet.number).orElse(0L);
+    coordinator
+        .requestReviewSupersession(currentChange.getFullChangeId(), patchSetNumber)
+        .ifPresent(
+            request -> {
+              try {
+                eventInjector
+                    .getInstance(SupersededReviewNotifier.class)
+                    .publish(config, currentChange, request, patchSetNumber);
+              } catch (Exception e) {
+                log.error(
+                    "Could not report early supersession of AI request {}",
+                    request.requestId(),
+                    e);
+              }
+            });
+  }
+
+  private void intake(Injector eventInjector, PatchSetEvent event) {
+    EventHandlerTask task = eventInjector.getInstance(EventHandlerTask.class);
     try {
       EventHandlerTask.Preparation preparation = task.prepareForIntake(null);
       AiRequestIntakeDecision decision = preparation.decision();
@@ -145,9 +169,12 @@ public class EventHandlerExecutor {
   }
 
   private EventHandlerTask createTask(Configuration config, Event event) {
-    GerritEventContextModule contextModule =
-        new GerritEventContextModule(config, event, buildFeatures);
-    return injector.createChildInjector(contextModule).getInstance(EventHandlerTask.class);
+    return createEventInjector(config, event).getInstance(EventHandlerTask.class);
+  }
+
+  private Injector createEventInjector(Configuration config, Event event) {
+    return injector.createChildInjector(
+        new GerritEventContextModule(config, event, buildFeatures));
   }
 
   private static String resolveSourceEventId(PatchSetEvent event, String sourceEventId) {

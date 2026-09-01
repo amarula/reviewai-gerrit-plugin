@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -35,6 +36,7 @@ import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Injector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -43,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -101,6 +104,50 @@ public class EventHandlerExecutorTest {
         AiRequestDescriptor.EventType.PATCH_SET_CREATED,
         AiRequestDescriptor.fromJson(admitted.get().payloadJson()).eventType());
     verify(topicCoordinator).recordEvent(event);
+  }
+
+  @Test
+  public void reportsRunningReviewSupersessionBeforePatchSetIntake() throws Exception {
+    AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
+    SupersededReviewNotifier notifier = mock(SupersededReviewNotifier.class);
+    Injector injector = mock(Injector.class);
+    Injector childInjector = mock(Injector.class);
+    Configuration config = mock(Configuration.class);
+    PatchSetCreatedEvent event = patchSetCreatedEvent();
+    AiRequest supersededRequest =
+        new AiRequest(
+            1,
+            "review-2",
+            new GerritChange(event).getFullChangeId(),
+            "patch-set-2",
+            AiRequest.Kind.REVIEW,
+            AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
+            AiRequest.State.SUPERSEDE_REQUESTED,
+            "{}",
+            "owner",
+            10L,
+            "Superseded by patch set 3",
+            1,
+            1);
+    when(coordinator.requestReviewSupersession(supersededRequest.changeId(), 3))
+        .thenReturn(Optional.of(supersededRequest));
+    when(injector.createChildInjector(any(com.google.inject.Module.class)))
+        .thenReturn(childInjector);
+    when(childInjector.getInstance(SupersededReviewNotifier.class)).thenReturn(notifier);
+    EventHandlerExecutor executor =
+        new EventHandlerExecutor(
+            injector,
+            coordinator,
+            mock(ConfigCreator.class),
+            mock(TopicPatchSetReviewCoordinator.class),
+            mock(AiAdministratorAccess.class),
+            mock(ClientCommandExtension.class));
+
+    executor.execute(config, event);
+
+    verify(notifier)
+        .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq(3L));
+    verify(coordinator).submitIntake(any());
   }
 
   @Test

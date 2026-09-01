@@ -17,13 +17,15 @@
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +34,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
@@ -204,6 +207,50 @@ public class AiRequestCoordinatorTest extends TestBase {
     assertTrue(processed.await(5, TimeUnit.SECONDS));
     awaitState("review-1", AiRequest.State.SUPERSEDED);
     awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  @Test
+  public void newerPatchSetCancelsRunningReviewAndRejectsIncomingReview() throws Exception {
+    CountDownLatch oldReviewStarted = new CountDownLatch(1);
+    CountDownLatch finishInFlightQuery = new CountDownLatch(1);
+    AtomicBoolean oldReviewStopped = new AtomicBoolean();
+    AtomicBoolean newReviewProcessed = new AtomicBoolean();
+    AtomicInteger aiQueries = new AtomicInteger();
+    coordinator.admit(
+        review("review-1", "patch-set-1"),
+        request -> {
+          AiRequestCancellation cancellation = AiRequestCancellation.current();
+          try (AiRequestCancellation.Work ignored = cancellation.beginWork()) {
+            aiQueries.incrementAndGet();
+            oldReviewStarted.countDown();
+            finishInFlightQuery.await();
+            cancellation.throwIfSupersessionRequested();
+            aiQueries.incrementAndGet();
+            return ProcessingOutcome.COMPLETED;
+          } finally {
+            oldReviewStopped.set(true);
+          }
+        });
+    assertTrue(oldReviewStarted.await(5, TimeUnit.SECONDS));
+
+    AiRequest requested =
+        coordinator.requestReviewSupersession(CHANGE_ID, 2).orElseThrow();
+    AiRequestStore.Admission incoming =
+        coordinator.admit(
+            review("review-2", "patch-set-2"),
+            request -> {
+              newReviewProcessed.set(true);
+              return ProcessingOutcome.COMPLETED;
+            });
+    finishInFlightQuery.countDown();
+
+    assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, requested.state());
+    assertEquals(AiRequest.State.REJECTED, incoming.request().state());
+    awaitState("review-1", AiRequest.State.SUPERSEDED);
+    awaitState("review-2", AiRequest.State.REJECTED);
+    assertEquals(1, aiQueries.get());
+    assertFalse(newReviewProcessed.get());
+    assertTrue(oldReviewStopped.get());
   }
 
   private AiRequestSubmission review(String requestId, String sourceEventId) {

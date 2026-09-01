@@ -22,11 +22,13 @@ import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +52,7 @@ public class AiRequestCoordinator {
   private final long recoveryIntervalMillis;
   private final String ownerId = UUID.randomUUID().toString();
   private final Map<String, RequestProcessor> preparedProcessors = new ConcurrentHashMap<>();
+  private final Map<String, ActiveRequest> activeRequests = new ConcurrentHashMap<>();
   private final Set<String> scheduledChanges = ConcurrentHashMap.newKeySet();
 
   private volatile RequestProcessor persistedProcessor;
@@ -144,6 +147,20 @@ public class AiRequestCoordinator {
     return admission;
   }
 
+  public Optional<AiRequest> requestReviewSupersession(
+      String changeId, long newerPatchSetNumber) {
+    String reason = "Superseded by patch set " + newerPatchSetNumber;
+    Optional<AiRequest> requested = store.requestSupersession(changeId, reason);
+    requested.ifPresent(
+        request -> {
+          ActiveRequest active = activeRequests.get(changeId);
+          if (active != null && active.requestId().equals(request.requestId())) {
+            active.cancellation().requestSupersession(reason);
+          }
+        });
+    return requested;
+  }
+
   public synchronized void stop() {
     stopping = true;
     if (recoveryTask != null) {
@@ -155,6 +172,7 @@ public class AiRequestCoordinator {
     awaitTermination(requestExecutor, "request");
     awaitTermination(leaseExecutor, "lease");
     preparedProcessors.clear();
+    activeRequests.clear();
     scheduledChanges.clear();
   }
 
@@ -199,10 +217,28 @@ public class AiRequestCoordinator {
       store.fail(request.requestId(), ownerId, "No persisted AI request processor is available");
       return;
     }
+    AiRequestCancellation cancellation =
+        new AiRequestCancellation(() -> store.isSupersessionRequested(request.requestId()));
+    ActiveRequest active = new ActiveRequest(request.requestId(), cancellation);
+    ActiveRequest existing = activeRequests.putIfAbsent(request.changeId(), active);
+    if (existing != null) {
+      store.fail(request.requestId(), ownerId, "Change already has an active AI request");
+      return;
+    }
     ScheduledFuture<?> leaseRenewal = null;
     try {
       leaseRenewal = startLeaseRenewal(request);
-      ProcessingOutcome outcome = processor.process(request);
+      if (store.isSupersessionRequested(request.requestId())) {
+        cancellation.requestSupersession("AI review superseded by a newer patch set");
+      }
+      ProcessingOutcome outcome;
+      try (AiRequestCancellation.Scope ignored = AiRequestCancellation.activate(cancellation)) {
+        outcome = processor.process(request);
+      }
+      cancellation.awaitWorkCompletion();
+      if (cancellation.isSupersessionRequested()) {
+        outcome = ProcessingOutcome.SUPERSEDED;
+      }
       boolean finished =
           outcome == ProcessingOutcome.SUPERSEDED
               ? store.supersede(request.requestId(), ownerId, "Patch set review superseded")
@@ -211,15 +247,21 @@ public class AiRequestCoordinator {
         log.warn("AI request {} lost ownership before finishing", request.requestId());
       }
     } catch (Exception e) {
-      log.error("AI request {} failed", request.requestId(), e);
-      store.fail(request.requestId(), ownerId, failureText(e));
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
+      cancellation.awaitWorkCompletion();
+      if (cancellation.isSupersessionRequested()) {
+        store.supersede(request.requestId(), ownerId, "Patch set review superseded");
+      } else {
+        log.error("AI request {} failed", request.requestId(), e);
+        store.fail(request.requestId(), ownerId, failureText(e));
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
       }
     } finally {
       if (leaseRenewal != null) {
         leaseRenewal.cancel(false);
       }
+      activeRequests.remove(request.changeId(), active);
     }
   }
 
@@ -254,8 +296,14 @@ public class AiRequestCoordinator {
     var abandoned =
         store.abandonExpiredRequests(System.currentTimeMillis(), "AI request lease expired");
     if (!abandoned.isEmpty()) {
-      log.warn("Abandoned {} expired AI request(s)", abandoned.size());
-      abandoned.forEach(this::notifyRecovery);
+      var interrupted =
+          abandoned.stream()
+              .filter(request -> request.state() == AiRequest.State.ABANDONED)
+              .toList();
+      if (!interrupted.isEmpty()) {
+        log.warn("Abandoned {} expired AI request(s)", interrupted.size());
+        interrupted.forEach(this::notifyRecovery);
+      }
     }
     store.listQueuedChangeIds(Integer.MAX_VALUE).forEach(this::schedule);
   }
@@ -303,4 +351,6 @@ public class AiRequestCoordinator {
   public interface RecoveryProcessor {
     void recover(AiRequest request) throws Exception;
   }
+
+  private record ActiveRequest(String requestId, AiRequestCancellation cancellation) {}
 }

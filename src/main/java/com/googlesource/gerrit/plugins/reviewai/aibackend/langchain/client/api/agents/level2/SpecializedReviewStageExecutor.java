@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -32,16 +33,9 @@ final class SpecializedReviewStageExecutor {
     this.executor = executor;
   }
 
-  <T> CompletableFuture<T> supplyAsync(StageCall<T> stageCall) {
-    return CompletableFuture.supplyAsync(
-        () -> {
-          try {
-            return stageCall.run();
-          } catch (Exception e) {
-            throw new CompletionException(e);
-          }
-        },
-        executor);
+  <T> CompletableFuture<T> supplyAsync(
+      ChangeSetData changeSetData, StageCall<T> stageCall) {
+    return changeSetData.getAiRequestCancellation().supplyAsync(stageCall::run, executor);
   }
 
   <T> T join(CompletableFuture<T> future) throws Exception {

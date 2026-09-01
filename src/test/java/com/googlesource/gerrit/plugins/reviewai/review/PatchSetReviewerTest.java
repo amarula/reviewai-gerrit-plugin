@@ -26,9 +26,11 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -49,6 +51,38 @@ public class PatchSetReviewerTest {
     assertEquals(
         Integer.valueOf(1),
         reviewer.getReviewScore(change(), new AiResponseContent("")));
+  }
+
+  @Test(expected = AiRequestSupersededException.class)
+  public void discardsCompletedAiResponseWhenReviewIsSuperseded() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getMaxReviewLines()).thenReturn(10);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    AiRequestCancellation cancellation = new AiRequestCancellation();
+    changeSetData.setAiRequestCancellation(cancellation);
+    GerritChange change = change();
+    IAiClient aiClient = mock(IAiClient.class);
+    when(aiClient.ask(changeSetData, change, "diff"))
+        .thenAnswer(
+            ignored -> {
+              cancellation.requestSupersession("Superseded by patch set 2");
+              return new AiResponseContent("completed response");
+            });
+    PatchSetReviewer reviewer =
+        new PatchSetReviewer(
+            mock(GerritClient.class),
+            config,
+            changeSetData,
+            Providers.of(mock(GerritClientReview.class)),
+            aiClient,
+            mock(Localizer.class),
+            mock(PatchSetReviewConversationRecorder.class),
+            mock(ReviewConcernPublisher.class),
+            mock(ReviewFeedbackLifecycle.class),
+            mock(AiReviewApplicabilityChecker.class),
+            null);
+
+    reviewer.getReviewReply(change, "diff");
   }
 
   private static PatchSetReviewer reviewer() {

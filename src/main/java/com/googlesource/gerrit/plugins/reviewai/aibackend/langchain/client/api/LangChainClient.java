@@ -47,6 +47,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
@@ -604,7 +605,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
       AiMessage ai =
           (rebuildToolExecutor ? buildToolExecutor(changeSetData) : getToolExecutor(changeSetData))
-              .execute(model, change, memory);
+              .execute(model, change, changeSetData, memory);
       String responseText = ai != null ? ai.text() : null;
 
       if (responseText == null) {
@@ -621,7 +622,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
       requestTimer.complete();
       return new RawReviewRequestResult(responseText, userMessage);
+    } catch (AiRequestSupersededException e) {
+      requestTimer.empty();
+      throw e;
     } catch (Exception e) {
+      if (changeSetData.getAiRequestCancellation().isSupersessionRequested()) {
+        requestTimer.empty();
+        changeSetData.getAiRequestCancellation().throwIfSupersessionRequested();
+      }
       requestTimer.fail();
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);

@@ -19,6 +19,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.logging.LogArg;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
@@ -51,6 +53,13 @@ class LangChainExecutor {
   private final AiCostTracker costTracker;
 
   AiMessage execute(ChatModel model, GerritChange change, ChatMemory memory) {
+    return execute(model, change, new ChangeSetData(0), memory);
+  }
+
+  AiMessage execute(
+      ChatModel model, GerritChange change, ChangeSetData changeSetData, ChatMemory memory) {
+    AiRequestCancellation cancellation = changeSetData.getAiRequestCancellation();
+    cancellation.throwIfSupersessionRequested();
     log.debug(
         "Starting LangChain execution with {} memory messages, initialToolChoice={}, tools={}, " +
             "structuredResponse={}",
