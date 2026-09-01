@@ -180,10 +180,11 @@ public class GerritClientReview extends GerritClientAccount {
         return Map.of();
       }
       concernBinder.tagReview(reviewInput, reviewBatches);
+      change.requireCurrentRevision(changeApi);
       Optional<Set<String>> existingCommentIds =
           concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
       ReviewResult result =
-          changeApi.current().review(reviewInput);
+          change.getRevisionApi(changeApi).review(reviewInput);
 
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);

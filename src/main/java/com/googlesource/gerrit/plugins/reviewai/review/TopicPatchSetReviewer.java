@@ -78,6 +78,7 @@ class TopicPatchSetReviewer {
     List<TopicReviewPatchSet> patchSets = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);
     for (GerritChange topicChange : changes) {
+      gerritClient.requireCurrentRevision(topicChange);
       String patchSet = gerritClient.getPatchSet(topicChange);
       if (!patchSetReviewer.shouldSkipAiReviewForEmptyPatchSet(topicChange)) {
         patchSets.add(topicPatchSetReviewMerger.patchSet(topicChange, patchSets.size(), patchSet));
@@ -126,6 +127,9 @@ class TopicPatchSetReviewer {
     }
 
     List<Double> topicReviewScores = patchSetReviewer.getReviewScores(reviewReply);
+    for (TopicReviewPatchSet patchSet : patchSets) {
+      gerritClient.requireCurrentRevision(patchSet.change());
+    }
     for (TopicReviewPatchSet patchSet : patchSets) {
       patchSetReviewer.publishTopicReviewPart(
           reviewReply, patchSet.change(), patchSet.prefix(), topicReviewScores);

@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
@@ -59,7 +60,7 @@ public class AiRequestCoordinatorTest extends TestBase {
             leaseExecutor,
             LEASE_MILLIS,
             RECOVERY_INTERVAL_MILLIS);
-    coordinator.start(request -> {});
+    coordinator.start(request -> ProcessingOutcome.COMPLETED);
   }
 
   @After
@@ -83,6 +84,7 @@ public class AiRequestCoordinatorTest extends TestBase {
           firstStarted.countDown();
           releaseFirst.await();
           leave(active, completed);
+          return ProcessingOutcome.COMPLETED;
         });
     assertTrue(firstStarted.await(5, TimeUnit.SECONDS));
 
@@ -91,6 +93,7 @@ public class AiRequestCoordinatorTest extends TestBase {
         request -> {
           enter(request, active, maximumActive, processingOrder);
           leave(active, completed);
+          return ProcessingOutcome.COMPLETED;
         });
 
     assertEquals(List.of("request-1"), processingOrder);
@@ -118,7 +121,11 @@ public class AiRequestCoordinatorTest extends TestBase {
             LEASE_MILLIS,
             RECOVERY_INTERVAL_MILLIS);
 
-    coordinator.start(request -> processed.countDown());
+    coordinator.start(
+        request -> {
+          processed.countDown();
+          return ProcessingOutcome.COMPLETED;
+        });
 
     assertTrue(processed.await(5, TimeUnit.SECONDS));
     awaitState("request-1", AiRequest.State.COMPLETED);
@@ -145,7 +152,10 @@ public class AiRequestCoordinatorTest extends TestBase {
             RECOVERY_INTERVAL_MILLIS);
 
     coordinator.start(
-        request -> processed.countDown(),
+        request -> {
+          processed.countDown();
+          return ProcessingOutcome.COMPLETED;
+        },
         request -> {
           recoveredRequestId.set(request.requestId());
           recovered.countDown();
@@ -167,11 +177,43 @@ public class AiRequestCoordinatorTest extends TestBase {
           throw new IllegalStateException(AiRequest.State.FAILED.name());
         });
     coordinator.admit(
-        message("request-2", "event-2"), request -> processed.countDown());
+        message("request-2", "event-2"),
+        request -> {
+          processed.countDown();
+          return ProcessingOutcome.COMPLETED;
+        });
 
     assertTrue(processed.await(5, TimeUnit.SECONDS));
     awaitState("request-1", AiRequest.State.FAILED);
     awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  @Test
+  public void supersededOutcomeReleasesLaneForNextRequest() throws Exception {
+    CountDownLatch processed = new CountDownLatch(1);
+    coordinator.admit(
+        review("review-1", "patch-set-1"),
+        request -> ProcessingOutcome.SUPERSEDED);
+    coordinator.admit(
+        message("request-2", "event-2"),
+        request -> {
+          processed.countDown();
+          return ProcessingOutcome.COMPLETED;
+        });
+
+    assertTrue(processed.await(5, TimeUnit.SECONDS));
+    awaitState("review-1", AiRequest.State.SUPERSEDED);
+    awaitState("request-2", AiRequest.State.COMPLETED);
+  }
+
+  private AiRequestSubmission review(String requestId, String sourceEventId) {
+    return new AiRequestSubmission(
+        requestId,
+        CHANGE_ID,
+        sourceEventId,
+        AiRequest.Kind.REVIEW,
+        AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
+        GsonUtils.getGson().toJson(Map.of()));
   }
 
   private AiRequestSubmission message(String requestId, String sourceEventId) {

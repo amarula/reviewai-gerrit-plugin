@@ -20,10 +20,13 @@ import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
+import com.google.gerrit.extensions.api.changes.RevisionApi;
+import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetEvent;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -84,6 +87,22 @@ public class GerritChange {
         .getGerritApi()
         .changes()
         .id(projectName, branchNameKey.shortName(), changeKey.get());
+  }
+
+  public RevisionApi getRevisionApi(ChangeApi changeApi) throws Exception {
+    return patchSetRevision == null || patchSetRevision.isBlank()
+        ? changeApi.current()
+        : changeApi.revision(patchSetRevision);
+  }
+
+  public void requireCurrentRevision(ChangeApi changeApi) throws Exception {
+    if (patchSetRevision == null || patchSetRevision.isBlank()) {
+      return;
+    }
+    String currentRevision = changeApi.get(ListChangesOption.CURRENT_REVISION).currentRevision;
+    if (!patchSetRevision.equals(currentRevision)) {
+      throw new StalePatchSetException(patchSetRevision, currentRevision);
+    }
   }
 
   public Optional<PatchSetAttribute> getPatchSetAttribute() {

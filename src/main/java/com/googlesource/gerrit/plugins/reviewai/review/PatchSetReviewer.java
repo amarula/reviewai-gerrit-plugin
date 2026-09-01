@@ -118,6 +118,7 @@ public class PatchSetReviewer {
 
   public void review(GerritChange change, boolean includeAiFailureDetails) throws Exception {
     log.debug("Starting review process for change: {}", change.getFullChangeId());
+    gerritClient.requireCurrentRevision(change);
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);

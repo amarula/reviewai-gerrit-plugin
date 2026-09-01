@@ -48,10 +48,15 @@ public record AiRequest(
     COMPLETED,
     FAILED,
     REJECTED,
+    SUPERSEDED,
     ABANDONED;
 
     public boolean isTerminal() {
-      return this == COMPLETED || this == FAILED || this == REJECTED || this == ABANDONED;
+      return this == COMPLETED
+          || this == FAILED
+          || this == REJECTED
+          || this == SUPERSEDED
+          || this == ABANDONED;
     }
   }
 }

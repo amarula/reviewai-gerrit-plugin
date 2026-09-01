@@ -36,6 +36,8 @@ import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.api.GerritApi;
+import com.google.gerrit.extensions.client.ListChangesOption;
+import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.json.OutputFormat;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
@@ -50,6 +52,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
@@ -115,6 +118,37 @@ public class GerritClientReviewTest {
     client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
 
     verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void publishesReviewToPinnedRevision() throws Exception {
+    change.setPatchSetRevision("revision-3");
+    ChangeInfo changeInfo = new ChangeInfo();
+    changeInfo.currentRevision = "revision-3";
+    when(changeApi.get(ListChangesOption.CURRENT_REVISION)).thenReturn(changeInfo);
+    when(changeApi.revision("revision-3")).thenReturn(revisionApi);
+
+    client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
+
+    verify(changeApi).revision("revision-3");
+    verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void doesNotPublishReviewWhenPinnedRevisionIsStale() throws Exception {
+    change.setPatchSetRevision("revision-2");
+    ChangeInfo changeInfo = new ChangeInfo();
+    changeInfo.currentRevision = "revision-3";
+    when(changeApi.get(ListChangesOption.CURRENT_REVISION)).thenReturn(changeInfo);
+
+    try {
+      client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
+      fail("Expected stale patch set review");
+    } catch (StalePatchSetException e) {
+      assertEquals(
+          "Patch set review revision revision-2 was superseded by current revision revision-3",
+          e.getMessage());
+    }
   }
 
   @Test

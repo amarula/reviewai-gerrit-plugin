@@ -53,6 +53,15 @@ public class GerritClientPatchSet extends GerritClientAccount {
 
   public void retrieveRevisionBase(GerritChange change) {
     log.debug("Retrieving revision base for change: {}", change.getFullChangeId());
+    Optional<Integer> targetPatchSetNumber =
+        change
+            .getPatchSetAttribute()
+            .map(attribute -> attribute.number)
+            .filter(number -> number > 0);
+    if (targetPatchSetNumber.isPresent()) {
+      revisionBase = targetPatchSetNumber.get() - 1;
+      return;
+    }
     try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeInfo changeInfo =
           config
@@ -83,22 +92,13 @@ public class GerritClientPatchSet extends GerritClientAccount {
     List<String> enabledFileExtensions = config.getEnabledFileExtensions();
     log.debug("Retrieving file diff for change: {}", change.getFullChangeId());
     try (ManualRequestContext ignored = config.openRequestContext()) {
+      var revisionApi = change.getRevisionApi(change.getChangeApi(config));
       for (String filename : patchSetFiles) {
         isCommitMessage = filename.equals("/COMMIT_MSG");
         if (!isCommitMessage && !matchesExtensionList(filename, enabledFileExtensions)) {
           continue;
         }
-        DiffInfo diff =
-            config
-                .getGerritApi()
-                .changes()
-                .id(
-                    change.getProjectName(),
-                    change.getBranchNameKey().shortName(),
-                    change.getChangeKey().get())
-                .current()
-                .file(filename)
-                .diff(revisionBase);
+        DiffInfo diff = revisionApi.file(filename).diff(revisionBase);
         processFileDiff(filename, diff);
         log.debug("Processed file diff for file: {}", filename);
       }

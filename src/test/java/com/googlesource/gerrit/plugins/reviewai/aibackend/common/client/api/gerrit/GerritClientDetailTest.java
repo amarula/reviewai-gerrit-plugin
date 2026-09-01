@@ -29,9 +29,11 @@ public class GerritClientDetailTest {
     changeInfo.branch = "myBranchName";
     changeInfo.changeId = "myChangeId";
     changeInfo._number = 15438;
+    changeInfo.currentRevision = "revision-3";
 
     GerritChange change = GerritClientDetail.toGerritChange(changeInfo);
 
     assertEquals(Integer.valueOf(15438), change.getChangeNumber().orElseThrow());
+    assertEquals("revision-3", change.getPatchSetRevision());
   }
 }

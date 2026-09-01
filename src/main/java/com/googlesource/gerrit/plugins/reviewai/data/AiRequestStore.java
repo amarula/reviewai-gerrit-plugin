@@ -159,6 +159,10 @@ public class AiRequestStore {
     return finish(requestId, ownerId, AiRequest.State.COMPLETED, resultText);
   }
 
+  public boolean supersede(String requestId, String ownerId, String resultText) {
+    return finish(requestId, ownerId, AiRequest.State.SUPERSEDED, resultText);
+  }
+
   public boolean fail(String requestId, String ownerId, String failureText) {
     return finish(requestId, ownerId, AiRequest.State.FAILED, failureText);
   }
@@ -286,9 +290,9 @@ public class AiRequestStore {
       String requestId, String ownerId, AiRequest.State state, String resultText) {
     requireNonBlank(requestId, "requestId");
     requireNonBlank(ownerId, "ownerId");
-    if (!state.isTerminal()
-        || state == AiRequest.State.REJECTED
-        || state == AiRequest.State.ABANDONED) {
+    if (state != AiRequest.State.COMPLETED
+        && state != AiRequest.State.FAILED
+        && state != AiRequest.State.SUPERSEDED) {
       throw new IllegalArgumentException("Unsupported worker terminal state: " + state);
     }
     try (Connection connection = db.getConnection()) {

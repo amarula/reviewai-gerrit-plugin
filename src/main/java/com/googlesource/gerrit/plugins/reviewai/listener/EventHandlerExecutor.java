@@ -31,6 +31,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -107,7 +108,7 @@ public class EventHandlerExecutor {
             decision.admissionPolicy(),
             descriptor.toJson());
     AiRequestStore.Admission admission =
-        coordinator.admit(submission, ignored -> requireSuccessful(task.executePrepared()));
+        coordinator.admit(submission, ignored -> processingOutcome(task.executePrepared()));
     if (admission.duplicate()) {
       task.discardPrepared();
     } else if (admission.request().state() == AiRequest.State.REJECTED) {
@@ -123,7 +124,7 @@ public class EventHandlerExecutor {
         admission.request().state());
   }
 
-  private void processPersistedRequest(AiRequest request) throws Exception {
+  private ProcessingOutcome processPersistedRequest(AiRequest request) throws Exception {
     AiRequestDescriptor descriptor = AiRequestDescriptor.fromJson(request.payloadJson());
     PatchSetEvent event = descriptor.toEvent();
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
@@ -132,7 +133,7 @@ public class EventHandlerExecutor {
     Configuration config =
         configCreator.createConfig(
             Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
-    requireSuccessful(createTask(config, event).execute(descriptor.sourceEventId()));
+    return processingOutcome(createTask(config, event).execute(descriptor.sourceEventId()));
   }
 
   private void recoverAbandonedRequest(AiRequest request) throws Exception {
@@ -164,5 +165,13 @@ public class EventHandlerExecutor {
     if (result == EventHandlerTask.Result.FAILURE) {
       throw new IllegalStateException("Gerrit event handler failed");
     }
+  }
+
+  private static ProcessingOutcome processingOutcome(EventHandlerTask.Result result) {
+    return switch (result) {
+      case OK, NOT_SUPPORTED -> ProcessingOutcome.COMPLETED;
+      case SUPERSEDED -> ProcessingOutcome.SUPERSEDED;
+      case FAILURE -> throw new IllegalStateException("Gerrit event handler failed");
+    };
   }
 }

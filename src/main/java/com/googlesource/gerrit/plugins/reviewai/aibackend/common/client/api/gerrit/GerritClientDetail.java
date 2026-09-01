@@ -20,6 +20,7 @@ import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
+import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.AccountInfo;
 import com.google.gerrit.extensions.common.ApprovalInfo;
 import com.google.gerrit.extensions.common.ChangeInfo;
@@ -143,7 +144,14 @@ public class GerritClientDetail {
             change.getBranchNameKey().shortName(),
             backslashBackslashesAndDoubleQuotes(topic.get()));
     try (ManualRequestContext ignored = config.openRequestContext()) {
-      return config.getGerritApi().changes().query(query).withNoLimit().get().stream()
+      return config
+          .getGerritApi()
+          .changes()
+          .query(query)
+          .withOption(ListChangesOption.CURRENT_REVISION)
+          .withNoLimit()
+          .get()
+          .stream()
           .map(GerritClientDetail::toGerritChange)
           .toList();
     } catch (Exception e) {
@@ -212,6 +220,7 @@ public class GerritClientDetail {
             Change.key(changeInfo.changeId));
     change.setChangeNumber(changeInfo._number);
     change.setPatchSetNumber(changeInfo.currentRevisionNumber);
+    change.setPatchSetRevision(changeInfo.currentRevision);
     change.setTopic(changeInfo.topic);
     return change;
   }

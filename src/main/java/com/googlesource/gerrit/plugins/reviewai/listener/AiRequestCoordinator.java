@@ -202,9 +202,13 @@ public class AiRequestCoordinator {
     ScheduledFuture<?> leaseRenewal = null;
     try {
       leaseRenewal = startLeaseRenewal(request);
-      processor.process(request);
-      if (!store.complete(request.requestId(), ownerId, null)) {
-        log.warn("AI request {} lost ownership before completion", request.requestId());
+      ProcessingOutcome outcome = processor.process(request);
+      boolean finished =
+          outcome == ProcessingOutcome.SUPERSEDED
+              ? store.supersede(request.requestId(), ownerId, "Patch set review superseded")
+              : store.complete(request.requestId(), ownerId, null);
+      if (!finished) {
+        log.warn("AI request {} lost ownership before finishing", request.requestId());
       }
     } catch (Exception e) {
       log.error("AI request {} failed", request.requestId(), e);
@@ -287,7 +291,12 @@ public class AiRequestCoordinator {
 
   @FunctionalInterface
   public interface RequestProcessor {
-    void process(AiRequest request) throws Exception;
+    ProcessingOutcome process(AiRequest request) throws Exception;
+  }
+
+  public enum ProcessingOutcome {
+    COMPLETED,
+    SUPERSEDED
   }
 
   @FunctionalInterface
