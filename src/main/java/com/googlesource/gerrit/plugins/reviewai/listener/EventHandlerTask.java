@@ -37,6 +37,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -80,6 +82,7 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   private final ReviewAiMetrics metrics;
   private final ReviewFeedbackPublisher reviewFeedbackPublisher;
+  private final Localizer localizer;
 
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
@@ -105,7 +108,8 @@ public class EventHandlerTask implements Runnable {
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       EventBuildFeatures buildFeatures,
       ReviewAiMetrics metrics,
-      ReviewFeedbackPublisher reviewFeedbackPublisher) {
+      ReviewFeedbackPublisher reviewFeedbackPublisher,
+      Localizer localizer) {
     this.changeSetData = changeSetData;
     this.change = change;
     this.reviewer = reviewer;
@@ -120,6 +124,7 @@ public class EventHandlerTask implements Runnable {
     this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
     this.metrics = metrics;
     this.reviewFeedbackPublisher = reviewFeedbackPublisher;
+    this.localizer = localizer;
     log.debug("EventHandlerTask initialized for change ID: {}", change.getFullChangeId());
   }
 
@@ -161,13 +166,24 @@ public class EventHandlerTask implements Runnable {
   }
 
   public Result executePrepared() {
+    return executePrepared(eventHandlerType::processEvent);
+  }
+
+  public Result rejectPrepared() {
+    changeSetData.setReviewSystemMessage(
+        SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer, "message.ai.request.in.progress"));
+    return executePrepared(() -> reviewer.review(change, isAdministratorUser(eventUser)));
+  }
+
+  private Result executePrepared(EventProcessor processor) {
     if (!prepared) {
       throw new IllegalStateException("Event handler task must be prepared before execution");
     }
     ReviewAiMetrics.MetricTimer reviewRunTimer = metrics.startReviewRun(change.getEventType());
     try {
       log.debug("Processing event for change ID:: {}", change.getFullChangeId());
-      eventHandlerType.processEvent();
+      processor.process();
       log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
       reviewRunTimer.complete();
     } catch (Exception e) {
@@ -336,5 +352,10 @@ public class EventHandlerTask implements Runnable {
   }
 
   public record Preparation(AiRequestIntakeDecision decision, String sourceEventId) {}
+
+  @FunctionalInterface
+  private interface EventProcessor {
+    void process() throws Exception;
+  }
 
 }
