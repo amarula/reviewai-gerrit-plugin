@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 
@@ -72,25 +73,37 @@ public class EventHandlerExecutor {
     log.debug("Executing event handler for event: {}", event);
     Injector eventInjector = createEventInjector(config, event);
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
-      requestActiveReviewSupersession(eventInjector, config, patchSetCreatedEvent);
+      long patchSetNumber =
+          new GerritChange(event)
+              .getPatchSetAttribute()
+              .map(patchSet -> (long) patchSet.number)
+              .orElse(0L);
+      requestActiveReviewSupersession(
+          eventInjector, config, patchSetCreatedEvent, patchSetNumber);
       topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
     }
-    coordinator.submitIntake(() -> intake(eventInjector, (PatchSetEvent) event));
+    coordinator.submitIntake(() -> intake(eventInjector, config, (PatchSetEvent) event));
   }
 
   private void requestActiveReviewSupersession(
-      Injector eventInjector, Configuration config, PatchSetCreatedEvent event) {
+      Injector eventInjector,
+      Configuration config,
+      PatchSetEvent event,
+      Long newerPatchSetNumber) {
     GerritChange currentChange = new GerritChange(event);
-    long patchSetNumber =
-        currentChange.getPatchSetAttribute().map(patchSet -> (long) patchSet.number).orElse(0L);
-    coordinator
-        .requestReviewSupersession(currentChange.getFullChangeId(), patchSetNumber)
+    String changeId = currentChange.getFullChangeId();
+    Optional<AiRequest> requested =
+        newerPatchSetNumber == null
+            ? coordinator.requestReviewSupersession(
+                changeId, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
+            : coordinator.requestReviewSupersession(changeId, newerPatchSetNumber);
+    requested
         .ifPresent(
             request -> {
               try {
                 eventInjector
                     .getInstance(SupersededReviewNotifier.class)
-                    .publish(config, currentChange, request, patchSetNumber);
+                    .publish(config, currentChange, request, newerPatchSetNumber);
               } catch (Exception e) {
                 log.error(
                     "Could not report early supersession of AI request {}",
@@ -100,11 +113,15 @@ public class EventHandlerExecutor {
             });
   }
 
-  private void intake(Injector eventInjector, PatchSetEvent event) {
+  private void intake(
+      Injector eventInjector, Configuration config, PatchSetEvent event) {
     EventHandlerTask task = eventInjector.getInstance(EventHandlerTask.class);
     try {
       EventHandlerTask.Preparation preparation = task.prepareForIntake(null);
       AiRequestIntakeDecision decision = preparation.decision();
+      if (decision.supersedesActiveReview()) {
+        requestActiveReviewSupersession(eventInjector, config, event, null);
+      }
       switch (decision.disposition()) {
         case IGNORE -> log.debug("Ignoring event {} after preprocessing", event.getType());
         case DIRECT -> task.executePrepared();

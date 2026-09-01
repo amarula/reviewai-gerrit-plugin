@@ -28,6 +28,7 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -37,22 +38,28 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
+import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_SELECTED_AI_MODEL;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.isDefaultSelectedAiModel;
 
+@Slf4j
 public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewMessage.Input> {
   private final ConfigCreator configCreator;
   private final GerritApi gerritApi;
   private final AiReviewPermission aiReviewPermission;
   private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
+  private final AiRequestCoordinator requestCoordinator;
+  private final SupersededReviewNotifier supersededReviewNotifier;
   private final ReviewAgentResponseService reviewAgentResponseService;
   private final ReviewAgentGerritMessageIdFinder gerritMessageIdFinder;
 
@@ -61,6 +68,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GerritApi gerritApi,
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      AiRequestCoordinator requestCoordinator,
+      SupersededReviewNotifier supersededReviewNotifier,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
       AiAdministratorAccess aiAdministratorAccess,
@@ -70,6 +79,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         gerritApi,
         aiReviewPermission,
         pluginDataHandlerBaseProvider,
+        requestCoordinator,
+        supersededReviewNotifier,
         repositoryManager,
         pluginDataPath,
         null,
@@ -84,6 +95,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       GerritApi gerritApi,
       AiReviewPermission aiReviewPermission,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
+      AiRequestCoordinator requestCoordinator,
+      SupersededReviewNotifier supersededReviewNotifier,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
@@ -94,6 +107,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
+    this.requestCoordinator = requestCoordinator;
+    this.supersededReviewNotifier = supersededReviewNotifier;
     reviewAgentResponseService =
         new ReviewAgentResponseService(
             repositoryManager,
@@ -122,6 +137,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     ReviewAgentRequestStatusStore statusStore = getStatusStore(resource);
     aiReviewPermission.checkCanAiReview(resource);
     storeSelectedModel(resource, input, config);
+    supersedeActiveReviewForDirectStateChange(resource, config, reviewAgent, message);
     Optional<Output> directResponse =
         reviewAgentResponseService.getDirectResponse(resource, config, input, message);
     if (directResponse.isPresent()) {
@@ -224,6 +240,34 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   private ReviewAgentRequestStatusStore getStatusStore(ChangeResource resource) {
     return new ReviewAgentRequestStatusStore(
         pluginDataHandlerBaseProvider.get(resource.getChange().getKey().toString()));
+  }
+
+  private void supersedeActiveReviewForDirectStateChange(
+      ChangeResource resource, Configuration config, boolean reviewAgent, String message) {
+    if (!reviewAgent
+        || !ClientCommandBase.shouldSkipGerritMessage(message)
+        || !ClientCommandBase.containsReviewInvalidatingCommand(message)) {
+      return;
+    }
+    GerritChange change =
+        new GerritChange(
+            resource.getProject(),
+            resource.getChange().getDest(),
+            resource.getChange().getKey());
+    requestCoordinator
+        .requestReviewSupersession(
+            change.getFullChangeId(), AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
+        .ifPresent(
+            request -> {
+              try {
+                supersededReviewNotifier.publish(config, change, request, null);
+              } catch (Exception e) {
+                log.error(
+                    "Could not report early supersession of AI request {}",
+                    request.requestId(),
+                    e);
+              }
+            });
   }
 
   private String getRequestId(Input input) {

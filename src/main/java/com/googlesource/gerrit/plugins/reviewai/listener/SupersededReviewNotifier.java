@@ -31,23 +31,20 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 
 @Singleton
-class SupersededReviewNotifier {
-  private final Localizer localizer;
-
+public class SupersededReviewNotifier {
   @Inject
-  SupersededReviewNotifier(Localizer localizer) {
-    this.localizer = localizer;
-  }
+  public SupersededReviewNotifier() {}
 
-  void publish(
+  public void publish(
       Configuration config,
       GerritChange currentChange,
       AiRequest supersededRequest,
-      long newerPatchSetNumber)
+      Long newerPatchSetNumber)
       throws Exception {
+    Localizer localizer = new Localizer(config);
     Integer olderPatchSetNumber = supersededPatchSetNumber(supersededRequest);
     String message =
-        olderPatchSetNumber == null
+        olderPatchSetNumber == null || newerPatchSetNumber == null
             ? SystemMessageFormatter.getLocalizedWarningMessage(
                 localizer, "message.review.superseded")
             : SystemMessageFormatter.getLocalizedWarningMessage(
