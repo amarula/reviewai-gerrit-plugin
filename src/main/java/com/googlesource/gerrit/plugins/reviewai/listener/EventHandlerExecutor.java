@@ -108,8 +108,14 @@ public class EventHandlerExecutor {
             descriptor.toJson());
     AiRequestStore.Admission admission =
         coordinator.admit(submission, ignored -> requireSuccessful(task.executePrepared()));
-    if (admission.duplicate() || admission.request().state() == AiRequest.State.REJECTED) {
+    if (admission.duplicate()) {
       task.discardPrepared();
+    } else if (admission.request().state() == AiRequest.State.REJECTED) {
+      if (preparation.sourceEventId() == null) {
+        task.discardPrepared();
+      } else {
+        requireSuccessful(task.rejectPrepared());
+      }
     }
     log.debug(
         "AI request {} admitted with state {}",

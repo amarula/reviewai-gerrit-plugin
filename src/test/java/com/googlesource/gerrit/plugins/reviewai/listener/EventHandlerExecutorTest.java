@@ -101,7 +101,57 @@ public class EventHandlerExecutorTest {
     verify(topicCoordinator).recordEvent(event);
   }
 
+  @Test
+  public void respondsToRejectedUserReviewWithoutExecutingAiRequest() {
+    Injector injector = mock(Injector.class);
+    Injector childInjector = mock(Injector.class);
+    AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
+    EventHandlerTask task = mock(EventHandlerTask.class);
+    when(injector.createChildInjector(any(com.google.inject.Module.class)))
+        .thenReturn(childInjector);
+    when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
+    when(task.prepareForIntake(null))
+        .thenReturn(
+            new EventHandlerTask.Preparation(
+                AiRequestIntakeDecision.persistent(
+                    AiRequest.Kind.REVIEW,
+                    AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED),
+                "change-message-id"));
+    when(task.rejectPrepared()).thenReturn(EventHandlerTask.Result.OK);
+    doAnswer(
+            invocation -> {
+              invocation.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(coordinator)
+        .submitIntake(any());
+    when(coordinator.admit(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              AiRequestSubmission submission = invocation.getArgument(0);
+              return new AiRequestStore.Admission(
+                  request(submission, AiRequest.State.REJECTED), false);
+            });
+    EventHandlerExecutor executor =
+        new EventHandlerExecutor(
+            injector,
+            coordinator,
+            mock(ConfigCreator.class),
+            mock(TopicPatchSetReviewCoordinator.class),
+            mock(AiAdministratorAccess.class),
+            mock(ClientCommandExtension.class));
+
+    executor.execute(mock(Configuration.class), patchSetCreatedEvent());
+
+    verify(task).rejectPrepared();
+  }
+
   private static AiRequest queued(AiRequestSubmission submission) {
+    return request(submission, AiRequest.State.QUEUED);
+  }
+
+  private static AiRequest request(
+      AiRequestSubmission submission, AiRequest.State state) {
     return new AiRequest(
         1,
         submission.requestId(),
@@ -109,7 +159,7 @@ public class EventHandlerExecutorTest {
         submission.sourceEventId(),
         submission.kind(),
         submission.admissionPolicy(),
-        AiRequest.State.QUEUED,
+        state,
         submission.payloadJson(),
         null,
         null,
