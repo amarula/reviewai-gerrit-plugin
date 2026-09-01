@@ -32,6 +32,7 @@ import com.google.gerrit.extensions.client.ChangeKind;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
+import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Injector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
@@ -44,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAcces
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class EventHandlerExecutorTest {
   @Test
@@ -146,6 +148,49 @@ public class EventHandlerExecutorTest {
     verify(task).rejectPrepared();
   }
 
+  @Test
+  public void marksExactPendingStatusFailedWhenExpiredRequestIsRecovered()
+      throws Exception {
+    Injector injector = mock(Injector.class);
+    Injector childInjector = mock(Injector.class);
+    AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
+    ConfigCreator configCreator = mock(ConfigCreator.class);
+    Configuration config = mock(Configuration.class);
+    EventHandlerTask task = mock(EventHandlerTask.class);
+    when(injector.createChildInjector(any(com.google.inject.Module.class)))
+        .thenReturn(childInjector);
+    when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
+    when(configCreator.createConfig(any(), any())).thenReturn(config);
+    EventHandlerExecutor executor =
+        new EventHandlerExecutor(
+            injector,
+            coordinator,
+            configCreator,
+            mock(TopicPatchSetReviewCoordinator.class),
+            mock(AiAdministratorAccess.class),
+            mock(ClientCommandExtension.class));
+    String sourceEventId = "change-message-id";
+    AiRequestDescriptor descriptor =
+        AiRequestDescriptor.from(commentAddedEvent(), sourceEventId);
+    AiRequestSubmission submission =
+        new AiRequestSubmission(
+            "request-id",
+            "project~main~I0123456789abcdef",
+            sourceEventId,
+            AiRequest.Kind.MESSAGE,
+            AiRequest.AdmissionPolicy.QUEUE,
+            descriptor.toJson());
+    ArgumentCaptor<AiRequestCoordinator.RecoveryProcessor> recovery =
+        ArgumentCaptor.forClass(AiRequestCoordinator.RecoveryProcessor.class);
+
+    executor.start();
+    verify(coordinator)
+        .start(any(AiRequestCoordinator.RequestProcessor.class), recovery.capture());
+    recovery.getValue().recover(request(submission, AiRequest.State.ABANDONED));
+
+    verify(task).failPendingRequest(sourceEventId);
+  }
+
   private static AiRequest queued(AiRequestSubmission submission) {
     return request(submission, AiRequest.State.QUEUED);
   }
@@ -184,6 +229,25 @@ public class EventHandlerExecutorTest {
     event.change = Suppliers.ofInstance(changeAttribute(project, branch));
     event.patchSet = Suppliers.ofInstance(patchSetAttribute());
     event.uploader = Suppliers.ofInstance(account());
+    return event;
+  }
+
+  private static CommentAddedEvent commentAddedEvent() {
+    Project.NameKey project = Project.nameKey("project");
+    BranchNameKey branch = BranchNameKey.create(project, "refs/heads/main");
+    Change change =
+        new Change(
+            Change.key("I0123456789abcdef"),
+            Change.id(42),
+            Account.id(1001),
+            branch,
+            Instant.ofEpochSecond(1_725_000_000L));
+    CommentAddedEvent event = new CommentAddedEvent(change);
+    event.eventCreatedOn = 1_725_000_000L;
+    event.instanceId = "gerrit-instance";
+    event.change = Suppliers.ofInstance(changeAttribute(project, branch));
+    event.patchSet = Suppliers.ofInstance(patchSetAttribute());
+    event.author = Suppliers.ofInstance(account());
     return event;
   }
 

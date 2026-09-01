@@ -60,7 +60,7 @@ public class EventHandlerExecutor {
   }
 
   public void start() {
-    coordinator.start(this::processPersistedRequest);
+    coordinator.start(this::processPersistedRequest, this::recoverAbandonedRequest);
   }
 
   public void stop() {
@@ -133,6 +133,14 @@ public class EventHandlerExecutor {
         configCreator.createConfig(
             Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
     requireSuccessful(createTask(config, event).execute(descriptor.sourceEventId()));
+  }
+
+  private void recoverAbandonedRequest(AiRequest request) throws Exception {
+    AiRequestDescriptor descriptor = AiRequestDescriptor.fromJson(request.payloadJson());
+    Configuration config =
+        configCreator.createConfig(
+            Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
+    createTask(config, descriptor.toEvent()).failPendingRequest(descriptor.sourceEventId());
   }
 
   private EventHandlerTask createTask(Configuration config, Event event) {

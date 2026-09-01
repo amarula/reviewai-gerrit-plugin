@@ -169,4 +169,36 @@ public class PluginDataTest extends TestBase {
     assertEquals(
         "message-1", statusStore.getPendingRequestId(initialRequestId).orElseThrow());
   }
+
+  @Test
+  public void testReviewAgentEventResolvesItsExactConcurrentRequest() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(provider.getChangeScope());
+    statusStore.pending("request-1", "/message first");
+    statusStore.pending("request-2", "/message second");
+    statusStore.move("request-1", "message-1");
+    statusStore.move("request-2", "message-2");
+
+    assertEquals(
+        "message-1",
+        statusStore.getPendingRequestIdForEvent("message-1").orElseThrow());
+    assertTrue(statusStore.getPendingRequestIdForEvent("unknown-message").isEmpty());
+  }
+
+  @Test
+  public void testReviewAgentEventFallsBackWhenOnlyOneRequestIsPending() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(provider.getChangeScope());
+    statusStore.pending("provisional-request", "/message pending");
+
+    assertEquals(
+        "provisional-request",
+        statusStore
+            .getPendingRequestIdForEvent("unresolved-message")
+            .orElseThrow());
+  }
 }

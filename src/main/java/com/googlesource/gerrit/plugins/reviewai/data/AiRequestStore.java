@@ -164,6 +164,11 @@ public class AiRequestStore {
   }
 
   public int abandonExpired(long expiredBeforeMillis, String failureText) {
+    return abandonExpiredRequests(expiredBeforeMillis, failureText).size();
+  }
+
+  public List<AiRequest> abandonExpiredRequests(
+      long expiredBeforeMillis, String failureText) {
     List<String> expiredRequestIds = new ArrayList<>();
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
@@ -185,10 +190,10 @@ public class AiRequestStore {
       throw new RuntimeException("Failed to list expired AI requests", e);
     }
 
-    int abandoned = 0;
+    List<AiRequest> abandoned = new ArrayList<>();
     for (String requestId : expiredRequestIds) {
       if (abandon(requestId, expiredBeforeMillis, failureText)) {
-        abandoned++;
+        get(requestId).ifPresent(abandoned::add);
       }
     }
     return abandoned;
