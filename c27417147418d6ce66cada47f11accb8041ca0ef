@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "124c14fa_20fef86a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-09-01T14:05:01Z",
+      "side": 1,
+      "message": "@michael@amarulasolutions.com I cannot reproduce the reported issue with voting enabled. When dismissing a concern produces Code-Review +1, the existing shouldSuppressSystemMessage() logic already prevents the “No update” message whenever the vote is new or changed.\n\nThe added test passes reviewScore \u003d null, so it covers the voting-disabled/comment-event path rather than the reported Code-Review +1 flow.\n\nPlease provide a voting-enabled reproducer and test—likely with both the existing and resulting vote set to +1—or drop this change if that scenario is not reachable.\n\nMoreover, with voting disabled (`enabledVoting\u003dfalse`), this change can result in no response at all when there are no concerns. That may mislead users into thinking the plugin failed to process the request.",
+      "revId": "c27417147418d6ce66cada47f11accb8041ca0ef",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
