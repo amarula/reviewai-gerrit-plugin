@@ -45,6 +45,10 @@ public final class AiRequestIntakeClassifier {
         || Boolean.TRUE.equals(changeSetData.getForcedReview())) {
       return rejectedWhenOccupied(AiRequest.Kind.REVIEW);
     }
+    if (ClientCommandBase.REVIEW_INVALIDATING_COMMANDS.stream()
+        .anyMatch(changeSetData::hasParsedCommand)) {
+      return AiRequestIntakeDecision.direct(true);
+    }
     if (hasDirectCommand(changeSetData) || !changeSetData.shouldRequestAiReview()) {
       return AiRequestIntakeDecision.direct();
     }

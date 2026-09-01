@@ -73,18 +73,28 @@ public class AiRequestIntakeClassifierTest {
   }
 
   @Test
-  public void handlesMutationsWithoutEnteringQueue() {
+  public void invalidatesActiveReviewForConversationMutations() {
     for (CommandSet command :
-        new CommandSet[] {
-          CommandSet.FORGET_THREAD, CommandSet.CONFIGURE, CommandSet.DIRECTIVES
-        }) {
+        new CommandSet[] {CommandSet.FORGET_THREAD, CommandSet.CONFIGURE}) {
       ChangeSetData data = changeSetData();
       addCommand(data, command);
 
-      assertEquals(
-          AiRequestIntakeDecision.Disposition.DIRECT,
-          AiRequestIntakeClassifier.comment(true, false, data).disposition());
+      AiRequestIntakeDecision decision =
+          AiRequestIntakeClassifier.comment(true, false, data);
+      assertEquals(AiRequestIntakeDecision.Disposition.DIRECT, decision.disposition());
+      assertEquals(true, decision.supersedesActiveReview());
     }
+  }
+
+  @Test
+  public void handlesOtherMutationsWithoutInvalidatingReview() {
+    ChangeSetData data = changeSetData();
+    addCommand(data, CommandSet.DIRECTIVES);
+
+    AiRequestIntakeDecision decision =
+        AiRequestIntakeClassifier.comment(true, false, data);
+    assertEquals(AiRequestIntakeDecision.Disposition.DIRECT, decision.disposition());
+    assertEquals(false, decision.supersedesActiveReview());
   }
 
   @Test

@@ -41,11 +41,15 @@ import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
+import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
 import com.google.gerrit.json.OutputFormat;
 import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
 import org.junit.Before;
@@ -62,6 +66,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
 import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
@@ -89,6 +94,8 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private PermissionBackend permissionBackend;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
+  @Mock private AiRequestCoordinator requestCoordinator;
+  @Mock private SupersededReviewNotifier supersededReviewNotifier;
   @Mock private GitRepositoryManager repositoryManager;
   @Mock private Changes changes;
   @Mock private ChangeApi changeApi;
@@ -132,6 +139,8 @@ public class AiReviewMessageTest extends TestBase {
             gerritApi,
             aiReviewPermission,
             pluginDataHandlerBaseProvider,
+            requestCoordinator,
+            supersededReviewNotifier,
             repositoryManager,
             mockPluginDataPath,
             null,
@@ -477,6 +486,11 @@ public class AiReviewMessageTest extends TestBase {
   public void reviewAgentConfigureCommandForAdminReturnsDirectResponseWithoutPostingGerritMessage()
       throws Exception {
     grantAdministratorPrivileges();
+    AiRequest supersededRequest = org.mockito.Mockito.mock(AiRequest.class);
+    String changeId = new GerritChange(PROJECT_NAME, BRANCH_NAME, CHANGE_ID).getFullChangeId();
+    when(requestCoordinator.requestReviewSupersession(
+            changeId, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON))
+        .thenReturn(Optional.of(supersededRequest));
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
     AiReviewMessage.Input input = new AiReviewMessage.Input();
@@ -490,6 +504,12 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
     assertTrue(output.responseText.contains("ReviewAI Message: Dynamic configuration modified"));
+    verify(requestCoordinator)
+        .requestReviewSupersession(
+            eq(changeId),
+            eq(AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON));
+    verify(supersededReviewNotifier)
+        .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
     verify(revisionApi, never()).review(any());
   }
 

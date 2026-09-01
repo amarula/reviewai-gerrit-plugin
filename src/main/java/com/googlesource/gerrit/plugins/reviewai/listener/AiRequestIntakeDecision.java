@@ -22,18 +22,24 @@ import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 public record AiRequestIntakeDecision(
     Disposition disposition,
     AiRequest.Kind kind,
-    AiRequest.AdmissionPolicy admissionPolicy) {
+    AiRequest.AdmissionPolicy admissionPolicy,
+    boolean supersedesActiveReview) {
   public static AiRequestIntakeDecision ignored() {
-    return new AiRequestIntakeDecision(Disposition.IGNORE, null, null);
+    return new AiRequestIntakeDecision(Disposition.IGNORE, null, null, false);
   }
 
   public static AiRequestIntakeDecision direct() {
-    return new AiRequestIntakeDecision(Disposition.DIRECT, null, null);
+    return direct(false);
+  }
+
+  public static AiRequestIntakeDecision direct(boolean supersedesActiveReview) {
+    return new AiRequestIntakeDecision(
+        Disposition.DIRECT, null, null, supersedesActiveReview);
   }
 
   public static AiRequestIntakeDecision persistent(
       AiRequest.Kind kind, AiRequest.AdmissionPolicy admissionPolicy) {
-    return new AiRequestIntakeDecision(Disposition.PERSIST, kind, admissionPolicy);
+    return new AiRequestIntakeDecision(Disposition.PERSIST, kind, admissionPolicy, false);
   }
 
   public enum Disposition {

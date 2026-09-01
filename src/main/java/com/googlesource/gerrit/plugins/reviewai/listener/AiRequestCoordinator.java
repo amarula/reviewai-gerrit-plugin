@@ -41,6 +41,8 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 @Slf4j
 public class AiRequestCoordinator {
+  public static final String STATE_CHANGE_SUPERSESSION_REASON =
+      "Superseded by a conversation reset command";
   private static final int DEFAULT_EXECUTOR_POOL_SIZE = 2;
   private static final long DEFAULT_LEASE_MILLIS = TimeUnit.MINUTES.toMillis(15);
   private static final long DEFAULT_RECOVERY_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(1);
@@ -149,7 +151,11 @@ public class AiRequestCoordinator {
 
   public Optional<AiRequest> requestReviewSupersession(
       String changeId, long newerPatchSetNumber) {
-    String reason = "Superseded by patch set " + newerPatchSetNumber;
+    return requestReviewSupersession(
+        changeId, "Superseded by patch set " + newerPatchSetNumber);
+  }
+
+  public Optional<AiRequest> requestReviewSupersession(String changeId, String reason) {
     Optional<AiRequest> requested = store.requestSupersession(changeId, reason);
     requested.ifPresent(
         request -> {

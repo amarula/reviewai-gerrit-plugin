@@ -151,6 +151,54 @@ public class EventHandlerExecutorTest {
   }
 
   @Test
+  public void supersedesRunningReviewBeforeConversationResetCommand() throws Exception {
+    Injector injector = mock(Injector.class);
+    Injector childInjector = mock(Injector.class);
+    AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
+    EventHandlerTask task = mock(EventHandlerTask.class);
+    SupersededReviewNotifier notifier = mock(SupersededReviewNotifier.class);
+    AiRequest supersededRequest = mock(AiRequest.class);
+    Configuration config = mock(Configuration.class);
+    CommentAddedEvent event = commentAddedEvent();
+    String changeId = new GerritChange(event).getFullChangeId();
+    when(supersededRequest.requestId()).thenReturn("review-1");
+    when(injector.createChildInjector(any(com.google.inject.Module.class)))
+        .thenReturn(childInjector);
+    when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
+    when(childInjector.getInstance(SupersededReviewNotifier.class)).thenReturn(notifier);
+    when(task.prepareForIntake(null))
+        .thenReturn(
+            new EventHandlerTask.Preparation(
+                AiRequestIntakeDecision.direct(true), "change-message-id"));
+    when(task.executePrepared()).thenReturn(EventHandlerTask.Result.OK);
+    when(coordinator.requestReviewSupersession(
+            changeId, "Superseded by a conversation reset command"))
+        .thenReturn(Optional.of(supersededRequest));
+    doAnswer(
+            invocation -> {
+              invocation.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(coordinator)
+        .submitIntake(any());
+    EventHandlerExecutor executor =
+        new EventHandlerExecutor(
+            injector,
+            coordinator,
+            mock(ConfigCreator.class),
+            mock(TopicPatchSetReviewCoordinator.class),
+            mock(AiAdministratorAccess.class),
+            mock(ClientCommandExtension.class));
+
+    executor.execute(config, event);
+
+    verify(notifier)
+        .publish(
+            eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
+    verify(task).executePrepared();
+  }
+
+  @Test
   public void respondsToRejectedUserReviewWithoutExecutingAiRequest() {
     Injector injector = mock(Injector.class);
     Injector childInjector = mock(Injector.class);

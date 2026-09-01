@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableBiMap;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -80,6 +81,8 @@ public abstract class ClientCommandBase extends ClientBase {
           CommandSet.FORGET_THREAD,
           CommandSet.CONFIGURE,
           CommandSet.DIRECTIVES);
+  public static final Set<CommandSet> REVIEW_INVALIDATING_COMMANDS =
+      Set.of(CommandSet.FORGET_THREAD, CommandSet.CONFIGURE);
   public static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
       Set.of(CommandSet.REVIEW, CommandSet.SUGGEST, CommandSet.CONFIGURE, CommandSet.SHOW);
 
@@ -116,5 +119,19 @@ public abstract class ClientCommandBase extends ClientBase {
 
   public static boolean shouldSkipGerritMessage(String message) {
     return message != null && GERRIT_MESSAGE_SKIPPED_COMMAND_PATTERN.matcher(message).matches();
+  }
+
+  public static boolean containsReviewInvalidatingCommand(String message) {
+    if (message == null) {
+      return false;
+    }
+    Matcher commandMatcher = COMMAND_PATTERN.matcher(message);
+    while (commandMatcher.find()) {
+      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
+      if (REVIEW_INVALIDATING_COMMANDS.contains(command)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
