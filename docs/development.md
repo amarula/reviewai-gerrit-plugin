@@ -108,6 +108,9 @@ plugin when running on a Gerrit instance. These tools can be managed through bot
 modifying `gerrit.config` and `project.config`) and dynamic configurations (using the `/configure` command in a message
 addressed to the AI user).
 
+For durable request states, queue-lane invariants, lease recovery, and expected cancellation behavior, see
+[AI Request Coordination](architecture/request-coordination.md).
+
 ### Using the Review Debug Command
 
 Users in the ReviewAI Administrator group can obtain additional useful debug information in each AI reply, such as

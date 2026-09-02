@@ -4,8 +4,10 @@ ReviewAI separates the review of known concerns from the discovery of new issues
 durable review guidance. This document describes those workflows, the agent-specialization levels, the concern
 lifecycle, and the persistence rules that connect reviews of successive Patch Sets.
 
-For configuration values, see [Configuration](configuration.md). For commands such as `/review` and
-`/forget_thread`, see the [Command Reference](commands.md).
+For durable event intake, per-Change request serialization, and cancellation, see
+[AI Request Coordination](request-coordination.md). For configuration values, see
+[Configuration](../configuration.md). For commands such as `/review` and `/forget_thread`, see the
+[Command Reference](../commands.md).
 
 ## Core Concepts
 
