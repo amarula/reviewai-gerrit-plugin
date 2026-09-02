@@ -31,17 +31,13 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -91,11 +87,10 @@ public class EventHandlerTask implements Runnable {
   private SupportedEvents processing_event_type;
   private IEventHandlerType eventHandlerType;
   private CurrentUser eventUser;
-  private ReviewAgentEventRequestStatusUpdater.PendingRequest pendingRequest;
   private String sourceEventId;
   private boolean preparationAttempted;
-  private boolean prepared;
   private boolean commentAddressed;
+  private boolean administratorUser;
 
   @Inject
   EventHandlerTask(
@@ -145,88 +140,42 @@ public class EventHandlerTask implements Runnable {
   }
 
   public Result execute(String requestedSourceEventId) {
-    Preparation preparation = prepareForIntake(requestedSourceEventId);
-    return preparation.decision().disposition() == AiRequestIntakeDecision.Disposition.IGNORE
-        ? Result.NOT_SUPPORTED
-        : executePrepared();
+    PreparedEventHandlerTask preparedTask = prepareForIntake(requestedSourceEventId);
+    if (preparedTask.decision().disposition()
+        == AiRequestIntakeDecision.Disposition.IGNORE) {
+      preparedTask.discard();
+      return Result.NOT_SUPPORTED;
+    }
+    return preparedTask.execute();
   }
 
-  public Preparation prepareForIntake(String requestedSourceEventId) {
+  PreparedEventHandlerTask prepareForIntake(String requestedSourceEventId) {
     if (preparationAttempted) {
       throw new IllegalStateException("Event handler task is already prepared");
     }
     preparationAttempted = true;
     log.debug("Starting event processing for change ID: {}", change.getFullChangeId());
     sourceEventId = requestedSourceEventId;
-    if (!preProcessEvent()) {
-      pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest(sourceEventId);
+    boolean preprocessed = preProcessEvent();
+    ReviewAgentEventRequestStatusUpdater.PendingRequest pendingRequest =
+        reviewAgentRequestStatusUpdater.getPendingRequest(sourceEventId);
+    AiRequestIntakeDecision decision =
+        preprocessed ? classify() : AiRequestIntakeDecision.ignored();
+    if (!preprocessed) {
       log.debug(
           "Preprocessing event not supported or failed for event type: {}", change.getEventType());
-      pendingRequest.completeNoUpdate();
-      return new Preparation(AiRequestIntakeDecision.ignored(), sourceEventId);
     }
-    pendingRequest = reviewAgentRequestStatusUpdater.getPendingRequest(sourceEventId);
-    prepared = true;
-    return new Preparation(classify(), sourceEventId);
-  }
-
-  public Result executePrepared() {
-    return executePrepared(eventHandlerType::processEvent);
-  }
-
-  public Result rejectPrepared() {
-    changeSetData.setReviewSystemMessage(
-        SystemMessageFormatter.getLocalizedWarningMessage(
-            localizer, "message.ai.request.in.progress"));
-    return executePrepared(() -> reviewer.review(change, isAdministratorUser(eventUser)));
-  }
-
-  public void failPendingRequest(String requestedSourceEventId) {
-    reviewAgentRequestStatusUpdater
-        .getPendingRequest(requestedSourceEventId)
-        .fail(
-            SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer, "message.ai.request.interrupted"));
-  }
-
-  private Result executePrepared(EventProcessor processor) {
-    if (!prepared) {
-      throw new IllegalStateException("Event handler task must be prepared before execution");
-    }
-    ReviewAiMetrics.MetricTimer reviewRunTimer = metrics.startReviewRun(change.getEventType());
-    AiRequestCancellation cancellation = AiRequestCancellation.current();
-    changeSetData.setAiRequestCancellation(cancellation);
-    try (AiRequestCancellation.Work ignored = cancellation.beginWork()) {
-      cancellation.throwIfSupersessionRequested();
-      log.debug("Processing event for change ID:: {}", change.getFullChangeId());
-      processor.process();
-      log.debug("Finished processing event for change ID: {}", change.getFullChangeId());
-      reviewRunTimer.complete();
-    } catch (StalePatchSetException | AiRequestSupersededException e) {
-      reviewRunTimer.complete();
-      log.info(
-          "Skipping superseded patch set review for {}: {}",
-          change.getFullChangeId(),
-          e.getMessage());
-      pendingRequest.completeNoUpdate();
-      return Result.SUPERSEDED;
-    } catch (Exception e) {
-      reviewRunTimer.fail();
-      log.error("Error while processing event for change ID: {}", change.getFullChangeId(), e);
-      pendingRequest.fail(e.getMessage());
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      return Result.FAILURE;
-    }
-    pendingRequest.completeReview();
-    return Result.OK;
-  }
-
-  public void discardPrepared() {
-    if (pendingRequest != null) {
-      pendingRequest.completeNoUpdate();
-    }
+    return new PreparedEventHandlerTask(
+        decision,
+        sourceEventId,
+        eventHandlerType,
+        change,
+        changeSetData,
+        reviewer,
+        administratorUser,
+        pendingRequest,
+        metrics,
+        localizer);
   }
 
   private boolean preProcessEvent() {
@@ -292,7 +241,7 @@ public class EventHandlerTask implements Runnable {
   }
 
   private IEventHandlerType getEventHandlerType() {
-    boolean administratorUser = isAdministratorUser(eventUser);
+    administratorUser = isAdministratorUser(eventUser);
     return switch (processing_event_type) {
       case PATCH_SET_CREATED ->
           new EventHandlerTypePatchSetReview(
@@ -372,13 +321,6 @@ public class EventHandlerTask implements Runnable {
       log.debug("Failed to retrieve event account for change {}", change.getFullChangeId(), e);
       return Optional.empty();
     }
-  }
-
-  public record Preparation(AiRequestIntakeDecision decision, String sourceEventId) {}
-
-  @FunctionalInterface
-  private interface EventProcessor {
-    void process() throws Exception;
   }
 
 }

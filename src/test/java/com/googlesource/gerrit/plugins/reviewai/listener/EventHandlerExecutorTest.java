@@ -43,6 +43,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.time.Instant;
 import java.util.Optional;
@@ -59,17 +60,17 @@ public class EventHandlerExecutorTest {
     TopicPatchSetReviewCoordinator topicCoordinator =
         mock(TopicPatchSetReviewCoordinator.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
+    PreparedEventHandlerTask preparedTask = mock(PreparedEventHandlerTask.class);
     AtomicReference<AiRequestSubmission> admitted = new AtomicReference<>();
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
     when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
-    when(task.prepareForIntake(null))
+    when(task.prepareForIntake(null)).thenReturn(preparedTask);
+    when(preparedTask.decision())
         .thenReturn(
-            new EventHandlerTask.Preparation(
-                AiRequestIntakeDecision.persistent(
-                    AiRequest.Kind.REVIEW,
-                    AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED),
-                null));
+            AiRequestIntakeDecision.persistent(
+                AiRequest.Kind.REVIEW,
+                AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
     doAnswer(
             invocation -> {
               invocation.<Runnable>getArgument(0).run();
@@ -161,6 +162,7 @@ public class EventHandlerExecutorTest {
     Injector childInjector = mock(Injector.class);
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
+    PreparedEventHandlerTask preparedTask = mock(PreparedEventHandlerTask.class);
     SupersededReviewNotifier notifier = mock(SupersededReviewNotifier.class);
     ReviewAgentEventRequestStatusUpdater statusUpdater =
         mock(ReviewAgentEventRequestStatusUpdater.class);
@@ -175,11 +177,10 @@ public class EventHandlerExecutorTest {
     when(childInjector.getInstance(SupersededReviewNotifier.class)).thenReturn(notifier);
     when(childInjector.getInstance(ReviewAgentEventRequestStatusUpdater.class))
         .thenReturn(statusUpdater);
-    when(task.prepareForIntake(null))
-        .thenReturn(
-            new EventHandlerTask.Preparation(
-                AiRequestIntakeDecision.direct(true), "change-message-id"));
-    when(task.executePrepared()).thenReturn(EventHandlerTask.Result.OK);
+    when(task.prepareForIntake(null)).thenReturn(preparedTask);
+    when(preparedTask.decision()).thenReturn(AiRequestIntakeDecision.direct(true));
+    when(preparedTask.sourceEventId()).thenReturn("change-message-id");
+    when(preparedTask.execute()).thenReturn(EventHandlerTask.Result.OK);
     when(coordinator.requestReviewSupersession(
             changeId, "Superseded by a conversation reset command"))
         .thenReturn(Optional.of(supersededRequest));
@@ -205,7 +206,7 @@ public class EventHandlerExecutorTest {
         .publish(
             eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
     verify(statusUpdater).completeSupersededRequest(supersededRequest, null);
-    verify(task).executePrepared();
+    verify(preparedTask).execute();
   }
 
   @Test
@@ -214,17 +215,18 @@ public class EventHandlerExecutorTest {
     Injector childInjector = mock(Injector.class);
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
+    PreparedEventHandlerTask preparedTask = mock(PreparedEventHandlerTask.class);
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
     when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
-    when(task.prepareForIntake(null))
+    when(task.prepareForIntake(null)).thenReturn(preparedTask);
+    when(preparedTask.decision())
         .thenReturn(
-            new EventHandlerTask.Preparation(
-                AiRequestIntakeDecision.persistent(
-                    AiRequest.Kind.REVIEW,
-                    AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED),
-                "change-message-id"));
-    when(task.rejectPrepared()).thenReturn(EventHandlerTask.Result.OK);
+            AiRequestIntakeDecision.persistent(
+                AiRequest.Kind.REVIEW,
+                AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
+    when(preparedTask.sourceEventId()).thenReturn("change-message-id");
+    when(preparedTask.reject()).thenReturn(EventHandlerTask.Result.OK);
     doAnswer(
             invocation -> {
               invocation.<Runnable>getArgument(0).run();
@@ -250,7 +252,7 @@ public class EventHandlerExecutorTest {
 
     executor.execute(mock(Configuration.class), patchSetCreatedEvent());
 
-    verify(task).rejectPrepared();
+    verify(preparedTask).reject();
   }
 
   @Test
@@ -262,9 +264,19 @@ public class EventHandlerExecutorTest {
     ConfigCreator configCreator = mock(ConfigCreator.class);
     Configuration config = mock(Configuration.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
+    Localizer localizer = mock(Localizer.class);
+    ReviewAgentEventRequestStatusUpdater statusUpdater =
+        mock(ReviewAgentEventRequestStatusUpdater.class);
+    ReviewAgentEventRequestStatusUpdater.PendingRequest pendingRequest =
+        mock(ReviewAgentEventRequestStatusUpdater.PendingRequest.class);
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
     when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
+    when(childInjector.getInstance(Localizer.class)).thenReturn(localizer);
+    when(childInjector.getInstance(ReviewAgentEventRequestStatusUpdater.class))
+        .thenReturn(statusUpdater);
+    when(statusUpdater.getPendingRequest("change-message-id")).thenReturn(pendingRequest);
+    when(localizer.getText(any())).thenReturn("Interrupted");
     when(configCreator.createConfig(any(), any())).thenReturn(config);
     EventHandlerExecutor executor =
         new EventHandlerExecutor(
@@ -293,7 +305,7 @@ public class EventHandlerExecutorTest {
         .start(any(AiRequestCoordinator.RequestProcessor.class), recovery.capture());
     recovery.getValue().recover(request(submission, AiRequest.State.ABANDONED));
 
-    verify(task).failPendingRequest(sourceEventId);
+    verify(pendingRequest).fail(any());
   }
 
   private static AiRequest queued(AiRequestSubmission submission) {
