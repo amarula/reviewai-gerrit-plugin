@@ -30,11 +30,20 @@ public class CommentData {
   private List<GerritComment> addressedComments;
   private HashMap<String, GerritComment> commentMap;
   private HashMap<String, GerritComment> patchSetCommentMap;
+  private String sourceChangeMessageId;
+
+  public CommentData(
+      List<GerritComment> commentProperties,
+      List<GerritComment> addressedComments,
+      HashMap<String, GerritComment> commentMap,
+      HashMap<String, GerritComment> patchSetCommentMap) {
+    this(commentProperties, addressedComments, commentMap, patchSetCommentMap, null);
+  }
 
   public CommentData(
       List<GerritComment> commentProperties,
       HashMap<String, GerritComment> commentMap,
       HashMap<String, GerritComment> patchSetCommentMap) {
-    this(commentProperties, commentProperties, commentMap, patchSetCommentMap);
+    this(commentProperties, commentProperties, commentMap, patchSetCommentMap, null);
   }
 }

@@ -77,7 +77,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       return PreprocessResult.SWITCH_TO_PATCH_SET_CREATED;
     }
     boolean commentsRetrieved =
-        gerritClient.retrieveLastComments(change, administratorUser);
+        gerritClient.retrieveComments(change, administratorUser);
     enqueueAddressedComments();
     if (!commentsRetrieved) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());

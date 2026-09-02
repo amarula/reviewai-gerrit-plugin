@@ -59,8 +59,13 @@ public class GerritClient {
     return gerritClientFacade.isWorkInProgress(change);
   }
 
-  public boolean retrieveLastComments(GerritChange change, boolean administratorUser) {
-    return gerritClientFacade.retrieveLastComments(change, administratorUser);
+  public boolean retrieveComments(GerritChange change, boolean administratorUser) {
+    return gerritClientFacade.retrieveComments(change, administratorUser);
+  }
+
+  public boolean retrieveComments(
+      GerritChange change, boolean administratorUser, String changeMessageId) {
+    return gerritClientFacade.retrieveComments(change, administratorUser, changeMessageId);
   }
 
   public void retrievePatchSetInfo(GerritChange change) {
