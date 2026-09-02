@@ -84,7 +84,7 @@ The sidebar allows users to select the AI provider and model used for the review
 When a Patch Set is submitted, ReviewAI can automatically review the change and publish findings. In this example, the
 review produces a `Code-Review -1` recommendation.
 
-See [Review Agent Architecture](docs/agent-architecture.md) for the agent-specialization levels and the concern
+See [Review Agent Architecture](docs/architecture/review-agents.md) for the agent-specialization levels and the concern
 lifecycle across successive Patch Sets.
 
 See [CI Integration](docs/ci-integration.md) to defer reviews until Jenkins, SonarQube, or another CI system has
@@ -143,7 +143,8 @@ See the [Command Reference](docs/commands.md) for every command, option, scope, 
 
 ## Documentation
 
-- [Review Agent Architecture](docs/agent-architecture.md)
+- [Review Agent Architecture](docs/architecture/review-agents.md)
+- [AI Request Coordination](docs/architecture/request-coordination.md)
 - [Configuration](docs/configuration.md)
 - [Command Reference](docs/commands.md)
 - [Development and Debugging](docs/development.md)
