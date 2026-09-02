@@ -253,6 +253,35 @@ public class AiRequestCoordinatorTest extends TestBase {
     assertTrue(oldReviewStopped.get());
   }
 
+  @Test
+  public void cancelsRunningReviewWithLifecycleReason() throws Exception {
+    CountDownLatch reviewStarted = new CountDownLatch(1);
+    CountDownLatch finishInFlightQuery = new CountDownLatch(1);
+    AtomicBoolean reviewStopped = new AtomicBoolean();
+    coordinator.admit(
+        review("review-1", "patch-set-1"),
+        request -> {
+          AiRequestCancellation cancellation = AiRequestCancellation.current();
+          try (AiRequestCancellation.Work ignored = cancellation.beginWork()) {
+            reviewStarted.countDown();
+            finishInFlightQuery.await();
+            cancellation.throwIfSupersessionRequested();
+            return ProcessingOutcome.COMPLETED;
+          } finally {
+            reviewStopped.set(true);
+          }
+        });
+    assertTrue(reviewStarted.await(5, TimeUnit.SECONDS));
+
+    AiRequest cancelled =
+        coordinator.cancelRunningReview(CHANGE_ID, "Change merged").orElseThrow();
+    finishInFlightQuery.countDown();
+
+    assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, cancelled.state());
+    awaitState("review-1", AiRequest.State.SUPERSEDED);
+    assertTrue(reviewStopped.get());
+  }
+
   private AiRequestSubmission review(String requestId, String sourceEventId) {
     return new AiRequestSubmission(
         requestId,
