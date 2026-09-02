@@ -86,6 +86,7 @@ public class AiRequestStore {
         }
         Optional<AiRequest> next = findFirstQueued(connection, changeId);
         if (next.isEmpty()) {
+          deleteIdleLane(connection, changeId);
           connection.commit();
           return Optional.empty();
         }
@@ -286,6 +287,29 @@ public class AiRequestStore {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to list AI requests for " + changeId, e);
+    }
+  }
+
+  /** Removes all persisted AI request state for a Change. */
+  public void deleteByChange(String changeId) {
+    requireNonBlank(changeId, "changeId");
+    try (Connection connection = db.getConnection()) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement deleteRequests =
+              connection.prepareStatement("DELETE FROM ai_requests WHERE change_id = ?");
+          PreparedStatement deleteLane =
+              connection.prepareStatement("DELETE FROM ai_request_lanes WHERE change_id = ?")) {
+        deleteRequests.setString(1, changeId);
+        deleteRequests.executeUpdate();
+        deleteLane.setString(1, changeId);
+        deleteLane.executeUpdate();
+        connection.commit();
+      } catch (SQLException | RuntimeException e) {
+        rollback(connection, e);
+        throw e;
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to delete AI requests for " + changeId, e);
     }
   }
 
@@ -588,6 +612,15 @@ public class AiRequestStore {
       if (statement.executeUpdate() != 1) {
         throw new IllegalStateException("AI request does not own its Change lane: " + requestId);
       }
+    }
+  }
+
+  private void deleteIdleLane(Connection connection, String changeId) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "DELETE FROM ai_request_lanes WHERE change_id = ? AND active_request_id IS NULL")) {
+      statement.setString(1, changeId);
+      statement.executeUpdate();
     }
   }
 

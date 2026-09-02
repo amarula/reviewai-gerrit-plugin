@@ -22,6 +22,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -203,12 +206,40 @@ public class AiRequestStoreTest extends TestBase {
     assertTrue(store.listQueuedChangeIds(10).isEmpty());
   }
 
+  @Test
+  public void deletesAllRequestsAndLaneForChange() throws Exception {
+    store.admit(message("request-1", "event-1"));
+    store.admit(message("request-2", "event-2"));
+    store.admit(message("request-3", "other-event", "other-change"));
+    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isPresent());
+
+    store.deleteByChange(CHANGE_ID);
+    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+
+    assertTrue(store.listByChange(CHANGE_ID).isEmpty());
+    assertFalse(store.hasQueuedRequest(CHANGE_ID));
+    assertEquals(0, laneCount(CHANGE_ID));
+    assertEquals(1, store.listByChange("other-change").size());
+  }
+
   private AiRequestStore.Admission admitAfterSignal(
       AiRequestSubmission submission, CountDownLatch ready, CountDownLatch start)
       throws InterruptedException {
     ready.countDown();
     start.await();
     return store.admit(submission);
+  }
+
+  private int laneCount(String changeId) throws Exception {
+    try (Connection connection = getTestReviewAiDb().getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement("SELECT COUNT(*) FROM ai_request_lanes WHERE change_id = ?")) {
+      statement.setString(1, changeId);
+      try (ResultSet results = statement.executeQuery()) {
+        results.next();
+        return results.getInt(1);
+      }
+    }
   }
 
   private AiRequestSubmission message(String requestId, String sourceEventId) {
