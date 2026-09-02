@@ -102,6 +102,16 @@ public class EventHandlerExecutor {
             request -> {
               try {
                 eventInjector
+                    .getInstance(ReviewAgentEventRequestStatusUpdater.class)
+                    .completeSupersededRequest(request, newerPatchSetNumber);
+              } catch (Exception e) {
+                log.error(
+                    "Could not complete sidebar request status for superseded AI request {}",
+                    request.requestId(),
+                    e);
+              }
+              try {
+                eventInjector
                     .getInstance(SupersededReviewNotifier.class)
                     .publish(config, currentChange, request, newerPatchSetNumber);
               } catch (Exception e) {

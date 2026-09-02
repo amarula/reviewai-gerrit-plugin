@@ -110,6 +110,8 @@ public class EventHandlerExecutorTest {
   public void reportsRunningReviewSupersessionBeforePatchSetIntake() throws Exception {
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
     SupersededReviewNotifier notifier = mock(SupersededReviewNotifier.class);
+    ReviewAgentEventRequestStatusUpdater statusUpdater =
+        mock(ReviewAgentEventRequestStatusUpdater.class);
     Injector injector = mock(Injector.class);
     Injector childInjector = mock(Injector.class);
     Configuration config = mock(Configuration.class);
@@ -134,6 +136,8 @@ public class EventHandlerExecutorTest {
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
     when(childInjector.getInstance(SupersededReviewNotifier.class)).thenReturn(notifier);
+    when(childInjector.getInstance(ReviewAgentEventRequestStatusUpdater.class))
+        .thenReturn(statusUpdater);
     EventHandlerExecutor executor =
         new EventHandlerExecutor(
             injector,
@@ -147,6 +151,7 @@ public class EventHandlerExecutorTest {
 
     verify(notifier)
         .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq(3L));
+    verify(statusUpdater).completeSupersededRequest(supersededRequest, 3L);
     verify(coordinator).submitIntake(any());
   }
 
@@ -157,6 +162,8 @@ public class EventHandlerExecutorTest {
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
     SupersededReviewNotifier notifier = mock(SupersededReviewNotifier.class);
+    ReviewAgentEventRequestStatusUpdater statusUpdater =
+        mock(ReviewAgentEventRequestStatusUpdater.class);
     AiRequest supersededRequest = mock(AiRequest.class);
     Configuration config = mock(Configuration.class);
     CommentAddedEvent event = commentAddedEvent();
@@ -166,6 +173,8 @@ public class EventHandlerExecutorTest {
         .thenReturn(childInjector);
     when(childInjector.getInstance(EventHandlerTask.class)).thenReturn(task);
     when(childInjector.getInstance(SupersededReviewNotifier.class)).thenReturn(notifier);
+    when(childInjector.getInstance(ReviewAgentEventRequestStatusUpdater.class))
+        .thenReturn(statusUpdater);
     when(task.prepareForIntake(null))
         .thenReturn(
             new EventHandlerTask.Preparation(
@@ -195,6 +204,7 @@ public class EventHandlerExecutorTest {
     verify(notifier)
         .publish(
             eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
+    verify(statusUpdater).completeSupersededRequest(supersededRequest, null);
     verify(task).executePrepared();
   }
 

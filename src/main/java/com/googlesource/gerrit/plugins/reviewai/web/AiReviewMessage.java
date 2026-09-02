@@ -40,6 +40,8 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusSto
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
 import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -137,7 +139,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     ReviewAgentRequestStatusStore statusStore = getStatusStore(resource);
     aiReviewPermission.checkCanAiReview(resource);
     storeSelectedModel(resource, input, config);
-    supersedeActiveReviewForDirectStateChange(resource, config, reviewAgent, message);
+    supersedeActiveReviewForDirectStateChange(resource, config, statusStore, reviewAgent, message);
     Optional<Output> directResponse =
         reviewAgentResponseService.getDirectResponse(resource, config, input, message);
     if (directResponse.isPresent()) {
@@ -243,7 +245,11 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   }
 
   private void supersedeActiveReviewForDirectStateChange(
-      ChangeResource resource, Configuration config, boolean reviewAgent, String message) {
+      ChangeResource resource,
+      Configuration config,
+      ReviewAgentRequestStatusStore statusStore,
+      boolean reviewAgent,
+      String message) {
     if (!reviewAgent
         || !ClientCommandBase.shouldSkipGerritMessage(message)
         || !ClientCommandBase.containsReviewInvalidatingCommand(message)) {
@@ -259,6 +265,17 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             change.getFullChangeId(), AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
         .ifPresent(
             request -> {
+              try {
+                statusStore.completedForEvent(
+                    request.sourceEventId(),
+                    SystemMessageFormatter.getLocalizedWarningMessage(
+                        new Localizer(config), "message.review.superseded"));
+              } catch (Exception e) {
+                log.error(
+                    "Could not complete sidebar request status for superseded AI request {}",
+                    request.requestId(),
+                    e);
+              }
               try {
                 supersededReviewNotifier.publish(config, change, request, null);
               } catch (Exception e) {

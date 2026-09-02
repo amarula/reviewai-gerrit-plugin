@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -70,6 +71,12 @@ class ReviewAgentEventRequestStatusUpdater {
             ? statusStore.getLatestPendingRequestId()
             : statusStore.getPendingRequestIdForEvent(sourceEventId);
     return new PendingRequest(statusStore, requestId, localizer, changeSetData);
+  }
+
+  void completeSupersededRequest(AiRequest request, Long newerPatchSetNumber) {
+    String message =
+        SupersededReviewNotifier.getMessage(localizer, request, newerPatchSetNumber);
+    statusStore.completedForEvent(request.sourceEventId(), message);
   }
 
   static class PendingRequest {
