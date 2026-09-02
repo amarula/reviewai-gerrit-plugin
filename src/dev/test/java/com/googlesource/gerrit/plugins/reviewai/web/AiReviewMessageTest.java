@@ -48,6 +48,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
 import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
 import com.google.gerrit.json.OutputFormat;
@@ -66,6 +67,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
@@ -77,6 +79,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -487,6 +490,22 @@ public class AiReviewMessageTest extends TestBase {
       throws Exception {
     grantAdministratorPrivileges();
     AiRequest supersededRequest = org.mockito.Mockito.mock(AiRequest.class);
+    when(supersededRequest.sourceEventId()).thenReturn("message-1");
+    Map<String, ReviewAgentRequestStatusStore.RequestStatus> statuses = new HashMap<>();
+    statuses.put(
+        "message-1",
+        new ReviewAgentRequestStatusStore.RequestStatus(
+            "message-1", ReviewAgentRequestStatusStore.STATUS_PENDING, "/review", null));
+    when(pluginDataHandler.getJsonValue(eq("reviewAgentRequestStatuses"), any()))
+        .thenAnswer(invocation -> new HashMap<>(statuses));
+    doAnswer(
+            invocation -> {
+              statuses.clear();
+              statuses.putAll(invocation.getArgument(1));
+              return null;
+            })
+        .when(pluginDataHandler)
+        .setJsonValue(eq("reviewAgentRequestStatuses"), any());
     String changeId = new GerritChange(PROJECT_NAME, BRANCH_NAME, CHANGE_ID).getFullChangeId();
     when(requestCoordinator.requestReviewSupersession(
             changeId, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON))
@@ -510,6 +529,9 @@ public class AiReviewMessageTest extends TestBase {
             eq(AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON));
     verify(supersededReviewNotifier)
         .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
+    ReviewAgentRequestStatusStore.RequestStatus status = statuses.get("message-1");
+    assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    assertTrue(status.responseText.contains("active AI review was superseded"));
     verify(revisionApi, never()).review(any());
   }
 

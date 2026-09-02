@@ -201,4 +201,40 @@ public class PluginDataTest extends TestBase {
             .getPendingRequestIdForEvent("unresolved-message")
             .orElseThrow());
   }
+
+  @Test
+  public void testReviewAgentSupersessionCompletesMatchingSidebarRequest() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(provider.getChangeScope());
+    statusStore.pending("request-1", "/review");
+    statusStore.pending("request-2", "/review");
+    statusStore.move("request-1", "message-1");
+    statusStore.move("request-2", "message-2");
+
+    statusStore.completedForEvent("message-1", "ReviewAI **WARNING**: Review superseded.");
+
+    ReviewAgentRequestStatusStore.RequestStatus superseded = statusStore.get("message-1");
+    assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, superseded.status);
+    assertEquals("ReviewAI **WARNING**: Review superseded.", superseded.responseText);
+    assertEquals(ReviewAgentRequestStatusStore.STATUS_PENDING, statusStore.get("message-2").status);
+  }
+
+  @Test
+  public void testReviewAgentSupersessionFallsBackToLatestPendingReview() {
+    PluginDataHandlerProvider provider =
+        new PluginDataHandlerProvider(mockPluginDataPath, getGerritChange(), getTestReviewAiDb());
+    ReviewAgentRequestStatusStore statusStore =
+        new ReviewAgentRequestStatusStore(provider.getChangeScope());
+    statusStore.pending("message-request", "/message What changed?");
+    statusStore.pending("review-request", "/review");
+
+    statusStore.completedForEvent("unavailable-message-id", "ReviewAI **WARNING**: Review superseded.");
+
+    assertEquals(
+        ReviewAgentRequestStatusStore.STATUS_PENDING, statusStore.get("message-request").status);
+    assertEquals(
+        ReviewAgentRequestStatusStore.STATUS_COMPLETED, statusStore.get("review-request").status);
+  }
 }

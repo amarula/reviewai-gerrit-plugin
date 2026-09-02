@@ -53,6 +53,16 @@ public class ReviewAgentRequestStatusStore {
     update(requestId, STATUS_FAILED, responseText);
   }
 
+  /** Completes the pending sidebar request associated with a Gerrit event. */
+  public synchronized void completedForEvent(String sourceEventId, String responseText) {
+    Map<String, RequestStatus> statuses = getStatuses();
+    Optional<String> requestId = getPendingRequestIdForEvent(statuses, sourceEventId);
+    if (requestId.isEmpty()) {
+      requestId = getLatestPendingReviewRequestId(statuses);
+    }
+    requestId.ifPresent(id -> completed(id, responseText));
+  }
+
   public synchronized void move(String oldRequestId, String newRequestId) {
     if (oldRequestId == null
         || oldRequestId.isBlank()
@@ -97,7 +107,11 @@ public class ReviewAgentRequestStatusStore {
   }
 
   public synchronized Optional<String> getPendingRequestIdForEvent(String sourceEventId) {
-    Map<String, RequestStatus> statuses = getStatuses();
+    return getPendingRequestIdForEvent(getStatuses(), sourceEventId);
+  }
+
+  private Optional<String> getPendingRequestIdForEvent(
+      Map<String, RequestStatus> statuses, String sourceEventId) {
     Optional<String> preferred = getPreferredPendingRequestId(statuses, sourceEventId);
     if (preferred.isPresent()) {
       return preferred;
@@ -108,6 +122,14 @@ public class ReviewAgentRequestStatusStore {
             .map(status -> status.requestId)
             .toList();
     return pendingIds.size() == 1 ? Optional.of(pendingIds.getFirst()) : Optional.empty();
+  }
+
+  private Optional<String> getLatestPendingReviewRequestId(Map<String, RequestStatus> statuses) {
+    return statuses.values().stream()
+        .filter(status -> STATUS_PENDING.equals(status.status))
+        .filter(status -> status.prompt != null && status.prompt.trim().startsWith("/review"))
+        .max((left, right) -> Long.compare(left.updatedMillis, right.updatedMillis))
+        .map(status -> status.requestId);
   }
 
   private Optional<String> getPreferredPendingRequestId(

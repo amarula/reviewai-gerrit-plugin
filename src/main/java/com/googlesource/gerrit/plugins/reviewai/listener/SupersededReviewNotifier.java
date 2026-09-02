@@ -42,16 +42,7 @@ public class SupersededReviewNotifier {
       Long newerPatchSetNumber)
       throws Exception {
     Localizer localizer = new Localizer(config);
-    Integer olderPatchSetNumber = supersededPatchSetNumber(supersededRequest);
-    String message =
-        olderPatchSetNumber == null || newerPatchSetNumber == null
-            ? SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer, "message.review.superseded")
-            : SystemMessageFormatter.getLocalizedWarningMessage(
-                localizer,
-                "message.review.patchset.superseded",
-                olderPatchSetNumber,
-                newerPatchSetNumber);
+    String message = getMessage(localizer, supersededRequest, newerPatchSetNumber);
     ReviewInput reviewInput = ReviewInput.create();
     reviewInput.message(message);
     reviewInput.notify = NotifyHandling.NONE;
@@ -61,6 +52,18 @@ public class SupersededReviewNotifier {
         throw new GerritReviewException(result.error);
       }
     }
+  }
+
+  static String getMessage(
+      Localizer localizer, AiRequest supersededRequest, Long newerPatchSetNumber) {
+    Integer olderPatchSetNumber = supersededPatchSetNumber(supersededRequest);
+    return olderPatchSetNumber == null || newerPatchSetNumber == null
+        ? SystemMessageFormatter.getLocalizedWarningMessage(localizer, "message.review.superseded")
+        : SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer,
+            "message.review.patchset.superseded",
+            olderPatchSetNumber,
+            newerPatchSetNumber);
   }
 
   private static Integer supersededPatchSetNumber(AiRequest request) {
