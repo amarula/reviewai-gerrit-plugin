@@ -151,11 +151,16 @@ public class AiRequestCoordinator {
 
   public Optional<AiRequest> requestReviewSupersession(
       String changeId, long newerPatchSetNumber) {
-    return requestReviewSupersession(
+    return cancelRunningReview(
         changeId, "Superseded by patch set " + newerPatchSetNumber);
   }
 
   public Optional<AiRequest> requestReviewSupersession(String changeId, String reason) {
+    return cancelRunningReview(changeId, reason);
+  }
+
+  /** Requests cancellation of the active AI review for a Change. */
+  public Optional<AiRequest> cancelRunningReview(String changeId, String reason) {
     Optional<AiRequest> requested = store.requestSupersession(changeId, reason);
     requested.ifPresent(
         request -> {

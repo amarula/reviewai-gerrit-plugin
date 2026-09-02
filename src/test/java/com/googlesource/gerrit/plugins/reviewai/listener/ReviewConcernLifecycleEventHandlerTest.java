@@ -42,6 +42,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
   @Mock private ReviewConcernPublisher reviewConcernPublisher;
+  @Mock private AiRequestCoordinator aiRequestCoordinator;
   @Mock private Change change;
 
   private ReviewConcernLifecycleEventHandler handler;
@@ -51,7 +52,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     when(change.getProject()).thenReturn(PROJECT_NAME);
     when(change.getDest()).thenReturn(BRANCH_NAME);
     when(change.getKey()).thenReturn(CHANGE_ID);
-    handler = new ReviewConcernLifecycleEventHandler(reviewConcernPublisher);
+    handler = new ReviewConcernLifecycleEventHandler(reviewConcernPublisher, aiRequestCoordinator);
   }
 
   @Test
@@ -59,6 +60,8 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     assertTrue(handler.handle(new ChangeMergedEvent(change)));
 
     assertClearedForCurrentChange();
+    verify(aiRequestCoordinator)
+        .cancelRunningReview("myProject~myBranchName~myChangeId", "Change merged");
   }
 
   @Test
@@ -66,6 +69,8 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     assertTrue(handler.handle(new ChangeAbandonedEvent(change)));
 
     assertClearedForCurrentChange();
+    verify(aiRequestCoordinator)
+        .cancelRunningReview("myProject~myBranchName~myChangeId", "Change abandoned");
   }
 
   @Test
@@ -73,6 +78,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     assertFalse(handler.handle(mock(Event.class)));
 
     verify(reviewConcernPublisher, never()).clear(any());
+    verify(aiRequestCoordinator, never()).cancelRunningReview(any(), any());
   }
 
   private void assertClearedForCurrentChange() {

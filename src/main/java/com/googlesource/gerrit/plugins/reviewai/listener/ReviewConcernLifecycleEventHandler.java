@@ -30,10 +30,13 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 public class ReviewConcernLifecycleEventHandler {
   private final ReviewConcernPublisher reviewConcernPublisher;
+  private final AiRequestCoordinator aiRequestCoordinator;
 
   @Inject
-  ReviewConcernLifecycleEventHandler(ReviewConcernPublisher reviewConcernPublisher) {
+  ReviewConcernLifecycleEventHandler(
+      ReviewConcernPublisher reviewConcernPublisher, AiRequestCoordinator aiRequestCoordinator) {
     this.reviewConcernPublisher = reviewConcernPublisher;
+    this.aiRequestCoordinator = aiRequestCoordinator;
   }
 
   /** Returns whether the event was a supported lifecycle event and was consumed. */
@@ -43,6 +46,7 @@ public class ReviewConcernLifecycleEventHandler {
     }
 
     GerritChange change = new GerritChange(event);
+    cancelActiveReview(change, event);
     log.debug(
         "Clearing review concern ledger for change {} on event {}",
         change.getFullChangeId(),
@@ -54,5 +58,15 @@ public class ReviewConcernLifecycleEventHandler {
           "Failed to clear review concern ledger for change {}", change.getFullChangeId(), e);
     }
     return true;
+  }
+
+  private void cancelActiveReview(GerritChange change, Event event) {
+    String reason =
+        event instanceof ChangeMergedEvent ? "Change merged" : "Change abandoned";
+    try {
+      aiRequestCoordinator.cancelRunningReview(change.getFullChangeId(), reason);
+    } catch (Exception e) {
+      log.error("Failed to cancel active AI review for change {}", change.getFullChangeId(), e);
+    }
   }
 }
