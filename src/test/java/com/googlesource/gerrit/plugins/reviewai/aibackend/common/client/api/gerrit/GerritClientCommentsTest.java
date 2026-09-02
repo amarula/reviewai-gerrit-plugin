@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -111,10 +112,12 @@ public class GerritClientCommentsTest {
 
   @Test
   public void addressedCommentsRemainEventLocal() {
-    assertTrue(client.retrieveLastComments(change, false));
+    assertTrue(client.retrieveComments(change, false));
 
     assertEquals(1, client.getCommentProperties().size());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
+    assertEquals(
+        "latest-review", client.getCommentData().getSourceChangeMessageId());
     assertEquals(
         "latest-reply",
         client.getCommentData().getAddressedComments().getFirst().getId());
@@ -125,10 +128,29 @@ public class GerritClientCommentsTest {
   }
 
   @Test
+  public void reloadsCommentsByExactChangeMessageId() {
+    when(change.getEventTimeStamp()).thenReturn(0L);
+
+    assertTrue(client.retrieveComments(change, false, "latest-review"));
+
+    assertEquals(
+        "latest-review", client.getCommentData().getSourceChangeMessageId());
+    assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
+  }
+
+  @Test
+  public void missingExactChangeMessageIdDoesNotSelectLatestComments() {
+    assertFalse(client.retrieveComments(change, false, "missing-message"));
+
+    assertTrue(client.getCommentProperties().isEmpty());
+    assertNull(client.getCommentData().getSourceChangeMessageId());
+  }
+
+  @Test
   public void addressedCommandIsRetainedForFeedbackClassification() {
     latestComment().message = "/review";
 
-    assertFalse(client.retrieveLastComments(change, false));
+    assertFalse(client.retrieveComments(change, false));
 
     assertTrue(client.getCommentProperties().isEmpty());
     assertEquals(
@@ -141,7 +163,7 @@ public class GerritClientCommentsTest {
     latestComment().inReplyTo = "human-parent";
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveLastComments(change, false));
+    assertFalse(client.retrieveComments(change, false));
   }
 
   @Test
@@ -149,7 +171,7 @@ public class GerritClientCommentsTest {
     latestComment().inReplyTo = null;
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveLastComments(change, false));
+    assertFalse(client.retrieveComments(change, false));
   }
 
   @Test
@@ -157,7 +179,7 @@ public class GerritClientCommentsTest {
     comments = readComments(RESOLVED_REPLY_RESOURCE);
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveLastComments(change, false));
+    assertFalse(client.retrieveComments(change, false));
   }
 
   private CommentInfo latestComment() {

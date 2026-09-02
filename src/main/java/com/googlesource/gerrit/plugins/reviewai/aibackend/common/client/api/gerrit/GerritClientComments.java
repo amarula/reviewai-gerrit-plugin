@@ -71,6 +71,7 @@ public class GerritClientComments extends GerritClientAccount {
   private GerritCommentThreadIndex commentThreadIndex;
   @Getter private List<GerritComment> commentProperties;
   private final List<GerritComment> addressedComments;
+  private String sourceChangeMessageId;
 
   @VisibleForTesting
   public GerritClientComments(
@@ -147,10 +148,20 @@ public class GerritClientComments extends GerritClientAccount {
   }
 
   public CommentData getCommentData() {
-    return new CommentData(commentProperties, addressedComments, commentMap, patchSetCommentMap);
+    return new CommentData(
+        commentProperties,
+        addressedComments,
+        commentMap,
+        patchSetCommentMap,
+        sourceChangeMessageId);
   }
 
-  public boolean retrieveLastComments(GerritChange change, boolean administratorUser) {
+  public boolean retrieveComments(GerritChange change, boolean administratorUser) {
+    return retrieveComments(change, administratorUser, null);
+  }
+
+  public boolean retrieveComments(
+      GerritChange change, boolean administratorUser, String requestedChangeMessageId) {
     clearCommentData();
     CommentAddedEvent commentAddedEvent = (CommentAddedEvent) change.getEvent();
     AccountAttribute author = commentAddedEvent.author.get();
@@ -165,7 +176,7 @@ public class GerritClientComments extends GerritClientAccount {
       log.info("Review of comments from user '{}' is disabled.", authorUsername);
       return false;
     }
-    addLastComments(change, administratorUser);
+    addComments(change, administratorUser, requestedChangeMessageId);
 
     return !commentProperties.isEmpty();
   }
@@ -173,7 +184,7 @@ public class GerritClientComments extends GerritClientAccount {
   public void retrieveAllComments(GerritChange change) {
     clearCommentData();
     try {
-      retrieveComments(change);
+      retrieveComments(change, null);
     } catch (Exception e) {
       log.error("Error while retrieving all comments for change: {}", change.getFullChangeId(), e);
     }
@@ -184,6 +195,7 @@ public class GerritClientComments extends GerritClientAccount {
     addressedComments.clear();
     commentMap.clear();
     patchSetCommentMap.clear();
+    sourceChangeMessageId = null;
     commentThreadIndex = new GerritCommentThreadIndex(List.of());
   }
 
@@ -194,7 +206,9 @@ public class GerritClientComments extends GerritClientAccount {
         .orElse(false);
   }
 
-  private List<GerritComment> retrieveComments(GerritChange change) throws Exception {
+  private List<GerritComment> retrieveComments(
+      GerritChange change, String requestedChangeMessageId)
+      throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
       Map<String, List<CommentInfo>> comments =
           config
@@ -219,7 +233,7 @@ public class GerritClientComments extends GerritClientAccount {
                               .collect(toList())))
               .collect(toList());
 
-      String latestChangeMessageId = null;
+      String eventChangeMessageId = null;
       HashMap<String, List<GerritComment>> latestComments = new HashMap<>();
       for (Map.Entry<String, List<GerritComment>> entry : lastCommentEntries) {
         String filename = entry.getKey();
@@ -238,7 +252,7 @@ public class GerritClientComments extends GerritClientAccount {
               && updatedTimeStamp
                   >= change.getEventTimeStamp() - MAX_SECS_GAP_BETWEEN_EVENT_AND_COMMENT) {
             log.debug("Found comment with updatedTimeStamp : {}", updatedTimeStamp);
-            latestChangeMessageId = changeMessageId;
+            eventChangeMessageId = changeMessageId;
           }
           latestComments
               .computeIfAbsent(changeMessageId, k -> new ArrayList<>())
@@ -251,11 +265,20 @@ public class GerritClientComments extends GerritClientAccount {
       }
 
       commentThreadIndex = new GerritCommentThreadIndex(commentMap.values());
-      return latestComments.getOrDefault(latestChangeMessageId, null);
+      String targetChangeMessageId =
+          requestedChangeMessageId == null || requestedChangeMessageId.isBlank()
+              ? eventChangeMessageId
+              : requestedChangeMessageId;
+      List<GerritComment> targetComments = latestComments.get(targetChangeMessageId);
+      if (targetComments != null) {
+        sourceChangeMessageId = targetChangeMessageId;
+      }
+      return targetComments;
     }
   }
 
-  private void addLastComments(GerritChange change, boolean administratorUser) {
+  private void addComments(
+      GerritChange change, boolean administratorUser, String requestedChangeMessageId) {
     log.debug("Adding last comments for change: {}", change.getFullChangeId());
     ClientMessageParser messageParser =
         new ClientMessageParser(
@@ -272,7 +295,8 @@ public class GerritClientComments extends GerritClientAccount {
             reviewFeedbackPublisher,
             commandExtension);
     try {
-      List<GerritComment> latestComments = retrieveComments(change);
+      List<GerritComment> latestComments =
+          retrieveComments(change, requestedChangeMessageId);
       if (latestComments == null) {
         return;
       }

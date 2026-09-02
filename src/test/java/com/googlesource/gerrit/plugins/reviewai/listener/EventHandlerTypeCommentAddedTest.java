@@ -95,7 +95,7 @@ public class EventHandlerTypeCommentAddedTest {
 
     verify(changeSetData).setForcedReview(true);
     verify(changeSetData).setDeferredReview(true);
-    verify(gerritClient, never()).retrieveLastComments(change, false);
+    verify(gerritClient, never()).retrieveComments(change, false);
   }
 
   @Test
@@ -133,7 +133,7 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void doesNotReevaluateExpressionForPlainComment() {
-    when(gerritClient.retrieveLastComments(change, false)).thenReturn(true);
+    when(gerritClient.retrieveComments(change, false)).thenReturn(true);
 
     assertEquals(PreprocessResult.OK, handler.preprocessEvent());
 
