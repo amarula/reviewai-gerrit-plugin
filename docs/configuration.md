@@ -276,7 +276,9 @@ directive = End each reply with \"Hope this helps!\"
     - **NONE**: Does not expose repository context tools. Reviews and interactions rely on the formatted patch and
       Gerrit discussion history only.
 - `aiMaxConcurrentRequests`: Maximum number of concurrent requests sent to AI models across review workflows. The
-  default value is `0`, which means unlimited.
+  default value is `0`, which means unlimited. See
+  [AI Request Coordination](architecture/request-coordination.md#concurrency-boundaries) for the distinction between
+  model-request concurrency and durable request execution.
 - `aiMaxMemoryTokens`: Maximum number of tokens retained in LangChain memory per Change, Patch Set, and review scope.
   The default value is 16K.
 - `aiMaxToolResponseRounds`: Maximum number of tool-response continuation rounds allowed for one AI review request.
@@ -304,8 +306,8 @@ directive = End each reply with \"Hope this helps!\"
       When SPECIALIZED_AGENTS is selected, the Sashiko prompts override custom prompts, including those set through
       `aiRelevanceRules`, `aiSystemPromptInstructions`, `ai-instructions.md`, and prompts imported from Gerrit.
 
-  See [Review Agent Architecture](agent-architecture.md) for the execution flow at each level, the concern lifecycle,
-  and the differences between initial and subsequent reviews.
+  See [Review Agent Architecture](architecture/review-agents.md) for the execution flow at each level, the concern
+  lifecycle, and the differences between initial and subsequent reviews.
 
 **NOTE**: Enabling these features may send multiple AI requests for a single review, which might increase AI API usage
 costs.
