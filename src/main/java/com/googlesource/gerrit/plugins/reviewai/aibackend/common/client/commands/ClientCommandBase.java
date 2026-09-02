@@ -73,6 +73,13 @@ public abstract class ClientCommandBase extends ClientBase {
       COMMAND_MAP.inverse();
   public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
       Set.of(CommandSet.HELP, CommandSet.DIRECTIVES, CommandSet.CONFIGURE, CommandSet.SHOW);
+  public static final Set<CommandSet> DIRECT_COMMANDS =
+      Set.of(
+          CommandSet.HELP,
+          CommandSet.SHOW,
+          CommandSet.FORGET_THREAD,
+          CommandSet.CONFIGURE,
+          CommandSet.DIRECTIVES);
   public static final Set<CommandSet> DYNAMIC_CONFIG_MESSAGE_COMMANDS =
       Set.of(CommandSet.REVIEW, CommandSet.SUGGEST, CommandSet.CONFIGURE, CommandSet.SHOW);
 
