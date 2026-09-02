@@ -31,6 +31,7 @@ import com.google.gerrit.server.events.ChangeMergedEvent;
 import com.google.gerrit.server.events.Event;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +44,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
   @Mock private ReviewConcernPublisher reviewConcernPublisher;
   @Mock private AiRequestCoordinator aiRequestCoordinator;
+  @Mock private AiRequestStore aiRequestStore;
   @Mock private Change change;
 
   private ReviewConcernLifecycleEventHandler handler;
@@ -52,7 +54,9 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     when(change.getProject()).thenReturn(PROJECT_NAME);
     when(change.getDest()).thenReturn(BRANCH_NAME);
     when(change.getKey()).thenReturn(CHANGE_ID);
-    handler = new ReviewConcernLifecycleEventHandler(reviewConcernPublisher, aiRequestCoordinator);
+    handler =
+        new ReviewConcernLifecycleEventHandler(
+            reviewConcernPublisher, aiRequestCoordinator, aiRequestStore);
   }
 
   @Test
@@ -62,6 +66,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     assertClearedForCurrentChange();
     verify(aiRequestCoordinator)
         .cancelRunningReview("myProject~myBranchName~myChangeId", "Change merged");
+    verify(aiRequestStore).deleteByChange("myProject~myBranchName~myChangeId");
   }
 
   @Test
@@ -71,6 +76,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
     assertClearedForCurrentChange();
     verify(aiRequestCoordinator)
         .cancelRunningReview("myProject~myBranchName~myChangeId", "Change abandoned");
+    verify(aiRequestStore).deleteByChange("myProject~myBranchName~myChangeId");
   }
 
   @Test
@@ -79,6 +85,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
 
     verify(reviewConcernPublisher, never()).clear(any());
     verify(aiRequestCoordinator, never()).cancelRunningReview(any(), any());
+    verify(aiRequestStore, never()).deleteByChange(any());
   }
 
   private void assertClearedForCurrentChange() {

@@ -22,6 +22,7 @@ import com.google.gerrit.server.events.Event;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,12 +32,16 @@ import lombok.extern.slf4j.Slf4j;
 public class ReviewConcernLifecycleEventHandler {
   private final ReviewConcernPublisher reviewConcernPublisher;
   private final AiRequestCoordinator aiRequestCoordinator;
+  private final AiRequestStore aiRequestStore;
 
   @Inject
   ReviewConcernLifecycleEventHandler(
-      ReviewConcernPublisher reviewConcernPublisher, AiRequestCoordinator aiRequestCoordinator) {
+      ReviewConcernPublisher reviewConcernPublisher,
+      AiRequestCoordinator aiRequestCoordinator,
+      AiRequestStore aiRequestStore) {
     this.reviewConcernPublisher = reviewConcernPublisher;
     this.aiRequestCoordinator = aiRequestCoordinator;
+    this.aiRequestStore = aiRequestStore;
   }
 
   /** Returns whether the event was a supported lifecycle event and was consumed. */
@@ -47,6 +52,7 @@ public class ReviewConcernLifecycleEventHandler {
 
     GerritChange change = new GerritChange(event);
     cancelActiveReview(change, event);
+    deleteAiRequests(change);
     log.debug(
         "Clearing review concern ledger for change {} on event {}",
         change.getFullChangeId(),
@@ -67,6 +73,14 @@ public class ReviewConcernLifecycleEventHandler {
       aiRequestCoordinator.cancelRunningReview(change.getFullChangeId(), reason);
     } catch (Exception e) {
       log.error("Failed to cancel active AI review for change {}", change.getFullChangeId(), e);
+    }
+  }
+
+  private void deleteAiRequests(GerritChange change) {
+    try {
+      aiRequestStore.deleteByChange(change.getFullChangeId());
+    } catch (Exception e) {
+      log.error("Failed to delete AI requests for change {}", change.getFullChangeId(), e);
     }
   }
 }
