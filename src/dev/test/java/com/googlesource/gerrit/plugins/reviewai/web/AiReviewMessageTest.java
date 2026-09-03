@@ -43,6 +43,7 @@ import com.google.gerrit.server.permissions.PermissionBackend;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -149,7 +150,8 @@ public class AiReviewMessageTest extends TestBase {
             null,
             getTestReviewAiDb(),
             new DevAiAdministratorAccess(groupCache, permissionBackend),
-            new DevClientCommandExtension());
+            new DevClientCommandExtension(),
+            "gerrit-instance");
   }
 
   private void grantAdministratorPrivileges() throws Exception {
@@ -506,9 +508,9 @@ public class AiReviewMessageTest extends TestBase {
             })
         .when(pluginDataHandler)
         .setJsonValue(eq("reviewAgentRequestStatuses"), any());
-    String changeId = new GerritChange(PROJECT_NAME, BRANCH_NAME, CHANGE_ID).getFullChangeId();
+    GerritChangeRef change = new GerritChangeRef("gerrit-instance", 1);
     when(requestCoordinator.requestReviewSupersession(
-            changeId, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON))
+            change, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON))
         .thenReturn(Optional.of(supersededRequest));
     new PluginDataHandler(realChangeDataPath, getTestReviewAiDb())
         .setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
@@ -525,7 +527,7 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.responseText.contains("ReviewAI Message: Dynamic configuration modified"));
     verify(requestCoordinator)
         .requestReviewSupersession(
-            eq(changeId),
+            eq(change),
             eq(AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON));
     verify(supersededReviewNotifier)
         .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));

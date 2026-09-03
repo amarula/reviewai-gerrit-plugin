@@ -23,6 +23,7 @@ import com.google.gerrit.server.git.WorkQueue;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
@@ -54,8 +55,8 @@ public class AiRequestCoordinator {
   private final long recoveryIntervalMillis;
   private final String ownerId = UUID.randomUUID().toString();
   private final Map<String, RequestProcessor> preparedProcessors = new ConcurrentHashMap<>();
-  private final Map<String, ActiveRequest> activeRequests = new ConcurrentHashMap<>();
-  private final Set<String> scheduledChanges = ConcurrentHashMap.newKeySet();
+  private final Map<GerritChangeRef, ActiveRequest> activeRequests = new ConcurrentHashMap<>();
+  private final Set<GerritChangeRef> scheduledChanges = ConcurrentHashMap.newKeySet();
 
   private volatile RequestProcessor persistedProcessor;
   private volatile RecoveryProcessor recoveryProcessor;
@@ -140,7 +141,7 @@ public class AiRequestCoordinator {
     }
     if (request.state() == AiRequest.State.QUEUED) {
       try {
-        schedule(request.changeId());
+        schedule(request.change());
       } catch (RuntimeException e) {
         preparedProcessors.remove(submission.requestId());
         throw e;
@@ -150,21 +151,21 @@ public class AiRequestCoordinator {
   }
 
   public Optional<AiRequest> requestReviewSupersession(
-      String changeId, long newerPatchSetNumber) {
+      GerritChangeRef change, long newerPatchSetNumber) {
     return cancelRunningReview(
-        changeId, "Superseded by patch set " + newerPatchSetNumber);
+        change, "Superseded by patch set " + newerPatchSetNumber);
   }
 
-  public Optional<AiRequest> requestReviewSupersession(String changeId, String reason) {
-    return cancelRunningReview(changeId, reason);
+  public Optional<AiRequest> requestReviewSupersession(GerritChangeRef change, String reason) {
+    return cancelRunningReview(change, reason);
   }
 
   /** Requests cancellation of the active AI review for a Change. */
-  public Optional<AiRequest> cancelRunningReview(String changeId, String reason) {
-    Optional<AiRequest> requested = store.requestSupersession(changeId, reason);
+  public Optional<AiRequest> cancelRunningReview(GerritChangeRef change, String reason) {
+    Optional<AiRequest> requested = store.requestSupersession(change, reason);
     requested.ifPresent(
         request -> {
-          ActiveRequest active = activeRequests.get(changeId);
+          ActiveRequest active = activeRequests.get(change);
           if (active != null && active.requestId().equals(request.requestId())) {
             active.cancellation().requestSupersession(reason);
           }
@@ -187,24 +188,24 @@ public class AiRequestCoordinator {
     scheduledChanges.clear();
   }
 
-  private void schedule(String changeId) {
-    if (!scheduledChanges.add(changeId)) {
+  private void schedule(GerritChangeRef change) {
+    if (!scheduledChanges.add(change)) {
       return;
     }
     try {
-      requestExecutor.execute(() -> drain(changeId));
+      requestExecutor.execute(() -> drain(change));
     } catch (RuntimeException e) {
-      scheduledChanges.remove(changeId);
+      scheduledChanges.remove(change);
       throw e;
     }
   }
 
-  private void drain(String changeId) {
+  private void drain(GerritChangeRef change) {
     try {
       while (!stopping) {
         AiRequest request =
             store
-                .claimNext(changeId, ownerId, leaseExpiration())
+                .claimNext(change, ownerId, leaseExpiration())
                 .orElse(null);
         if (request == null) {
           return;
@@ -212,9 +213,9 @@ public class AiRequestCoordinator {
         process(request);
       }
     } finally {
-      scheduledChanges.remove(changeId);
-      if (!stopping && store.hasQueuedRequest(changeId)) {
-        schedule(changeId);
+      scheduledChanges.remove(change);
+      if (!stopping && store.hasQueuedRequest(change)) {
+        schedule(change);
       }
     }
   }
@@ -231,7 +232,7 @@ public class AiRequestCoordinator {
     AiRequestCancellation cancellation =
         new AiRequestCancellation(() -> store.isSupersessionRequested(request.requestId()));
     ActiveRequest active = new ActiveRequest(request.requestId(), cancellation);
-    ActiveRequest existing = activeRequests.putIfAbsent(request.changeId(), active);
+    ActiveRequest existing = activeRequests.putIfAbsent(request.change(), active);
     if (existing != null) {
       store.fail(request.requestId(), ownerId, "Change already has an active AI request");
       return;
@@ -272,7 +273,7 @@ public class AiRequestCoordinator {
       if (leaseRenewal != null) {
         leaseRenewal.cancel(false);
       }
-      activeRequests.remove(request.changeId(), active);
+      activeRequests.remove(request.change(), active);
     }
   }
 
@@ -316,7 +317,7 @@ public class AiRequestCoordinator {
         interrupted.forEach(this::notifyRecovery);
       }
     }
-    store.listQueuedChangeIds(Integer.MAX_VALUE).forEach(this::schedule);
+    store.listQueuedChanges(Integer.MAX_VALUE).forEach(this::schedule);
   }
 
   private void notifyRecovery(AiRequest request) {

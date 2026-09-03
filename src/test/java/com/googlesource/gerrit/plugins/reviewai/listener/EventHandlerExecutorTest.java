@@ -38,6 +38,7 @@ import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Injector;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
@@ -104,6 +105,7 @@ public class EventHandlerExecutorTest {
     assertEquals(
         AiRequestDescriptor.EventType.PATCH_SET_CREATED,
         AiRequestDescriptor.fromJson(admitted.get().payloadJson()).eventType());
+    assertEquals(new GerritChangeRef("gerrit-instance", 42), admitted.get().change());
     verify(topicCoordinator).recordEvent(event);
   }
 
@@ -121,7 +123,7 @@ public class EventHandlerExecutorTest {
         new AiRequest(
             1,
             "review-2",
-            new GerritChange(event).getFullChangeId(),
+            AiRequestDescriptor.from(event, "patch-set-2").changeRef(),
             "patch-set-2",
             AiRequest.Kind.REVIEW,
             AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
@@ -132,7 +134,7 @@ public class EventHandlerExecutorTest {
             "Superseded by patch set 3",
             1,
             1);
-    when(coordinator.requestReviewSupersession(supersededRequest.changeId(), 3))
+    when(coordinator.requestReviewSupersession(supersededRequest.change(), 3))
         .thenReturn(Optional.of(supersededRequest));
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
@@ -169,7 +171,7 @@ public class EventHandlerExecutorTest {
     AiRequest supersededRequest = mock(AiRequest.class);
     Configuration config = mock(Configuration.class);
     CommentAddedEvent event = commentAddedEvent();
-    String changeId = new GerritChange(event).getFullChangeId();
+    GerritChangeRef change = AiRequestDescriptor.from(event, "change-message-id").changeRef();
     when(supersededRequest.requestId()).thenReturn("review-1");
     when(injector.createChildInjector(any(com.google.inject.Module.class)))
         .thenReturn(childInjector);
@@ -182,7 +184,7 @@ public class EventHandlerExecutorTest {
     when(preparedTask.sourceEventId()).thenReturn("change-message-id");
     when(preparedTask.execute()).thenReturn(EventHandlerTask.Result.OK);
     when(coordinator.requestReviewSupersession(
-            changeId, "Superseded by a conversation reset command"))
+            change, "Superseded by a conversation reset command"))
         .thenReturn(Optional.of(supersededRequest));
     doAnswer(
             invocation -> {
@@ -292,7 +294,7 @@ public class EventHandlerExecutorTest {
     AiRequestSubmission submission =
         new AiRequestSubmission(
             "request-id",
-            "project~main~I0123456789abcdef",
+            descriptor.changeRef(),
             sourceEventId,
             AiRequest.Kind.MESSAGE,
             AiRequest.AdmissionPolicy.QUEUE,
@@ -317,7 +319,7 @@ public class EventHandlerExecutorTest {
     return new AiRequest(
         1,
         submission.requestId(),
-        submission.changeId(),
+        submission.change(),
         submission.sourceEventId(),
         submission.kind(),
         submission.admissionPolicy(),

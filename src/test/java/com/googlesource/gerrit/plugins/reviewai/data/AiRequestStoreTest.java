@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,7 +36,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class AiRequestStoreTest extends TestBase {
-  private static final String CHANGE_ID = "project~branch~change";
+  private static final GerritChangeRef CHANGE = new GerritChangeRef("gerrit", 42);
+  private static final GerritChangeRef OTHER_CHANGE = new GerritChangeRef("gerrit", 43);
   private static final String OWNER = "worker-1";
   private static final long LEASE = 10_000L;
 
@@ -51,13 +53,13 @@ public class AiRequestStoreTest extends TestBase {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
 
-    AiRequest first = store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow();
+    AiRequest first = store.claimNext(CHANGE, OWNER, LEASE).orElseThrow();
 
     assertEquals("request-1", first.requestId());
     assertEquals(AiRequest.State.RUNNING, first.state());
     assertTrue(store.complete(first.requestId(), OWNER, null));
 
-    AiRequest second = store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow();
+    AiRequest second = store.claimNext(CHANGE, OWNER, LEASE).orElseThrow();
 
     assertEquals("request-2", second.requestId());
   }
@@ -71,28 +73,28 @@ public class AiRequestStoreTest extends TestBase {
 
     assertFalse(admission.duplicate());
     assertEquals(AiRequest.State.REJECTED, admission.request().state());
-    assertEquals("message-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("message-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
   }
 
   @Test
   public void requestsRunningReviewSupersessionAndRejectsIncomingReview() {
     store.admit(review("review-1", "patch-set-1"));
     assertEquals(
-        "review-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "review-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     AiRequest requested =
         store
-            .requestSupersession(CHANGE_ID, "Superseded by patch set 2")
+            .requestSupersession(CHANGE, "Superseded by patch set 2")
             .orElseThrow();
     AiRequestStore.Admission incoming = store.admit(review("review-2", "patch-set-2"));
 
     assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, requested.state());
     assertEquals(AiRequest.State.REJECTED, incoming.request().state());
     assertTrue(store.renewLease("review-1", OWNER, LEASE + 1));
-    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isEmpty());
     assertTrue(store.complete("review-1", OWNER, null));
     assertEquals(AiRequest.State.SUPERSEDED, store.get("review-1").orElseThrow().state());
-    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isEmpty());
   }
 
   @Test
@@ -103,14 +105,14 @@ public class AiRequestStoreTest extends TestBase {
 
     assertTrue(replay.duplicate());
     assertEquals(initial.request(), replay.request());
-    assertEquals(1, store.listByChange(CHANGE_ID).size());
+    assertEquals(1, store.listByChange(CHANGE).size());
   }
 
   @Test
   public void staleOwnerCannotCompleteRequest() {
     store.admit(message("request-1", "event-1"));
     assertEquals(
-        "request-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     assertFalse(store.complete("request-1", "stale-worker", null));
     assertEquals(AiRequest.State.RUNNING, store.get("request-1").orElseThrow().state());
@@ -122,7 +124,7 @@ public class AiRequestStoreTest extends TestBase {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
     assertEquals(
-        "request-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
     String failureReason = AiRequest.State.FAILED.name();
 
     assertTrue(store.fail("request-1", OWNER, failureReason));
@@ -130,7 +132,7 @@ public class AiRequestStoreTest extends TestBase {
     AiRequest failed = store.get("request-1").orElseThrow();
     assertEquals(AiRequest.State.FAILED, failed.state());
     assertEquals(failureReason, failed.resultText());
-    assertEquals("request-2", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-2", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
   }
 
   @Test
@@ -138,12 +140,12 @@ public class AiRequestStoreTest extends TestBase {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
     assertEquals(
-        "request-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     assertEquals(1, store.abandonExpired(LEASE, "expired"));
     assertEquals(AiRequest.State.ABANDONED, store.get("request-1").orElseThrow().state());
     assertEquals(
-        "request-2", store.claimNext(CHANGE_ID, "worker-2", LEASE + 1).orElseThrow().requestId());
+        "request-2", store.claimNext(CHANGE, "worker-2", LEASE + 1).orElseThrow().requestId());
   }
 
   @Test
@@ -153,16 +155,28 @@ public class AiRequestStoreTest extends TestBase {
     AiRequestStore recreated = new AiRequestStore(getTestReviewAiDb());
 
     assertEquals(
-        "request-1", recreated.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "request-1", recreated.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
   }
 
   @Test
   public void requestsForDifferentChangesCanRunAtTheSameTime() {
     store.admit(message("request-1", "event-1"));
-    store.admit(message("request-2", "other-event", "other-change"));
+    store.admit(message("request-2", "other-event", OTHER_CHANGE));
 
-    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isPresent());
-    assertTrue(store.claimNext("other-change", OWNER, LEASE).isPresent());
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isPresent());
+    assertTrue(store.claimNext(OTHER_CHANGE, OWNER, LEASE).isPresent());
+  }
+
+  @Test
+  public void sameChangeNumberOnDifferentInstancesHasIndependentLanes() {
+    GerritChangeRef remoteChange = new GerritChangeRef("other-gerrit", CHANGE.changeNumber());
+    store.admit(message("request-1", "same-event", CHANGE));
+    store.admit(message("request-2", "same-event", remoteChange));
+
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isPresent());
+    assertTrue(store.claimNext(remoteChange, OWNER, LEASE).isPresent());
+    assertEquals(1, store.listByChange(CHANGE).size());
+    assertEquals(1, store.listByChange(remoteChange).size());
   }
 
   @Test
@@ -190,10 +204,10 @@ public class AiRequestStoreTest extends TestBase {
 
   @Test
   public void listsChangesWithQueuedWorkByOldestRequest() {
-    store.admit(message("request-1", "event-1", "first-change"));
-    store.admit(message("request-2", "event-2", "second-change"));
+    store.admit(message("request-1", "event-1", CHANGE));
+    store.admit(message("request-2", "event-2", OTHER_CHANGE));
 
-    assertEquals(List.of("first-change"), store.listQueuedChangeIds(1));
+    assertEquals(List.of(CHANGE), store.listQueuedChanges(1));
   }
 
   @Test
@@ -201,25 +215,25 @@ public class AiRequestStoreTest extends TestBase {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
     assertEquals(
-        "request-1", store.claimNext(CHANGE_ID, OWNER, LEASE).orElseThrow().requestId());
+        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
-    assertTrue(store.listQueuedChangeIds(10).isEmpty());
+    assertTrue(store.listQueuedChanges(10).isEmpty());
   }
 
   @Test
   public void deletesAllRequestsAndLaneForChange() throws Exception {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
-    store.admit(message("request-3", "other-event", "other-change"));
-    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isPresent());
+    store.admit(message("request-3", "other-event", OTHER_CHANGE));
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isPresent());
 
-    store.deleteByChange(CHANGE_ID);
-    assertTrue(store.claimNext(CHANGE_ID, OWNER, LEASE).isEmpty());
+    store.deleteByChange(CHANGE);
+    assertTrue(store.claimNext(CHANGE, OWNER, LEASE).isEmpty());
 
-    assertTrue(store.listByChange(CHANGE_ID).isEmpty());
-    assertFalse(store.hasQueuedRequest(CHANGE_ID));
-    assertEquals(0, laneCount(CHANGE_ID));
-    assertEquals(1, store.listByChange("other-change").size());
+    assertTrue(store.listByChange(CHANGE).isEmpty());
+    assertFalse(store.hasQueuedRequest(CHANGE));
+    assertEquals(0, laneCount(CHANGE));
+    assertEquals(1, store.listByChange(OTHER_CHANGE).size());
   }
 
   private AiRequestStore.Admission admitAfterSignal(
@@ -230,11 +244,14 @@ public class AiRequestStoreTest extends TestBase {
     return store.admit(submission);
   }
 
-  private int laneCount(String changeId) throws Exception {
+  private int laneCount(GerritChangeRef change) throws Exception {
     try (Connection connection = getTestReviewAiDb().getConnection();
         PreparedStatement statement =
-            connection.prepareStatement("SELECT COUNT(*) FROM ai_request_lanes WHERE change_id = ?")) {
-      statement.setString(1, changeId);
+            connection.prepareStatement(
+                "SELECT COUNT(*) FROM ai_request_lanes"
+                    + " WHERE gerrit_instance_id = ? AND change_number = ?")) {
+      statement.setString(1, change.instanceId());
+      statement.setInt(2, change.changeNumber());
       try (ResultSet results = statement.executeQuery()) {
         results.next();
         return results.getInt(1);
@@ -243,15 +260,15 @@ public class AiRequestStoreTest extends TestBase {
   }
 
   private AiRequestSubmission message(String requestId, String sourceEventId) {
-    return message(requestId, sourceEventId, CHANGE_ID);
+    return message(requestId, sourceEventId, CHANGE);
   }
 
   private AiRequestSubmission message(
-      String requestId, String sourceEventId, String changeId) {
+      String requestId, String sourceEventId, GerritChangeRef change) {
     return submission(
         requestId,
         sourceEventId,
-        changeId,
+        change,
         AiRequest.Kind.MESSAGE,
         AiRequest.AdmissionPolicy.QUEUE);
   }
@@ -260,7 +277,7 @@ public class AiRequestStoreTest extends TestBase {
     return submission(
         requestId,
         sourceEventId,
-        CHANGE_ID,
+        CHANGE,
         AiRequest.Kind.REVIEW,
         AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED);
   }
@@ -268,12 +285,12 @@ public class AiRequestStoreTest extends TestBase {
   private AiRequestSubmission submission(
       String requestId,
       String sourceEventId,
-      String changeId,
+      GerritChangeRef change,
       AiRequest.Kind kind,
       AiRequest.AdmissionPolicy policy) {
     return new AiRequestSubmission(
         requestId,
-        changeId,
+        change,
         sourceEventId,
         kind,
         policy,

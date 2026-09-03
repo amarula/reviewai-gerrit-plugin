@@ -236,7 +236,8 @@ public class ReviewAiDb {
         "CREATE TABLE IF NOT EXISTS ai_requests ("
             + getDialect().autoIncrementPk("queue_sequence")
             + ", request_id VARCHAR(255) NOT NULL UNIQUE"
-            + ", change_id VARCHAR(512) NOT NULL"
+            + ", gerrit_instance_id VARCHAR(255) NOT NULL"
+            + ", change_number INT NOT NULL"
             + ", source_event_id VARCHAR(255)"
             + ", request_kind VARCHAR(32) NOT NULL"
             + ", admission_policy VARCHAR(32) NOT NULL"
@@ -249,13 +250,15 @@ public class ReviewAiDb {
             + ", updated_at_millis BIGINT NOT NULL"
             + ")",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_requests_source_event"
-            + " ON ai_requests(change_id, source_event_id)",
+            + " ON ai_requests(gerrit_instance_id, change_number, source_event_id)",
         "CREATE INDEX IF NOT EXISTS idx_ai_requests_change_queue"
-            + " ON ai_requests(change_id, request_state, queue_sequence)",
+            + " ON ai_requests(gerrit_instance_id, change_number, request_state, queue_sequence)",
         "CREATE TABLE IF NOT EXISTS ai_request_lanes ("
-            + "change_id VARCHAR(512) PRIMARY KEY"
+            + "gerrit_instance_id VARCHAR(255) NOT NULL"
+            + ", change_number INT NOT NULL"
             + ", active_request_id VARCHAR(255)"
             + ", updated_at_millis BIGINT NOT NULL DEFAULT 0"
+            + ", PRIMARY KEY(gerrit_instance_id, change_number)"
             + ")");
   }
 

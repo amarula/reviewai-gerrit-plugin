@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -47,7 +48,7 @@ public class AiRequestStore {
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        ensureAndLockLane(connection, submission.changeId());
+        ensureAndLockLane(connection, submission.change());
         Optional<AiRequest> duplicate = findBySourceEvent(connection, submission);
         if (duplicate.isPresent()) {
           connection.commit();
@@ -55,7 +56,7 @@ public class AiRequestStore {
         }
         AiRequest.State initialState =
             submission.admissionPolicy() == AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED
-                    && isOccupied(connection, submission.changeId())
+                    && isOccupied(connection, submission.change())
                 ? AiRequest.State.REJECTED
                 : AiRequest.State.QUEUED;
         insert(connection, submission, initialState);
@@ -73,20 +74,20 @@ public class AiRequestStore {
   }
 
   public Optional<AiRequest> claimNext(
-      String changeId, String ownerId, long leaseExpiresAtMillis) {
-    requireNonBlank(changeId, "changeId");
+      GerritChangeRef change, String ownerId, long leaseExpiresAtMillis) {
+    Objects.requireNonNull(change, "change");
     requireNonBlank(ownerId, "ownerId");
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        String activeRequestId = ensureAndLockLane(connection, changeId);
+        String activeRequestId = ensureAndLockLane(connection, change);
         if (activeRequestId != null) {
           connection.commit();
           return Optional.empty();
         }
-        Optional<AiRequest> next = findFirstQueued(connection, changeId);
+        Optional<AiRequest> next = findFirstQueued(connection, change);
         if (next.isEmpty()) {
-          deleteIdleLane(connection, changeId);
+          deleteIdleLane(connection, change);
           connection.commit();
           return Optional.empty();
         }
@@ -104,7 +105,8 @@ public class AiRequestStore {
                     """
                     UPDATE ai_request_lanes
                     SET active_request_id = ?, updated_at_millis = ?
-                    WHERE change_id = ? AND active_request_id IS NULL
+                    WHERE gerrit_instance_id = ? AND change_number = ?
+                        AND active_request_id IS NULL
                     """)) {
           updateRequest.setString(1, AiRequest.State.RUNNING.name());
           updateRequest.setString(2, ownerId);
@@ -117,7 +119,7 @@ public class AiRequestStore {
           }
           updateLane.setString(1, next.get().requestId());
           updateLane.setLong(2, now);
-          updateLane.setString(3, changeId);
+          bindChange(updateLane, 3, change);
           if (updateLane.executeUpdate() != 1) {
             throw new IllegalStateException("AI request lane could not be claimed");
           }
@@ -130,7 +132,7 @@ public class AiRequestStore {
         throw e;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to claim queued AI request for " + changeId, e);
+      throw new RuntimeException("Failed to claim queued AI request for " + change, e);
     }
   }
 
@@ -169,12 +171,12 @@ public class AiRequestStore {
     return finish(requestId, ownerId, AiRequest.State.FAILED, failureText);
   }
 
-  public Optional<AiRequest> requestSupersession(String changeId, String resultText) {
-    requireNonBlank(changeId, "changeId");
+  public Optional<AiRequest> requestSupersession(GerritChangeRef change, String resultText) {
+    Objects.requireNonNull(change, "change");
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        String activeRequestId = ensureAndLockLane(connection, changeId);
+        String activeRequestId = ensureAndLockLane(connection, change);
         if (activeRequestId == null) {
           connection.commit();
           return Optional.empty();
@@ -210,7 +212,7 @@ public class AiRequestStore {
         throw e;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to request AI review supersession for " + changeId, e);
+      throw new RuntimeException("Failed to request AI review supersession for " + change, e);
     }
   }
 
@@ -266,18 +268,18 @@ public class AiRequestStore {
     }
   }
 
-  public List<AiRequest> listByChange(String changeId) {
-    requireNonBlank(changeId, "changeId");
+  public List<AiRequest> listByChange(GerritChangeRef change) {
+    Objects.requireNonNull(change, "change");
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
                 """
                 SELECT *
                 FROM ai_requests
-                WHERE change_id = ?
+                WHERE gerrit_instance_id = ? AND change_number = ?
                 ORDER BY queue_sequence
                 """)) {
-      statement.setString(1, changeId);
+      bindChange(statement, 1, change);
       try (ResultSet results = statement.executeQuery()) {
         List<AiRequest> requests = new ArrayList<>();
         while (results.next()) {
@@ -286,22 +288,26 @@ public class AiRequestStore {
         return requests;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to list AI requests for " + changeId, e);
+      throw new RuntimeException("Failed to list AI requests for " + change, e);
     }
   }
 
   /** Removes all persisted AI request state for a Change. */
-  public void deleteByChange(String changeId) {
-    requireNonBlank(changeId, "changeId");
+  public void deleteByChange(GerritChangeRef change) {
+    Objects.requireNonNull(change, "change");
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try (PreparedStatement deleteRequests =
-              connection.prepareStatement("DELETE FROM ai_requests WHERE change_id = ?");
+              connection.prepareStatement(
+                  "DELETE FROM ai_requests"
+                      + " WHERE gerrit_instance_id = ? AND change_number = ?");
           PreparedStatement deleteLane =
-              connection.prepareStatement("DELETE FROM ai_request_lanes WHERE change_id = ?")) {
-        deleteRequests.setString(1, changeId);
+              connection.prepareStatement(
+                  "DELETE FROM ai_request_lanes"
+                      + " WHERE gerrit_instance_id = ? AND change_number = ?")) {
+        bindChange(deleteRequests, 1, change);
         deleteRequests.executeUpdate();
-        deleteLane.setString(1, changeId);
+        bindChange(deleteLane, 1, change);
         deleteLane.executeUpdate();
         connection.commit();
       } catch (SQLException | RuntimeException e) {
@@ -309,11 +315,11 @@ public class AiRequestStore {
         throw e;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to delete AI requests for " + changeId, e);
+      throw new RuntimeException("Failed to delete AI requests for " + change, e);
     }
   }
 
-  public List<String> listQueuedChangeIds(int limit) {
+  public List<GerritChangeRef> listQueuedChanges(int limit) {
     if (limit <= 0) {
       return List.of();
     }
@@ -321,45 +327,48 @@ public class AiRequestStore {
         PreparedStatement statement =
             connection.prepareStatement(
                 """
-                SELECT r.change_id, MIN(r.queue_sequence) AS first_sequence
+                SELECT r.gerrit_instance_id, r.change_number,
+                    MIN(r.queue_sequence) AS first_sequence
                 FROM ai_requests r
-                JOIN ai_request_lanes l ON l.change_id = r.change_id
+                JOIN ai_request_lanes l
+                  ON l.gerrit_instance_id = r.gerrit_instance_id
+                  AND l.change_number = r.change_number
                 WHERE r.request_state = ? AND l.active_request_id IS NULL
-                GROUP BY r.change_id
+                GROUP BY r.gerrit_instance_id, r.change_number
                 ORDER BY first_sequence
                 LIMIT ?
                 """)) {
       statement.setString(1, AiRequest.State.QUEUED.name());
       statement.setInt(2, limit);
       try (ResultSet results = statement.executeQuery()) {
-        List<String> changeIds = new ArrayList<>();
+        List<GerritChangeRef> changes = new ArrayList<>();
         while (results.next()) {
-          changeIds.add(results.getString(1));
+          changes.add(new GerritChangeRef(results.getString(1), results.getInt(2)));
         }
-        return changeIds;
+        return changes;
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to list Changes with queued AI requests", e);
     }
   }
 
-  public boolean hasQueuedRequest(String changeId) {
-    requireNonBlank(changeId, "changeId");
+  public boolean hasQueuedRequest(GerritChangeRef change) {
+    Objects.requireNonNull(change, "change");
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
                 """
                 SELECT COUNT(*)
                 FROM ai_requests
-                WHERE change_id = ? AND request_state = ?
+                WHERE gerrit_instance_id = ? AND change_number = ? AND request_state = ?
                 """)) {
-      statement.setString(1, changeId);
-      statement.setString(2, AiRequest.State.QUEUED.name());
+      bindChange(statement, 1, change);
+      statement.setString(3, AiRequest.State.QUEUED.name());
       try (ResultSet results = statement.executeQuery()) {
         return results.next() && results.getLong(1) > 0;
       }
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to inspect queued AI requests for " + changeId, e);
+      throw new RuntimeException("Failed to inspect queued AI requests for " + change, e);
     }
   }
 
@@ -380,7 +389,7 @@ public class AiRequestStore {
           connection.commit();
           return false;
         }
-        ensureAndLockLane(connection, existing.get().changeId());
+        ensureAndLockLane(connection, existing.get().change());
         Optional<AiRequest> request = getForUpdate(connection, requestId);
         if (request.isEmpty()
             || (request.get().state() != AiRequest.State.RUNNING
@@ -396,7 +405,7 @@ public class AiRequestStore {
             requestId,
             supersessionRequested ? AiRequest.State.SUPERSEDED : state,
             supersessionRequested ? request.get().resultText() : resultText);
-        releaseLane(connection, request.get().changeId(), requestId);
+        releaseLane(connection, request.get().change(), requestId);
         connection.commit();
         return true;
       } catch (SQLException | RuntimeException e) {
@@ -417,7 +426,7 @@ public class AiRequestStore {
           connection.commit();
           return false;
         }
-        ensureAndLockLane(connection, existing.get().changeId());
+        ensureAndLockLane(connection, existing.get().change());
         Optional<AiRequest> request = getForUpdate(connection, requestId);
         if (request.isEmpty()
             || (request.get().state() != AiRequest.State.RUNNING
@@ -432,7 +441,7 @@ public class AiRequestStore {
                 ? AiRequest.State.SUPERSEDED
                 : AiRequest.State.ABANDONED;
         updateTerminalRequest(connection, requestId, terminalState, failureText);
-        releaseLane(connection, request.get().changeId(), requestId);
+        releaseLane(connection, request.get().change(), requestId);
         connection.commit();
         return true;
       } catch (SQLException | RuntimeException e) {
@@ -444,44 +453,47 @@ public class AiRequestStore {
     }
   }
 
-  private String ensureAndLockLane(Connection connection, String changeId) throws SQLException {
+  private String ensureAndLockLane(Connection connection, GerritChangeRef change)
+      throws SQLException {
     String upsert =
         db.getDialect()
             .upsert(
                 "ai_request_lanes",
-                "change_id",
-                "?",
-                "change_id",
-                "change_id = EXCLUDED.change_id");
+                "gerrit_instance_id, change_number",
+                "?, ?",
+                "gerrit_instance_id, change_number",
+                "gerrit_instance_id = EXCLUDED.gerrit_instance_id");
     try (PreparedStatement statement = connection.prepareStatement(upsert)) {
-      statement.setString(1, changeId);
+      bindChange(statement, 1, change);
       statement.executeUpdate();
     }
     try (PreparedStatement statement =
         connection.prepareStatement(
-            "SELECT active_request_id FROM ai_request_lanes WHERE change_id = ? FOR UPDATE")) {
-      statement.setString(1, changeId);
+            "SELECT active_request_id FROM ai_request_lanes"
+                + " WHERE gerrit_instance_id = ? AND change_number = ? FOR UPDATE")) {
+      bindChange(statement, 1, change);
       try (ResultSet results = statement.executeQuery()) {
         if (!results.next()) {
-          throw new IllegalStateException("AI request lane was not created for " + changeId);
+          throw new IllegalStateException("AI request lane was not created for " + change);
         }
         return results.getString(1);
       }
     }
   }
 
-  private boolean isOccupied(Connection connection, String changeId) throws SQLException {
+  private boolean isOccupied(Connection connection, GerritChangeRef change) throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
             """
             SELECT COUNT(*)
             FROM ai_requests
-            WHERE change_id = ? AND request_state IN (?, ?, ?)
+            WHERE gerrit_instance_id = ? AND change_number = ?
+                AND request_state IN (?, ?, ?)
             """)) {
-      statement.setString(1, changeId);
-      statement.setString(2, AiRequest.State.QUEUED.name());
-      statement.setString(3, AiRequest.State.RUNNING.name());
-      statement.setString(4, AiRequest.State.SUPERSEDE_REQUESTED.name());
+      bindChange(statement, 1, change);
+      statement.setString(3, AiRequest.State.QUEUED.name());
+      statement.setString(4, AiRequest.State.RUNNING.name());
+      statement.setString(5, AiRequest.State.SUPERSEDE_REQUESTED.name());
       try (ResultSet results = statement.executeQuery()) {
         if (!results.next()) {
           throw new IllegalStateException("Could not determine AI request lane occupancy");
@@ -499,20 +511,20 @@ public class AiRequestStore {
         connection.prepareStatement(
             """
             INSERT INTO ai_requests
-                (request_id, change_id, source_event_id, request_kind, admission_policy,
-                 request_state, payload_json, owner_id, lease_expires_at_millis, result_text,
-                 created_at_millis, updated_at_millis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
+                (request_id, gerrit_instance_id, change_number, source_event_id,
+                 request_kind, admission_policy, request_state, payload_json, owner_id,
+                 lease_expires_at_millis, result_text, created_at_millis, updated_at_millis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)
             """)) {
       statement.setString(1, submission.requestId());
-      statement.setString(2, submission.changeId());
-      statement.setString(3, submission.sourceEventId());
-      statement.setString(4, submission.kind().name());
-      statement.setString(5, submission.admissionPolicy().name());
-      statement.setString(6, state.name());
-      statement.setString(7, submission.payloadJson());
-      statement.setLong(8, now);
+      bindChange(statement, 2, submission.change());
+      statement.setString(4, submission.sourceEventId());
+      statement.setString(5, submission.kind().name());
+      statement.setString(6, submission.admissionPolicy().name());
+      statement.setString(7, state.name());
+      statement.setString(8, submission.payloadJson());
       statement.setLong(9, now);
+      statement.setLong(10, now);
       statement.executeUpdate();
     }
   }
@@ -527,29 +539,29 @@ public class AiRequestStore {
             """
             SELECT *
             FROM ai_requests
-            WHERE change_id = ? AND source_event_id = ?
+            WHERE gerrit_instance_id = ? AND change_number = ? AND source_event_id = ?
             """)) {
-      statement.setString(1, submission.changeId());
-      statement.setString(2, submission.sourceEventId());
+      bindChange(statement, 1, submission.change());
+      statement.setString(3, submission.sourceEventId());
       try (ResultSet results = statement.executeQuery()) {
         return results.next() ? Optional.of(read(results)) : Optional.empty();
       }
     }
   }
 
-  private Optional<AiRequest> findFirstQueued(Connection connection, String changeId)
+  private Optional<AiRequest> findFirstQueued(Connection connection, GerritChangeRef change)
       throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
             """
             SELECT *
             FROM ai_requests
-            WHERE change_id = ? AND request_state = ?
+            WHERE gerrit_instance_id = ? AND change_number = ? AND request_state = ?
             ORDER BY queue_sequence
             LIMIT 1
             """)) {
-      statement.setString(1, changeId);
-      statement.setString(2, AiRequest.State.QUEUED.name());
+      bindChange(statement, 1, change);
+      statement.setString(3, AiRequest.State.QUEUED.name());
       try (ResultSet results = statement.executeQuery()) {
         return results.next() ? Optional.of(read(results)) : Optional.empty();
       }
@@ -597,29 +609,31 @@ public class AiRequestStore {
     }
   }
 
-  private void releaseLane(Connection connection, String changeId, String requestId)
+  private void releaseLane(Connection connection, GerritChangeRef change, String requestId)
       throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
             """
             UPDATE ai_request_lanes
             SET active_request_id = NULL, updated_at_millis = ?
-            WHERE change_id = ? AND active_request_id = ?
+            WHERE gerrit_instance_id = ? AND change_number = ? AND active_request_id = ?
             """)) {
       statement.setLong(1, System.currentTimeMillis());
-      statement.setString(2, changeId);
-      statement.setString(3, requestId);
+      bindChange(statement, 2, change);
+      statement.setString(4, requestId);
       if (statement.executeUpdate() != 1) {
         throw new IllegalStateException("AI request does not own its Change lane: " + requestId);
       }
     }
   }
 
-  private void deleteIdleLane(Connection connection, String changeId) throws SQLException {
+  private void deleteIdleLane(Connection connection, GerritChangeRef change) throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
-            "DELETE FROM ai_request_lanes WHERE change_id = ? AND active_request_id IS NULL")) {
-      statement.setString(1, changeId);
+            "DELETE FROM ai_request_lanes"
+                + " WHERE gerrit_instance_id = ? AND change_number = ?"
+                + " AND active_request_id IS NULL")) {
+      bindChange(statement, 1, change);
       statement.executeUpdate();
     }
   }
@@ -630,7 +644,8 @@ public class AiRequestStore {
     return new AiRequest(
         results.getLong("queue_sequence"),
         results.getString("request_id"),
-        results.getString("change_id"),
+        new GerritChangeRef(
+            results.getString("gerrit_instance_id"), results.getInt("change_number")),
         results.getString("source_event_id"),
         AiRequest.Kind.valueOf(results.getString("request_kind")),
         AiRequest.AdmissionPolicy.valueOf(results.getString("admission_policy")),
@@ -649,6 +664,13 @@ public class AiRequestStore {
     } catch (SQLException rollbackFailure) {
       cause.addSuppressed(rollbackFailure);
     }
+  }
+
+  private static void bindChange(
+      PreparedStatement statement, int parameterIndex, GerritChangeRef change)
+      throws SQLException {
+    statement.setString(parameterIndex, change.instanceId());
+    statement.setInt(parameterIndex + 1, change.changeNumber());
   }
 
   private static String requireNonBlank(String value, String name) {

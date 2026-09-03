@@ -22,6 +22,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
@@ -42,7 +43,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class AiRequestCoordinatorTest extends TestBase {
-  private static final String CHANGE_ID = "project~branch~change";
+  private static final GerritChangeRef CHANGE = new GerritChangeRef("gerrit", 42);
   private static final long LEASE_MILLIS = TimeUnit.MINUTES.toMillis(1);
   private static final long RECOVERY_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(1);
 
@@ -139,7 +140,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     coordinator.stop();
     store.admit(message("request-1", "event-1"));
     assertEquals(
-        "request-1", store.claimNext(CHANGE_ID, "old-owner", 0L).orElseThrow().requestId());
+        "request-1", store.claimNext(CHANGE, "old-owner", 0L).orElseThrow().requestId());
     store.admit(message("request-2", "event-2"));
     CountDownLatch processed = new CountDownLatch(1);
     CountDownLatch recovered = new CountDownLatch(1);
@@ -234,7 +235,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     assertTrue(oldReviewStarted.await(5, TimeUnit.SECONDS));
 
     AiRequest requested =
-        coordinator.requestReviewSupersession(CHANGE_ID, 2).orElseThrow();
+        coordinator.requestReviewSupersession(CHANGE, 2).orElseThrow();
     AiRequestStore.Admission incoming =
         coordinator.admit(
             review("review-2", "patch-set-2"),
@@ -274,7 +275,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     assertTrue(reviewStarted.await(5, TimeUnit.SECONDS));
 
     AiRequest cancelled =
-        coordinator.cancelRunningReview(CHANGE_ID, "Change merged").orElseThrow();
+        coordinator.cancelRunningReview(CHANGE, "Change merged").orElseThrow();
     finishInFlightQuery.countDown();
 
     assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, cancelled.state());
@@ -285,7 +286,7 @@ public class AiRequestCoordinatorTest extends TestBase {
   private AiRequestSubmission review(String requestId, String sourceEventId) {
     return new AiRequestSubmission(
         requestId,
-        CHANGE_ID,
+        CHANGE,
         sourceEventId,
         AiRequest.Kind.REVIEW,
         AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
@@ -295,7 +296,7 @@ public class AiRequestCoordinatorTest extends TestBase {
   private AiRequestSubmission message(String requestId, String sourceEventId) {
     return new AiRequestSubmission(
         requestId,
-        CHANGE_ID,
+        CHANGE,
         sourceEventId,
         AiRequest.Kind.MESSAGE,
         AiRequest.AdmissionPolicy.QUEUE,

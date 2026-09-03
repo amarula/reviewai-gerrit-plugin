@@ -16,11 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
+
 /** Persisted unit of AI work and its queue ownership state. */
 public record AiRequest(
     long queueSequence,
     String requestId,
-    String changeId,
+    GerritChangeRef change,
     String sourceEventId,
     Kind kind,
     AdmissionPolicy admissionPolicy,
