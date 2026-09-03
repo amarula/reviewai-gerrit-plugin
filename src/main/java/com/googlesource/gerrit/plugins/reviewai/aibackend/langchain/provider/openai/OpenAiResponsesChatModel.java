@@ -110,7 +110,10 @@ public class OpenAiResponsesChatModel implements ChatModel {
     requestBody = getGson().toJson(request._body());
     log.debug("OpenAI Responses LangChain request: {}", requestBody);
 
-    OpenAIClient client = OpenAiSdkClientFactory.create(config);
+    OpenAIClient client =
+        conversationId == null
+            ? OpenAiSdkClientFactory.create(config)
+            : OpenAiSdkClientFactory.createWithoutRetries(config);
     try {
       try (HttpResponseFor<Response> rawResponse =
           client.responses().withRawResponse().create(request)) {

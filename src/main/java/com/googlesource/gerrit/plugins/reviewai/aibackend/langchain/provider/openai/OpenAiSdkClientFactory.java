@@ -23,19 +23,44 @@ import com.openai.errors.OpenAIServiceException;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Locale;
 
 public final class OpenAiSdkClientFactory {
   private OpenAiSdkClientFactory() {}
 
   public static OpenAIClient create(Configuration config) {
+    return create(config, config.getAiConnectionMaxRetryAttempts());
+  }
+
+  static OpenAIClient createWithoutRetries(Configuration config) {
+    return create(config, 0);
+  }
+
+  private static OpenAIClient create(Configuration config, int maxRetries) {
     return OpenAIOkHttpClient.builder()
         .apiKey(config.getAiToken())
         .baseUrl(getResolvedBaseUrl(config))
         .timeout(Duration.ofSeconds(config.getAiConnectionTimeout()))
-        .maxRetries(config.getAiConnectionMaxRetryAttempts())
+        .maxRetries(maxRetries)
         .build();
+  }
+
+  public static boolean isTimeout(Throwable throwable) {
+    Throwable cause = throwable;
+    while (cause != null) {
+      if (cause instanceof SocketTimeoutException
+          || cause instanceof InterruptedIOException
+          && cause.getMessage() != null
+          && cause.getMessage().toLowerCase(Locale.ROOT).contains("timeout")) {
+        return true;
+      }
+      cause = cause.getCause();
+    }
+    return false;
   }
 
   public static String getResolvedBaseUrl(Configuration config) {
