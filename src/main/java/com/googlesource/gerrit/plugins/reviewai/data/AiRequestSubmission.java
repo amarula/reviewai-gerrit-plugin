@@ -16,19 +16,20 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import java.util.Objects;
 
 /** Immutable input used to admit an AI request into a per-Change lane. */
 public record AiRequestSubmission(
     String requestId,
-    String changeId,
+    GerritChangeRef change,
     String sourceEventId,
     AiRequest.Kind kind,
     AiRequest.AdmissionPolicy admissionPolicy,
     String payloadJson) {
   public AiRequestSubmission {
     requestId = requireNonBlank(requestId, "requestId");
-    changeId = requireNonBlank(changeId, "changeId");
+    Objects.requireNonNull(change, "change");
     sourceEventId = normalize(sourceEventId);
     Objects.requireNonNull(kind, "kind");
     Objects.requireNonNull(admissionPolicy, "admissionPolicy");

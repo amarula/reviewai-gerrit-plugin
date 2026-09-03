@@ -19,9 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.server.events.ChangeAbandonedEvent;
 import com.google.gerrit.server.events.ChangeMergedEvent;
 import com.google.gerrit.server.events.Event;
+import com.google.gerrit.server.events.PatchSetEvent;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import lombok.extern.slf4j.Slf4j;
@@ -51,8 +53,9 @@ public class ReviewConcernLifecycleEventHandler {
     }
 
     GerritChange change = new GerritChange(event);
-    cancelActiveReview(change, event);
-    deleteAiRequests(change);
+    GerritChangeRef changeRef = changeRef((PatchSetEvent) event);
+    cancelActiveReview(changeRef, change, event);
+    deleteAiRequests(changeRef, change);
     log.debug(
         "Clearing review concern ledger for change {} on event {}",
         change.getFullChangeId(),
@@ -66,21 +69,28 @@ public class ReviewConcernLifecycleEventHandler {
     return true;
   }
 
-  private void cancelActiveReview(GerritChange change, Event event) {
+  private void cancelActiveReview(GerritChangeRef changeRef, GerritChange change, Event event) {
     String reason =
         event instanceof ChangeMergedEvent ? "Change merged" : "Change abandoned";
     try {
-      aiRequestCoordinator.cancelRunningReview(change.getFullChangeId(), reason);
+      aiRequestCoordinator.cancelRunningReview(changeRef, reason);
     } catch (Exception e) {
       log.error("Failed to cancel active AI review for change {}", change.getFullChangeId(), e);
     }
   }
 
-  private void deleteAiRequests(GerritChange change) {
+  private void deleteAiRequests(GerritChangeRef changeRef, GerritChange change) {
     try {
-      aiRequestStore.deleteByChange(change.getFullChangeId());
+      aiRequestStore.deleteByChange(changeRef);
     } catch (Exception e) {
       log.error("Failed to delete AI requests for change {}", change.getFullChangeId(), e);
     }
+  }
+
+  private static GerritChangeRef changeRef(PatchSetEvent event) {
+    if (event.change == null || event.change.get() == null) {
+      throw new IllegalArgumentException("change event data is required");
+    }
+    return new GerritChangeRef(event.instanceId, event.change.get().number);
   }
 }

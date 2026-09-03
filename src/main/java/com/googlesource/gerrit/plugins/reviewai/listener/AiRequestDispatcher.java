@@ -21,6 +21,8 @@ import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.gerrit.server.events.PatchSetEvent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
@@ -71,12 +73,12 @@ final class AiRequestDispatcher {
       PatchSetEvent event,
       Long newerPatchSetNumber) {
     GerritChange currentChange = new GerritChange(event);
-    String changeId = currentChange.getFullChangeId();
+    GerritChangeRef change = changeRef(event);
     Optional<AiRequest> requested =
         newerPatchSetNumber == null
             ? coordinator.requestReviewSupersession(
-                changeId, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
-            : coordinator.requestReviewSupersession(changeId, newerPatchSetNumber);
+                change, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
+            : coordinator.requestReviewSupersession(change, newerPatchSetNumber);
     requested
         .ifPresent(
             request -> {
@@ -138,7 +140,7 @@ final class AiRequestDispatcher {
     AiRequestSubmission submission =
         new AiRequestSubmission(
             UUID.randomUUID().toString(),
-            new GerritChange(event).getFullChangeId(),
+            descriptor.changeRef(),
             sourceEventId,
             decision.kind(),
             decision.admissionPolicy(),
@@ -166,18 +168,14 @@ final class AiRequestDispatcher {
     if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
       topicPatchSetReviewCoordinator.recordEvent(patchSetCreatedEvent);
     }
-    Configuration config =
-        configCreator.createConfig(
-            Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
+    Configuration config = createConfig(descriptor.changeLocator());
     EventHandlerTask task = contextFactory.create(config, event).task();
     return processingOutcome(task.execute(descriptor.sourceEventId()));
   }
 
   private void recoverAbandonedRequest(AiRequest request) throws Exception {
     AiRequestDescriptor descriptor = AiRequestDescriptor.fromJson(request.payloadJson());
-    Configuration config =
-        configCreator.createConfig(
-            Project.nameKey(descriptor.project()), Change.key(descriptor.changeKey()));
+    Configuration config = createConfig(descriptor.changeLocator());
     Context context = contextFactory.create(config, descriptor.toEvent());
     context
         .injector()
@@ -198,6 +196,18 @@ final class AiRequestDispatcher {
         new GerritChange(event).getPatchSetEventKey(),
         event.getType(),
         String.valueOf(event.eventCreatedOn));
+  }
+
+  private Configuration createConfig(GerritChangeLocator change) throws Exception {
+    return configCreator.createConfig(
+        Project.nameKey(change.project()), Change.key(change.changeKey()));
+  }
+
+  private static GerritChangeRef changeRef(PatchSetEvent event) {
+    if (event.change == null || event.change.get() == null) {
+      throw new IllegalArgumentException("change event data is required");
+    }
+    return new GerritChangeRef(event.instanceId, event.change.get().number);
   }
 
   private static void requireSuccessful(EventHandlerTask.Result result) {

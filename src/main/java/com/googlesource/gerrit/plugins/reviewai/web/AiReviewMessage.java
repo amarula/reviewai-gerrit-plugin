@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import com.google.gerrit.common.Nullable;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
@@ -25,6 +26,7 @@ import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.config.GerritInstanceId;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
@@ -32,6 +34,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -64,6 +67,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   private final SupersededReviewNotifier supersededReviewNotifier;
   private final ReviewAgentResponseService reviewAgentResponseService;
   private final ReviewAgentGerritMessageIdFinder gerritMessageIdFinder;
+  private final String gerritInstanceId;
 
   AiReviewMessage(
       ConfigCreator configCreator,
@@ -88,7 +92,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         null,
         null,
         aiAdministratorAccess,
-        commandExtension);
+        commandExtension,
+        null);
   }
 
   @Inject
@@ -104,13 +109,15 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
       AiAdministratorAccess aiAdministratorAccess,
-      ClientCommandExtension commandExtension) {
+      ClientCommandExtension commandExtension,
+      @GerritInstanceId @Nullable String gerritInstanceId) {
     this.configCreator = configCreator;
     this.gerritApi = gerritApi;
     this.aiReviewPermission = aiReviewPermission;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     this.requestCoordinator = requestCoordinator;
     this.supersededReviewNotifier = supersededReviewNotifier;
+    this.gerritInstanceId = gerritInstanceId;
     reviewAgentResponseService =
         new ReviewAgentResponseService(
             repositoryManager,
@@ -262,7 +269,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             resource.getChange().getKey());
     requestCoordinator
         .requestReviewSupersession(
-            change.getFullChangeId(), AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
+            new GerritChangeRef(gerritInstanceId, resource.getChange().getId().get()),
+            AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
         .ifPresent(
             request -> {
               try {

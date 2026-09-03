@@ -28,6 +28,8 @@ import com.google.gerrit.server.data.PatchSetAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.gerrit.server.events.PatchSetEvent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import java.time.Instant;
 import java.util.Arrays;
@@ -112,6 +114,14 @@ public record AiRequestDescriptor(
 
   public String toJson() {
     return GsonUtils.getGson().toJson(this);
+  }
+
+  public GerritChangeRef changeRef() {
+    return new GerritChangeRef(instanceId, changeNumber);
+  }
+
+  public GerritChangeLocator changeLocator() {
+    return new GerritChangeLocator(project, branch, changeKey);
   }
 
   public PatchSetEvent toEvent() {

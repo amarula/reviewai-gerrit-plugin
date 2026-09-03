@@ -31,9 +31,10 @@ import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.gerrit.server.events.PatchSetEvent;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeLocator;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
@@ -54,17 +55,17 @@ public class AiRequestDescriptorTest extends TestBase {
     CommentAddedEvent original = commentAddedEvent();
     AiRequestDescriptor descriptor = AiRequestDescriptor.from(original, SOURCE_EVENT_ID);
     AiRequestStore store = new AiRequestStore(getTestReviewAiDb());
-    String changeId = new GerritChange(original).getFullChangeId();
     store.admit(
         new AiRequestSubmission(
             "request-id",
-            changeId,
+            descriptor.changeRef(),
             SOURCE_EVENT_ID,
             AiRequest.Kind.MESSAGE,
             AiRequest.AdmissionPolicy.QUEUE,
             descriptor.toJson()));
 
-    AiRequest claimed = store.claimNext(changeId, OWNER_ID, Long.MAX_VALUE).orElseThrow();
+    AiRequest claimed =
+        store.claimNext(descriptor.changeRef(), OWNER_ID, Long.MAX_VALUE).orElseThrow();
     AiRequestDescriptor restoredDescriptor =
         AiRequestDescriptor.fromJson(claimed.payloadJson());
     PatchSetEvent restored = restoredDescriptor.toEvent();
@@ -78,6 +79,10 @@ public class AiRequestDescriptorTest extends TestBase {
     assertEquals("Verified", restoredComment.approvals.get()[0].type);
     assertEquals("1", restoredComment.approvals.get()[0].value);
     assertEquals(SOURCE_EVENT_ID, restoredDescriptor.sourceEventId());
+    assertEquals(new GerritChangeRef(INSTANCE_ID, CHANGE_NUMBER), claimed.change());
+    assertEquals(
+        new GerritChangeLocator(PROJECT_NAME.get(), BRANCH_NAME.branch(), CHANGE_ID.get()),
+        restoredDescriptor.changeLocator());
   }
 
   @Test

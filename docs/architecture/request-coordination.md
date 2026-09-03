@@ -49,7 +49,10 @@ accepts the request and preserves FIFO order using its generated queue sequence.
 
 Before admission, supported Gerrit events are converted into a versioned `AiRequestDescriptor`. The descriptor stores
 the Change and Patch Set identity, actor, comment, approvals, event time, and event type required to reconstruct the
-event after restart. A unique `(change_id, source_event_id)` index makes replayed event delivery idempotent.
+event after restart. Request coordination identifies a Change with `GerritChangeRef`, the immutable Gerrit instance
+ID and numeric change number. Project, branch, and Change-Id belong to `GerritChangeLocator`, which is retained in the
+descriptor for repository and configuration lookup. A unique
+`(gerrit_instance_id, change_number, source_event_id)` index makes replayed event delivery idempotent.
 
 ### User-visible request status
 
@@ -71,8 +74,8 @@ The request coordinator uses two tables:
 
 | Table | Responsibility |
 | --- | --- |
-| `ai_requests` | Stores request identity, Change identity, kind, policy, state, serialized event, ownership, lease, result, and timestamps. |
-| `ai_request_lanes` | Stores the active request ID for each occupied Change and provides the row locked during admission and claiming. |
+| `ai_requests` | Stores request identity, Gerrit instance and change number, kind, policy, state, serialized event, ownership, lease, result, and timestamps. |
+| `ai_request_lanes` | Stores the active request ID for each `(gerrit_instance_id, change_number)` lane and provides the row locked during admission and claiming. |
 
 A lane is synchronization state, not request history. It may exist while a Change has queued or active work. Once a
 drain finds no queued work and the lane has no active owner, the idle lane is removed. Terminal request rows remain
