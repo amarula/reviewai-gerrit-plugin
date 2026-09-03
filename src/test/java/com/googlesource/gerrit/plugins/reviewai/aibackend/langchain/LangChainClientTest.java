@@ -54,6 +54,7 @@ import dev.langchain4j.model.chat.request.json.JsonSchema;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -399,6 +400,20 @@ public class LangChainClientTest {
     assertEquals("conv_fresh_langchain_openai", conversationId);
     assertTrue(conversation.clearCurrentConversationCalled);
     assertFalse(conversation.hasExistingConversationCalled);
+  }
+
+  @Test
+  public void timeoutClearsCurrentOpenAiConversation() {
+    FakeOpenAiConversation conversation = new FakeOpenAiConversation("conv_timed_out", true);
+    OpenAiConversationTestLangChainClient client =
+        new OpenAiConversationTestLangChainClient(conversation);
+
+    client.clearTimedOutConversation(
+        AiProviderType.OPENAI,
+        new ChangeSetData(1),
+        new RuntimeException(new SocketTimeoutException()));
+
+    assertTrue(conversation.clearCurrentConversationCalled);
   }
 
   @Test
@@ -797,6 +812,11 @@ public class LangChainClientTest {
     protected OpenAiConversation openAiConversation(
         ChangeSetData changeSetData, GerritChange change) {
       return conversation;
+    }
+
+    private void clearTimedOutConversation(
+        AiProviderType providerType, ChangeSetData changeSetData, Throwable failure) {
+      clearTimedOutOpenAiConversation(providerType, changeSetData, null, failure);
     }
   }
 

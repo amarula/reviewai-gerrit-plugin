@@ -43,6 +43,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiSdkClientFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -626,6 +627,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       requestTimer.empty();
       throw e;
     } catch (Exception e) {
+      clearTimedOutOpenAiConversation(providerType, changeSetData, change, e);
       if (changeSetData.getAiRequestCancellation().isSupersessionRequested()) {
         requestTimer.empty();
         changeSetData.getAiRequestCancellation().throwIfSupersessionRequested();
@@ -634,6 +636,21 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       log.warn("Error while processing LangChain request", e);
       throw new AiConnectionFailException(e);
     }
+  }
+
+  @VisibleForTesting
+  protected void clearTimedOutOpenAiConversation(
+      AiProviderType providerType,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      Throwable failure) {
+    if (pluginDataHandlerProvider == null
+        || !shouldUseOpenAiConversation(providerType)
+        || !OpenAiSdkClientFactory.isTimeout(failure)) {
+      return;
+    }
+    openAiConversation(changeSetData, change).clearCurrentConversation();
+    log.info("Cleared OpenAI conversation after request timeout");
   }
 
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
