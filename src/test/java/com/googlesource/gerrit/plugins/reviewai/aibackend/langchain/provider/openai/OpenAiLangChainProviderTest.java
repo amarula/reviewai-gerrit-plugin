@@ -8,6 +8,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +122,35 @@ public class OpenAiLangChainProviderTest {
     assertEquals(Integer.valueOf(4), tokenUsage.inputTokenCount());
     assertNull(tokenUsage.cachedInputTokenCount());
     assertNull(tokenUsage.cacheWriteTokenCount());
+  }
+
+  @Test
+  public void doesNotRetryTimedOutResponseUsingConversation() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(config.getAiConnectionTimeout()).thenReturn(1);
+    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(2);
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withFixedDelay(1500)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(successfulResponseBody())));
+
+    RuntimeException failure =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                provider
+                    .buildChatModel(config, 0.0, "conv_test")
+                    .getModel()
+                    .chat(ChatRequest.builder().messages(UserMessage.from("Say ok")).build()));
+
+    assertTrue(OpenAiSdkClientFactory.isTimeout(failure));
+    WireMock.verify(1, postRequestedFor(urlEqualTo("/v1/responses")));
   }
 
   @Test
