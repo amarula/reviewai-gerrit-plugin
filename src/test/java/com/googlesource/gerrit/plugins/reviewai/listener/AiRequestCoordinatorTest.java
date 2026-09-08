@@ -283,6 +283,27 @@ public class AiRequestCoordinatorTest extends TestBase {
     assertTrue(reviewStopped.get());
   }
 
+  @Test
+  public void runsIdleActionAfterInFlightRequestFinishes() throws Exception {
+    CountDownLatch requestStarted = new CountDownLatch(1);
+    CountDownLatch releaseRequest = new CountDownLatch(1);
+    CountDownLatch idleActionRan = new CountDownLatch(1);
+    coordinator.admit(
+        message("request-1", "event-1"),
+        request -> {
+          requestStarted.countDown();
+          releaseRequest.await();
+          return ProcessingOutcome.COMPLETED;
+        });
+    assertTrue(requestStarted.await(5, TimeUnit.SECONDS));
+
+    coordinator.runWhenChangeIdle(CHANGE, idleActionRan::countDown);
+
+    assertEquals(1, idleActionRan.getCount());
+    releaseRequest.countDown();
+    assertTrue(idleActionRan.await(5, TimeUnit.SECONDS));
+  }
+
   private AiRequestSubmission review(String requestId, String sourceEventId) {
     return new AiRequestSubmission(
         requestId,

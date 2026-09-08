@@ -25,23 +25,23 @@ import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewChangeStateStore;
 import lombok.extern.slf4j.Slf4j;
 
-/** Handles concern-ledger cleanup when a change is merged or abandoned. */
+/** Handles operational review-state cleanup when a change is merged or abandoned. */
 @Slf4j
 @Singleton
-public class ReviewConcernLifecycleEventHandler {
-  private final ReviewConcernPublisher reviewConcernPublisher;
+public class ClosedChangeLifecycleEventHandler {
+  private final ReviewChangeStateStore reviewChangeStateStore;
   private final AiRequestCoordinator aiRequestCoordinator;
   private final AiRequestStore aiRequestStore;
 
   @Inject
-  ReviewConcernLifecycleEventHandler(
-      ReviewConcernPublisher reviewConcernPublisher,
+  ClosedChangeLifecycleEventHandler(
+      ReviewChangeStateStore reviewChangeStateStore,
       AiRequestCoordinator aiRequestCoordinator,
       AiRequestStore aiRequestStore) {
-    this.reviewConcernPublisher = reviewConcernPublisher;
+    this.reviewChangeStateStore = reviewChangeStateStore;
     this.aiRequestCoordinator = aiRequestCoordinator;
     this.aiRequestStore = aiRequestStore;
   }
@@ -56,17 +56,32 @@ public class ReviewConcernLifecycleEventHandler {
     GerritChangeRef changeRef = changeRef((PatchSetEvent) event);
     cancelActiveReview(changeRef, change, event);
     deleteAiRequests(changeRef, change);
+    clearReviewStateWhenIdle(changeRef, change, event);
+    return true;
+  }
+
+  private void clearReviewStateWhenIdle(
+      GerritChangeRef changeRef, GerritChange change, Event event) {
+    try {
+      aiRequestCoordinator.runWhenChangeIdle(changeRef, () -> clearReviewState(change, event));
+    } catch (Exception e) {
+      log.error(
+          "Failed to schedule final review state cleanup for change {}",
+          change.getFullChangeId(),
+          e);
+    }
+  }
+
+  private void clearReviewState(GerritChange change, Event event) {
     log.debug(
-        "Clearing review concern ledger for change {} on event {}",
+        "Clearing operational review state for change {} on event {}",
         change.getFullChangeId(),
         event.getType());
     try {
-      reviewConcernPublisher.clear(change);
+      reviewChangeStateStore.clear(change.getFullChangeId());
     } catch (Exception e) {
-      log.error(
-          "Failed to clear review concern ledger for change {}", change.getFullChangeId(), e);
+      log.error("Failed to clear review state for change {}", change.getFullChangeId(), e);
     }
-    return true;
   }
 
   private void cancelActiveReview(GerritChangeRef changeRef, GerritChange change, Event event) {

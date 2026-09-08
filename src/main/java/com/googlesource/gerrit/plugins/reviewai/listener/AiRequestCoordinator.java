@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -57,6 +58,8 @@ public class AiRequestCoordinator {
   private final Map<String, RequestProcessor> preparedProcessors = new ConcurrentHashMap<>();
   private final Map<GerritChangeRef, ActiveRequest> activeRequests = new ConcurrentHashMap<>();
   private final Set<GerritChangeRef> scheduledChanges = ConcurrentHashMap.newKeySet();
+  private final Map<GerritChangeRef, ConcurrentLinkedQueue<Runnable>> idleActions =
+      new ConcurrentHashMap<>();
 
   private volatile RequestProcessor persistedProcessor;
   private volatile RecoveryProcessor recoveryProcessor;
@@ -173,6 +176,18 @@ public class AiRequestCoordinator {
     return requested;
   }
 
+  /** Runs an action after the currently scheduled work for a Change has finished. */
+  public void runWhenChangeIdle(GerritChangeRef change, Runnable action) {
+    Objects.requireNonNull(change, "change");
+    Objects.requireNonNull(action, "action");
+    synchronized (idleActions) {
+      idleActions.computeIfAbsent(change, ignored -> new ConcurrentLinkedQueue<>()).add(action);
+    }
+    if (!scheduledChanges.contains(change)) {
+      runIdleActions(change);
+    }
+  }
+
   public synchronized void stop() {
     stopping = true;
     if (recoveryTask != null) {
@@ -186,6 +201,7 @@ public class AiRequestCoordinator {
     preparedProcessors.clear();
     activeRequests.clear();
     scheduledChanges.clear();
+    idleActions.clear();
   }
 
   private void schedule(GerritChangeRef change) {
@@ -214,8 +230,26 @@ public class AiRequestCoordinator {
       }
     } finally {
       scheduledChanges.remove(change);
+      runIdleActions(change);
       if (!stopping && store.hasQueuedRequest(change)) {
         schedule(change);
+      }
+    }
+  }
+
+  private void runIdleActions(GerritChangeRef change) {
+    ConcurrentLinkedQueue<Runnable> actions;
+    synchronized (idleActions) {
+      actions = idleActions.remove(change);
+    }
+    if (actions == null) {
+      return;
+    }
+    for (Runnable action : actions) {
+      try {
+        action.run();
+      } catch (RuntimeException e) {
+        log.error("Failed to run idle action for {}", change, e);
       }
     }
   }

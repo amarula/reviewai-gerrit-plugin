@@ -24,22 +24,23 @@ import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.sql.SQLException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
-/** Removes concern ledgers for changes that are no longer open (merged, abandoned, or gone). */
+/** Removes operational review state for changes that are no longer open. */
 @Slf4j
 @Singleton
 public class ReviewConcernSanitizer {
-  private final ReviewAiDb db;
+  private final ReviewChangeStateStore reviewChangeStateStore;
   private final GerritApi gerritApi;
   private final OneOffRequestContext requestContext;
 
   @Inject
   public ReviewConcernSanitizer(
-      ReviewAiDb db, GerritApi gerritApi, OneOffRequestContext requestContext) {
-    this.db = db;
+      ReviewChangeStateStore reviewChangeStateStore,
+      GerritApi gerritApi,
+      OneOffRequestContext requestContext) {
+    this.reviewChangeStateStore = reviewChangeStateStore;
     this.gerritApi = gerritApi;
     this.requestContext = requestContext;
   }
@@ -47,9 +48,9 @@ public class ReviewConcernSanitizer {
   public int sanitize() {
     List<String> changeIds;
     try {
-      changeIds = db.listReviewConcernChangeIds();
-    } catch (SQLException e) {
-      log.error("Could not list review concern change IDs for sanitization", e);
+      changeIds = reviewChangeStateStore.listChangeIds();
+    } catch (RuntimeException e) {
+      log.error("Could not list review change IDs for sanitization", e);
       return 0;
     }
     if (changeIds.isEmpty()) {
@@ -65,21 +66,21 @@ public class ReviewConcernSanitizer {
           }
         } catch (RuntimeException e) {
           log.warn(
-              "Could not clear review concern ledger for change {} (database unavailable); aborting sanitization",
+              "Could not clear review state for change {} (database unavailable); aborting sanitization",
               changeId,
               e);
           break;
         }
       }
     }
-    log.info("Review concern sanitization removed {} of {} ledgers", removed, changeIds.size());
+    log.info("Review state sanitization removed {} of {} Changes", removed, changeIds.size());
     return removed;
   }
 
   private boolean removeIfClosed(String changeId) {
     int separator = changeId.lastIndexOf('~');
     if (separator <= 0 || separator == changeId.length() - 1) {
-      log.warn("Skipping review concern ledger with malformed change id: {}", changeId);
+      log.warn("Skipping review state with malformed change id: {}", changeId);
       return false;
     }
     boolean shouldClear;
@@ -90,7 +91,7 @@ public class ReviewConcernSanitizer {
       shouldClear = true;
     } catch (Exception e) {
       log.warn(
-          "Could not resolve status of change {}; keeping its review concern ledger", changeId, e);
+          "Could not resolve status of change {}; keeping its review state", changeId, e);
       return false;
     }
 
@@ -98,8 +99,8 @@ public class ReviewConcernSanitizer {
       return false;
     }
 
-    ReviewConcernStore.clear(db, changeId);
-    log.info("Removed review concern ledger for change {}", changeId);
+    reviewChangeStateStore.clear(changeId);
+    log.info("Removed review state for change {}", changeId);
     return true;
   }
 }

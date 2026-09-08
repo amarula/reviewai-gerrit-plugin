@@ -41,7 +41,7 @@ public class GerritListenerTest extends TestBase {
   @Mock private EventHandlerExecutor eventHandlerExecutor;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private LoggingConfigurator loggingConfigurator;
-  @Mock private ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler;
+  @Mock private ClosedChangeLifecycleEventHandler closedChangeLifecycleEventHandler;
   @Mock private Change change;
 
   private GerritListener listener;
@@ -58,7 +58,7 @@ public class GerritListenerTest extends TestBase {
             eventHandlerExecutor,
             pluginDataHandlerBaseProvider,
             loggingConfigurator,
-            reviewConcernLifecycleEventHandler,
+            closedChangeLifecycleEventHandler,
             INSTANCE_ID);
   }
 
@@ -66,11 +66,11 @@ public class GerritListenerTest extends TestBase {
   public void delegatesMergeToConcernLifecycleHandler() {
     ChangeMergedEvent event = new ChangeMergedEvent(change);
     event.instanceId = INSTANCE_ID;
-    when(reviewConcernLifecycleEventHandler.handle(event)).thenReturn(true);
+    when(closedChangeLifecycleEventHandler.handle(event)).thenReturn(true);
 
     listener.onEvent(event);
 
-    verify(reviewConcernLifecycleEventHandler).handle(event);
+    verify(closedChangeLifecycleEventHandler).handle(event);
     verify(eventHandlerExecutor, never()).execute(any(), any());
   }
 
@@ -78,11 +78,11 @@ public class GerritListenerTest extends TestBase {
   public void delegatesAbandonToConcernLifecycleHandler() {
     ChangeAbandonedEvent event = new ChangeAbandonedEvent(change);
     event.instanceId = INSTANCE_ID;
-    when(reviewConcernLifecycleEventHandler.handle(event)).thenReturn(true);
+    when(closedChangeLifecycleEventHandler.handle(event)).thenReturn(true);
 
     listener.onEvent(event);
 
-    verify(reviewConcernLifecycleEventHandler).handle(event);
+    verify(closedChangeLifecycleEventHandler).handle(event);
     verify(eventHandlerExecutor, never()).execute(any(), any());
   }
 
@@ -93,6 +93,6 @@ public class GerritListenerTest extends TestBase {
 
     listener.onEvent(event);
 
-    verify(reviewConcernLifecycleEventHandler, never()).handle(any());
+    verify(closedChangeLifecycleEventHandler, never()).handle(any());
   }
 }
