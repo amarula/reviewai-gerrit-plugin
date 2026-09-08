@@ -41,8 +41,6 @@ gerrit_plugin(
         "Implementation-Vendor: Amarula Solutions",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
         "Implementation-Title: AI Code Review Gerrit Plugin",
-        "Gerrit-ApiType: plugin",
-        "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob(["src/main/resources/**/*"]),
     deps = PLUGIN_DEPS,
@@ -59,8 +57,6 @@ gerrit_plugin(
         "Implementation-Vendor: Amarula Solutions",
         "Implementation-URL: https://github.com/amarula/reviewai-gerrit-plugin",
         "Implementation-Title: AI Code Review Gerrit Plugin Dev",
-        "Gerrit-ApiType: plugin",
-        "Gerrit-ApiVersion: 3.13.1",
     ],
     resources = glob([
         "src/main/resources/**/*",

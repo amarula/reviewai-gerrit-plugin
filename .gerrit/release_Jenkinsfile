@@ -72,7 +72,6 @@ node('android-build') {
                     def builds = [:]
                     gerritVersions.each { gerritVersion ->
                         def shortVersion = gerritVersion.replaceAll(/^v(\d+\.\d+).*/, '$1')
-                        def apiVersion = gerritVersion.replaceAll(/^v/, '')
                         def jarName = "reviewai-gerrit-plugin-${shortVersion}.jar"
 
                         builds["gerrit-${shortVersion}"] = {
@@ -83,8 +82,7 @@ node('android-build') {
                                 rm -rf "\${BUILD_DIR}"
                                 mkdir -p "\${BUILD_DIR}"
 
-                                # ---- Copy plugin source (each parallel branch gets its own
-                                #      copy so we can patch Gerrit-ApiVersion independently) ----
+                                # ---- Copy plugin source into this branch's build directory ----
                                 cp -r "\${PWD}/plugin-source" "\${BUILD_DIR}/plugin-source"
 
                                 # ---- Clone Gerrit for this version ----
@@ -92,12 +90,6 @@ node('android-build') {
                                 git clone --depth 1 --branch "${gerritVersion}" \
                                     --recurse-submodules --shallow-submodules \
                                     "${GERRIT_REPO}" "\${BUILD_DIR}/gerrit"
-
-                                # ---- Patch Gerrit-ApiVersion in BUILD ----
-                                # Matches only the version value inside the existing
-                                # quoted string, preserving the surrounding \" and \",.
-                                sed -i 's/"Gerrit-ApiVersion: [^"]*"/"Gerrit-ApiVersion: ${apiVersion}"/' \
-                                    "\${BUILD_DIR}/plugin-source/BUILD"
 
                                 # ---- Symlink plugin into Gerrit's plugins/ directory ----
                                 ln -sfn "\${BUILD_DIR}/plugin-source" \
