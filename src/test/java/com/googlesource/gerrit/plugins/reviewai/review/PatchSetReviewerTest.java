@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.review;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -67,6 +68,14 @@ public class PatchSetReviewerTest {
         "Too many changes. Please consider splitting into patches smaller than 1 lines for review.",
         changeSetData.getReviewSystemMessage());
     assertNull(reviewer.getReviewScore(change(), response));
+  }
+
+  @Test
+  public void commentMessageDoesNotSkipAiReviewForEmptyPatchSet() {
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+
+    assertFalse(reviewer().shouldSkipAiReviewForEmptyPatchSet(change));
   }
 
   @Test(expected = AiRequestSupersededException.class)

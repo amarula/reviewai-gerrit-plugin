@@ -215,7 +215,8 @@ public class PatchSetReviewer {
   }
 
   boolean shouldSkipAiReviewForEmptyPatchSet(GerritChange change) {
-    if (changeSetData.getReviewScope() == ReviewScope.COMMIT_MESSAGE) {
+    if (change.getIsCommentEvent()
+        || changeSetData.getReviewScope() == ReviewScope.COMMIT_MESSAGE) {
       return false;
     }
     List<String> patchSetFiles =
