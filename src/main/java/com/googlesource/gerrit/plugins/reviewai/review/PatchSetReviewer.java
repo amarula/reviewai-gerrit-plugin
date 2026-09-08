@@ -134,6 +134,8 @@ public class PatchSetReviewer {
     String patchSet = gerritClient.getPatchSet(change);
     prepareConcernContext(change);
     if (shouldSkipAiReviewForEmptyPatchSet(change)) {
+      changeSetData.setReviewSystemMessage(SystemMessageFormatter.getLocalizedMessage(
+          localizer, "message.review.skipped"));
       log.debug(
           "Skipping AI review for change {} because no files remain after patch filtering.",
           change.getFullChangeId());

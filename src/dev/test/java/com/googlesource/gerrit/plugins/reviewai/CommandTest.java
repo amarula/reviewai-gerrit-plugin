@@ -600,7 +600,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
     Mockito.verify(revisionApiMock).review(captor.capture());
     Assert.assertEquals(
-        "ReviewAI Message: No update to show for this Change Set", captor.getValue().message);
+        "ReviewAI Message: Review skipped because this Patch Set contains no reviewable changes.", captor.getValue().message);
     Assert.assertNull(captor.getValue().comments);
     WireMock.verify(
         0, WireMock.postRequestedFor(WireMock.urlEqualTo(OpenAiUriResourceLocator.responsesUri())));
