@@ -29,6 +29,8 @@ import com.google.gerrit.extensions.restapi.ResourceNotFoundException;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
+import com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,20 +45,26 @@ public class ReviewConcernSanitizerTest extends TestBase {
   @Mock private OneOffRequestContext requestContext;
 
   private ReviewConcernSanitizer sanitizer;
+  private ReviewChangeStateStore reviewChangeStateStore;
   private ReviewAiDb db;
 
   @Before
   public void setUp() {
     db = getTestReviewAiDb();
-    sanitizer = new ReviewConcernSanitizer(db, gerritApi, requestContext);
+    reviewChangeStateStore = new ReviewChangeStateStore(db);
+    sanitizer = new ReviewConcernSanitizer(reviewChangeStateStore, gerritApi, requestContext);
   }
 
   @Test
   public void removesMergedAbandonedAndMissingLedgersKeepsOpenOnesUsingFullChangeIds()
       throws Exception {
     new ReviewConcernStore(db, "p~main~Imerged").save(new ReviewConcernLedger());
-    new ReviewConcernStore(db, "p~main~Iabandoned").save(new ReviewConcernLedger());
+    new ReviewFeedbackMemoryStore(db, "p~main~Iabandoned")
+        .save(new ReviewFeedbackMemory());
+    new ReviewFeedbackStore(db, "p~main~Iabandoned").enqueue(List.of("comment-1"));
     new ReviewConcernStore(db, "p~main~Inew").save(new ReviewConcernLedger());
+    new LangChainChatMemoryRepository(db)
+        .updateMessages("p~main~Inew", 3, "review_code", List.of("{}"));
     new ReviewConcernStore(db, "p~main~Imissing").save(new ReviewConcernLedger());
 
     ChangeApi mergedApi = changeApiWithStatus(ChangeStatus.MERGED);
@@ -70,7 +78,7 @@ public class ReviewConcernSanitizerTest extends TestBase {
     when(changes.id("p~main~Imissing")).thenThrow(new ResourceNotFoundException("gone"));
 
     assertEquals(3, sanitizer.sanitize());
-    assertEquals(List.of("p~main~Inew"), db.listReviewConcernChangeIds());
+    assertEquals(List.of("p~main~Inew"), reviewChangeStateStore.listChangeIds());
   }
 
   private ChangeApi changeApiWithStatus(ChangeStatus status) throws Exception {

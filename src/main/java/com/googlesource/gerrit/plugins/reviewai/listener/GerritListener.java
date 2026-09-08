@@ -39,7 +39,7 @@ public class GerritListener implements EventListener {
   private final EventHandlerExecutor evenHandlerExecutor;
   private final PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   private final LoggingConfigurator loggingConfigurator;
-  private final ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler;
+  private final ClosedChangeLifecycleEventHandler closedChangeLifecycleEventHandler;
 
   @Inject
   public GerritListener(
@@ -47,13 +47,13 @@ public class GerritListener implements EventListener {
       EventHandlerExecutor evenHandlerExecutor,
       PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
       LoggingConfigurator loggingConfigurator,
-      ReviewConcernLifecycleEventHandler reviewConcernLifecycleEventHandler,
+      ClosedChangeLifecycleEventHandler closedChangeLifecycleEventHandler,
       @GerritInstanceId @Nullable String myInstanceId) {
     this.configCreator = configCreator;
     this.evenHandlerExecutor = evenHandlerExecutor;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
     this.loggingConfigurator = loggingConfigurator;
-    this.reviewConcernLifecycleEventHandler = reviewConcernLifecycleEventHandler;
+    this.closedChangeLifecycleEventHandler = closedChangeLifecycleEventHandler;
     this.myInstanceId = myInstanceId;
     log.debug("GerritListener initialized with instance ID: {}", myInstanceId);
   }
@@ -65,7 +65,7 @@ public class GerritListener implements EventListener {
       log.debug("Ignore event from another instance: {}", event.instanceId);
       return;
     }
-    if (reviewConcernLifecycleEventHandler.handle(event)) {
+    if (closedChangeLifecycleEventHandler.handle(event)) {
       return;
     }
     if (!EVENT_CLASS_MAP.containsValue(event.getClass())) {

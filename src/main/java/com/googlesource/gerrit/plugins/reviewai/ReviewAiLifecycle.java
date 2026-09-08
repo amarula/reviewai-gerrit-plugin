@@ -123,7 +123,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
               try {
                 reviewConcernSanitizer.sanitize();
               } catch (Exception e) {
-                log.error("Review concern sanitization failed", e);
+                log.error("Review state sanitization failed", e);
               }
             });
   }

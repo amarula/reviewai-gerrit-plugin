@@ -172,17 +172,26 @@ For `change-merged` and `change-abandoned`, the lifecycle handler performs three
 
 1. Signal cancellation of the active review with a closure-specific reason.
 2. Delete all `ai_requests` rows and the `ai_request_lanes` row for the Change in one transaction.
-3. Clear the Change's concern ledger.
+3. Clear the Change's operational review state in one transaction: concern ledgers, distilled feedback and its
+   comment-processing state, and LangChain chat memory for every Patch Set and scope.
+
+Before deleting LangChain memory, cleanup materializes any legacy sidebar conversation turn that still references a
+LangChain message. Sidebar conversation history is retained; only context used to continue model conversations is
+removed. The lifecycle handler performs operational-state cleanup after scheduled work for the Change becomes idle,
+so an in-flight model call cannot recreate memory after deletion. Cleanup runs immediately when there is no scheduled
+work.
 
 An in-flight worker can finish after its durable row has been deleted. Its ownership-checked terminal update then
 returns false and may log that it lost ownership; it cannot recreate the deleted request. Its final empty claim also
 removes any idle lane it creates, as described above.
 
 No tombstone is retained for a closed Change. If an abandoned Change is restored and later receives an eligible
-event, admission creates a fresh lane and request history. A merged Change is treated as final by Gerrit.
+event, admission creates fresh request, concern, feedback, and model-conversation state. A merged Change is treated as
+final by Gerrit.
 
-This is event-driven retention rather than an age-based policy. Open Changes retain their terminal request rows until
-they are merged or abandoned.
+This is event-driven retention rather than an age-based policy. Open Changes retain their operational review state
+until they are merged or abandoned. Startup sanitization also removes state left behind when a lifecycle event was
+missed while the plugin was stopped.
 
 ## Concurrency Boundaries
 

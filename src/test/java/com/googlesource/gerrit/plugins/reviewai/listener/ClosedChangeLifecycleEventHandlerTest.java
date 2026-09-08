@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,10 +34,9 @@ import com.google.gerrit.server.events.ChangeMergedEvent;
 import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetEvent;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewChangeStateStore;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -45,24 +45,31 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
+public class ClosedChangeLifecycleEventHandlerTest extends TestBase {
   private static final GerritChangeRef CHANGE_REF = new GerritChangeRef("gerrit-instance", 42);
 
-  @Mock private ReviewConcernPublisher reviewConcernPublisher;
+  @Mock private ReviewChangeStateStore reviewChangeStateStore;
   @Mock private AiRequestCoordinator aiRequestCoordinator;
   @Mock private AiRequestStore aiRequestStore;
   @Mock private Change change;
 
-  private ReviewConcernLifecycleEventHandler handler;
+  private ClosedChangeLifecycleEventHandler handler;
 
   @Before
   public void setUp() {
     when(change.getProject()).thenReturn(PROJECT_NAME);
     when(change.getDest()).thenReturn(BRANCH_NAME);
     when(change.getKey()).thenReturn(CHANGE_ID);
+    doAnswer(
+            invocation -> {
+              ((Runnable) invocation.getArgument(1)).run();
+              return null;
+            })
+        .when(aiRequestCoordinator)
+        .runWhenChangeIdle(any(), any());
     handler =
-        new ReviewConcernLifecycleEventHandler(
-            reviewConcernPublisher, aiRequestCoordinator, aiRequestStore);
+        new ClosedChangeLifecycleEventHandler(
+            reviewChangeStateStore, aiRequestCoordinator, aiRequestStore);
   }
 
   @Test
@@ -74,6 +81,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
 
     assertClearedForCurrentChange();
     verify(aiRequestCoordinator).cancelRunningReview(CHANGE_REF, "Change merged");
+    verify(aiRequestCoordinator).runWhenChangeIdle(any(), any());
     verify(aiRequestStore).deleteByChange(CHANGE_REF);
   }
 
@@ -86,6 +94,7 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
 
     assertClearedForCurrentChange();
     verify(aiRequestCoordinator).cancelRunningReview(CHANGE_REF, "Change abandoned");
+    verify(aiRequestCoordinator).runWhenChangeIdle(any(), any());
     verify(aiRequestStore).deleteByChange(CHANGE_REF);
   }
 
@@ -93,15 +102,16 @@ public class ReviewConcernLifecycleEventHandlerTest extends TestBase {
   public void doesNotHandleOtherEvents() {
     assertFalse(handler.handle(mock(Event.class)));
 
-    verify(reviewConcernPublisher, never()).clear(any());
+    verify(reviewChangeStateStore, never()).clear(any());
     verify(aiRequestCoordinator, never()).cancelRunningReview(any(), any());
+    verify(aiRequestCoordinator, never()).runWhenChangeIdle(any(), any());
     verify(aiRequestStore, never()).deleteByChange(any());
   }
 
   private void assertClearedForCurrentChange() {
-    ArgumentCaptor<GerritChange> captor = ArgumentCaptor.forClass(GerritChange.class);
-    verify(reviewConcernPublisher).clear(captor.capture());
-    assertEquals("myProject~myBranchName~myChangeId", captor.getValue().getFullChangeId());
+    ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+    verify(reviewChangeStateStore).clear(captor.capture());
+    assertEquals("myProject~myBranchName~myChangeId", captor.getValue());
   }
 
   private static void populateChangeRef(PatchSetEvent event) {
