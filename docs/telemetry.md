@@ -219,15 +219,15 @@ Additional behavior:
   including cached and cache-write tokens.
 - Cached-input pricing is used when the provider integration retains a reported cache-hit count. If that detail is not
   available, all input is charged at the regular input price, producing a conservative estimate.
-- GPT-5.6 cache-write pricing is used only when the response explicitly reports `cache_write_tokens`. Otherwise,
-  non-cached input is charged at the regular input price.
+- GPT-5.6 and GPT-6 cache-write pricing is used only when the response explicitly reports `cache_write_tokens`.
+  Otherwise, non-cached input is charged at the regular input price.
 - A response for a known-priced route without complete token usage does not update the cost counter. Unknown exact model
   routes increment `pricing_missing` once per response, independently of token-usage availability.
 - Ollama and ReviewAI mock-model routes are excluded from both cost metrics.
 
 ### Built-in pricing
 
-The built-in prices are USD per one million tokens and were verified on 2026-07-22 against the official
+The built-in prices are USD per one million tokens and were verified on 2026-09-08 against the official
 [OpenAI](https://developers.openai.com/api/docs/pricing),
 [Gemini](https://ai.google.dev/gemini-api/docs/pricing),
 [DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/), and
@@ -236,9 +236,10 @@ plugin, as described below.
 
 | Provider/model                                         | Input | Cached input | Cache write | Output | Long-context input / cached / write / output |
 |--------------------------------------------------------|------:|-------------:|------------:|-------:|----------------------------------------------|
-| `OpenAI/gpt-5.6-sol`                                   |  5.00 |         0.50 |        6.25 |  30.00 | 10.00 / 1.00 / 12.50 / 45.00 above 272K      |
-| `OpenAI/gpt-5.6-terra`                                 |  2.50 |         0.25 |       3.125 |  15.00 | 5.00 / 0.50 / 6.25 / 22.50 above 272K        |
-| `OpenAI/gpt-5.6-luna`                                  |  1.00 |         0.10 |        1.25 |   6.00 | 2.00 / 0.20 / 2.50 / 9.00 above 272K         |
+| `OpenAI/gpt-6-astra`                                   | 10.00 |         1.00 |       12.50 |  50.00 | 20.00 / 2.00 / 25.00 / 75.00 above 272K      |
+| `OpenAI/gpt-5.6-sol`                                   |  4.00 |         0.40 |        5.00 |  20.00 | 8.00 / 0.80 / 10.00 / 30.00 above 272K       |
+| `OpenAI/gpt-5.6-terra`                                 |  2.00 |         0.20 |        2.50 |  12.00 | 4.00 / 0.40 / 5.00 / 18.00 above 272K        |
+| `OpenAI/gpt-5.6-luna`                                  |  0.20 |         0.02 |        0.25 |   1.20 | 0.40 / 0.04 / 0.50 / 1.80 above 272K         |
 | `OpenAI/gpt-5.5`                                       |  5.00 |         0.50 |        5.00 |  30.00 | 10.00 / 1.00 / 10.00 / 45.00 above 272K      |
 | `OpenAI/gpt-5.4`                                       |  2.50 |         0.25 |        2.50 |  15.00 | 5.00 / 0.50 / 5.00 / 22.50 above 272K        |
 | `OpenAI/gpt-4.1`                                       |  2.00 |         0.50 |        2.00 |   8.00 | —                                            |
@@ -246,12 +247,15 @@ plugin, as described below.
 | `Gemini/gemini-3.1-flash` and `gemini-3-flash-preview` |  0.50 |         0.05 |        0.50 |   3.00 | —                                            |
 | `Gemini/gemini-2.5-pro`                                |  1.25 |        0.125 |        1.25 |  10.00 | 2.50 / 0.25 / 2.50 / 15.00 above 200K        |
 | `Gemini/gemini-2.5-flash`                              |  0.30 |         0.03 |        0.30 |   2.50 | —                                            |
-| `DeepSeek/deepseek-v4-pro`                             | 0.435 |     0.003625 |       0.435 |   0.87 | —                                            |
-| `DeepSeek/deepseek-v4-flash`                           |  0.14 |       0.0028 |        0.14 |   0.28 | —                                            |
+| `DeepSeek/deepseek-v4-pro`                             |  1.32 |        0.044 |        1.32 |   3.96 | —                                            |
+| `DeepSeek/deepseek-v4-flash`                           |  0.44 |        0.014 |        0.44 |   1.32 | —                                            |
 | `MoonShot/kimi-k3`                                     |  3.00 |         0.30 |        3.00 |  15.00 | —                                            |
 | `MoonShot/kimi-k2.7-code`                              |  0.95 |         0.19 |        0.95 |   4.00 | —                                            |
 | `MoonShot/kimi-k2.6`                                   |  0.95 |         0.16 |        0.95 |   4.00 | —                                            |
 | `MoonShot/moonshot-v1-8k`                              |  0.20 |         0.20 |        0.20 |   2.00 | —                                            |
+
+DeepSeek uses peak and off-peak pricing based on request time. The built-in catalog uses peak rates so that estimated
+cost does not understate the maximum charge; official off-peak rates are 50% lower.
 
 ### Pricing override syntax
 
@@ -303,7 +307,7 @@ Define GPT-5.6 cache-write rates:
 
 ```ini
 [plugin "reviewai-gerrit-plugin"]
-    aiPricing = OpenAI/gpt-5.6-sol,input=5,cachedInput=.5,cacheWrite=6.25,output=30,longThreshold=272000,longInput=10,longCachedInput=1,longCacheWrite=12.5,longOutput=45
+    aiPricing = OpenAI/gpt-5.6-sol,input=4,cachedInput=.4,cacheWrite=5,output=20,longThreshold=272000,longInput=8,longCachedInput=.8,longCacheWrite=10,longOutput=30
 ```
 
 Multiple entries can be repeated in the same configuration section:
