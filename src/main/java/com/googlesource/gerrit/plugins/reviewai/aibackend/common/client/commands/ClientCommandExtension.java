@@ -27,10 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface ClientCommandExtension {
-  boolean requiresAdministrator(
-      ClientCommandBase.CommandSet command,
-      Map<ClientCommandBase.BaseOptionSet, String> baseOptions);
-
   boolean acceptsDynamicOptions(ClientCommandBase.CommandSet command);
 
   boolean dynamicOptionsMismatch(

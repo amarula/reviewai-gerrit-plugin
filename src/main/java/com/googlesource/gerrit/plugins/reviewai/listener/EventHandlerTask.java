@@ -25,7 +25,10 @@ import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
@@ -76,7 +79,7 @@ public class EventHandlerTask implements Runnable {
   private final AiReviewPermission aiReviewPermission;
   private final IdentifiedUser.GenericFactory identifiedUserFactory;
   private final AccountCache accountCache;
-  private final AiAdministratorAccess aiAdministratorAccess;
+  private final AiRoleResolver roleResolver;
   private final ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater;
   private final TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator;
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
@@ -102,10 +105,10 @@ public class EventHandlerTask implements Runnable {
       AiReviewPermission aiReviewPermission,
       IdentifiedUser.GenericFactory identifiedUserFactory,
       AccountCache accountCache,
+      AiRoleResolver roleResolver,
       ReviewAgentEventRequestStatusUpdater reviewAgentRequestStatusUpdater,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
-      EventBuildFeatures buildFeatures,
       ReviewAiMetrics metrics,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
       Localizer localizer) {
@@ -117,10 +120,10 @@ public class EventHandlerTask implements Runnable {
     this.aiReviewPermission = aiReviewPermission;
     this.identifiedUserFactory = identifiedUserFactory;
     this.accountCache = accountCache;
+    this.roleResolver = roleResolver;
     this.reviewAgentRequestStatusUpdater = reviewAgentRequestStatusUpdater;
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
-    this.aiAdministratorAccess = buildFeatures.aiAdministratorAccess();
     this.metrics = metrics;
     this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     this.localizer = localizer;
@@ -241,7 +244,9 @@ public class EventHandlerTask implements Runnable {
   }
 
   private IEventHandlerType getEventHandlerType() {
-    administratorUser = isAdministratorUser(eventUser);
+    AiRole userRole = roleResolver.resolve(config, eventUser);
+    administratorUser =
+        AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES);
     return switch (processing_event_type) {
       case PATCH_SET_CREATED ->
           new EventHandlerTypePatchSetReview(
@@ -262,13 +267,9 @@ public class EventHandlerTask implements Runnable {
               gerritClient,
               aiReviewApplicabilityChecker,
               reviewFeedbackPublisher,
-              administratorUser,
+              userRole,
               sourceEventId);
     };
-  }
-
-  private boolean isAdministratorUser(CurrentUser user) {
-    return aiAdministratorAccess.isAdministrator(config, user);
   }
 
   private boolean isReviewEnabled(GerritChange change) {

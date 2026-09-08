@@ -35,7 +35,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.con
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
-import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
 import lombok.extern.slf4j.Slf4j;
 
 import static com.google.inject.Scopes.SINGLETON;
@@ -50,8 +49,7 @@ public class GerritEventContextModule extends FactoryModule {
     this(
         config,
         event,
-        new EventBuildFeatures(
-            new NoAiAdministratorAccess(), new DisabledClientCommandExtension()));
+        new EventBuildFeatures(new DisabledClientCommandExtension()));
   }
 
   public GerritEventContextModule(

@@ -24,8 +24,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarPluginDetector;
 import com.googlesource.gerrit.plugins.reviewai.listener.DevLoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
-import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.web.DevAiReviewConfig;
 
 public class DevModule extends Module {
@@ -35,8 +35,8 @@ public class DevModule extends Module {
   }
 
   @Override
-  protected Class<? extends AiAdministratorAccess> aiAdministratorAccessClass() {
-    return DevAiAdministratorAccess.class;
+  protected Class<? extends AiRoleResolver> aiRoleResolverClass() {
+    return DevAiRoleResolver.class;
   }
 
   @Override

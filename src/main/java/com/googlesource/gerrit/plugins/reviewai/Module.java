@@ -29,8 +29,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.listener.NoLoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
-import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DefaultAiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewHistory;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessage;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessageStatus;
@@ -49,7 +49,7 @@ public class Module extends LifecycleModule {
 
   @Override
   protected void configure() {
-    bind(AiAdministratorAccess.class).to(aiAdministratorAccessClass());
+    bind(AiRoleResolver.class).to(aiRoleResolverClass());
     bind(ClientCommandExtension.class).to(clientCommandExtensionClass());
     bind(LoggingConfigurator.class).to(loggingConfiguratorClass());
     // Gerrit's Prometheus exporter can only expose metrics after they have been registered with
@@ -81,8 +81,8 @@ public class Module extends LifecycleModule {
         });
   }
 
-  protected Class<? extends AiAdministratorAccess> aiAdministratorAccessClass() {
-    return NoAiAdministratorAccess.class;
+  protected Class<? extends AiRoleResolver> aiRoleResolverClass() {
+    return DefaultAiRoleResolver.class;
   }
 
   protected Class<? extends ClientCommandExtension> clientCommandExtensionClass() {

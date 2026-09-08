@@ -38,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType.PreprocessResult;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import java.util.HashMap;
 import java.util.List;
@@ -82,7 +83,7 @@ public class EventHandlerTypeCommentAddedTest {
             gerritClient,
             applicabilityChecker,
             reviewFeedbackPublisher,
-            false);
+            AiRole.USER);
   }
 
   @Test
@@ -95,7 +96,7 @@ public class EventHandlerTypeCommentAddedTest {
 
     verify(changeSetData).setForcedReview(true);
     verify(changeSetData).setDeferredReview(true);
-    verify(gerritClient, never()).retrieveComments(change, false);
+    verify(gerritClient, never()).retrieveComments(change, AiRole.USER);
   }
 
   @Test
@@ -133,7 +134,7 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void doesNotReevaluateExpressionForPlainComment() {
-    when(gerritClient.retrieveComments(change, false)).thenReturn(true);
+    when(gerritClient.retrieveComments(change, AiRole.USER)).thenReturn(true);
 
     assertEquals(PreprocessResult.OK, handler.preprocessEvent());
 
@@ -152,14 +153,14 @@ public class EventHandlerTypeCommentAddedTest {
             gerritClient,
             applicabilityChecker,
             reviewFeedbackPublisher,
-            false,
+            AiRole.USER,
             changeMessageId);
-    when(gerritClient.retrieveComments(change, false, changeMessageId)).thenReturn(true);
+    when(gerritClient.retrieveComments(change, AiRole.USER, changeMessageId)).thenReturn(true);
 
     assertEquals(PreprocessResult.OK, handler.preprocessEvent());
 
-    verify(gerritClient).retrieveComments(change, false, changeMessageId);
-    verify(gerritClient, never()).retrieveComments(change, false);
+    verify(gerritClient).retrieveComments(change, AiRole.USER, changeMessageId);
+    verify(gerritClient, never()).retrieveComments(change, AiRole.USER);
   }
 
   @Test

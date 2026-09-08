@@ -53,7 +53,8 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusSto
 import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
 import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
 import com.google.gerrit.json.OutputFormat;
-import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.ConfiguredAiGroupMembership;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiRoleResolver;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -149,7 +150,8 @@ public class AiReviewMessageTest extends TestBase {
             mockPluginDataPath,
             null,
             getTestReviewAiDb(),
-            new DevAiAdministratorAccess(groupCache, permissionBackend),
+            new DevAiRoleResolver(
+                new ConfiguredAiGroupMembership(groupCache), permissionBackend),
             new DevClientCommandExtension(),
             "gerrit-instance");
   }

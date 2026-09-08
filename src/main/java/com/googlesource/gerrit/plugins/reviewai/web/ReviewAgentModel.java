@@ -23,29 +23,34 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.util.List;
 
 public class ReviewAgentModel implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
   private final AiReviewPermission aiReviewPermission;
-  private final AiAdministratorAccess aiAdministratorAccess;
+  private final AiRoleResolver roleResolver;
 
   @Inject
   ReviewAgentModel(
       ConfigCreator configCreator,
       AiReviewPermission aiReviewPermission,
-      AiAdministratorAccess aiAdministratorAccess) {
+      AiRoleResolver roleResolver) {
     this.configCreator = configCreator;
     this.aiReviewPermission = aiReviewPermission;
-    this.aiAdministratorAccess = aiAdministratorAccess;
+    this.roleResolver = roleResolver;
   }
 
   @Override
   public Response<Output> apply(ChangeResource resource) throws Exception {
     Configuration config =
         configCreator.createConfig(resource.getProject(), resource.getChange().getKey());
-    boolean administratorUser = aiAdministratorAccess.isAdministrator(config, resource.getUser());
+    boolean administratorUser =
+        AiRolePolicy.isAllowed(
+            roleResolver.resolve(config, resource.getUser()),
+            AiAction.USE_ADMINISTRATOR_FEATURES);
     List<String> models = config.getAiModels(administratorUser);
     return Response.ok(
         new Output(
