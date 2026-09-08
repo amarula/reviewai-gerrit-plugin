@@ -417,6 +417,41 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void feedbackClassifierDoesNotUseConversationHistory() throws Exception {
+    FakeOpenAiConversation conversation =
+        new FakeOpenAiConversation("conv_review", true);
+    OpenAiConversationTestLangChainClient client =
+        new OpenAiConversationTestLangChainClient(conversation);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
+
+    String conversationId =
+        resolveConversationId(client, AiProviderType.OPENAI, changeSetData);
+
+    assertNull(conversationId);
+    assertFalse(client.useConversationHistory(changeSetData));
+    assertFalse(client.includeInitialHistory(changeSetData));
+    assertFalse(conversation.hasExistingConversationCalled);
+  }
+
+  @Test
+  public void feedbackClassifierTimeoutDoesNotClearReviewConversation() {
+    FakeOpenAiConversation conversation =
+        new FakeOpenAiConversation("conv_review", true);
+    OpenAiConversationTestLangChainClient client =
+        new OpenAiConversationTestLangChainClient(conversation);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
+
+    client.clearTimedOutConversation(
+        AiProviderType.OPENAI,
+        changeSetData,
+        new RuntimeException(new SocketTimeoutException()));
+
+    assertFalse(conversation.clearCurrentConversationCalled);
+  }
+
+  @Test
   public void resolvesOpenAiConversationForNormalFollowUpMessage() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
@@ -817,6 +852,14 @@ public class LangChainClientTest {
     private void clearTimedOutConversation(
         AiProviderType providerType, ChangeSetData changeSetData, Throwable failure) {
       clearTimedOutOpenAiConversation(providerType, changeSetData, null, failure);
+    }
+
+    private boolean includeInitialHistory(ChangeSetData changeSetData) {
+      return shouldIncludeInitialHistory(changeSetData);
+    }
+
+    private boolean useConversationHistory(ChangeSetData changeSetData) {
+      return shouldUseConversationHistory(changeSetData);
     }
   }
 

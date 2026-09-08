@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.P
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
@@ -544,6 +545,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       if (forgetThreadRequested && chatMemoryStore != null) {
         chatMemoryStore.deleteMessages(memoryId);
       }
+      boolean useConversationHistory = shouldUseConversationHistory(changeSetData);
       ConversationResolution conversationResolution =
           resolveConversation(providerType, changeSetData, change);
       boolean omitRequestContext =
@@ -558,9 +560,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       log.debug("LangChain user prompt for {}: {}", memoryId, userMessage);
 
       ChatMemory memory =
-          shouldUseOpenAiConversation(providerType)
-              ? buildTransientMemory(memoryId)
-              : buildMemory(memoryId);
+          useConversationHistory && !shouldUseOpenAiConversation(providerType)
+              ? buildMemory(memoryId)
+              : buildTransientMemory(memoryId);
       boolean hasStoredMemory =
           prepareMemoryForRequest(memory, useOpenAiResponses, systemInstructions);
 
@@ -645,6 +647,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GerritChange change,
       Throwable failure) {
     if (pluginDataHandlerProvider == null
+        || !shouldUseConversationHistory(changeSetData)
         || !shouldUseOpenAiConversation(providerType)
         || !OpenAiSdkClientFactory.isTimeout(failure)) {
       return;
@@ -654,7 +657,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return !isForgetThreadRequested(changeSetData);
+    return shouldUseConversationHistory(changeSetData)
+        && !isForgetThreadRequested(changeSetData);
+  }
+
+  protected boolean shouldUseConversationHistory(ChangeSetData changeSetData) {
+    return changeSetData == null
+        || changeSetData.getReviewAssistantStage()
+            != ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK;
   }
 
   protected boolean isForgetThreadRequested(ChangeSetData changeSetData) {
@@ -733,7 +743,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected ConversationResolution resolveConversation(
       AiProviderType providerType, ChangeSetData changeSetData, GerritChange change)
       throws AiConnectionFailException {
-    if (!shouldUseOpenAiConversation(providerType) || pluginDataHandlerProvider == null) {
+    if (!shouldUseConversationHistory(changeSetData)
+        || !shouldUseOpenAiConversation(providerType)
+        || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
     }
     OpenAiConversation conversation = openAiConversation(changeSetData, change);
