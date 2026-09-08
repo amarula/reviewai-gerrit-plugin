@@ -30,13 +30,6 @@ import java.util.Optional;
 @Singleton
 public class DisabledClientCommandExtension implements ClientCommandExtension {
   @Override
-  public boolean requiresAdministrator(
-      ClientCommandBase.CommandSet command,
-      Map<ClientCommandBase.BaseOptionSet, String> baseOptions) {
-    return false;
-  }
-
-  @Override
   public boolean acceptsDynamicOptions(ClientCommandBase.CommandSet command) {
     return false;
   }

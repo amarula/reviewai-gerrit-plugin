@@ -28,6 +28,8 @@ import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormat
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiCommandAccessPolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -88,7 +90,7 @@ public class ClientCommandParser extends ClientCommandBase {
   private final Localizer localizer;
   private final ClientCommandExecutor clientCommandExecutor;
   private final ClientCommandExtension commandExtension;
-  private final boolean administratorUser;
+  private final AiRole userRole;
 
   private Map<BaseOptionSet, String> baseOptions;
   private Map<String, String> dynamicOptions;
@@ -111,7 +113,7 @@ public class ClientCommandParser extends ClientCommandBase {
         localizer,
         IPatchSetProvider,
         chatMemoryStore,
-        false,
+        AiRole.USER,
         null,
         null,
         new DisabledClientCommandExtension());
@@ -126,7 +128,7 @@ public class ClientCommandParser extends ClientCommandBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
-      boolean administratorUser,
+      AiRole userRole,
       ClientCommandExtension commandExtension) {
     this(
         config,
@@ -137,7 +139,7 @@ public class ClientCommandParser extends ClientCommandBase {
         localizer,
         IPatchSetProvider,
         chatMemoryStore,
-        administratorUser,
+        userRole,
         null,
         null,
         commandExtension);
@@ -152,7 +154,7 @@ public class ClientCommandParser extends ClientCommandBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
-      boolean administratorUser,
+      AiRole userRole,
       ReviewConcernPublisher reviewConcernPublisher,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
       ClientCommandExtension commandExtension) {
@@ -160,7 +162,7 @@ public class ClientCommandParser extends ClientCommandBase {
     this.localizer = localizer;
     this.changeSetData = changeSetData;
     this.commandExtension = commandExtension;
-    this.administratorUser = administratorUser;
+    this.userRole = userRole == null ? AiRole.USER : userRole;
     this.clientCommandExecutor =
         new ClientCommandExecutor(
             config,
@@ -255,11 +257,14 @@ public class ClientCommandParser extends ClientCommandBase {
     if (optionsMismatch(command)) {
       return false;
     }
-    if (!administratorUser && commandExtension.requiresAdministrator(command, baseOptions)) {
+    Optional<AiRole> deniedRole =
+        AiCommandAccessPolicy.deniedRequiredRole(userRole, command, baseOptions);
+    if (deniedRole.isPresent()) {
+      AiRole requiredRole = deniedRole.get();
       changeSetData.setReviewSystemMessage(
           SystemMessageFormatter.getPrefixedSystemMessage(
-              localizer, localizer.getText("message.command.debugging.administrator.required")));
-      log.debug("Command `{}` not validated: administrator privileges are required", command);
+              localizer, localizer.getText(requiredRole.requiredMessageKey())));
+      log.debug("Command `{}` not validated: role `{}` is required", command, requiredRole);
       return false;
     }
     log.debug("Command `{}` validated", command);

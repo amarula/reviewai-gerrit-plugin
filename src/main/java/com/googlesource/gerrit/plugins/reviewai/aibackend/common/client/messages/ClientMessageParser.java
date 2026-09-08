@@ -23,9 +23,11 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +47,7 @@ public class ClientMessageParser extends ClientMessageBase {
       Localizer localizer,
       IPatchSetProvider IPatchSetProvider,
       PluginChatMemoryStore chatMemoryStore,
-      boolean administratorUser,
+      AiRole userRole,
       ReviewConcernPublisher reviewConcernPublisher,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
       ClientCommandExtension commandExtension) {
@@ -60,7 +62,7 @@ public class ClientMessageParser extends ClientMessageBase {
             localizer,
             IPatchSetProvider,
             chatMemoryStore,
-            administratorUser,
+            userRole,
             reviewConcernPublisher,
             reviewFeedbackPublisher,
             commandExtension);

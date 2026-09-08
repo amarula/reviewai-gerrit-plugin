@@ -28,6 +28,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
@@ -42,8 +45,8 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   private final GerritClient gerritClient;
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
   private final ReviewFeedbackPublisher reviewFeedbackPublisher;
-  private final boolean administratorUser;
   private final String sourceChangeMessageId;
+  private final AiRole userRole;
 
   EventHandlerTypeCommentAdded(
       Configuration config,
@@ -53,7 +56,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       GerritClient gerritClient,
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
-      boolean administratorUser) {
+      AiRole userRole) {
     this(
         config,
         changeSetData,
@@ -62,7 +65,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
         gerritClient,
         aiReviewApplicabilityChecker,
         reviewFeedbackPublisher,
-        administratorUser,
+        userRole,
         null);
   }
 
@@ -74,7 +77,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       GerritClient gerritClient,
       AiReviewApplicabilityChecker aiReviewApplicabilityChecker,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
-      boolean administratorUser,
+      AiRole userRole,
       String sourceChangeMessageId) {
     this.config = config;
     this.changeSetData = changeSetData;
@@ -83,8 +86,8 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     this.gerritClient = gerritClient;
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.reviewFeedbackPublisher = reviewFeedbackPublisher;
-    this.administratorUser = administratorUser;
     this.sourceChangeMessageId = sourceChangeMessageId;
+    this.userRole = userRole;
     log.debug(
         "Initialized EventHandlerTypeCommentAdded for full change ID: {}",
         change.getFullChangeId());
@@ -102,9 +105,9 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     }
     boolean commentsRetrieved =
         sourceChangeMessageId == null
-            ? gerritClient.retrieveComments(change, administratorUser)
+            ? gerritClient.retrieveComments(change, userRole)
             : gerritClient.retrieveComments(
-                change, administratorUser, sourceChangeMessageId);
+                change, userRole, sourceChangeMessageId);
     enqueueAddressedComments();
     if (!commentsRetrieved) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());
@@ -149,7 +152,8 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   public void processEvent() throws Exception {
     log.debug(
         "Processing event to review comments on full change ID: {}", change.getFullChangeId());
-    reviewer.review(change, administratorUser);
+    reviewer.review(
+        change, AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES));
     log.debug(
         "Completed processing event for reviewing comments on full change ID: {}",
         change.getFullChangeId());

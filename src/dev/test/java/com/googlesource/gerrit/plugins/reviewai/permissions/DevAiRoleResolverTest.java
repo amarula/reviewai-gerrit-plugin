@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -37,7 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class AiAdministratorGroupTest {
+public class DevAiRoleResolverTest {
   private static final String GROUP_NAME = "AI Owners";
   private static final AccountGroup.UUID GROUP_UUID = AccountGroup.uuid("ai-owners");
 
@@ -45,54 +44,49 @@ public class AiAdministratorGroupTest {
   @Mock private GroupCache groupCache;
   @Mock private CurrentUser user;
   @Mock private InternalGroup group;
-  @Mock private GroupMembership groupMembership;
+  @Mock private GroupMembership userGroups;
   @Mock private PermissionBackend permissionBackend;
   @Mock private PermissionBackend.WithUser permissionBackendWithUser;
 
+  private DevAiRoleResolver roleResolver;
+
   @Before
   public void setUp() {
+    roleResolver =
+        new DevAiRoleResolver(
+            new ConfiguredAiGroupMembership(groupCache), permissionBackend);
     when(config.getAiAdministratorsGroup()).thenReturn(GROUP_NAME);
-    when(groupCache.get(AccountGroup.nameKey(GROUP_NAME))).thenReturn(Optional.of(group));
-    when(group.getGroupUUID()).thenReturn(GROUP_UUID);
-    when(user.getEffectiveGroups()).thenReturn(groupMembership);
   }
 
   @Test
-  public void containsReturnsTrueForConfiguredGroupMember() {
-    when(groupMembership.contains(GROUP_UUID)).thenReturn(true);
+  public void resolvesAdministratorForConfiguredGroupMember() {
+    configureAdministratorGroupMembership(true);
 
-    assertTrue(AiAdministratorGroup.contains(config, groupCache, user));
-  }
-
-  @Test
-  public void containsReturnsFalseForNonMember() {
-    when(groupMembership.contains(GROUP_UUID)).thenReturn(false);
-
-    assertFalse(AiAdministratorGroup.contains(config, groupCache, user));
-  }
-
-  @Test
-  public void containsReturnsFalseForUnknownGroup() {
-    when(groupCache.get(AccountGroup.nameKey(GROUP_NAME))).thenReturn(Optional.empty());
-
-    assertFalse(AiAdministratorGroup.contains(config, groupCache, user));
-  }
-
-  @Test
-  public void isAdministratorDeniesConfiguredGroupNonMemberEvenWhenGerritAdmin() {
-    when(groupMembership.contains(GROUP_UUID)).thenReturn(false);
-
-    assertFalse(AiAdministratorGroup.isAdministrator(config, groupCache, permissionBackend, user));
+    assertEquals(AiRole.ADMINISTRATOR, roleResolver.resolve(config, user));
     verifyNoInteractions(permissionBackend);
   }
 
   @Test
-  public void isAdministratorFallsBackToGerritAdminWhenConfiguredGroupIsUnknown()
-      throws Exception {
+  public void configuredGroupNonMemberIsNotAdministratorDespiteGerritPermission() {
+    configureAdministratorGroupMembership(false);
+
+    assertEquals(AiRole.USER, roleResolver.resolve(config, user));
+    verifyNoInteractions(permissionBackend);
+  }
+
+  @Test
+  public void unknownConfiguredGroupFallsBackToGerritAdministratorPermission() throws Exception {
     when(groupCache.get(AccountGroup.nameKey(GROUP_NAME))).thenReturn(Optional.empty());
     when(permissionBackend.user(user)).thenReturn(permissionBackendWithUser);
     when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
 
-    assertTrue(AiAdministratorGroup.isAdministrator(config, groupCache, permissionBackend, user));
+    assertEquals(AiRole.ADMINISTRATOR, roleResolver.resolve(config, user));
+  }
+
+  private void configureAdministratorGroupMembership(boolean member) {
+    when(groupCache.get(AccountGroup.nameKey(GROUP_NAME))).thenReturn(Optional.of(group));
+    when(group.getGroupUUID()).thenReturn(GROUP_UUID);
+    when(user.getEffectiveGroups()).thenReturn(userGroups);
+    when(userGroups.contains(GROUP_UUID)).thenReturn(member);
   }
 }

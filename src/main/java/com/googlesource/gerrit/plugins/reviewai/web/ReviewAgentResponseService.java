@@ -40,7 +40,10 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +57,7 @@ class ReviewAgentResponseService {
   private final Path pluginDataPath;
   private final PluginChatMemoryStore chatMemoryStore;
   private final ReviewAiDb db;
-  private final AiAdministratorAccess aiAdministratorAccess;
+  private final AiRoleResolver roleResolver;
   private final ClientCommandExtension commandExtension;
 
   ReviewAgentResponseService(
@@ -62,13 +65,13 @@ class ReviewAgentResponseService {
       Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
-      AiAdministratorAccess aiAdministratorAccess,
+      AiRoleResolver roleResolver,
       ClientCommandExtension commandExtension) {
     this.repositoryManager = repositoryManager;
     this.pluginDataPath = pluginDataPath;
     this.chatMemoryStore = chatMemoryStore;
     this.db = db;
-    this.aiAdministratorAccess = aiAdministratorAccess;
+    this.roleResolver = roleResolver;
     this.commandExtension = commandExtension;
   }
 
@@ -207,7 +210,9 @@ class ReviewAgentResponseService {
         new PluginDataHandlerProvider(pluginDataPath, change, db);
     GerritClientPatchSetReviewAi gerritClientPatchSet =
         new GerritClientPatchSetReviewAi(config, repositoryManager);
-    boolean administratorUser = isAdministrator(config, resource);
+    AiRole userRole = resolveRole(config, resource);
+    boolean administratorUser =
+        AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES);
     new ClientCommandParser(
             config,
             changeSetData,
@@ -217,7 +222,7 @@ class ReviewAgentResponseService {
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
-            administratorUser,
+            userRole,
             new ReviewConcernPublisher(db),
             new ReviewFeedbackPublisher(db),
             commandExtension)
@@ -226,11 +231,8 @@ class ReviewAgentResponseService {
         changeSetData, pluginDataHandlerProvider, localizer, administratorUser);
   }
 
-  private boolean isAdministrator(Configuration config, ChangeResource resource) {
-    if (resource == null) {
-      return false;
-    }
-    return aiAdministratorAccess.isAdministrator(config, resource.getUser());
+  private AiRole resolveRole(Configuration config, ChangeResource resource) {
+    return resource == null ? AiRole.USER : roleResolver.resolve(config, resource.getUser());
   }
 
   private String getDynamicConfigurationMessage(

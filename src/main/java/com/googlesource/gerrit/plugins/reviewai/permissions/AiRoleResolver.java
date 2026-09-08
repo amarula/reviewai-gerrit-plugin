@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
 import com.google.gerrit.server.CurrentUser;
-import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
-@Singleton
-public class NoAiAdministratorAccess implements AiAdministratorAccess {
-  @Override
-  public boolean isAdministrator(Configuration config, CurrentUser user) {
-    return false;
-  }
+public interface AiRoleResolver {
+  AiRole resolve(Configuration config, CurrentUser user);
 }

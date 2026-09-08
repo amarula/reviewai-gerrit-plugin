@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
 import java.util.List;
 import org.junit.Test;
@@ -52,7 +53,7 @@ public class ClientCommandParserTest {
             localizer,
             null,
             null,
-            false,
+            AiRole.USER,
             reviewConcernPublisher,
             reviewFeedbackPublisher,
             new DisabledClientCommandExtension());

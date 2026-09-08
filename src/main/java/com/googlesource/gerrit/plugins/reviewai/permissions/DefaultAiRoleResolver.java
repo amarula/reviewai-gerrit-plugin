@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,25 +17,13 @@
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
 import com.google.gerrit.server.CurrentUser;
-import com.google.gerrit.server.account.GroupCache;
-import com.google.gerrit.server.permissions.PermissionBackend;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 @Singleton
-public class DevAiAdministratorAccess implements AiAdministratorAccess {
-  private final GroupCache groupCache;
-  private final PermissionBackend permissionBackend;
-
-  @Inject
-  public DevAiAdministratorAccess(GroupCache groupCache, PermissionBackend permissionBackend) {
-    this.groupCache = groupCache;
-    this.permissionBackend = permissionBackend;
-  }
-
+public class DefaultAiRoleResolver implements AiRoleResolver {
   @Override
-  public boolean isAdministrator(Configuration config, CurrentUser user) {
-    return AiAdministratorGroup.isAdministrator(config, groupCache, permissionBackend, user);
+  public AiRole resolve(Configuration config, CurrentUser user) {
+    return AiRole.USER;
   }
 }

@@ -21,6 +21,7 @@ import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -63,13 +64,13 @@ public class GerritClient {
     return gerritClientFacade.isWorkInProgress(change);
   }
 
-  public boolean retrieveComments(GerritChange change, boolean administratorUser) {
-    return gerritClientFacade.retrieveComments(change, administratorUser);
+  public boolean retrieveComments(GerritChange change, AiRole userRole) {
+    return gerritClientFacade.retrieveComments(change, userRole);
   }
 
   public boolean retrieveComments(
-      GerritChange change, boolean administratorUser, String changeMessageId) {
-    return gerritClientFacade.retrieveComments(change, administratorUser, changeMessageId);
+      GerritChange change, AiRole userRole, String changeMessageId) {
+    return gerritClientFacade.retrieveComments(change, userRole, changeMessageId);
   }
 
   public void retrievePatchSetInfo(GerritChange change) {

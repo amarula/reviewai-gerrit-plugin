@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026. The Android Open Source Project
+ * Copyright (c) 2026. Amarula Solutions
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,19 @@
 
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
-import com.google.gerrit.server.CurrentUser;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.util.Map;
 
-public interface AiAdministratorAccess {
-  boolean isAdministrator(Configuration config, CurrentUser user);
+public final class AiRolePolicy {
+  private static final Map<AiAction, AiRole> REQUIRED_ROLES =
+      Map.of(AiAction.USE_ADMINISTRATOR_FEATURES, AiRole.ADMINISTRATOR);
+
+  private AiRolePolicy() {}
+
+  public static AiRole requiredRole(AiAction action) {
+    return REQUIRED_ROLES.getOrDefault(action, AiRole.USER);
+  }
+
+  public static boolean isAllowed(AiRole role, AiAction action) {
+    return role != null && role.includes(requiredRole(action));
+  }
 }

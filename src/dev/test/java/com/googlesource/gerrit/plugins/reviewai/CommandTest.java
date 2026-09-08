@@ -40,8 +40,10 @@ import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiUriResourceLocator;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
-import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.ConfiguredAiGroupMembership;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -83,8 +85,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Override
-  protected AiAdministratorAccess getAiAdministratorAccess() {
-    return new DevAiAdministratorAccess(groupCache, permissionBackend);
+  protected AiRoleResolver getAiRoleResolver() {
+    return new DevAiRoleResolver(
+        new ConfiguredAiGroupMembership(groupCache), permissionBackend);
   }
 
   @Override
@@ -248,7 +251,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
             localizer,
             () -> "",
             null,
-            true,
+            AiRole.ADMINISTRATOR,
             getClientCommandExtension());
 
     Assert.assertTrue(parser.parseCommands("/review --topic"));

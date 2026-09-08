@@ -69,8 +69,8 @@ import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModul
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
-import com.googlesource.gerrit.plugins.reviewai.permissions.NoAiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.permissions.DefaultAiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle;
@@ -350,8 +350,7 @@ public class ReviewTestBase extends TestBase {
                         new GerritEventContextModule(
                             config,
                             event,
-                            new EventBuildFeatures(
-                                getAiAdministratorAccess(), getClientCommandExtension())));
+                            new EventBuildFeatures(getClientCommandExtension())));
 
                     bind(GerritClient.class).toInstance(gerritClient);
                     bind(ConfigCreator.class).toInstance(mockConfigCreator);
@@ -363,7 +362,7 @@ public class ReviewTestBase extends TestBase {
                     bind(AccountCache.class).toInstance(accountCacheMock);
                     bind(GroupCache.class).toInstance(groupCache);
                     bind(PermissionBackend.class).toInstance(permissionBackend);
-                    bind(AiAdministratorAccess.class).toInstance(getAiAdministratorAccess());
+                    bind(AiRoleResolver.class).toInstance(getAiRoleResolver());
                     bind(ClientCommandExtension.class).toInstance(getClientCommandExtension());
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(ReviewAiMetrics.class).toInstance(new ReviewAiMetrics());
@@ -379,8 +378,8 @@ public class ReviewTestBase extends TestBase {
     return task.execute();
   }
 
-  protected AiAdministratorAccess getAiAdministratorAccess() {
-    return new NoAiAdministratorAccess();
+  protected AiRoleResolver getAiRoleResolver() {
+    return new DefaultAiRoleResolver();
   }
 
   protected ClientCommandExtension getClientCommandExtension() {
