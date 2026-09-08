@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.review;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -51,6 +52,14 @@ public class PatchSetReviewerTest {
     assertEquals(
         Integer.valueOf(1),
         reviewer.getReviewScore(change(), new AiResponseContent("")));
+  }
+
+  @Test
+  public void commentMessageDoesNotSkipAiReviewForEmptyPatchSet() {
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+
+    assertFalse(reviewer().shouldSkipAiReviewForEmptyPatchSet(change));
   }
 
   @Test(expected = AiRequestSupersededException.class)
