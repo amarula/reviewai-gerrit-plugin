@@ -45,7 +45,6 @@ import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,7 +91,6 @@ public class EventHandlerExecutorTest {
             coordinator,
             mock(ConfigCreator.class),
             topicCoordinator,
-            mock(AiAdministratorAccess.class),
             mock(ClientCommandExtension.class));
     PatchSetCreatedEvent event = patchSetCreatedEvent();
 
@@ -147,7 +145,6 @@ public class EventHandlerExecutorTest {
             coordinator,
             mock(ConfigCreator.class),
             mock(TopicPatchSetReviewCoordinator.class),
-            mock(AiAdministratorAccess.class),
             mock(ClientCommandExtension.class));
 
     executor.execute(config, event);
@@ -199,7 +196,6 @@ public class EventHandlerExecutorTest {
             coordinator,
             mock(ConfigCreator.class),
             mock(TopicPatchSetReviewCoordinator.class),
-            mock(AiAdministratorAccess.class),
             mock(ClientCommandExtension.class));
 
     executor.execute(config, event);
@@ -249,7 +245,6 @@ public class EventHandlerExecutorTest {
             coordinator,
             mock(ConfigCreator.class),
             mock(TopicPatchSetReviewCoordinator.class),
-            mock(AiAdministratorAccess.class),
             mock(ClientCommandExtension.class));
 
     executor.execute(mock(Configuration.class), patchSetCreatedEvent());
@@ -286,7 +281,6 @@ public class EventHandlerExecutorTest {
             coordinator,
             configCreator,
             mock(TopicPatchSetReviewCoordinator.class),
-            mock(AiAdministratorAccess.class),
             mock(ClientCommandExtension.class));
     String sourceEventId = "change-message-id";
     AiRequestDescriptor descriptor =

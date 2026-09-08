@@ -27,7 +27,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventHandlerContextFactory.Context;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
 import lombok.extern.slf4j.Slf4j;
 
 @Singleton
@@ -43,12 +42,11 @@ public class EventHandlerExecutor {
       AiRequestCoordinator coordinator,
       ConfigCreator configCreator,
       TopicPatchSetReviewCoordinator topicPatchSetReviewCoordinator,
-      AiAdministratorAccess aiAdministratorAccess,
       ClientCommandExtension clientCommandExtension) {
     this.topicPatchSetReviewCoordinator = topicPatchSetReviewCoordinator;
     this.contextFactory =
         new GerritEventHandlerContextFactory(
-            injector, new EventBuildFeatures(aiAdministratorAccess, clientCommandExtension));
+            injector, new EventBuildFeatures(clientCommandExtension));
     this.dispatcher =
         new AiRequestDispatcher(
             coordinator, configCreator, topicPatchSetReviewCoordinator, contextFactory);

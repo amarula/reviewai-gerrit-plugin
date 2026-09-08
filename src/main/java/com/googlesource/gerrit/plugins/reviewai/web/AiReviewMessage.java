@@ -45,7 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator;
 import com.googlesource.gerrit.plugins.reviewai.listener.SupersededReviewNotifier;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAdministratorAccess;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,7 +78,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       SupersededReviewNotifier supersededReviewNotifier,
       GitRepositoryManager repositoryManager,
       @PluginData Path pluginDataPath,
-      AiAdministratorAccess aiAdministratorAccess,
+      AiRoleResolver roleResolver,
       ClientCommandExtension commandExtension) {
     this(
         configCreator,
@@ -91,7 +91,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         pluginDataPath,
         null,
         null,
-        aiAdministratorAccess,
+        roleResolver,
         commandExtension,
         null);
   }
@@ -108,7 +108,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       @PluginData Path pluginDataPath,
       PluginChatMemoryStore chatMemoryStore,
       ReviewAiDb db,
-      AiAdministratorAccess aiAdministratorAccess,
+      AiRoleResolver roleResolver,
       ClientCommandExtension commandExtension,
       @GerritInstanceId @Nullable String gerritInstanceId) {
     this.configCreator = configCreator;
@@ -124,7 +124,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             pluginDataPath,
             chatMemoryStore,
             db,
-            aiAdministratorAccess,
+            roleResolver,
             commandExtension);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }

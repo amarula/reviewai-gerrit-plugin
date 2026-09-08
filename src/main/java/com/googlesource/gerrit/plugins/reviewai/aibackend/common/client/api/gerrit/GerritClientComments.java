@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
@@ -156,12 +157,12 @@ public class GerritClientComments extends GerritClientAccount {
         sourceChangeMessageId);
   }
 
-  public boolean retrieveComments(GerritChange change, boolean administratorUser) {
-    return retrieveComments(change, administratorUser, null);
+  public boolean retrieveComments(GerritChange change, AiRole userRole) {
+    return retrieveComments(change, userRole, null);
   }
 
   public boolean retrieveComments(
-      GerritChange change, boolean administratorUser, String requestedChangeMessageId) {
+      GerritChange change, AiRole userRole, String requestedChangeMessageId) {
     clearCommentData();
     CommentAddedEvent commentAddedEvent = (CommentAddedEvent) change.getEvent();
     AccountAttribute author = commentAddedEvent.author.get();
@@ -176,7 +177,7 @@ public class GerritClientComments extends GerritClientAccount {
       log.info("Review of comments from user '{}' is disabled.", authorUsername);
       return false;
     }
-    addComments(change, administratorUser, requestedChangeMessageId);
+    addComments(change, userRole, requestedChangeMessageId);
 
     return !commentProperties.isEmpty();
   }
@@ -184,7 +185,7 @@ public class GerritClientComments extends GerritClientAccount {
   public void retrieveAllComments(GerritChange change) {
     clearCommentData();
     try {
-      retrieveComments(change, null);
+      fetchComments(change, null);
     } catch (Exception e) {
       log.error("Error while retrieving all comments for change: {}", change.getFullChangeId(), e);
     }
@@ -206,7 +207,7 @@ public class GerritClientComments extends GerritClientAccount {
         .orElse(false);
   }
 
-  private List<GerritComment> retrieveComments(
+  private List<GerritComment> fetchComments(
       GerritChange change, String requestedChangeMessageId)
       throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
@@ -278,7 +279,7 @@ public class GerritClientComments extends GerritClientAccount {
   }
 
   private void addComments(
-      GerritChange change, boolean administratorUser, String requestedChangeMessageId) {
+      GerritChange change, AiRole userRole, String requestedChangeMessageId) {
     log.debug("Adding last comments for change: {}", change.getFullChangeId());
     ClientMessageParser messageParser =
         new ClientMessageParser(
@@ -290,13 +291,13 @@ public class GerritClientComments extends GerritClientAccount {
             localizer,
             () -> gerritClientPatchSet.getPatchSet(changeSetData, change),
             chatMemoryStore,
-            administratorUser,
+            userRole,
             reviewConcernPublisher,
             reviewFeedbackPublisher,
             commandExtension);
     try {
       List<GerritComment> latestComments =
-          retrieveComments(change, requestedChangeMessageId);
+          fetchComments(change, requestedChangeMessageId);
       if (latestComments == null) {
         return;
       }

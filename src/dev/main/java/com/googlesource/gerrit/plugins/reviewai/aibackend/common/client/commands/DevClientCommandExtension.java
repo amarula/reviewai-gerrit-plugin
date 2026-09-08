@@ -41,17 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DevClientCommandExtension implements ClientCommandExtension {
   @Override
-  public boolean requiresAdministrator(
-      ClientCommandBase.CommandSet command,
-      Map<ClientCommandBase.BaseOptionSet, String> baseOptions) {
-    return command == ClientCommandBase.CommandSet.DIRECTIVES
-        || command == ClientCommandBase.CommandSet.CONFIGURE
-        || command == ClientCommandBase.CommandSet.SHOW
-        || command == ClientCommandBase.CommandSet.REVIEW
-            && baseOptions.containsKey(ClientCommandBase.BaseOptionSet.DEBUG);
-  }
-
-  @Override
   public boolean acceptsDynamicOptions(ClientCommandBase.CommandSet command) {
     return command == ClientCommandBase.CommandSet.CONFIGURE;
   }

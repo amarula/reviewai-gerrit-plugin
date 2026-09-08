@@ -44,6 +44,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
@@ -112,7 +113,7 @@ public class GerritClientCommentsTest {
 
   @Test
   public void addressedCommentsRemainEventLocal() {
-    assertTrue(client.retrieveComments(change, false));
+    assertTrue(client.retrieveComments(change, AiRole.USER));
 
     assertEquals(1, client.getCommentProperties().size());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
@@ -131,7 +132,7 @@ public class GerritClientCommentsTest {
   public void reloadsCommentsByExactChangeMessageId() {
     when(change.getEventTimeStamp()).thenReturn(0L);
 
-    assertTrue(client.retrieveComments(change, false, "latest-review"));
+    assertTrue(client.retrieveComments(change, AiRole.USER, "latest-review"));
 
     assertEquals(
         "latest-review", client.getCommentData().getSourceChangeMessageId());
@@ -140,7 +141,7 @@ public class GerritClientCommentsTest {
 
   @Test
   public void missingExactChangeMessageIdDoesNotSelectLatestComments() {
-    assertFalse(client.retrieveComments(change, false, "missing-message"));
+    assertFalse(client.retrieveComments(change, AiRole.USER, "missing-message"));
 
     assertTrue(client.getCommentProperties().isEmpty());
     assertNull(client.getCommentData().getSourceChangeMessageId());
@@ -150,7 +151,7 @@ public class GerritClientCommentsTest {
   public void addressedCommandIsRetainedForFeedbackClassification() {
     latestComment().message = "/review";
 
-    assertFalse(client.retrieveComments(change, false));
+    assertFalse(client.retrieveComments(change, AiRole.USER));
 
     assertTrue(client.getCommentProperties().isEmpty());
     assertEquals(
@@ -163,7 +164,7 @@ public class GerritClientCommentsTest {
     latestComment().inReplyTo = "human-parent";
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveComments(change, false));
+    assertFalse(client.retrieveComments(change, AiRole.USER));
   }
 
   @Test
@@ -171,7 +172,7 @@ public class GerritClientCommentsTest {
     latestComment().inReplyTo = null;
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveComments(change, false));
+    assertFalse(client.retrieveComments(change, AiRole.USER));
   }
 
   @Test
@@ -179,7 +180,7 @@ public class GerritClientCommentsTest {
     comments = readComments(RESOLVED_REPLY_RESOURCE);
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveComments(change, false));
+    assertFalse(client.retrieveComments(change, AiRole.USER));
   }
 
   private CommentInfo latestComment() {
