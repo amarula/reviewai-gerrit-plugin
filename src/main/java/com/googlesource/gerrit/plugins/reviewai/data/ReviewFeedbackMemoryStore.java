@@ -204,16 +204,34 @@ public final class ReviewFeedbackMemoryStore {
     if (memory.getDisabledSpecializedAgents() == null) {
       memory.setDisabledSpecializedAgents(Set.of());
     } else {
-      Set<String> disabledSpecializedAgents = new LinkedHashSet<>();
-      for (String agent : memory.getDisabledSpecializedAgents()) {
-        if (agent == null || agent.isBlank()) {
-          throw new IllegalArgumentException(
-              "Review feedback memory contains an invalid disabled specialized agent");
-        }
-        disabledSpecializedAgents.add(
-            agent.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_'));
-      }
-      memory.setDisabledSpecializedAgents(disabledSpecializedAgents);
+      memory.setDisabledSpecializedAgents(
+          normalizeSpecializedAgents(memory.getDisabledSpecializedAgents()));
     }
+    if (memory.getConditionLabelDisabledSpecializedAgents() == null) {
+      memory.setConditionLabelDisabledSpecializedAgents(Set.of());
+    } else {
+      memory.setConditionLabelDisabledSpecializedAgents(
+          normalizeSpecializedAgents(
+              memory.getConditionLabelDisabledSpecializedAgents()));
+    }
+    if (!memory
+        .getDisabledSpecializedAgents()
+        .containsAll(memory.getConditionLabelDisabledSpecializedAgents())) {
+      throw new IllegalArgumentException(
+          "Condition Label exclusions must be included in disabled specialized agents");
+    }
+  }
+
+  private static Set<String> normalizeSpecializedAgents(Set<String> agents) {
+    Set<String> normalizedAgents = new LinkedHashSet<>();
+    for (String agent : agents) {
+      if (agent == null || agent.isBlank()) {
+        throw new IllegalArgumentException(
+            "Review feedback memory contains an invalid disabled specialized agent");
+      }
+      normalizedAgents.add(
+          agent.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_'));
+    }
+    return normalizedAgents;
   }
 }

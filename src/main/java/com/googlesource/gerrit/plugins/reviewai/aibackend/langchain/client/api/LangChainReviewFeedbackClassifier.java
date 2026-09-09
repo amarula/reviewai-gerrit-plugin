@@ -38,6 +38,9 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput.TargetComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult.Category;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult.Classification;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult.ReviewControlAction;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult.ReviewControlOperation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -87,9 +90,7 @@ final class LangChainReviewFeedbackClassifier {
       RequestExecutor requestExecutor)
       throws Exception {
     ReviewFeedbackClassificationInput input = buildInput(changeSetData, clientData, currentMemory);
-    if (input.getComments().isEmpty()
-        && (changeSetData.getConditionLabels() == null
-            || changeSetData.getConditionLabels().isEmpty())) {
+    if (input.getComments().isEmpty() && !hasConditionLabels(changeSetData)) {
       return input.getCurrentMemory();
     }
 
@@ -107,12 +108,22 @@ final class LangChainReviewFeedbackClassifier {
         getGson()
             .fromJson(
                 unwrapJsonCode(responseText), ReviewFeedbackClassificationResult.class);
-    ReviewFeedbackMemory memory = toMemory(input, result);
+    ReviewFeedbackMemory memory =
+        toMemory(input, result, hasConditionLabels(changeSetData));
     if (hasUnauthorizedDismissal(input, result)) {
-      changeSetData.setReviewNoticeMessage(
+      appendReviewNotice(
+          changeSetData,
           localizer == null
               ? "A concern dismissal was ignored because AI moderator privileges are required."
               : localizer.getText("message.review.feedback.dismissal.moderator.required"));
+    }
+    if (hasUnauthorizedReviewControl(input, result)) {
+      appendReviewNotice(
+          changeSetData,
+          localizer == null
+              ? "A review-agent control request was ignored because AI moderator privileges are"
+                  + " required."
+              : localizer.getText("message.review.feedback.control.moderator.required"));
     }
     return memory;
   }
@@ -184,7 +195,8 @@ final class LangChainReviewFeedbackClassifier {
                   comment.getLine()),
               threadConcernId,
               threadContext,
-              isDismissalAuthorized(changeSetData, commentId)));
+              isDismissalAuthorized(changeSetData, commentId),
+              isReviewControlAuthorized(changeSetData, commentId)));
     }
     return new ReviewFeedbackClassificationInput(memory, concerns, comments);
   }
@@ -222,7 +234,8 @@ final class LangChainReviewFeedbackClassifier {
 
   private ReviewFeedbackMemory toMemory(
       ReviewFeedbackClassificationInput input,
-      ReviewFeedbackClassificationResult result) {
+      ReviewFeedbackClassificationResult result,
+      boolean hasConditionLabels) {
     if (result == null) {
       throw new IllegalStateException("Review feedback classifier returned an empty result");
     }
@@ -243,13 +256,14 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException(
           "Review feedback classifier must classify every addressed comment exactly once");
     }
-    return createMemory(input, result, concernIds);
+    return createMemory(input, result, concernIds, hasConditionLabels);
   }
 
   private ReviewFeedbackMemory createMemory(
       ReviewFeedbackClassificationInput input,
       ReviewFeedbackClassificationResult result,
-      Set<String> concernIds) {
+      Set<String> concernIds,
+      boolean hasConditionLabels) {
     Map<String, String> concernFeedback = new LinkedHashMap<>();
     if (result.getConcernFeedback() == null) {
       throw new IllegalStateException("Review concern feedback summaries are missing");
@@ -292,27 +306,107 @@ final class LangChainReviewFeedbackClassifier {
       dismissedConcerns.put(classification.getConcernId(), rationale);
     }
     memory.setDismissedConcerns(dismissedConcerns);
-    Set<ReviewScope> disabledReviewScopes = result.getDisabledReviewScopes();
-    if (disabledReviewScopes == null
-        || disabledReviewScopes.contains(null)
-        || disabledReviewScopes.contains(ReviewScope.FULL)) {
-      throw new IllegalStateException("Review feedback contains an invalid disabled scope");
+    Set<ReviewScope> disabledReviewScopes =
+        new HashSet<>(currentDisabledReviewScopes(input));
+    Set<String> previousConditionLabelAgents =
+        currentConditionLabelDisabledSpecializedAgents(input);
+    Set<String> disabledSpecializedAgents =
+        new HashSet<>(currentDisabledSpecializedAgents(input));
+    disabledSpecializedAgents.removeAll(previousConditionLabelAgents);
+    Map<String, Classification> classificationsByCommentId = new LinkedHashMap<>();
+    result
+        .getClassifications()
+        .forEach(
+            classification ->
+                classificationsByCommentId.put(
+                    classification.getCommentId(), classification));
+    for (ReviewFeedbackClassificationInput.Comment comment : input.getComments()) {
+      if (!comment.isReviewControlAllowed()) {
+        continue;
+      }
+      for (ReviewControlAction action :
+          classificationsByCommentId
+              .get(comment.getTargetComment().getId())
+              .getReviewControlActions()) {
+        applyReviewControlAction(
+            disabledReviewScopes, disabledSpecializedAgents, action);
+      }
     }
+    Set<String> conditionLabelAgents =
+        validatedConditionLabelDisabledSpecializedAgents(result);
+    if (!hasConditionLabels && !conditionLabelAgents.isEmpty()) {
+      throw new IllegalStateException(
+          "Review feedback cannot exclude agents without Condition Labels");
+    }
+    disabledSpecializedAgents.addAll(conditionLabelAgents);
     memory.setDisabledReviewScopes(Set.copyOf(disabledReviewScopes));
+    memory.setDisabledSpecializedAgents(Set.copyOf(disabledSpecializedAgents));
+    memory.setConditionLabelDisabledSpecializedAgents(conditionLabelAgents);
+    return memory;
+  }
+
+  private Set<String> validatedConditionLabelDisabledSpecializedAgents(
+      ReviewFeedbackClassificationResult result) {
     Set<String> disabledSpecializedAgents = new HashSet<>();
-    if (result.getDisabledSpecializedAgents() == null) {
-      throw new IllegalStateException("Review feedback disabled specialized agents are missing");
+    if (result.getConditionLabelDisabledSpecializedAgents() == null) {
+      throw new IllegalStateException(
+          "Review feedback Condition Label exclusions are missing");
     }
-    for (String agent : result.getDisabledSpecializedAgents()) {
+    for (String agent : result.getConditionLabelDisabledSpecializedAgents()) {
       String normalizedAgent = SpecializedReviewAgentDefinition.normalizeName(agent);
       if (SpecializedReviewAgentDefinitions.findByName(normalizedAgent).isEmpty()) {
         throw new IllegalStateException(
-            "Review feedback contains an invalid disabled specialized agent");
+            "Review feedback contains an invalid Condition Label exclusion");
       }
       disabledSpecializedAgents.add(normalizedAgent);
     }
-    memory.setDisabledSpecializedAgents(Set.copyOf(disabledSpecializedAgents));
-    return memory;
+    return Set.copyOf(disabledSpecializedAgents);
+  }
+
+  private Set<ReviewScope> currentDisabledReviewScopes(
+      ReviewFeedbackClassificationInput input) {
+    Set<ReviewScope> disabledReviewScopes =
+        input.getCurrentMemory().getDisabledReviewScopes();
+    return disabledReviewScopes == null ? Set.of() : Set.copyOf(disabledReviewScopes);
+  }
+
+  private Set<String> currentDisabledSpecializedAgents(
+      ReviewFeedbackClassificationInput input) {
+    Set<String> disabledSpecializedAgents =
+        input.getCurrentMemory().getDisabledSpecializedAgents();
+    return disabledSpecializedAgents == null
+        ? Set.of()
+        : Set.copyOf(disabledSpecializedAgents);
+  }
+
+  private Set<String> currentConditionLabelDisabledSpecializedAgents(
+      ReviewFeedbackClassificationInput input) {
+    Set<String> disabledSpecializedAgents =
+        input.getCurrentMemory().getConditionLabelDisabledSpecializedAgents();
+    return disabledSpecializedAgents == null
+        ? Set.of()
+        : Set.copyOf(disabledSpecializedAgents);
+  }
+
+  private void applyReviewControlAction(
+      Set<ReviewScope> disabledReviewScopes,
+      Set<String> disabledSpecializedAgents,
+      ReviewControlAction action) {
+    ReviewScope scope = reviewScope(action.getTarget());
+    if (scope != null) {
+      if (action.getOperation() == ReviewControlOperation.DISABLE) {
+        disabledReviewScopes.add(scope);
+      } else {
+        disabledReviewScopes.remove(scope);
+      }
+      return;
+    }
+    String agent = SpecializedReviewAgentDefinition.normalizeName(action.getTarget());
+    if (action.getOperation() == ReviewControlOperation.DISABLE) {
+      disabledSpecializedAgents.add(agent);
+    } else {
+      disabledSpecializedAgents.remove(agent);
+    }
   }
 
   private void validateClassification(
@@ -336,6 +430,42 @@ final class LangChainReviewFeedbackClassifier {
     } else if (concernId != null && !concernId.isBlank()) {
       throw new IllegalStateException(
           "Only concern-related review feedback may reference a concern ID");
+    }
+    if (classification.getReviewControlActions() == null) {
+      throw new IllegalStateException("Review feedback control actions are missing");
+    }
+    if (!classification.getReviewControlActions().isEmpty()
+        && classification.getCategory() != Category.GENERIC) {
+      throw new IllegalStateException(
+          "Only generic review feedback may control review agents");
+    }
+    for (ReviewControlAction action : classification.getReviewControlActions()) {
+      validateReviewControlAction(action);
+    }
+  }
+
+  private void validateReviewControlAction(ReviewControlAction action) {
+    if (action == null
+        || action.getOperation() == null
+        || action.getTarget() == null
+        || action.getTarget().isBlank()) {
+      throw new IllegalStateException("Review feedback contains an invalid control action");
+    }
+    String target = action.getTarget();
+    if (reviewScope(target) == null
+        && SpecializedReviewAgentDefinitions.findByName(
+                SpecializedReviewAgentDefinition.normalizeName(target))
+            .isEmpty()) {
+      throw new IllegalStateException("Review feedback contains an invalid control target");
+    }
+  }
+
+  private ReviewScope reviewScope(String target) {
+    try {
+      ReviewScope scope = ReviewScope.valueOf(target);
+      return scope == ReviewScope.FULL ? null : scope;
+    } catch (IllegalArgumentException e) {
+      return null;
     }
   }
 
@@ -363,6 +493,45 @@ final class LangChainReviewFeedbackClassifier {
     Set<String> authorizedCommentIds =
         changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds();
     return authorizedCommentIds != null && authorizedCommentIds.contains(commentId);
+  }
+
+  private boolean hasUnauthorizedReviewControl(
+      ReviewFeedbackClassificationInput input,
+      ReviewFeedbackClassificationResult result) {
+    return result.getClassifications().stream()
+        .anyMatch(
+            classification ->
+                !classification.getReviewControlActions().isEmpty()
+                    && !isReviewControlAllowed(input, classification.getCommentId()));
+  }
+
+  private boolean isReviewControlAllowed(
+      ReviewFeedbackClassificationInput input, String commentId) {
+    return input.getComments().stream()
+        .filter(comment -> comment.getTargetComment().getId().equals(commentId))
+        .map(ReviewFeedbackClassificationInput.Comment::isReviewControlAllowed)
+        .findFirst()
+        .orElse(false);
+  }
+
+  private boolean isReviewControlAuthorized(
+      ChangeSetData changeSetData, String commentId) {
+    Set<String> authorizedCommentIds =
+        changeSetData.getReviewFeedbackControlAuthorizedCommentIds();
+    return authorizedCommentIds != null && authorizedCommentIds.contains(commentId);
+  }
+
+  private boolean hasConditionLabels(ChangeSetData changeSetData) {
+    return changeSetData.getConditionLabels() != null
+        && !changeSetData.getConditionLabels().isEmpty();
+  }
+
+  private void appendReviewNotice(ChangeSetData changeSetData, String notice) {
+    String currentNotice = changeSetData.getReviewNoticeMessage();
+    changeSetData.setReviewNoticeMessage(
+        currentNotice == null || currentNotice.isBlank()
+            ? notice
+            : currentNotice + "\n\n" + notice);
   }
 
   @FunctionalInterface
