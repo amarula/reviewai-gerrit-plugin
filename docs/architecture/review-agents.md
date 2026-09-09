@@ -163,7 +163,8 @@ The feedback classifier assigns every substantive addressed comment to exactly o
 | Category | Meaning | Memory update |
 | --- | --- | --- |
 | `GENERIC` | Durable guidance that applies across the Patch Set. | Merge into `generic_feedback`. |
-| `CONCERN` | Durable evidence or a decision about exactly one known concern. | Merge under that concern's exact ID. |
+| `CONCERN` | Durable evidence or guidance about exactly one known concern. | Merge under that concern's exact ID. |
+| `DISMISS_CONCERN` | An explicit request or decision to dismiss exactly one known concern. | Record a protected dismissal only when the target comment's original author currently has AI moderator privileges. |
 | `IRRELEVANT` | A question, acknowledgement, or other non-guidance conversation. | None. |
 
 Commands and a leading AI mention are removed when checking whether a target comment has substantive content. If no
@@ -174,6 +175,13 @@ removed from the current review context.
 For a reply in an AI concern thread, ReviewAI walks the exact `inReplyTo` lineage and compares ancestor Gerrit comment
 IDs with the comment ID persisted on each ledger concern. That match becomes a strong concern-routing hint; text or
 code location similarity is not used to infer the concern.
+
+Each journal row also retains the original comment author's Gerrit account ID. When a later review claims the row,
+ReviewAI resolves that author's current AI role on the Change. The classifier reports dismissal intent for both
+authorized and unauthorized comments, but Java records the protected `dismissed_concerns` memory only for comments
+whose authors have moderator privileges. Unauthorized requests are ignored with a review notice. The concern-status
+validator independently prevents a newly `DISMISSED` concern unless that protected memory contains its exact ID;
+ordinary `concern_feedback` is never sufficient authorization.
 
 When pending comments or Condition Labels exist, execution order depends on the specialization level:
 
@@ -543,7 +551,7 @@ Concern data is stored in the plugin's H2-compatible database schema:
 | `review_concern_reviewers` | Ordered logical reviewers belonging to a ledger. |
 | `review_concerns` | Ordered, status-indexed concerns belonging to a reviewer. |
 | `review_feedback_memories` | One schema-versioned generic and per-concern feedback summary per full Change ID. |
-| `review_feedback_comments` | Replay-safe processing state for each addressed user comment ID. |
+| `review_feedback_comments` | Replay-safe processing state and original author account for each addressed user comment ID. |
 
 The complete concern is serialized in `concern_json`, while identity, order, and status are also stored in dedicated
 columns. Saving a ledger replaces its reviewer and concern rows in one transaction.

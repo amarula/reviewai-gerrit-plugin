@@ -28,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
@@ -138,13 +139,15 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     if (commentData == null || commentData.getAddressedComments() == null) {
       return;
     }
-    reviewFeedbackPublisher.enqueue(
+    reviewFeedbackPublisher.enqueueFeedback(
         change,
         commentData.getAddressedComments().stream()
             .filter(Objects::nonNull)
-            .map(comment -> comment.getId())
-            .filter(Objects::nonNull)
-            .filter(id -> !id.isBlank())
+            .filter(comment -> comment.getId() != null && !comment.getId().isBlank())
+            .map(
+                comment ->
+                    new ReviewFeedbackStore.FeedbackRequest(
+                        comment.getId(), comment.getAuthorAccountId()))
             .toList());
   }
 

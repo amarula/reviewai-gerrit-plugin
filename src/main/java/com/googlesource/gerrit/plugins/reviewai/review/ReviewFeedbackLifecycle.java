@@ -16,23 +16,45 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import com.google.gerrit.entities.Account;
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.server.IdentifiedUser;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public final class ReviewFeedbackLifecycle {
   private final ReviewFeedbackPublisher publisher;
+  private final Configuration config;
+  private final IdentifiedUser.GenericFactory identifiedUserFactory;
+  private final AiRoleResolver roleResolver;
 
   @Inject
-  public ReviewFeedbackLifecycle(ReviewFeedbackPublisher publisher) {
+  public ReviewFeedbackLifecycle(
+      ReviewFeedbackPublisher publisher,
+      Configuration config,
+      IdentifiedUser.GenericFactory identifiedUserFactory,
+      AiRoleResolver roleResolver) {
     this.publisher = publisher;
+    this.config = config;
+    this.identifiedUserFactory = identifiedUserFactory;
+    this.roleResolver = roleResolver;
   }
 
   void reset(ChangeSetData changeSetData) {
     changeSetData.setPendingReviewFeedbackCommentIds(List.of());
+    changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of());
     changeSetData.setReviewFeedbackClassified(false);
   }
 
@@ -48,7 +70,39 @@ public final class ReviewFeedbackLifecycle {
     }
     ReviewFeedbackStore.Claim claim = publisher.claimPending(change);
     changeSetData.setPendingReviewFeedbackCommentIds(claim.commentIds());
+    changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(
+        dismissalAuthorizedCommentIds(change, claim));
     return claim.isEmpty() ? Session.empty() : new Session(claim);
+  }
+
+  private Set<String> dismissalAuthorizedCommentIds(
+      GerritChange change, ReviewFeedbackStore.Claim claim) {
+    Change.Id changeId = change.getChangeNumber().map(Change::id).orElse(null);
+    return claim.authorAccountIds().entrySet().stream()
+        .filter(
+            entry ->
+                canDismissConcern(change, changeId, entry.getValue()))
+        .map(java.util.Map.Entry::getKey)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  private boolean canDismissConcern(
+      GerritChange change, Change.Id changeId, Integer authorAccountId) {
+    if (authorAccountId == null || changeId == null) {
+      return false;
+    }
+    try {
+      return AiRolePolicy.isAllowed(
+          roleResolver.resolve(
+              config,
+              identifiedUserFactory.create(Account.id(authorAccountId)),
+              change.getProjectNameKey(),
+              changeId),
+          AiAction.USE_MODERATOR_FEATURES);
+    } catch (RuntimeException e) {
+      log.debug("Failed to authorize review feedback author {}", authorAccountId, e);
+      return false;
+    }
   }
 
   void settle(

@@ -19,12 +19,22 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class ReviewConcernStatusUpdater {
   private ReviewConcernStatusUpdater() {}
 
   public static List<ReviewConcern> apply(
       List<ReviewConcern> existingConcerns, List<ReviewConcern> statusUpdates) {
+    return apply(existingConcerns, statusUpdates, Set.of());
+  }
+
+  public static List<ReviewConcern> apply(
+      List<ReviewConcern> existingConcerns,
+      List<ReviewConcern> statusUpdates,
+      Set<String> dismissalAuthorizedConcernIds) {
+    Set<String> authorizedDismissals =
+        dismissalAuthorizedConcernIds == null ? Set.of() : dismissalAuthorizedConcernIds;
     Map<String, ReviewConcern> existingById = indexById(existingConcerns, "existing");
     Map<String, ReviewConcern> updatesById = indexById(statusUpdates, "updated");
     if (!existingById.keySet().equals(updatesById.keySet())) {
@@ -43,6 +53,13 @@ public final class ReviewConcernStatusUpdater {
               if (update.getStatus() == ConcernStatus.SKIPPED) {
                 throw new IllegalArgumentException(
                     "SKIPPED can only be assigned by disabled-scope handling");
+              }
+              if (update.getStatus() == ConcernStatus.DISMISSED
+                  && existing.getStatus() != ConcernStatus.DISMISSED
+                  && !authorizedDismissals.contains(existing.getId())) {
+                throw new IllegalArgumentException(
+                    "DISMISSED requires an authorized moderator decision for "
+                        + existing.getId());
               }
               ReviewConcern updated = existing.copy();
               updated.setStatus(update.getStatus());

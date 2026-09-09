@@ -1,0 +1,18 @@
+{
+  "classifications": [
+    {
+      "comment_id": "dismiss-request",
+      "category": "DISMISS_CONCERN",
+      "concern_id": "old-present"
+    }
+  ],
+  "generic_feedback": "",
+  "concern_feedback": [
+    {
+      "concern_id": "old-present",
+      "summary": "The reviewer explicitly requested that this concern be dismissed."
+    }
+  ],
+  "disabled_review_scopes": [],
+  "disabled_specialized_agents": []
+}

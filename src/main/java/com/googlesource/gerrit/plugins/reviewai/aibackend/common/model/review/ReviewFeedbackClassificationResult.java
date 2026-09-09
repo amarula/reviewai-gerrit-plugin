@@ -41,7 +41,8 @@ public class ReviewFeedbackClassificationResult {
   public enum Category {
     GENERIC,
     IRRELEVANT,
-    CONCERN
+    CONCERN,
+    DISMISS_CONCERN
   }
 
   @Data

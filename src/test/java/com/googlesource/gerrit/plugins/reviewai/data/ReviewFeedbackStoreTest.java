@@ -24,6 +24,7 @@ import static org.junit.Assert.fail;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -58,6 +59,17 @@ public class ReviewFeedbackStoreTest extends TestBase {
     store.release(claim);
 
     assertEquals(List.of("comment-1"), store.claimPending().commentIds());
+  }
+
+  @Test
+  public void claimPreservesFeedbackAuthorForDeferredAuthorization() {
+    store.enqueueFeedback(
+        List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42)));
+
+    ReviewFeedbackStore.Claim claim = store.claimPending();
+
+    assertEquals(List.of("comment-1"), claim.commentIds());
+    assertEquals(Map.of("comment-1", 42), claim.authorAccountIds());
   }
 
   @Test
