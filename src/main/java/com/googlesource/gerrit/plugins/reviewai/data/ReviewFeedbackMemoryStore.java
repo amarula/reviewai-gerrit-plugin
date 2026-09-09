@@ -166,6 +166,28 @@ public final class ReviewFeedbackMemoryStore {
       }
       memory.setConcernFeedback(normalizedFeedback);
     }
+    if (memory.getDismissedConcerns() == null) {
+      memory.setDismissedConcerns(Map.of());
+    } else {
+      Map<String, String> normalizedDismissals = new LinkedHashMap<>();
+      for (Map.Entry<String, String> entry : memory.getDismissedConcerns().entrySet()) {
+        String concernId = entry.getKey();
+        String rationale = entry.getValue();
+        if (concernId == null
+            || concernId.isBlank()
+            || rationale == null
+            || rationale.isBlank()) {
+          throw new IllegalArgumentException(
+              "Dismissed concerns require a concern ID and a rationale");
+        }
+        concernId = concernId.trim();
+        if (normalizedDismissals.putIfAbsent(concernId, rationale.trim()) != null) {
+          throw new IllegalArgumentException(
+              "Review feedback memory contains duplicate dismissed concern IDs");
+        }
+      }
+      memory.setDismissedConcerns(normalizedDismissals);
+    }
     if (memory.getDisabledReviewScopes() == null) {
       memory.setDisabledReviewScopes(Set.of());
     } else {

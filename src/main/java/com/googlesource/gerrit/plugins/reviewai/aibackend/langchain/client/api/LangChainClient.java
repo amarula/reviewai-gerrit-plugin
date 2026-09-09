@@ -238,6 +238,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         new LangChainReviewFeedbackClassifier(
             config,
             costTracker,
+            localizer,
             responseFormat ->
                 getProviderResponseFormat(config, List.of(), responseFormat));
     ResponseFormat specializedToolExecutorResponseFormat =

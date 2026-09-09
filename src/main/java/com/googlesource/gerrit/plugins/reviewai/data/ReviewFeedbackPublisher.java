@@ -35,8 +35,9 @@ public final class ReviewFeedbackPublisher {
     return store(change).loadMemory();
   }
 
-  public void enqueue(GerritChange change, Collection<String> commentIds) {
-    store(change).enqueue(commentIds);
+  public void enqueueFeedback(
+      GerritChange change, Collection<ReviewFeedbackStore.FeedbackRequest> comments) {
+    store(change).enqueueFeedback(comments);
   }
 
   public List<ReviewFeedbackStore.FeedbackComment> listComments(GerritChange change) {

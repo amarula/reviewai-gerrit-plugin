@@ -21,10 +21,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -88,6 +92,20 @@ public final class ReviewFeedbackStore {
     }
   }
 
+  public void enqueueFeedback(Collection<FeedbackRequest> comments) {
+    Map<String, Integer> normalizedComments = normalizeFeedbackRequests(comments);
+    if (normalizedComments.isEmpty()) {
+      return;
+    }
+    try (Connection connection = db.getConnection()) {
+      for (Map.Entry<String, Integer> comment : normalizedComments.entrySet()) {
+        enqueue(connection, comment.getKey(), comment.getValue());
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to enqueue review feedback for change " + changeId, e);
+    }
+  }
+
   public Claim claimPending() {
     String token = UUID.randomUUID().toString();
     try (Connection connection = db.getConnection()) {
@@ -106,9 +124,9 @@ public final class ReviewFeedbackStore {
           statement.setString(4, PENDING);
           statement.executeUpdate();
         }
-        List<String> commentIds = loadClaimedCommentIds(connection, token);
+        Map<String, Integer> claimedComments = loadClaimedComments(connection, token);
         connection.commit();
-        return new Claim(token, commentIds);
+        return new Claim(token, List.copyOf(claimedComments.keySet()), claimedComments);
       } catch (SQLException | RuntimeException e) {
         rollback(connection, e);
         throw e;
@@ -174,6 +192,11 @@ public final class ReviewFeedbackStore {
   }
 
   private void enqueue(Connection connection, String commentId) throws SQLException {
+    enqueue(connection, commentId, null);
+  }
+
+  private void enqueue(
+      Connection connection, String commentId, Integer authorAccountId) throws SQLException {
     try (PreparedStatement existing =
         connection.prepareStatement(
             """
@@ -193,12 +216,18 @@ public final class ReviewFeedbackStore {
         connection.prepareStatement(
             """
             INSERT INTO review_feedback_comments
-                (change_id, comment_id, processing_state, processing_token, updated_at)
-            VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)
+                (change_id, comment_id, author_account_id, processing_state,
+                 processing_token, updated_at)
+            VALUES (?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)
             """)) {
       insert.setString(1, changeId);
       insert.setString(2, commentId);
-      insert.setString(3, PENDING);
+      if (authorAccountId == null) {
+        insert.setNull(3, Types.INTEGER);
+      } else {
+        insert.setInt(3, authorAccountId);
+      }
+      insert.setString(4, PENDING);
       insert.executeUpdate();
     } catch (SQLException e) {
       if (e.getSQLState() == null || !e.getSQLState().startsWith("23")) {
@@ -207,13 +236,13 @@ public final class ReviewFeedbackStore {
     }
   }
 
-  private List<String> loadClaimedCommentIds(Connection connection, String token)
+  private Map<String, Integer> loadClaimedComments(Connection connection, String token)
       throws SQLException {
-    List<String> commentIds = new ArrayList<>();
+    Map<String, Integer> comments = new LinkedHashMap<>();
     try (PreparedStatement statement =
         connection.prepareStatement(
             """
-            SELECT comment_id
+            SELECT comment_id, author_account_id
             FROM review_feedback_comments
             WHERE change_id = ? AND processing_token = ?
             ORDER BY updated_at, comment_id
@@ -222,11 +251,12 @@ public final class ReviewFeedbackStore {
       statement.setString(2, token);
       try (ResultSet results = statement.executeQuery()) {
         while (results.next()) {
-          commentIds.add(results.getString(1));
+          int authorAccountId = results.getInt(2);
+          comments.put(results.getString(1), results.wasNull() ? null : authorAccountId);
         }
       }
     }
-    return commentIds;
+    return comments;
   }
 
   private void updateClaim(
@@ -265,6 +295,24 @@ public final class ReviewFeedbackStore {
     return normalizedIds;
   }
 
+  private static Map<String, Integer> normalizeFeedbackRequests(
+      Collection<FeedbackRequest> comments) {
+    if (comments == null) {
+      throw new IllegalArgumentException("comments must not be null");
+    }
+    Map<String, Integer> normalizedComments = new LinkedHashMap<>();
+    for (FeedbackRequest comment : comments) {
+      if (comment == null || comment.commentId() == null || comment.commentId().isBlank()) {
+        throw new IllegalArgumentException("comments must not contain blank IDs");
+      }
+      if (comment.authorAccountId() != null && comment.authorAccountId() <= 0) {
+        throw new IllegalArgumentException("author account IDs must be positive");
+      }
+      normalizedComments.putIfAbsent(comment.commentId().trim(), comment.authorAccountId());
+    }
+    return normalizedComments;
+  }
+
   private static void validateClaim(Claim claim) {
     if (claim == null || claim.token() == null || claim.token().isBlank()) {
       throw new IllegalArgumentException("claim must have a token");
@@ -279,15 +327,24 @@ public final class ReviewFeedbackStore {
     }
   }
 
-  public record Claim(String token, List<String> commentIds) {
+  public record Claim(
+      String token, List<String> commentIds, Map<String, Integer> authorAccountIds) {
+    public Claim(String token, List<String> commentIds) {
+      this(token, commentIds, Map.of());
+    }
+
     public Claim {
       commentIds = List.copyOf(commentIds);
+      authorAccountIds =
+          Collections.unmodifiableMap(new LinkedHashMap<>(authorAccountIds));
     }
 
     public boolean isEmpty() {
       return commentIds.isEmpty();
     }
   }
+
+  public record FeedbackRequest(String commentId, Integer authorAccountId) {}
 
   public record FeedbackComment(String commentId, String processingState) {}
 }

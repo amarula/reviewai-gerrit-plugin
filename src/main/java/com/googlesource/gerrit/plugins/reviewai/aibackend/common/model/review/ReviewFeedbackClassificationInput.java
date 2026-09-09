@@ -41,6 +41,9 @@ public class ReviewFeedbackClassificationInput {
 
     @SerializedName("thread_context")
     private List<ThreadMessage> threadContext;
+
+    @SerializedName("dismissal_allowed")
+    private boolean dismissalAllowed;
   }
 
   @Data
