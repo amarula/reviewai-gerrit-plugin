@@ -92,6 +92,50 @@ public class ClientCommandParserTest {
     }
   }
 
+  @Test
+  public void forgetThreadRequiresModeratorPrivileges() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    Localizer localizer = localizer();
+    ClientCommandParser parser =
+        new ClientCommandParser(
+            mock(Configuration.class),
+            changeSetData,
+            mock(GerritChange.class),
+            null,
+            null,
+            localizer,
+            null,
+            null);
+
+    assertTrue(parser.parseCommands("/forget_thread", false));
+
+    assertEquals(
+        SystemMessageFormatter.getPrefixedSystemMessage(
+            localizer, localizer.getText("message.command.moderator.required")),
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void forgetThreadIsParsedForModerator() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser =
+        new ClientCommandParser(
+            mock(Configuration.class),
+            changeSetData,
+            mock(GerritChange.class),
+            null,
+            null,
+            localizer(),
+            null,
+            null,
+            AiRole.MODERATOR,
+            new DisabledClientCommandExtension());
+
+    assertTrue(parser.parseCommands("/forget_thread", false));
+
+    assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+  }
+
   private static Localizer localizer() {
     Localizer localizer = mock(Localizer.class);
     when(localizer.getText("plugin.message.prefix")).thenReturn("ReviewAI");
@@ -102,6 +146,8 @@ public class ClientCommandParserTest {
         .thenReturn("Unable to execute command: the -dev build is required");
     when(localizer.getText("message.command.option.unknown"))
         .thenReturn("Unknown command option: %s %s");
+    when(localizer.getText("message.command.moderator.required"))
+        .thenReturn("Unable to execute command: Moderator privileges are required");
     return localizer;
   }
 }

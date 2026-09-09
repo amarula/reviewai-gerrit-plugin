@@ -20,7 +20,9 @@ import java.util.Map;
 
 public final class AiRolePolicy {
   private static final Map<AiAction, AiRole> REQUIRED_ROLES =
-      Map.of(AiAction.USE_ADMINISTRATOR_FEATURES, AiRole.ADMINISTRATOR);
+      Map.of(
+          AiAction.USE_MODERATOR_FEATURES, AiRole.MODERATOR,
+          AiAction.USE_ADMINISTRATOR_FEATURES, AiRole.ADMINISTRATOR);
 
   private AiRolePolicy() {}
 
