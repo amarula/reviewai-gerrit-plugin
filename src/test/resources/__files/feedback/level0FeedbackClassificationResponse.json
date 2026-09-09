@@ -3,36 +3,50 @@
     {
       "comment_id": "user-feedback",
       "category": "CONCERN",
-      "concern_id": "old-present"
+      "concern_id": "old-present",
+      "review_control_actions": []
     },
     {
       "comment_id": "generic-guidance",
       "category": "GENERIC",
-      "concern_id": ""
+      "concern_id": "",
+      "review_control_actions": []
     },
     {
       "comment_id": "question",
       "category": "IRRELEVANT",
-      "concern_id": ""
+      "concern_id": "",
+      "review_control_actions": []
     },
     {
       "comment_id": "ca0764e7_4e6e27ab",
       "category": "GENERIC",
-      "concern_id": ""
+      "concern_id": "",
+      "review_control_actions": [
+        {
+          "operation": "DISABLE",
+          "target": "COMMIT_MESSAGE"
+        }
+      ]
     },
     {
       "comment_id": "skip-testability",
       "category": "GENERIC",
-      "concern_id": ""
+      "concern_id": "",
+      "review_control_actions": [
+        {
+          "operation": "DISABLE",
+          "target": "TESTABILITY"
+        }
+      ]
     }
   ],
-  "generic_feedback": "Keep public API changes backward compatible; skip commit message and test coverage review.",
+  "generic_feedback": "Keep public API changes backward compatible.",
   "concern_feedback": [
     {
       "concern_id": "old-present",
       "summary": "The null fallback is intentional for legacy callers."
     }
   ],
-  "disabled_review_scopes": ["COMMIT_MESSAGE"],
-  "disabled_specialized_agents": ["TESTABILITY"]
+  "condition_label_disabled_specialized_agents": []
 }

@@ -1,0 +1,18 @@
+{
+  "classifications": [
+    {
+      "comment_id": "enable-security",
+      "category": "GENERIC",
+      "concern_id": "",
+      "review_control_actions": [
+        {
+          "operation": "ENABLE",
+          "target": "SECURITY"
+        }
+      ]
+    }
+  ],
+  "generic_feedback": "",
+  "concern_feedback": [],
+  "condition_label_disabled_specialized_agents": []
+}

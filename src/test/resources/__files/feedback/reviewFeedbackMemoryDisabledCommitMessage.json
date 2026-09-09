@@ -4,5 +4,6 @@
   "concern_feedback": {},
   "dismissed_concerns": {},
   "disabled_review_scopes": ["COMMIT_MESSAGE"],
-  "disabled_specialized_agents": []
+  "disabled_specialized_agents": [],
+  "condition_label_disabled_specialized_agents": []
 }

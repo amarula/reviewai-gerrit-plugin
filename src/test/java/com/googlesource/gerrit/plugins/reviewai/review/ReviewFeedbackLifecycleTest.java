@@ -39,7 +39,7 @@ import org.junit.Test;
 
 public class ReviewFeedbackLifecycleTest {
   @Test
-  public void authorizesDismissalAgainstOriginalFeedbackAuthor() {
+  public void authorizesModeratorActionsAgainstOriginalFeedbackAuthor() {
     ReviewFeedbackPublisher publisher = mock(ReviewFeedbackPublisher.class);
     Configuration config = mock(Configuration.class);
     IdentifiedUser.GenericFactory identifiedUserFactory =
@@ -70,10 +70,13 @@ public class ReviewFeedbackLifecycleTest {
     assertEquals(
         Set.of("comment-1"),
         changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
+    assertEquals(
+        Set.of("comment-1"),
+        changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
   }
 
   @Test
-  public void ordinaryFeedbackAuthorCannotAuthorizeDismissal() {
+  public void ordinaryFeedbackAuthorCannotAuthorizeModeratorActions() {
     ReviewFeedbackPublisher publisher = mock(ReviewFeedbackPublisher.class);
     Configuration config = mock(Configuration.class);
     IdentifiedUser.GenericFactory identifiedUserFactory =
@@ -103,5 +106,7 @@ public class ReviewFeedbackLifecycleTest {
 
     assertEquals(
         Set.of(), changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
+    assertEquals(
+        Set.of(), changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
   }
 }
