@@ -40,6 +40,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult.Category;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 
@@ -57,11 +58,14 @@ final class LangChainReviewFeedbackClassifier {
 
   private final ResponseFormat responseFormat;
   private final LangChainExecutor executor;
+  private final Localizer localizer;
 
   LangChainReviewFeedbackClassifier(
       Configuration config,
       AiCostTracker costTracker,
+      Localizer localizer,
       Function<ResponseFormat, ResponseFormat> providerResponseFormat) {
+    this.localizer = localizer;
     responseFormat =
         new LangChainStructuredResponseFactory(RESPONSE_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
@@ -103,7 +107,14 @@ final class LangChainReviewFeedbackClassifier {
         getGson()
             .fromJson(
                 unwrapJsonCode(responseText), ReviewFeedbackClassificationResult.class);
-    return toMemory(input, result);
+    ReviewFeedbackMemory memory = toMemory(input, result);
+    if (hasUnauthorizedDismissal(input, result)) {
+      changeSetData.setReviewNoticeMessage(
+          localizer == null
+              ? "A concern dismissal was ignored because AI moderator privileges are required."
+              : localizer.getText("message.review.feedback.dismissal.moderator.required"));
+    }
+    return memory;
   }
 
   ResponseFormat getResponseFormat() {
@@ -172,7 +183,8 @@ final class LangChainReviewFeedbackClassifier {
                   comment.getFilename(),
                   comment.getLine()),
               threadConcernId,
-              threadContext));
+              threadContext,
+              isDismissalAuthorized(changeSetData, commentId)));
     }
     return new ReviewFeedbackClassificationInput(memory, concerns, comments);
   }
@@ -231,10 +243,11 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException(
           "Review feedback classifier must classify every addressed comment exactly once");
     }
-    return createMemory(result, concernIds);
+    return createMemory(input, result, concernIds);
   }
 
   private ReviewFeedbackMemory createMemory(
+      ReviewFeedbackClassificationInput input,
       ReviewFeedbackClassificationResult result,
       Set<String> concernIds) {
     Map<String, String> concernFeedback = new LinkedHashMap<>();
@@ -261,6 +274,24 @@ final class LangChainReviewFeedbackClassifier {
             ? null
             : genericFeedback.trim());
     memory.setConcernFeedback(concernFeedback);
+    Map<String, String> dismissedConcerns =
+        input.getCurrentMemory().getDismissedConcerns() == null
+            ? new LinkedHashMap<>()
+            : new LinkedHashMap<>(input.getCurrentMemory().getDismissedConcerns());
+    for (ReviewFeedbackClassificationResult.Classification classification :
+        result.getClassifications()) {
+      if (classification.getCategory() != Category.DISMISS_CONCERN
+          || !isDismissalAllowed(input, classification.getCommentId())) {
+        continue;
+      }
+      String rationale = concernFeedback.get(classification.getConcernId());
+      if (rationale == null) {
+        throw new IllegalStateException(
+            "Concern dismissal requires a concern feedback summary");
+      }
+      dismissedConcerns.put(classification.getConcernId(), rationale);
+    }
+    memory.setDismissedConcerns(dismissedConcerns);
     Set<ReviewScope> disabledReviewScopes = result.getDisabledReviewScopes();
     if (disabledReviewScopes == null
         || disabledReviewScopes.contains(null)
@@ -296,7 +327,8 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException("Review feedback contains an invalid classification");
     }
     String concernId = classification.getConcernId();
-    if (classification.getCategory() == Category.CONCERN) {
+    if (classification.getCategory() == Category.CONCERN
+        || classification.getCategory() == Category.DISMISS_CONCERN) {
       if (concernId == null || !concernIds.contains(concernId)) {
         throw new IllegalStateException(
             "Concern-related review feedback requires a known concern ID");
@@ -305,6 +337,32 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException(
           "Only concern-related review feedback may reference a concern ID");
     }
+  }
+
+  private boolean hasUnauthorizedDismissal(
+      ReviewFeedbackClassificationInput input,
+      ReviewFeedbackClassificationResult result) {
+    return result.getClassifications().stream()
+        .anyMatch(
+            classification ->
+                classification.getCategory() == Category.DISMISS_CONCERN
+                    && !isDismissalAllowed(input, classification.getCommentId()));
+  }
+
+  private boolean isDismissalAllowed(
+      ReviewFeedbackClassificationInput input, String commentId) {
+    return input.getComments().stream()
+        .filter(comment -> comment.getTargetComment().getId().equals(commentId))
+        .map(ReviewFeedbackClassificationInput.Comment::isDismissalAllowed)
+        .findFirst()
+        .orElse(false);
+  }
+
+  private boolean isDismissalAuthorized(
+      ChangeSetData changeSetData, String commentId) {
+    Set<String> authorizedCommentIds =
+        changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds();
+    return authorizedCommentIds != null && authorizedCommentIds.contains(commentId);
   }
 
   @FunctionalInterface

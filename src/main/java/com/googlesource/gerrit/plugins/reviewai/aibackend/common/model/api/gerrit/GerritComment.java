@@ -81,6 +81,10 @@ public class GerritComment {
     return unresolved != null && !unresolved;
   }
 
+  public Integer getAuthorAccountId() {
+    return author == null || author.getAccountId() <= 0 ? null : author.getAccountId();
+  }
+
   public int getOneBasedPatchSet() {
     return patchSet == null ? 1 : Math.max(patchSet, 1);
   }

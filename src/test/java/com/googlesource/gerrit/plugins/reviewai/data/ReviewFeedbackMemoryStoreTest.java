@@ -76,6 +76,16 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   }
 
   @Test
+  public void storesAuthorizedConcernDismissals() throws Exception {
+    ReviewFeedbackMemory memory = loadMemory();
+    memory.setDismissedConcerns(Map.of("concern-1", "The moderator accepted the risk."));
+
+    store.save(memory);
+
+    assertEquals(memory, store.load().orElseThrow());
+  }
+
+  @Test
   public void saveReplacesExistingMemory() throws Exception {
     ReviewFeedbackMemory memory = loadMemory();
     store.save(memory);
@@ -130,6 +140,10 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
     ReviewFeedbackMemory invalidAgent = loadMemory();
     invalidAgent.setDisabledSpecializedAgents(Set.of(" "));
     assertRejected(() -> store.save(invalidAgent));
+
+    ReviewFeedbackMemory invalidDismissal = loadMemory();
+    invalidDismissal.setDismissedConcerns(Map.of("concern-1", " "));
+    assertRejected(() -> store.save(invalidDismissal));
   }
 
   private static ReviewFeedbackMemory loadMemory() throws Exception {

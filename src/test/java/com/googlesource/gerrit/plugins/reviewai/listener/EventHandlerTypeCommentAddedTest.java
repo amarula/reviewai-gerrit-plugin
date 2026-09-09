@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType.PreprocessResult;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
@@ -114,6 +115,9 @@ public class EventHandlerTypeCommentAddedTest {
   public void enqueuesAddressedCommentBeforeSwitchingToForcedReview() {
     GerritComment comment = new GerritComment();
     comment.setId("comment-1");
+    GerritComment.Author author = new GerritComment.Author();
+    author.setAccountId(42);
+    comment.setAuthor(author);
     when(gerritClient.getClientData(change))
         .thenReturn(
             new GerritClientData(
@@ -129,7 +133,9 @@ public class EventHandlerTypeCommentAddedTest {
         handler.preprocessEvent());
 
     verify(reviewFeedbackPublisher)
-        .enqueue(eq(change), eq(List.of("comment-1")));
+        .enqueueFeedback(
+            eq(change),
+            eq(List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42))));
   }
 
   @Test

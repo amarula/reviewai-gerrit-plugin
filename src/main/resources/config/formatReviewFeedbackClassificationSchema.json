@@ -13,7 +13,7 @@
             "comment_id": { "type": "string" },
             "category": {
               "type": "string",
-              "enum": ["GENERIC", "IRRELEVANT", "CONCERN"]
+              "enum": ["GENERIC", "IRRELEVANT", "CONCERN", "DISMISS_CONCERN"]
             },
             "concern_id": { "type": "string" }
           },

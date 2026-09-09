@@ -35,6 +35,9 @@ public class ReviewFeedbackMemory {
   @SerializedName("concern_feedback")
   private Map<String, String> concernFeedback = Map.of();
 
+  @SerializedName("dismissed_concerns")
+  private Map<String, String> dismissedConcerns = Map.of();
+
   @SerializedName("disabled_review_scopes")
   private Set<ReviewScope> disabledReviewScopes = Set.of();
 
@@ -43,5 +46,9 @@ public class ReviewFeedbackMemory {
 
   public boolean isReviewScopeDisabled(ReviewScope scope) {
     return disabledReviewScopes != null && disabledReviewScopes.contains(scope);
+  }
+
+  public boolean isConcernDismissalAuthorized(String concernId) {
+    return dismissedConcerns != null && dismissedConcerns.containsKey(concernId);
   }
 }

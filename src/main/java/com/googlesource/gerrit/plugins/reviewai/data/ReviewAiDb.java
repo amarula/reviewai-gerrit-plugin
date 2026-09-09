@@ -206,11 +206,14 @@ public class ReviewAiDb {
         "CREATE TABLE IF NOT EXISTS review_feedback_comments ("
             + "change_id VARCHAR(512) NOT NULL"
             + ", comment_id VARCHAR(255) NOT NULL"
+            + ", author_account_id INT"
             + ", processing_state VARCHAR(32) NOT NULL"
             + ", processing_token VARCHAR(36)"
             + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
             + ", PRIMARY KEY(change_id, comment_id)"
             + ")",
+        "ALTER TABLE review_feedback_comments"
+            + " ADD COLUMN IF NOT EXISTS author_account_id INT",
         "CREATE INDEX IF NOT EXISTS idx_review_feedback_comments_pending"
             + " ON review_feedback_comments(change_id, processing_state, updated_at)");
   }

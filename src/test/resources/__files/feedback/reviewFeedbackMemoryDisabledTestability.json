@@ -2,6 +2,7 @@
   "schema_version": 1,
   "generic_feedback": "Skip test coverage review.",
   "concern_feedback": {},
+  "dismissed_concerns": {},
   "disabled_review_scopes": [],
   "disabled_specialized_agents": ["TESTABILITY"]
 }
