@@ -64,6 +64,7 @@ public class ChangeSetData {
   private transient List<String> pendingReviewFeedbackCommentIds = List.of();
   private transient Set<String> reviewFeedbackDismissalAuthorizedCommentIds = Set.of();
   private transient Set<String> reviewFeedbackControlAuthorizedCommentIds = Set.of();
+  private transient Boolean moderatorFeaturesAllowed = false;
   private transient boolean reviewFeedbackClassified;
   private transient AiRequestCancellation aiRequestCancellation = new AiRequestCancellation();
 
@@ -165,6 +166,7 @@ public class ChangeSetData {
         reviewFeedbackDismissalAuthorizedCommentIds);
     copy.setReviewFeedbackControlAuthorizedCommentIds(
         reviewFeedbackControlAuthorizedCommentIds);
+    copy.setModeratorFeaturesAllowed(moderatorFeaturesAllowed);
     copy.setReviewFeedbackClassified(reviewFeedbackClassified);
     copy.setAiRequestCancellation(aiRequestCancellation);
     copy.setForcedReview(forcedReview);
