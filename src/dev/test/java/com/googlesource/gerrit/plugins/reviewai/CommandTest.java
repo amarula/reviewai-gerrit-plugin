@@ -429,6 +429,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertEquals(
         "ReviewAI Message: Unable to execute command: Moderator privileges are required",
         changeSetData.getReviewSystemMessage());
+    Assert.assertFalse(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
   }
 
   @Test
