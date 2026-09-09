@@ -16,9 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.CurrentUser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 public interface AiRoleResolver {
-  AiRole resolve(Configuration config, CurrentUser user);
+  AiRole resolve(
+      Configuration config, CurrentUser user, Project.NameKey project, Change.Id changeId);
 }
