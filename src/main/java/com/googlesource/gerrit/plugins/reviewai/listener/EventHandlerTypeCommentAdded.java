@@ -104,6 +104,8 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
       changeSetData.setDeferredReview(true);
       return PreprocessResult.SWITCH_TO_PATCH_SET_CREATED;
     }
+    changeSetData.setModeratorFeaturesAllowed(
+        AiRolePolicy.isAllowed(userRole, AiAction.USE_MODERATOR_FEATURES));
     boolean commentsRetrieved =
         sourceChangeMessageId == null
             ? gerritClient.retrieveComments(change, userRole)

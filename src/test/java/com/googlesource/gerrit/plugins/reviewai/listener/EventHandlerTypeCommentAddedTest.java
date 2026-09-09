@@ -112,6 +112,34 @@ public class EventHandlerTypeCommentAddedTest {
   }
 
   @Test
+  public void regularUserCannotUseModeratorFeaturesInMessageResponse() {
+    when(gerritClient.retrieveComments(change, AiRole.USER)).thenReturn(true);
+
+    assertEquals(PreprocessResult.OK, handler.preprocessEvent());
+
+    verify(changeSetData).setModeratorFeaturesAllowed(false);
+  }
+
+  @Test
+  public void moderatorCanUseModeratorFeaturesInMessageResponse() {
+    handler =
+        new EventHandlerTypeCommentAdded(
+            config,
+            changeSetData,
+            change,
+            mock(PatchSetReviewer.class),
+            gerritClient,
+            applicabilityChecker,
+            reviewFeedbackPublisher,
+            AiRole.MODERATOR);
+    when(gerritClient.retrieveComments(change, AiRole.MODERATOR)).thenReturn(true);
+
+    assertEquals(PreprocessResult.OK, handler.preprocessEvent());
+
+    verify(changeSetData).setModeratorFeaturesAllowed(true);
+  }
+
+  @Test
   public void enqueuesAddressedCommentBeforeSwitchingToForcedReview() {
     GerritComment comment = new GerritComment();
     comment.setId("comment-1");
