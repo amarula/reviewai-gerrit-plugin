@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.entities.Account;
+import com.google.gerrit.entities.Change;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
@@ -244,7 +245,9 @@ public class EventHandlerTask implements Runnable {
   }
 
   private IEventHandlerType getEventHandlerType() {
-    AiRole userRole = roleResolver.resolve(config, eventUser);
+    Change.Id changeId = change.getChangeNumber().map(Change::id).orElse(null);
+    AiRole userRole =
+        roleResolver.resolve(config, eventUser, change.getProjectNameKey(), changeId);
     administratorUser =
         AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES);
     return switch (processing_event_type) {

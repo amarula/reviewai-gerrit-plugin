@@ -232,7 +232,13 @@ class ReviewAgentResponseService {
   }
 
   private AiRole resolveRole(Configuration config, ChangeResource resource) {
-    return resource == null ? AiRole.USER : roleResolver.resolve(config, resource.getUser());
+    return resource == null
+        ? AiRole.USER
+        : roleResolver.resolve(
+            config,
+            resource.getUser(),
+            resource.getProject(),
+            resource.getChange().getId());
   }
 
   private String getDynamicConfigurationMessage(

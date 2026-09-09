@@ -18,7 +18,8 @@ package com.googlesource.gerrit.plugins.reviewai.permissions;
 
 public enum AiRole {
   USER(null, null),
-  ADMINISTRATOR(USER, "message.command.debugging.administrator.required");
+  MODERATOR(USER, "message.command.moderator.required"),
+  ADMINISTRATOR(MODERATOR, "message.command.debugging.administrator.required");
 
   private final AiRole inheritedRole;
   private final String requiredMessageKey;

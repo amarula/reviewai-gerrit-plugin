@@ -23,6 +23,7 @@ import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -87,7 +88,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   @Override
   protected AiRoleResolver getAiRoleResolver() {
     return new DevAiRoleResolver(
-        new ConfiguredAiGroupMembership(groupCache), permissionBackend);
+        new ConfiguredAiGroupMembership(groupCache),
+        permissionBackend,
+        Mockito.mock(ChangeData.Factory.class));
   }
 
   @Override
