@@ -139,7 +139,8 @@ Messages and commands can be entered directly in the Review Agent sidebar:
 They can also be sent through traditional Gerrit comments by addressing the configured AI user, for example
 `@gpt /review`.
 
-See the [Command Reference](docs/commands.md) for every command, option, scope, and administrator-only operation.
+See the [Command Reference](docs/commands.md) for every command, option, scope, and the AI Moderator and ReviewAI
+Administrator roles.
 
 ## Documentation
 
