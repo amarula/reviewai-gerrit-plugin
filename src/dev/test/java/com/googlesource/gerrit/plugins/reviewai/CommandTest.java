@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.googlesource.gerrit.plugins.reviewai.config.Configuration.KEY_DIRECTIVES;
@@ -202,7 +203,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewClassifiesGuidanceInSameComment() throws RestApiException {
+  public void commandReviewClassifiesGuidanceInSameComment() throws Exception {
+    grantAdministratorPrivileges();
     setupCommandCommentWithPastAiComments(
         "/review Skip commit message review");
     setupMockRequestCreateResponse(
@@ -217,12 +219,12 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     testRequestSent();
+    var feedbackMemory =
+        reviewFeedbackPublisher.load(getGerritChange()).orElseThrow();
+    Assert.assertNull(feedbackMemory.getGenericFeedback());
     Assert.assertEquals(
-        "Skip commit message review.",
-        reviewFeedbackPublisher
-            .load(getGerritChange())
-            .orElseThrow()
-            .getGenericFeedback());
+        Set.of(ReviewScope.COMMIT_MESSAGE),
+        feedbackMemory.getDisabledReviewScopes());
   }
 
   @Test

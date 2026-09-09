@@ -17,7 +17,6 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import com.google.gson.annotations.SerializedName;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import java.util.List;
 import java.util.Set;
 import lombok.Data;
@@ -32,11 +31,8 @@ public class ReviewFeedbackClassificationResult {
   @SerializedName("concern_feedback")
   private List<ConcernFeedback> concernFeedback = List.of();
 
-  @SerializedName("disabled_review_scopes")
-  private Set<ReviewScope> disabledReviewScopes = Set.of();
-
-  @SerializedName("disabled_specialized_agents")
-  private Set<String> disabledSpecializedAgents = Set.of();
+  @SerializedName("condition_label_disabled_specialized_agents")
+  private Set<String> conditionLabelDisabledSpecializedAgents = Set.of();
 
   public enum Category {
     GENERIC,
@@ -54,6 +50,20 @@ public class ReviewFeedbackClassificationResult {
 
     @SerializedName("concern_id")
     private String concernId;
+
+    @SerializedName("review_control_actions")
+    private List<ReviewControlAction> reviewControlActions = List.of();
+  }
+
+  public enum ReviewControlOperation {
+    DISABLE,
+    ENABLE
+  }
+
+  @Data
+  public static class ReviewControlAction {
+    private ReviewControlOperation operation;
+    private String target;
   }
 
   @Data

@@ -55,6 +55,7 @@ public final class ReviewFeedbackLifecycle {
   void reset(ChangeSetData changeSetData) {
     changeSetData.setPendingReviewFeedbackCommentIds(List.of());
     changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of());
+    changeSetData.setReviewFeedbackControlAuthorizedCommentIds(Set.of());
     changeSetData.setReviewFeedbackClassified(false);
   }
 
@@ -70,23 +71,27 @@ public final class ReviewFeedbackLifecycle {
     }
     ReviewFeedbackStore.Claim claim = publisher.claimPending(change);
     changeSetData.setPendingReviewFeedbackCommentIds(claim.commentIds());
+    Set<String> moderatorAuthorizedCommentIds =
+        moderatorAuthorizedCommentIds(change, claim);
     changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(
-        dismissalAuthorizedCommentIds(change, claim));
+        moderatorAuthorizedCommentIds);
+    changeSetData.setReviewFeedbackControlAuthorizedCommentIds(
+        moderatorAuthorizedCommentIds);
     return claim.isEmpty() ? Session.empty() : new Session(claim);
   }
 
-  private Set<String> dismissalAuthorizedCommentIds(
+  private Set<String> moderatorAuthorizedCommentIds(
       GerritChange change, ReviewFeedbackStore.Claim claim) {
     Change.Id changeId = change.getChangeNumber().map(Change::id).orElse(null);
     return claim.authorAccountIds().entrySet().stream()
         .filter(
             entry ->
-                canDismissConcern(change, changeId, entry.getValue()))
+                canUseModeratorFeatures(change, changeId, entry.getValue()))
         .map(java.util.Map.Entry::getKey)
         .collect(Collectors.toUnmodifiableSet());
   }
 
-  private boolean canDismissConcern(
+  private boolean canUseModeratorFeatures(
       GerritChange change, Change.Id changeId, Integer authorAccountId) {
     if (authorAccountId == null || changeId == null) {
       return false;

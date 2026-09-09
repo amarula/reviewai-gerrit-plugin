@@ -3,7 +3,8 @@
     {
       "comment_id": "dismiss-request",
       "category": "DISMISS_CONCERN",
-      "concern_id": "old-present"
+      "concern_id": "old-present",
+      "review_control_actions": []
     }
   ],
   "generic_feedback": "",
@@ -13,6 +14,5 @@
       "summary": "The reviewer explicitly requested that this concern be dismissed."
     }
   ],
-  "disabled_review_scopes": [],
-  "disabled_specialized_agents": []
+  "condition_label_disabled_specialized_agents": []
 }
