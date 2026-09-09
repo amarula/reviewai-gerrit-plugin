@@ -16,9 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -29,17 +32,19 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DevAiRoleResolver extends DefaultAiRoleResolver {
   private final ConfiguredAiGroupMembership groupMembership;
-  private final PermissionBackend permissionBackend;
 
   @Inject
   public DevAiRoleResolver(
-      ConfiguredAiGroupMembership groupMembership, PermissionBackend permissionBackend) {
+      ConfiguredAiGroupMembership groupMembership,
+      PermissionBackend permissionBackend,
+      ChangeData.Factory changeDataFactory) {
+    super(permissionBackend, changeDataFactory);
     this.groupMembership = groupMembership;
-    this.permissionBackend = permissionBackend;
   }
 
   @Override
-  public AiRole resolve(Configuration config, CurrentUser user) {
+  public AiRole resolve(
+      Configuration config, CurrentUser user, Project.NameKey project, Change.Id changeId) {
     Optional<Boolean> configuredAdministrator =
         config == null
             ? Optional.empty()
@@ -48,7 +53,7 @@ public class DevAiRoleResolver extends DefaultAiRoleResolver {
         || configuredAdministrator.isEmpty() && isGerritAdministrator(user)) {
       return AiRole.ADMINISTRATOR;
     }
-    return super.resolve(config, user);
+    return super.resolve(config, user, project, changeId);
   }
 
   private boolean isGerritAdministrator(CurrentUser user) {

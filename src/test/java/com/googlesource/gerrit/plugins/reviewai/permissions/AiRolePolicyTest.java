@@ -27,13 +27,14 @@ import org.junit.Test;
 
 public class AiRolePolicyTest {
   @Test
-  public void userCannotUseAdministratorFeatures() {
-    assertFalse(AiRolePolicy.isAllowed(AiRole.USER, AiAction.USE_ADMINISTRATOR_FEATURES));
+  public void moderatorCannotUseAdministratorFeatures() {
+    assertFalse(
+        AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }
 
   @Test
-  public void administratorInheritsUserRoleAndCanUseAdministratorFeatures() {
-    assertTrue(AiRole.ADMINISTRATOR.includes(AiRole.USER));
+  public void administratorInheritsModeratorRoleAndCanUseAdministratorFeatures() {
+    assertTrue(AiRole.ADMINISTRATOR.includes(AiRole.MODERATOR));
     assertTrue(
         AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }

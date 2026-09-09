@@ -31,6 +31,7 @@ import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
@@ -74,7 +75,9 @@ public class ReviewAgentModelTest extends TestBase {
             configCreator,
             aiReviewPermission,
             new DevAiRoleResolver(
-                new ConfiguredAiGroupMembership(groupCache), permissionBackend));
+                new ConfiguredAiGroupMembership(groupCache),
+                permissionBackend,
+                org.mockito.Mockito.mock(ChangeData.Factory.class)));
   }
 
   @Test
