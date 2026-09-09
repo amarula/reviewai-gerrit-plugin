@@ -17,5 +17,6 @@
 package com.googlesource.gerrit.plugins.reviewai.permissions;
 
 public enum AiAction {
+  USE_MODERATOR_FEATURES,
   USE_ADMINISTRATOR_FEATURES
 }

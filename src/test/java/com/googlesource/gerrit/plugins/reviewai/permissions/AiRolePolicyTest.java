@@ -27,20 +27,24 @@ import org.junit.Test;
 
 public class AiRolePolicyTest {
   @Test
-  public void moderatorCannotUseAdministratorFeatures() {
+  public void moderatorCanForgetConversationButCannotUseAdministratorFeatures() {
+    assertTrue(AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_MODERATOR_FEATURES));
     assertFalse(
         AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }
 
   @Test
-  public void administratorInheritsModeratorRoleAndCanUseAdministratorFeatures() {
-    assertTrue(AiRole.ADMINISTRATOR.includes(AiRole.MODERATOR));
+  public void administratorInheritsModeratorPermissions() {
+    assertTrue(AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_MODERATOR_FEATURES));
     assertTrue(
         AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }
 
   @Test
-  public void administratorCommandsAreMappedCentrally() {
+  public void commandActionsAreMappedCentrally() {
+    assertEquals(
+        AiAction.USE_MODERATOR_FEATURES,
+        AiCommandAccessPolicy.requiredAction(CommandSet.FORGET_THREAD, Map.of()).orElseThrow());
     assertEquals(
         AiAction.USE_ADMINISTRATOR_FEATURES,
         AiCommandAccessPolicy.requiredAction(

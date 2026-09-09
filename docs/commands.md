@@ -142,6 +142,9 @@ modifications to configuration parameters.
 /forget_thread
 ```
 
+**NOTE**: This command is reserved to users who can apply Code-Review +2 or submit the change.
+ReviewAI Administrators inherit moderator permissions.
+
 ## Showing Information
 
 The `/show` command, followed by one or more options, can be used to display relevant information for debugging and
