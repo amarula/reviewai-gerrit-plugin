@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -109,6 +110,7 @@ public class ClientCommandParserTest {
 
     assertTrue(parser.parseCommands("/forget_thread", false));
 
+    assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
     assertEquals(
         SystemMessageFormatter.getPrefixedSystemMessage(
             localizer, localizer.getText("message.command.moderator.required")),
