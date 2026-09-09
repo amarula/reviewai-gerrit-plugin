@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.command
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -118,6 +119,88 @@ public class ClientCommandParserTest {
   }
 
   @Test
+  public void deniedCommandAbortsEntireCommandChainInDevelopmentBuild() {
+    try (MockedStatic<PluginBuild> pluginBuild = mockStatic(PluginBuild.class)) {
+      pluginBuild.when(PluginBuild::isProductionBuild).thenReturn(false);
+      for (DeniedCommandChain testCase :
+          List.of(
+              new DeniedCommandChain(AiRole.USER, "/forget_thread /review"),
+              new DeniedCommandChain(AiRole.USER, "/review /forget_thread"),
+              new DeniedCommandChain(AiRole.MODERATOR, "/show --config /review"),
+              new DeniedCommandChain(AiRole.MODERATOR, "/review /show --config"),
+              new DeniedCommandChain(AiRole.MODERATOR, "/review --debug /suggest"),
+              new DeniedCommandChain(AiRole.MODERATOR, "/suggest /review --debug"))) {
+        ChangeSetData changeSetData = new ChangeSetData(1);
+        ReviewConcernPublisher reviewConcernPublisher = mock(ReviewConcernPublisher.class);
+        ReviewFeedbackPublisher reviewFeedbackPublisher = mock(ReviewFeedbackPublisher.class);
+        ClientCommandParser parser =
+            new ClientCommandParser(
+                mock(Configuration.class),
+                changeSetData,
+                mock(GerritChange.class),
+                null,
+                null,
+                localizer(),
+                null,
+                null,
+                testCase.role(),
+                reviewConcernPublisher,
+                reviewFeedbackPublisher,
+                new DisabledClientCommandExtension());
+
+        assertTrue(parser.parseCommands(testCase.commands()));
+
+        assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+        assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.REVIEW));
+        assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.SUGGEST));
+        assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.SHOW));
+        assertFalse(changeSetData.getForcedReview());
+        verifyNoInteractions(reviewConcernPublisher);
+        verifyNoInteractions(reviewFeedbackPublisher);
+      }
+    }
+  }
+
+  @Test
+  public void administratorCanParseProtectedCommandChainInDevelopmentBuild() {
+    try (MockedStatic<PluginBuild> pluginBuild = mockStatic(PluginBuild.class)) {
+      pluginBuild.when(PluginBuild::isProductionBuild).thenReturn(false);
+      ChangeSetData changeSetData = new ChangeSetData(1);
+      ClientCommandParser parser = parserForRole(changeSetData, AiRole.ADMINISTRATOR);
+
+      assertTrue(
+          parser.parseCommands(
+              "/forget_thread /show --config /review --debug", false));
+
+      assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+      assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.SHOW));
+      assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.REVIEW));
+    }
+  }
+
+  @Test
+  public void helpDoesNotPreflightCommandsThatFollowIt() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser = parserForRole(changeSetData, AiRole.MODERATOR);
+
+    assertTrue(parser.parseCommands("/help /show --config", false));
+
+    assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.HELP));
+    assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.SHOW));
+  }
+
+  @Test
+  public void messageBypassesDeniedCommandPreflight() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser = parserForRole(changeSetData, AiRole.USER);
+
+    assertFalse(parser.parseCommands("/message /forget_thread", false));
+
+    assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+    assertNull(changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
   public void forgetThreadIsParsedForModerator() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     ClientCommandParser parser =
@@ -137,6 +220,22 @@ public class ClientCommandParserTest {
 
     assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
   }
+
+  private static ClientCommandParser parserForRole(ChangeSetData changeSetData, AiRole role) {
+    return new ClientCommandParser(
+        mock(Configuration.class),
+        changeSetData,
+        mock(GerritChange.class),
+        null,
+        null,
+        localizer(),
+        null,
+        null,
+        role,
+        new DisabledClientCommandExtension());
+  }
+
+  private record DeniedCommandChain(AiRole role, String commands) {}
 
   private static Localizer localizer() {
     Localizer localizer = mock(Localizer.class);

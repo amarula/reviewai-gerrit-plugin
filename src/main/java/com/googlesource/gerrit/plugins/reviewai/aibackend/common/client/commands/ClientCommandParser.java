@@ -192,6 +192,9 @@ public class ClientCommandParser extends ClientCommandBase {
       log.debug("Message command detected: parsing complete.");
       return false;
     }
+    if (rejectDeniedCommandChain(comment)) {
+      return true;
+    }
     Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
     changeSetData.setHideAiReview(true);
     while (commandMatcher.find()) {
@@ -220,10 +223,33 @@ public class ClientCommandParser extends ClientCommandBase {
     return messageCommandMatcher.find();
   }
 
+  private boolean rejectDeniedCommandChain(String comment) {
+    Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
+    while (commandMatcher.find()) {
+      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
+      if (command == null) {
+        return false;
+      }
+      resetOptions();
+      parseOptions(commandMatcher);
+      if (!devBuildRequired(command)) {
+        Optional<AiRole> deniedRole =
+            AiCommandAccessPolicy.deniedRequiredRole(userRole, command, baseOptions);
+        if (deniedRole.isPresent()) {
+          setRoleDeniedMessage(command, deniedRole.get());
+          return true;
+        }
+      }
+      if (command == CommandSet.HELP) {
+        return false;
+      }
+    }
+    return false;
+  }
+
   private boolean parseSingleCommand(
       String comment, Matcher commandMatcher, CommandSet command, boolean executeCommands) {
-    baseOptions = new HashMap<>();
-    dynamicOptions = new HashMap<>();
+    resetOptions();
     if (command == null) {
       changeSetData.setReviewSystemMessage(
           String.format(
@@ -246,6 +272,11 @@ public class ClientCommandParser extends ClientCommandBase {
     return true;
   }
 
+  private void resetOptions() {
+    baseOptions = new HashMap<>();
+    dynamicOptions = new HashMap<>();
+  }
+
   private boolean validateCommand(CommandSet command) {
     log.debug("Validating command: {}", command);
     if (devBuildRequired(command)) {
@@ -261,15 +292,18 @@ public class ClientCommandParser extends ClientCommandBase {
     Optional<AiRole> deniedRole =
         AiCommandAccessPolicy.deniedRequiredRole(userRole, command, baseOptions);
     if (deniedRole.isPresent()) {
-      AiRole requiredRole = deniedRole.get();
-      changeSetData.setReviewSystemMessage(
-          SystemMessageFormatter.getPrefixedSystemMessage(
-              localizer, localizer.getText(requiredRole.requiredMessageKey())));
-      log.debug("Command `{}` not validated: role `{}` is required", command, requiredRole);
+      setRoleDeniedMessage(command, deniedRole.get());
       return false;
     }
     log.debug("Command `{}` validated", command);
     return true;
+  }
+
+  private void setRoleDeniedMessage(CommandSet command, AiRole requiredRole) {
+    changeSetData.setReviewSystemMessage(
+        SystemMessageFormatter.getPrefixedSystemMessage(
+            localizer, localizer.getText(requiredRole.requiredMessageKey())));
+    log.debug("Command `{}` not validated: role `{}` is required", command, requiredRole);
   }
 
   private boolean devBuildRequired(CommandSet command) {
