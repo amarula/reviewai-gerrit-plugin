@@ -6,6 +6,25 @@ examples in this section do not include a @{gerritUserName} prefix.
 The `/configure`, `/show`, and `/directives` commands and the `/review --debug` option are available only in the
 development build and are restricted to users in the ReviewAI Administrator group.
 
+## Roles and Permissions
+
+ReviewAI assigns each user one of three roles for the current Change:
+
+| Role | Assignment | Additional capabilities |
+| --- | --- | --- |
+| User | The default role. | Standard messages, reviews, and suggestions. |
+| AI Moderator | The user can apply `Code-Review +2` or submit the Change. | Dismiss tracked concerns, control future review scopes and specialized agents, and use `/forget_thread`. |
+| ReviewAI Administrator | In the development build, the user belongs to `aiAdministratorsGroup`; if that group is not configured or cannot be found, Gerrit administrators are used. | All AI Moderator capabilities plus development and debugging features. |
+
+AI Moderator permissions are evaluated per Change. Moderator actions can be requested using ordinary messages; no
+special command prefix is required. For example, a moderator can reply to a tracked concern with “Dismiss this
+concern,” ask ReviewAI to “Skip commit message review,” or later say “Resume security review.”
+
+Concern dismissals and review-agent controls take effect during the next eligible review. ReviewAI checks the original
+comment author's current role again at that time. Requests from users who do not have AI Moderator permission are
+ignored, and the immediate AI response tells the user that moderator permission is required instead of confirming the
+requested action.
+
 ## Help
 
 Use `/help` to display a summary of all supported commands and their main options. Use `/help <command>` or
