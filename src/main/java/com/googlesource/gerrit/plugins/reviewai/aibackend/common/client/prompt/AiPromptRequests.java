@@ -44,10 +44,11 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
-    instructions.addAll(
-        List.of(
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS"),
-            getCommentRequestPrompt(changeSetData.getCommentPropertiesSize())));
+    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS"));
+    if (!Boolean.TRUE.equals(changeSetData.getModeratorFeaturesAllowed())) {
+      instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED"));
+    }
+    instructions.add(getCommentRequestPrompt(changeSetData.getCommentPropertiesSize()));
     log.debug("AI Assistant Instructions for requests added: {}", instructions);
   }
 

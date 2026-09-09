@@ -62,6 +62,45 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void regularUserRequestPromptRequiresModeratorPermissionForProtectedActions() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setCommentPropertiesSize(1);
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            commentEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String permissionInstruction =
+        (String)
+            AiPrompt.getJsonPromptValues("promptsAiRequests")
+                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+    assertTrue(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
+  }
+
+  @Test
+  public void moderatorRequestPromptKeepsExistingInstructions() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setCommentPropertiesSize(1);
+    changeSetData.setModeratorFeaturesAllowed(true);
+
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class),
+            changeSetData,
+            commentEventChange(),
+            mock(ICodeContextPolicy.class));
+
+    String permissionInstruction =
+        (String)
+            AiPrompt.getJsonPromptValues("promptsAiRequests")
+                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+    assertFalse(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
+  }
+
+  @Test
   public void routedCommentEventUsesStageAwareRequestPrompt() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
