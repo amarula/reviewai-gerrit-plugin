@@ -40,6 +40,7 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
@@ -151,7 +152,9 @@ public class AiReviewMessageTest extends TestBase {
             null,
             getTestReviewAiDb(),
             new DevAiRoleResolver(
-                new ConfiguredAiGroupMembership(groupCache), permissionBackend),
+                new ConfiguredAiGroupMembership(groupCache),
+                permissionBackend,
+                org.mockito.Mockito.mock(ChangeData.Factory.class)),
             new DevClientCommandExtension(),
             "gerrit-instance");
   }

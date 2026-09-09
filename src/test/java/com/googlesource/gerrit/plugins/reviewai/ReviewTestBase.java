@@ -70,7 +70,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityCh
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
-import com.googlesource.gerrit.plugins.reviewai.permissions.DefaultAiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle;
@@ -379,7 +379,7 @@ public class ReviewTestBase extends TestBase {
   }
 
   protected AiRoleResolver getAiRoleResolver() {
-    return new DefaultAiRoleResolver();
+    return (config, user, project, changeId) -> AiRole.USER;
   }
 
   protected ClientCommandExtension getClientCommandExtension() {
