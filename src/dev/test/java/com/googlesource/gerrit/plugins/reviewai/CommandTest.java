@@ -18,11 +18,15 @@ package com.googlesource.gerrit.plugins.reviewai;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.Project;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gerrit.server.permissions.ChangePermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.query.change.ChangeData;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -70,6 +74,7 @@ import static org.mockito.Mockito.when;
 
 public class CommandTest extends OpenAiLangChainReviewTestBase {
   private static final String UNSUPPORTED_ONLY_PATCH_FILE = "__files/commands/unsupportedOnlyPatch.txt";
+  private final ChangeData.Factory roleChangeDataFactory = Mockito.mock(ChangeData.Factory.class);
 
   @Before
   public void setUp() {
@@ -90,7 +95,7 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     return new DevAiRoleResolver(
         new ConfiguredAiGroupMembership(groupCache),
         permissionBackend,
-        Mockito.mock(ChangeData.Factory.class));
+        roleChangeDataFactory);
   }
 
   @Override
@@ -416,6 +421,29 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandForgetThreadRequiresAiModeratorPrivileges() throws Exception {
+    setupCommandComment("/forget_thread");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        "ReviewAI Message: Unable to execute command: Moderator privileges are required",
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void commandForgetThreadAllowsAiModerator() throws Exception {
+    setupCommandComment("/forget_thread");
+    grantSubmitPermission();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        "Conversation history successfully removed", changeSetData.getReviewSystemMessage());
+    Assert.assertTrue(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
+  }
+
+  @Test
   public void commandReviewSkippedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
     when(aiReviewPermission.isAiReviewConfigured(Mockito.any())).thenReturn(false);
 
@@ -425,6 +453,20 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
+  }
+
+  private void grantSubmitPermission() {
+    ChangeData changeData = Mockito.mock(ChangeData.class);
+    PermissionBackend.WithUser permissionsForUser =
+        Mockito.mock(PermissionBackend.WithUser.class);
+    PermissionBackend.ForChange permissionsForChange =
+        Mockito.mock(PermissionBackend.ForChange.class);
+    when(roleChangeDataFactory.create(
+            Mockito.any(Project.NameKey.class), Mockito.any(Change.Id.class)))
+        .thenReturn(changeData);
+    when(permissionBackend.user(eventUser)).thenReturn(permissionsForUser);
+    when(permissionsForUser.change(changeData)).thenReturn(permissionsForChange);
+    when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
   }
 
   @Test

@@ -38,6 +38,7 @@ import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
+import com.google.gerrit.server.permissions.ChangePermission;
 import com.google.gerrit.server.permissions.GlobalPermission;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.query.change.ChangeData;
@@ -98,6 +99,10 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private CurrentUser currentUser;
   @Mock private GroupCache groupCache;
   @Mock private PermissionBackend permissionBackend;
+  @Mock private PermissionBackend.WithUser permissionsForUser;
+  @Mock private PermissionBackend.ForChange permissionsForChange;
+  @Mock private ChangeData.Factory changeDataFactory;
+  @Mock private ChangeData changeData;
   @Mock private PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider;
   @Mock private PluginDataHandler pluginDataHandler;
   @Mock private AiRequestCoordinator requestCoordinator;
@@ -137,6 +142,9 @@ public class AiReviewMessageTest extends TestBase {
     when(commentsRequest.get()).thenReturn(Map.of());
     when(revisionApi.review(any())).thenReturn(null);
     when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(pluginDataHandler);
+    when(changeDataFactory.create(PROJECT_NAME, change.getId())).thenReturn(changeData);
+    when(permissionBackend.user(currentUser)).thenReturn(permissionsForUser);
+    when(permissionsForUser.change(changeData)).thenReturn(permissionsForChange);
     realChangeDataPath = tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data");
     when(mockPluginDataPath.resolve(CHANGE_ID + ".data")).thenReturn(realChangeDataPath);
     view =
@@ -154,7 +162,7 @@ public class AiReviewMessageTest extends TestBase {
             new DevAiRoleResolver(
                 new ConfiguredAiGroupMembership(groupCache),
                 permissionBackend,
-                org.mockito.Mockito.mock(ChangeData.Factory.class)),
+                changeDataFactory),
             new DevClientCommandExtension(),
             "gerrit-instance");
   }
@@ -330,6 +338,34 @@ public class AiReviewMessageTest extends TestBase {
     assertTrue(output.responseText.contains("CONFIGURATION SETTINGS"));
     assertFalse(output.responseText.contains("Administrator privileges are required"));
     verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentForgetThreadRequiresAiModeratorPrivileges() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/forget_thread";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("Moderator privileges are required"));
+    verify(revisionApi, never()).review(any());
+  }
+
+  @Test
+  public void reviewAgentForgetThreadPostsRequestForAiModerator() throws Exception {
+    when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/forget_thread";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    verify(revisionApi).review(any());
   }
 
   @Test
