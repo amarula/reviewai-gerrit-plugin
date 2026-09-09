@@ -91,12 +91,14 @@ Review feedback memory is the persisted, change-scoped summary of durable user g
 - `concern_feedback`: summaries keyed by exact concern ID, such as an accepted risk, intentional constraint, or
   dismissal rationale for one known concern.
 - `disabled_review_scopes`: the effective set of `PATCHSET` and `COMMIT_MESSAGE` review scopes explicitly disabled by
-  the user. A later explicit resume instruction removes the corresponding scope. On a review where a scope is
+  an AI moderator. A later authorized resume instruction removes the corresponding scope. On a review where a scope is
   disabled, its non-dismissed tracked concerns become `SKIPPED`: they were not reassessed for that Patch Set.
-- `disabled_specialized_agents`: individual Level 2 patchset agents disabled without suppressing the entire
-  `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.” An exclusion can also be derived for the
-  current review from a positive Condition Label whose configured description conclusively establishes that the
+- `disabled_specialized_agents`: individual Level 2 patchset agents an AI moderator disabled without suppressing the
+  entire `PATCHSET` scope, such as `TESTABILITY` for “Skip test coverage review.” An exclusion can also be derived for
+  the current review from a positive Condition Label whose configured description conclusively establishes that the
   agent's full review scope has already been validated.
+- `condition_label_disabled_specialized_agents`: the subset of specialized-agent exclusions derived from current
+  Condition Labels, retained separately so label changes cannot remove an AI moderator's explicit exclusion.
 
 The memory stores distilled guidance rather than raw conversations. Questions, acknowledgements, and other
 non-durable messages are not included. Generic guidance is supplied to later review agents, while concern-specific
@@ -182,6 +184,12 @@ authorized and unauthorized comments, but Java records the protected `dismissed_
 whose authors have moderator privileges. Unauthorized requests are ignored with a review notice. The concern-status
 validator independently prevents a newly `DISMISSED` concern unless that protected memory contains its exact ID;
 ordinary `concern_feedback` is never sufficient authorization.
+
+The same resolved moderator permission protects changes to `disabled_review_scopes` and
+`disabled_specialized_agents`. The classifier reports explicit enable or disable actions for the individual comment
+that requested them. Java applies only actions whose original author has moderator privileges and publishes a notice
+for every unauthorized control request. Condition Label exclusions remain separate application-managed state, so
+recomputing them cannot grant an ordinary feedback author control over review-agent execution.
 
 When pending comments or Condition Labels exist, execution order depends on the specialization level:
 

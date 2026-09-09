@@ -44,6 +44,9 @@ public class ReviewFeedbackClassificationInput {
 
     @SerializedName("dismissal_allowed")
     private boolean dismissalAllowed;
+
+    @SerializedName("review_control_allowed")
+    private boolean reviewControlAllowed;
   }
 
   @Data
