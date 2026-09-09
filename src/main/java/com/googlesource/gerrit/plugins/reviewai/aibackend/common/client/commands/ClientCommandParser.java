@@ -232,8 +232,9 @@ public class ClientCommandParser extends ClientCommandBase {
       return false;
     }
     parseOptions(commandMatcher);
-    changeSetData.addParsedCommand(commandMatcher.group(1), getParsedOptions());
     if (validateCommand(command)) {
+      // Only validated commands may trigger behavior that relies on the parsed-command state.
+      changeSetData.addParsedCommand(commandMatcher.group(1), getParsedOptions());
       if (executeCommands) {
         clientCommandExecutor.executeCommand(
             command, baseOptions, dynamicOptions, comment.substring(commandMatcher.end()));
