@@ -4,5 +4,6 @@
   "concern_feedback": {},
   "dismissed_concerns": {},
   "disabled_review_scopes": [],
-  "disabled_specialized_agents": ["TESTABILITY"]
+  "disabled_specialized_agents": ["TESTABILITY"],
+  "condition_label_disabled_specialized_agents": []
 }

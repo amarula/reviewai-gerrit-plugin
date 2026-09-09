@@ -15,9 +15,39 @@
               "type": "string",
               "enum": ["GENERIC", "IRRELEVANT", "CONCERN", "DISMISS_CONCERN"]
             },
-            "concern_id": { "type": "string" }
+            "concern_id": { "type": "string" },
+            "review_control_actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "enum": ["DISABLE", "ENABLE"]
+                  },
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "PATCHSET",
+                      "COMMIT_MESSAGE",
+                      "CORRECTNESS",
+                      "TESTABILITY",
+                      "CODE_QUALITY",
+                      "DOCUMENTATION",
+                      "SECURITY"
+                    ]
+                  }
+                },
+                "required": ["operation", "target"]
+              }
+            }
           },
-          "required": ["comment_id", "category", "concern_id"]
+          "required": [
+            "comment_id",
+            "category",
+            "concern_id",
+            "review_control_actions"
+          ]
         }
       },
       "generic_feedback": { "type": "string" },
@@ -32,15 +62,7 @@
           "required": ["concern_id", "summary"]
         }
       },
-      "disabled_review_scopes": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "enum": ["PATCHSET", "COMMIT_MESSAGE"]
-        },
-        "uniqueItems": true
-      },
-      "disabled_specialized_agents": {
+      "condition_label_disabled_specialized_agents": {
         "type": "array",
         "items": {
           "type": "string",
@@ -59,8 +81,7 @@
       "classifications",
       "generic_feedback",
       "concern_feedback",
-      "disabled_review_scopes",
-      "disabled_specialized_agents"
+      "condition_label_disabled_specialized_agents"
     ]
   }
 }

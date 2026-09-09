@@ -429,6 +429,9 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
     @SerializedName("disabled_specialized_agents")
     public Set<String> disabledSpecializedAgents;
 
+    @SerializedName("condition_label_disabled_specialized_agents")
+    public Set<String> conditionLabelDisabledSpecializedAgents;
+
     FeedbackMemoryInfo(ReviewFeedbackMemory memory) {
       schemaVersion = memory.getSchemaVersion();
       genericFeedback = memory.getGenericFeedback();
@@ -436,6 +439,8 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       dismissedConcerns = memory.getDismissedConcerns();
       disabledReviewScopes = memory.getDisabledReviewScopes();
       disabledSpecializedAgents = memory.getDisabledSpecializedAgents();
+      conditionLabelDisabledSpecializedAgents =
+          memory.getConditionLabelDisabledSpecializedAgents();
     }
   }
 

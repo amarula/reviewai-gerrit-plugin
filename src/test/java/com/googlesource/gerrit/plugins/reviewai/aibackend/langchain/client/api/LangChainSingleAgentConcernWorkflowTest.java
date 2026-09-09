@@ -76,6 +76,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/feedback/level0FeedbackClassificationResponse.json";
   private static final String DISMISS_FEEDBACK_RESPONSE =
       "__files/feedback/dismissConcernFeedbackClassificationResponse.json";
+  private static final String ENABLE_AGENT_FEEDBACK_RESPONSE =
+      "__files/feedback/enableAgentFeedbackClassificationResponse.json";
   private static final String DISMISS_CONCERN_REVIEW_RESPONSE =
       "__files/langchain/singleAgentDismissConcernReviewResponse.json";
   private static final String LABEL_FEEDBACK_RESPONSE =
@@ -195,6 +197,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
             "question",
             "ca0764e7_4e6e27ab",
             "skip-testability"));
+    data.setReviewFeedbackControlAuthorizedCommentIds(
+        Set.of("ca0764e7_4e6e27ab", "skip-testability"));
     ReviewFeedbackMemory currentMemory =
         getGson().fromJson(readTestResource(FEEDBACK_MEMORY), ReviewFeedbackMemory.class);
     currentMemory.setConcernFeedback(Map.of());
@@ -224,6 +228,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         "Skip commit message review",
         scopeDirective.getTargetComment().getMessage());
+    assertTrue(scopeDirective.isReviewControlAllowed());
     assertEquals(
         List.of("AI", "USER", "AI"),
         scopeDirective.getThreadContext().stream()
@@ -245,6 +250,60 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         Set.of("TESTABILITY"),
         data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+  }
+
+  @Test
+  public void ordinaryUserFeedbackCannotControlReviewAgents() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(feedbackClientData());
+    TestClient client = new TestClient(gerritClient);
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(previousLedger());
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+    data.setForcedReview(true);
+    data.setPendingReviewFeedbackCommentIds(
+        List.of(
+            "user-feedback",
+            "generic-guidance",
+            "question",
+            "ca0764e7_4e6e27ab",
+            "skip-testability"));
+    data.setReviewFeedbackMemory(new ReviewFeedbackMemory());
+
+    client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertTrue(
+        client.feedbackData.getReviewFeedbackClassificationInput().getComments().stream()
+            .noneMatch(comment -> comment.isReviewControlAllowed()));
+    assertEquals(Set.of(), data.getReviewFeedbackMemory().getDisabledReviewScopes());
+    assertEquals(
+        Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+    assertTrue(data.getReviewNoticeMessage().contains("moderator privileges are required"));
+  }
+
+  @Test
+  public void authorizedModeratorFeedbackCanEnableReviewAgent() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change))
+        .thenReturn(reviewControlClientData("enable-security", "Resume security review"));
+    TestClient client = new TestClient(gerritClient);
+    client.feedbackResponse = ENABLE_AGENT_FEEDBACK_RESPONSE;
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(previousLedger());
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+    data.setForcedReview(true);
+    data.setPendingReviewFeedbackCommentIds(List.of("enable-security"));
+    data.setReviewFeedbackControlAuthorizedCommentIds(Set.of("enable-security"));
+    ReviewFeedbackMemory memory = new ReviewFeedbackMemory();
+    memory.setDisabledSpecializedAgents(Set.of("SECURITY"));
+    data.setReviewFeedbackMemory(memory);
+
+    client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(
+        Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
   }
 
   @Test
@@ -271,6 +330,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         Set.of("CORRECTNESS"),
         data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+    assertEquals(
+        Set.of("CORRECTNESS"),
+        data
+            .getReviewFeedbackMemory()
+            .getConditionLabelDisabledSpecializedAgents());
   }
 
   @Test
@@ -540,6 +604,21 @@ public class LangChainSingleAgentConcernWorkflowTest {
         null,
         List.of(),
         new CommentData(List.of(), List.of(), commentsById, new HashMap<>()),
+        0);
+  }
+
+  private static GerritClientData reviewControlClientData(
+      String commentId, String message) {
+    GerritComment comment = new GerritComment();
+    comment.setId(commentId);
+    comment.setMessage(message);
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    commentsById.put(commentId, comment);
+    return new GerritClientData(
+        null,
+        List.of(),
+        new CommentData(
+            List.of(), List.of(), commentsById, new HashMap<>()),
         0);
   }
 

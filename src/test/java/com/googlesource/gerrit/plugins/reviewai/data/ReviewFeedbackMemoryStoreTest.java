@@ -76,6 +76,17 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   }
 
   @Test
+  public void storesConditionLabelAgentExclusions() throws Exception {
+    ReviewFeedbackMemory memory = loadMemory();
+    memory.setDisabledSpecializedAgents(Set.of("CORRECTNESS"));
+    memory.setConditionLabelDisabledSpecializedAgents(Set.of("CORRECTNESS"));
+
+    store.save(memory);
+
+    assertEquals(memory, store.load().orElseThrow());
+  }
+
+  @Test
   public void storesAuthorizedConcernDismissals() throws Exception {
     ReviewFeedbackMemory memory = loadMemory();
     memory.setDismissedConcerns(Map.of("concern-1", "The moderator accepted the risk."));
@@ -140,6 +151,15 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
     ReviewFeedbackMemory invalidAgent = loadMemory();
     invalidAgent.setDisabledSpecializedAgents(Set.of(" "));
     assertRejected(() -> store.save(invalidAgent));
+
+    ReviewFeedbackMemory invalidConditionLabelAgent = loadMemory();
+    invalidConditionLabelAgent.setConditionLabelDisabledSpecializedAgents(Set.of(" "));
+    assertRejected(() -> store.save(invalidConditionLabelAgent));
+
+    ReviewFeedbackMemory inconsistentConditionLabelAgent = loadMemory();
+    inconsistentConditionLabelAgent.setConditionLabelDisabledSpecializedAgents(
+        Set.of("CORRECTNESS"));
+    assertRejected(() -> store.save(inconsistentConditionLabelAgent));
 
     ReviewFeedbackMemory invalidDismissal = loadMemory();
     invalidDismissal.setDismissedConcerns(Map.of("concern-1", " "));
