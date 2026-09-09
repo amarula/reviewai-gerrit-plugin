@@ -24,6 +24,7 @@ import java.util.Optional;
 public final class AiCommandAccessPolicy {
   private static final Map<CommandSet, AiAction> COMMAND_ACTIONS =
       Map.of(
+          CommandSet.FORGET_THREAD, AiAction.USE_MODERATOR_FEATURES,
           CommandSet.DIRECTIVES, AiAction.USE_ADMINISTRATOR_FEATURES,
           CommandSet.CONFIGURE, AiAction.USE_ADMINISTRATOR_FEATURES,
           CommandSet.SHOW, AiAction.USE_ADMINISTRATOR_FEATURES);
