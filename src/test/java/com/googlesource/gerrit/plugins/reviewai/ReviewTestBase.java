@@ -437,7 +437,11 @@ public class ReviewTestBase extends TestBase {
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
             new ReviewConcernPublisher(getTestReviewAiDb()),
-            new ReviewFeedbackLifecycle(reviewFeedbackPublisher),
+            new ReviewFeedbackLifecycle(
+                reviewFeedbackPublisher,
+                config,
+                identifiedUserFactory,
+                getAiRoleResolver()),
             aiReviewApplicabilityChecker,
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);

@@ -72,12 +72,25 @@ public class ReviewConcernStatusUpdaterTest {
             List.of(present, dismissed),
             List.of(
                 concern("concern-1", ConcernStatus.DISMISSED, "Risk accepted by the user"),
-                concern("concern-2", ConcernStatus.PRESENT, "The dismissal no longer applies")));
+                concern("concern-2", ConcernStatus.PRESENT, "The dismissal no longer applies")),
+            java.util.Set.of("concern-1"));
 
     assertEquals(ConcernStatus.DISMISSED, results.get(0).getStatus());
     assertEquals("Risk accepted by the user", results.get(0).getStatusReason());
     assertEquals(ConcernStatus.PRESENT, results.get(1).getStatus());
     assertEquals("The dismissal no longer applies", results.get(1).getStatusReason());
+  }
+
+  @Test
+  public void rejectsNewDismissalWithoutAuthorizedModeratorDecision() {
+    ReviewConcern existing =
+        concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
+    ReviewConcern dismissed =
+        concern("concern-1", ConcernStatus.DISMISSED, "User requested dismissal");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewConcernStatusUpdater.apply(List.of(existing), List.of(dismissed)));
   }
 
   @Test

@@ -420,6 +420,9 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
     @SerializedName("concern_feedback")
     public Map<String, String> concernFeedback;
 
+    @SerializedName("dismissed_concerns")
+    public Map<String, String> dismissedConcerns;
+
     @SerializedName("disabled_review_scopes")
     public Set<ReviewScope> disabledReviewScopes;
 
@@ -430,6 +433,7 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       schemaVersion = memory.getSchemaVersion();
       genericFeedback = memory.getGenericFeedback();
       concernFeedback = memory.getConcernFeedback();
+      dismissedConcerns = memory.getDismissedConcerns();
       disabledReviewScopes = memory.getDisabledReviewScopes();
       disabledSpecializedAgents = memory.getDisabledSpecializedAgents();
     }

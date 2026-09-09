@@ -74,6 +74,10 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/feedback/level0FeedbackComments.json";
   private static final String FEEDBACK_RESPONSE =
       "__files/feedback/level0FeedbackClassificationResponse.json";
+  private static final String DISMISS_FEEDBACK_RESPONSE =
+      "__files/feedback/dismissConcernFeedbackClassificationResponse.json";
+  private static final String DISMISS_CONCERN_REVIEW_RESPONSE =
+      "__files/langchain/singleAgentDismissConcernReviewResponse.json";
   private static final String LABEL_FEEDBACK_RESPONSE =
       "__files/feedback/labelFeedbackClassificationResponse.json";
   private static final String FEEDBACK_MEMORY =
@@ -267,6 +271,57 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         Set.of("CORRECTNESS"),
         data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+  }
+
+  @Test
+  public void authorizedModeratorFeedbackCanDismissConcern() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(dismissalClientData());
+    TestClient client = new TestClient(gerritClient);
+    client.feedbackResponse = DISMISS_FEEDBACK_RESPONSE;
+    client.concernReviewResponse = DISMISS_CONCERN_REVIEW_RESPONSE;
+    ChangeSetData data = dismissalChangeSetData();
+    data.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of("dismiss-request"));
+
+    AiResponseContent response =
+        client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertTrue(
+        client.feedbackData
+            .getReviewFeedbackClassificationInput()
+            .getComments()
+            .getFirst()
+            .isDismissalAllowed());
+    assertTrue(data.getReviewFeedbackMemory().isConcernDismissalAuthorized("old-present"));
+    assertEquals(
+        ConcernStatus.DISMISSED,
+        pendingLedger(response).getReviewers().getFirst().getConcerns().getFirst().getStatus());
+  }
+
+  @Test
+  public void ordinaryUserFeedbackCannotDismissConcern() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(dismissalClientData());
+    TestClient client = new TestClient(gerritClient);
+    client.feedbackResponse = DISMISS_FEEDBACK_RESPONSE;
+    ChangeSetData data = dismissalChangeSetData();
+
+    AiResponseContent response =
+        client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertFalse(
+        client.feedbackData
+            .getReviewFeedbackClassificationInput()
+            .getComments()
+            .getFirst()
+            .isDismissalAllowed());
+    assertFalse(data.getReviewFeedbackMemory().isConcernDismissalAuthorized("old-present"));
+    assertTrue(data.getReviewNoticeMessage().contains("moderator privileges are required"));
+    assertEquals(
+        ConcernStatus.PRESENT,
+        pendingLedger(response).getReviewers().getFirst().getConcerns().getFirst().getStatus());
   }
 
   @Test
@@ -471,6 +526,35 @@ public class LangChainSingleAgentConcernWorkflowTest {
         0);
   }
 
+  private static GerritClientData dismissalClientData() throws IOException {
+    FeedbackCommentsFixture fixture =
+        getGson().fromJson(readTestResource(FEEDBACK_COMMENTS), FeedbackCommentsFixture.class);
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    fixture.allComments.forEach(comment -> commentsById.put(comment.getId(), comment));
+    GerritComment dismissal = new GerritComment();
+    dismissal.setId("dismiss-request");
+    dismissal.setInReplyTo("ai-concern");
+    dismissal.setMessage("Dismiss this concern");
+    commentsById.put(dismissal.getId(), dismissal);
+    return new GerritClientData(
+        null,
+        List.of(),
+        new CommentData(List.of(), List.of(), commentsById, new HashMap<>()),
+        0);
+  }
+
+  private static ChangeSetData dismissalChangeSetData() throws IOException {
+    ChangeSetData data = new ChangeSetData(1);
+    ReviewConcernLedger ledger = previousLedger();
+    ledger.getReviewers().getFirst().getConcerns().getFirst().setPreviousCommentId("ai-concern");
+    data.setPreviousReviewConcernLedger(ledger);
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+    data.setForcedReview(true);
+    data.setPendingReviewFeedbackCommentIds(List.of("dismiss-request"));
+    data.setReviewFeedbackMemory(new ReviewFeedbackMemory());
+    return data;
+  }
+
   private static final class TestClient extends LangChainClient {
     private final List<ReviewAssistantStage> stages = new ArrayList<>();
     private final Map<ReviewAssistantStage, String> patches =
@@ -479,6 +563,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     private ChangeSetData finderData;
     private ChangeSetData feedbackData;
     private String concernReviewResponse = CONCERN_REVIEW_RESPONSE;
+    private String feedbackResponse = FEEDBACK_RESPONSE;
 
     private TestClient() {
       this(null);
@@ -503,7 +588,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
                         .getComments()
                         .isEmpty()
                     ? LABEL_FEEDBACK_RESPONSE
-                    : FEEDBACK_RESPONSE),
+                    : feedbackResponse),
             "review feedback request");
       }
       if (stage == ReviewAssistantStage.FIND_NEW_ISSUES) {

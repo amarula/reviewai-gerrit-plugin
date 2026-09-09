@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 final class LangChainConcernReviewer {
@@ -97,7 +98,12 @@ final class LangChainConcernReviewer {
         getGson().fromJson(unwrapJsonCode(responseText), ReviewerConcerns.class);
     List<ReviewConcern> updatedConcerns =
         ReviewConcernStatusUpdater.apply(
-            existingConcerns.getConcerns(), response == null ? null : response.getConcerns());
+            existingConcerns.getConcerns(),
+            response == null ? null : response.getConcerns(),
+            changeSetData.getReviewFeedbackMemory() == null
+                    || changeSetData.getReviewFeedbackMemory().getDismissedConcerns() == null
+                ? Set.of()
+                : changeSetData.getReviewFeedbackMemory().getDismissedConcerns().keySet());
     ReviewerConcerns result = new ReviewerConcerns();
     result.setReviewer(existingConcerns.getReviewer());
     result.setConcerns(updatedConcerns);
