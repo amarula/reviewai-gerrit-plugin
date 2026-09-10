@@ -61,6 +61,22 @@ public class PatchSetReviewerTest {
   }
 
   @Test
+  public void oversizedPatchSetProducesWarningWithoutVote() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getMaxReviewLines()).thenReturn(1);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    PatchSetReviewer reviewer = reviewer(config, changeSetData);
+
+    AiResponseContent response = reviewer.getReviewReply(change(), "first line\nsecond line");
+
+    assertNull(response);
+    assertEquals(
+        "Too many changes. Please consider splitting into patches smaller than 1 lines for review.",
+        changeSetData.getReviewSystemMessage());
+    assertNull(reviewer.getReviewScore(change(), response));
+  }
+
+  @Test
   public void allDismissedConcernsResetVoteToNeutral() {
     PatchSetReviewer reviewer = reviewer();
     GerritChange change = change();
@@ -122,11 +138,15 @@ public class PatchSetReviewerTest {
     Configuration config = mock(Configuration.class);
     when(config.isVotingEnabled()).thenReturn(true);
     when(config.getConvertNeutralReviewScoreToPositive()).thenReturn(true);
+    return reviewer(config, new ChangeSetData(1));
+  }
+
+  private static PatchSetReviewer reviewer(Configuration config, ChangeSetData changeSetData) {
     Localizer localizer = mock(Localizer.class);
     return new PatchSetReviewer(
         mock(GerritClient.class),
         config,
-        new ChangeSetData(1),
+        changeSetData,
         Providers.of(mock(GerritClientReview.class)),
         mock(IAiClient.class),
         localizer,
