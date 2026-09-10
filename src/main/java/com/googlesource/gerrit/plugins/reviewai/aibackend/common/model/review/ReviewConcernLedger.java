@@ -32,6 +32,14 @@ public class ReviewConcernLedger {
 
   private List<ReviewerConcerns> reviewers = List.of();
 
+  public boolean allConcernsDismissed() {
+    normalize();
+    List<ReviewConcern> concerns =
+        reviewers.stream().flatMap(reviewer -> reviewer.getConcerns().stream()).toList();
+    return !concerns.isEmpty()
+        && concerns.stream().allMatch(concern -> concern.getStatus() == ConcernStatus.DISMISSED);
+  }
+
   public void normalize() {
     if (lastReviewedCommit != null) {
       lastReviewedCommit = lastReviewedCommit.trim();
