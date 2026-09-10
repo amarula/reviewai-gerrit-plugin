@@ -46,6 +46,11 @@ public enum DbDialect {
     public boolean needsTcpServer() {
       return true;
     }
+
+    @Override
+    public String dropPrimaryKey(String table, String constraint) {
+      return "ALTER TABLE " + table + " DROP PRIMARY KEY";
+    }
   },
 
   POSTGRESQL {
@@ -77,6 +82,11 @@ public enum DbDialect {
     public boolean needsTcpServer() {
       return false;
     }
+
+    @Override
+    public String dropPrimaryKey(String table, String constraint) {
+      return "ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint;
+    }
   };
 
   /** Returns the text type for storing large values (CLOB for H2, TEXT for PostgreSQL). */
@@ -103,6 +113,9 @@ public enum DbDialect {
 
   /** Whether this dialect requires an embedded TCP server (H2) or not (PostgreSQL). */
   public abstract boolean needsTcpServer();
+
+  /** Returns the statement for removing an existing primary key. */
+  public abstract String dropPrimaryKey(String table, String constraint);
 
   /** Determine the dialect from a JDBC URL prefix. */
   public static DbDialect fromJdbcUrl(String jdbcUrl) {
