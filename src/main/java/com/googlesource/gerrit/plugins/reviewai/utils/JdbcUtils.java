@@ -17,10 +17,12 @@
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Locale;
 
 public class JdbcUtils {
   public static void setLongOrNull(PreparedStatement ps, int index, Long value)
@@ -33,16 +35,33 @@ public class JdbcUtils {
   }
 
   public static boolean hasTable(Connection c, String tableName) throws SQLException {
-    try (ResultSet rs = c.getMetaData().getTables(null, null, tableName, null)) {
+    DatabaseMetaData metadata = c.getMetaData();
+    String metadataTableName = metadataIdentifier(metadata, tableName);
+    try (ResultSet rs = metadata.getTables(null, null, metadataTableName, null)) {
       return rs.next();
     }
   }
 
   public static boolean hasColumn(Connection c, String tableName, String columnName)
       throws SQLException {
-    try (ResultSet rs = c.getMetaData().getColumns(null, null, tableName, columnName)) {
+    DatabaseMetaData metadata = c.getMetaData();
+    String metadataTableName = metadataIdentifier(metadata, tableName);
+    String metadataColumnName = metadataIdentifier(metadata, columnName);
+    try (ResultSet rs =
+        metadata.getColumns(null, null, metadataTableName, metadataColumnName)) {
       return rs.next();
     }
+  }
+
+  public static String metadataIdentifier(DatabaseMetaData metadata, String identifier)
+      throws SQLException {
+    if (metadata.storesLowerCaseIdentifiers()) {
+      return identifier.toLowerCase(Locale.ROOT);
+    }
+    if (metadata.storesUpperCaseIdentifiers()) {
+      return identifier.toUpperCase(Locale.ROOT);
+    }
+    return identifier;
   }
 
   private JdbcUtils() {}
