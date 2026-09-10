@@ -10,7 +10,7 @@
       "content": [
         {
           "type": "output_text",
-          "text": "{\"replies\":[{\"reply\":\"This was already raised before.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"raw-previous-r1\",\"conflicting\":false,\"filename\":\"test_file.py\",\"lineNumber\":5,\"codeSnippet\":\"message from gpt\"}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
+          "text": "{\"replies\":[{\"reply\":\"This was already raised before.\",\"score\":-1.0,\"relevance\":1.0,\"repeated\":true,\"repetition_reply_id\":\"raw-previous-r1\",\"repeated_reason\":\"The unsafe access is still present.\",\"conflicting\":false,\"filename\":\"test_file.py\",\"lineNumber\":5,\"codeSnippet\":\"message from gpt\"}],\"changeId\":\"myProject~myBranchName~myChangeId\"}"
         }
       ]
     }
