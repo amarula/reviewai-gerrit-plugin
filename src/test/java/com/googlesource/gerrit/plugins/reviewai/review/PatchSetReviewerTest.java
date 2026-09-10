@@ -29,12 +29,18 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import java.util.List;
 import org.junit.Test;
 
 public class PatchSetReviewerTest {
@@ -52,6 +58,24 @@ public class PatchSetReviewerTest {
     assertEquals(
         Integer.valueOf(1),
         reviewer.getReviewScore(change(), new AiResponseContent("")));
+  }
+
+  @Test
+  public void allDismissedConcernsResetVoteToNeutral() {
+    PatchSetReviewer reviewer = reviewer();
+    GerritChange change = change();
+    AiResponseContent response = new AiResponseContent("");
+    ReviewConcern dismissedConcern = new ReviewConcern();
+    dismissedConcern.setStatus(ConcernStatus.DISMISSED);
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setConcerns(List.of(dismissedConcern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewerConcerns));
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    response.setPendingConcernUpdates(updates);
+
+    assertEquals(Integer.valueOf(0), reviewer.getReviewScore(change, response));
   }
 
   @Test
