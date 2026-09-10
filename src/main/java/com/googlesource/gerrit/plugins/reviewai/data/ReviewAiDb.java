@@ -17,8 +17,12 @@
 package com.googlesource.gerrit.plugins.reviewai.data;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.metadataIdentifier;
 
 import com.google.gerrit.extensions.annotations.PluginData;
+import com.google.gerrit.extensions.annotations.PluginName;
+import com.google.gerrit.server.config.PluginConfig;
+import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
@@ -32,6 +36,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +72,19 @@ public class ReviewAiDb {
     this.connectionProperties = new Properties();
   }
 
+  public ReviewAiDb(
+      @PluginData Path pluginDataDir,
+      @PluginName String pluginName,
+      PluginConfigFactory configFactory)
+      throws IOException {
+    this(pluginDataDir);
+    PluginConfig globalConfig = configFactory.getFromGerritConfig(pluginName);
+    applyConfig(
+        globalConfig.getString(KEY_STORE_URL),
+        globalConfig.getString(KEY_STORE_USERNAME),
+        globalConfig.getString(KEY_STORE_PASSWORD));
+  }
+
   public ReviewAiDb(Path pluginDataDir, String jdbcUrl) throws IOException {
     Files.createDirectories(pluginDataDir);
     this.pluginDataDir = pluginDataDir;
@@ -77,7 +95,7 @@ public class ReviewAiDb {
 
   /**
    * Reconfigures the database connection with an external JDBC URL. Must be called before any
-   * schema initialization or connection use. Called by ConfigCreator if storeUrl is present.
+   * schema initialization or connection use.
    */
   public void applyConfig(String storeUrl, String storeUsername, String storePassword) {
     if (storeUrl == null || storeUrl.isBlank()) {
@@ -275,8 +293,8 @@ public class ReviewAiDb {
                     + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
                     + ", PRIMARY KEY(change_id, user_id, conversation_id, turn_index)"
                     + ")");
-            addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATIONS");
-            addUserIdColumnIfMissing(c, s, "REVIEW_AGENT_CONVERSATION_TURNS");
+            addUserIdColumnIfMissing(s, "REVIEW_AGENT_CONVERSATIONS");
+            addUserIdColumnIfMissing(s, "REVIEW_AGENT_CONVERSATION_TURNS");
             ensurePrimaryKeyIncludesUserId(
                 c, s, "REVIEW_AGENT_CONVERSATIONS", "CHANGE_ID", "USER_ID", "CONVERSATION_ID");
             ensurePrimaryKeyIncludesUserId(
@@ -306,37 +324,66 @@ public class ReviewAiDb {
         });
   }
 
-  private void addUserIdColumnIfMissing(Connection c, Statement s, String tableName)
-      throws SQLException {
-    if (!hasColumn(c, tableName, "USER_ID")) {
-      s.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
-    }
+  private void addUserIdColumnIfMissing(Statement s, String tableName) throws SQLException {
+    s.executeUpdate(
+        "ALTER TABLE "
+            + tableName
+            + " ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0");
   }
 
   private void ensurePrimaryKeyIncludesUserId(
       Connection c, Statement s, String tableName, String... primaryKeyColumns)
       throws SQLException {
-    if (primaryKeyColumns(c, tableName).contains("USER_ID")) {
+    PrimaryKeyInfo primaryKey = primaryKey(c, tableName);
+    if (primaryKey.columns().contains("USER_ID")) {
       return;
     }
-    s.executeUpdate("ALTER TABLE " + tableName + " DROP PRIMARY KEY");
+    if (primaryKey.name() == null || primaryKey.name().isBlank()) {
+      throw new SQLException("Could not determine primary key constraint for " + tableName);
+    }
     s.executeUpdate(
-        "ALTER TABLE "
-            + tableName
-            + " ADD PRIMARY KEY("
-            + String.join(", ", primaryKeyColumns)
-            + ")");
-  }
-
-  private Set<String> primaryKeyColumns(Connection c, String tableName) throws SQLException {
-    Set<String> columns = new HashSet<>();
-    try (ResultSet rs = c.getMetaData().getPrimaryKeys(null, null, tableName)) {
-      while (rs.next()) {
-        columns.add(rs.getString("COLUMN_NAME"));
+        getDialect().dropPrimaryKey(tableName, quoteIdentifier(c, primaryKey.name())));
+    try {
+      s.executeUpdate(
+          "ALTER TABLE "
+              + tableName
+              + " ADD PRIMARY KEY("
+              + String.join(", ", primaryKeyColumns)
+              + ")");
+    } catch (SQLException e) {
+      if (!primaryKey(c, tableName).columns().contains("USER_ID")) {
+        throw e;
       }
     }
-    return columns;
   }
+
+  private PrimaryKeyInfo primaryKey(Connection c, String tableName) throws SQLException {
+    Set<String> columns = new HashSet<>();
+    String name = null;
+    String metadataTableName = metadataIdentifier(c.getMetaData(), tableName);
+    try (ResultSet rs = c.getMetaData().getPrimaryKeys(null, null, metadataTableName)) {
+      while (rs.next()) {
+        String column = rs.getString("COLUMN_NAME");
+        if (column != null) {
+          columns.add(column.toUpperCase(Locale.ROOT));
+        }
+        if (name == null) {
+          name = rs.getString("PK_NAME");
+        }
+      }
+    }
+    return new PrimaryKeyInfo(name, columns);
+  }
+
+  private String quoteIdentifier(Connection c, String identifier) throws SQLException {
+    String quote = c.getMetaData().getIdentifierQuoteString();
+    if (quote == null || quote.isBlank()) {
+      return identifier;
+    }
+    return quote + identifier.replace(quote, quote + quote) + quote;
+  }
+
+  private record PrimaryKeyInfo(String name, Set<String> columns) {}
 
   private void executeSchema(String... statements) throws SQLException {
     withConnection(
