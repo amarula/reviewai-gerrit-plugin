@@ -375,7 +375,9 @@ public class PatchSetReviewer {
           "Patch set too large for review, size: {}, max allowed: {}",
           patchLines.size(),
           config.getMaxReviewLines());
-      return new AiResponseContent(String.format(SPLIT_REVIEW_MSG, config.getMaxReviewLines()));
+      changeSetData.setReviewSystemMessage(
+          String.format(SPLIT_REVIEW_MSG, config.getMaxReviewLines()));
+      return null;
     }
 
     boolean aiReviewConditionMet =
