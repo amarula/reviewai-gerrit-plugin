@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.review;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.gerrit.server.config.CanonicalWebUrl;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
@@ -247,9 +248,10 @@ public class PatchSetReviewer {
     Integer reviewScore =
         reviewReply == null
             ? null
-            : topicReviewScores == null
-                ? getReviewScore(change)
-                : getReviewScore(change, topicReviewScores);
+            : getReviewScore(
+                change,
+                topicReviewScores == null ? reviewScores : topicReviewScores,
+                reviewReply);
     Map<String, String> publishedCommentIdsByConcern =
         clientReviewProvider
             .get()
@@ -401,15 +403,12 @@ public class PatchSetReviewer {
     return response;
   }
 
-  private Integer getReviewScore(GerritChange change) {
-    return getReviewScore(change, reviewScores);
-  }
-
   Integer getReviewScore(GerritChange change, AiResponseContent reviewReply) {
-    return reviewReply == null ? null : getReviewScore(change);
+    return reviewReply == null ? null : getReviewScore(change, reviewScores, reviewReply);
   }
 
-  private Integer getReviewScore(GerritChange change, List<Double> scores) {
+  private Integer getReviewScore(
+      GerritChange change, List<Double> scores, AiResponseContent reviewReply) {
     log.debug("Calculating review score for change ID: {}", change.getFullChangeId());
     if (changeSetData.getSuggestMode()) {
       return null;
@@ -418,9 +417,18 @@ public class PatchSetReviewer {
       if (change.getIsCommentEvent()) {
         return null;
       }
+      boolean allConcernsDismissed =
+          reviewReply != null
+              && reviewReply.getPendingConcernUpdates() != null
+              && reviewReply
+                  .getPendingConcernUpdates()
+                  .get(change.getFullChangeId())
+                  .map(ReviewConcernLedger::allConcernsDismissed)
+                  .orElse(false);
       int reviewScore = scores.isEmpty() ? 0 : normalizeReviewScore(Collections.min(scores));
       if (reviewScore == 0
           && config.getConvertNeutralReviewScoreToPositive()
+          && !allConcernsDismissed
           && canVotePositive()) {
         reviewScore = 1;
       }
