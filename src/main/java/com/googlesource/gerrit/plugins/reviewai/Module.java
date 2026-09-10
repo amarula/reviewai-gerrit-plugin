@@ -16,16 +16,22 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
+import com.google.gerrit.extensions.annotations.PluginData;
+import com.google.gerrit.extensions.annotations.PluginName;
 import com.google.gerrit.extensions.registration.DynamicItem;
 import com.google.gerrit.extensions.restapi.RestApiModule;
 import com.google.gerrit.lifecycle.LifecycleModule;
 import com.google.gerrit.server.avatar.AvatarProvider;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.inject.Inject;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarPluginDetector;
 import com.googlesource.gerrit.plugins.reviewai.avatar.ReviewAiAvatarProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.listener.LoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.listener.NoLoggingConfigurator;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
@@ -37,6 +43,8 @@ import com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessageStatus;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel;
+import java.io.IOException;
+import java.nio.file.Path;
 
 /** Configures ReviewAI listeners, REST endpoints, and optional avatar integration. */
 public class Module extends LifecycleModule {
@@ -91,5 +99,15 @@ public class Module extends LifecycleModule {
 
   protected Class<? extends LoggingConfigurator> loggingConfiguratorClass() {
     return NoLoggingConfigurator.class;
+  }
+
+  @Provides
+  @Singleton
+  ReviewAiDb provideReviewAiDb(
+      @PluginData Path pluginDataDir,
+      @PluginName String pluginName,
+      PluginConfigFactory configFactory)
+      throws IOException {
+    return new ReviewAiDb(pluginDataDir, pluginName, configFactory);
   }
 }

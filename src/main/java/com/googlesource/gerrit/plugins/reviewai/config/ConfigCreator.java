@@ -19,10 +19,10 @@ package com.googlesource.gerrit.plugins.reviewai.config;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
+import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.annotations.PluginName;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
-import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.gerrit.server.project.NoSuchProjectException;
@@ -30,7 +30,6 @@ import com.google.gerrit.server.util.OneOffRequestContext;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.config.entry.IConfigEntry;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -63,21 +62,13 @@ public class ConfigCreator {
       PluginConfigFactory configFactory,
       OneOffRequestContext context,
       GerritApi gerritApi,
-      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider,
-      ReviewAiDb reviewAiDb) {
+      PluginDataHandlerBaseProvider pluginDataHandlerBaseProvider) {
     this.pluginName = pluginName;
     this.accountCache = accountCache;
     this.configFactory = configFactory;
     this.context = context;
     this.gerritApi = gerritApi;
     this.pluginDataHandlerBaseProvider = pluginDataHandlerBaseProvider;
-
-    // Apply external database configuration if present in gerrit.config.
-    PluginConfig globalConfig = configFactory.getFromGerritConfig(pluginName);
-    reviewAiDb.applyConfig(
-        globalConfig.getString(ReviewAiDb.KEY_STORE_URL),
-        globalConfig.getString(ReviewAiDb.KEY_STORE_USERNAME),
-        globalConfig.getString(ReviewAiDb.KEY_STORE_PASSWORD));
 
     log.debug("ConfigCreator initialized for plugin: {}", pluginName);
   }
