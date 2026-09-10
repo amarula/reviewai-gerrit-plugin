@@ -63,6 +63,7 @@ public class ReviewAiDb {
   private volatile DbDialect dialect;
   private volatile Properties connectionProperties;
 
+  @Inject
   public ReviewAiDb(@PluginData Path pluginDataDir) throws IOException {
     Files.createDirectories(pluginDataDir);
     this.pluginDataDir = pluginDataDir;
@@ -71,7 +72,6 @@ public class ReviewAiDb {
     this.connectionProperties = new Properties();
   }
 
-  @Inject
   public ReviewAiDb(
       @PluginData Path pluginDataDir,
       @PluginName String pluginName,
