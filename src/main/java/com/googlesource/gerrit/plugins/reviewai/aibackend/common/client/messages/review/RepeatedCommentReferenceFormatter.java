@@ -22,10 +22,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 public final class RepeatedCommentReferenceFormatter {
   private final Localizer localizer;
@@ -47,28 +47,55 @@ public final class RepeatedCommentReferenceFormatter {
       return Optional.empty();
     }
 
-    Set<String> repeatedCommentLinks = new LinkedHashSet<>();
+    Map<String, String> repeatedCommentReferences = new LinkedHashMap<>();
     for (AiReplyItem replyItem : repeatedReplyItems) {
       repeatedCommentResolver
           .resolve(replyItem, change)
           .flatMap(comment -> commentLinkFormatter.toCommentLink(comment, replyItem, change))
-          .ifPresent(repeatedCommentLinks::add);
+          .ifPresent(
+              reference ->
+                  repeatedCommentReferences.compute(
+                      reference,
+                      (ignored, reason) ->
+                          hasText(reason) ? reason : normalizedReason(replyItem)));
     }
 
-    if (repeatedCommentLinks.isEmpty()) {
+    if (repeatedCommentReferences.isEmpty()) {
       return Optional.of(localizer.getText("message.repeated.comments.still.hold.no.references"));
     }
 
-    boolean singleComment = repeatedCommentLinks.size() == 1;
+    boolean singleComment = repeatedCommentReferences.size() == 1;
     String messageKey =
         singleComment
             ? "message.repeated.comment.still.holds"
             : "message.repeated.comments.still.hold";
-    String commentReferences =
-        singleComment
-            ? repeatedCommentLinks.iterator().next()
-            : "\n\n" + GerritCommentLinkFormatter.toMarkdownList(repeatedCommentLinks);
+    if (singleComment) {
+      Map.Entry<String, String> reference = repeatedCommentReferences.entrySet().iterator().next();
+      String message =
+          SystemMessageFormatter.getLocalizedMessage(localizer, messageKey, reference.getKey());
+      return Optional.of(appendStatusReason(message, reference.getValue()));
+    }
+    List<String> commentReferences =
+        repeatedCommentReferences.entrySet().stream()
+            .map(reference -> appendStatusReason(reference.getKey(), reference.getValue()))
+            .toList();
     return Optional.of(
-        SystemMessageFormatter.getLocalizedMessage(localizer, messageKey, commentReferences));
+        SystemMessageFormatter.getLocalizedMessage(
+            localizer,
+            messageKey,
+            "\n\n" + GerritCommentLinkFormatter.toMarkdownList(commentReferences)));
+  }
+
+  private static String normalizedReason(AiReplyItem replyItem) {
+    String reason = replyItem.getRepeatedReason();
+    return hasText(reason) ? reason.strip() : "";
+  }
+
+  private static String appendStatusReason(String text, String reason) {
+    return hasText(reason) ? text + ": " + reason : text;
+  }
+
+  private static boolean hasText(String text) {
+    return text != null && !text.isBlank();
   }
 }
