@@ -60,7 +60,7 @@ pipeline {
                 spotBugs(pattern: '**/target/spotbugsXml.xml')
               ],
               qualityGates: [
-                  [threshold: 1, type: 'NEW', criticality: 'ERROR']
+                  [threshold: 1, type: 'NEW', criticality: 'FAILURE']
               ]
             )
           }
