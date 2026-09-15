@@ -32,7 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.matchesExtensionList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getNoEscapedGson;
 import static java.util.stream.Collectors.toList;
 
@@ -90,12 +90,15 @@ public class GerritClientPatchSet extends GerritClientAccount {
 
   protected void retrieveFileDiff(GerritChange change, int revisionBase) throws Exception {
     List<String> enabledFileExtensions = config.getEnabledFileExtensions();
+    List<String> disabledFileExtensions = config.getDisabledFileExtensions();
     log.debug("Retrieving file diff for change: {}", change.getFullChangeId());
     try (ManualRequestContext ignored = config.openRequestContext()) {
       var revisionApi = change.getRevisionApi(change.getChangeApi(config));
       for (String filename : patchSetFiles) {
         isCommitMessage = filename.equals("/COMMIT_MSG");
-        if (!isCommitMessage && !matchesExtensionList(filename, enabledFileExtensions)) {
+        if (!isCommitMessage
+            && !isFileExtensionEnabled(
+                filename, enabledFileExtensions, disabledFileExtensions)) {
           continue;
         }
         DiffInfo diff = revisionApi.file(filename).diff(revisionBase);

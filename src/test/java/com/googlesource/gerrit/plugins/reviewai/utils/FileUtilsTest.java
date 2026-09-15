@@ -58,4 +58,18 @@ public class FileUtilsTest {
   public void doesNotMatchExtensionlessFileWhenOnlyExtensionsConfigured() {
     assertFalse(FileUtils.matchesExtensionList("Jenkinsfile", List.of("py", "java")));
   }
+
+  @Test
+  public void disabledExtensionTakesPrecedenceOverEnabledExtension() {
+    assertFalse(
+        FileUtils.isFileExtensionEnabled(
+            "src/main.py", List.of("py", "java"), List.of("py")));
+  }
+
+  @Test
+  public void enabledExtensionNotInDisabledListRemainsEnabled() {
+    assertTrue(
+        FileUtils.isFileExtensionEnabled(
+            "src/main.py", List.of("py", "java"), List.of("java")));
+  }
 }

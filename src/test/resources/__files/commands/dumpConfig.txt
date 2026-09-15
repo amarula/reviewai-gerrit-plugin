@@ -29,6 +29,7 @@ aiUploadedChunkSizeMb: 5
 codeContextPolicy: ON_DEMAND
 convertNeutralReviewScoreToPositive: true
 directive:
+disabledFileExtensions:
 enabledFileExtensions:
     py
     java

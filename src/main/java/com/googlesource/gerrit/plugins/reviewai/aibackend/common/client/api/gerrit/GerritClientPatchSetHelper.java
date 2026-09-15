@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.COMMIT_MESSAGE_FILTER_OUT_PREFIXES;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_COMMIT_MESSAGE_PREFIX;
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.matchesExtensionList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
 
 @Slf4j
 public class GerritClientPatchSetHelper {
@@ -74,6 +74,13 @@ public class GerritClientPatchSetHelper {
 
   public static String filterPatchByEnabledFileExtensions(
       String formattedPatch, List<String> enabledFileExtensions) {
+    return filterPatchByEnabledFileExtensions(formattedPatch, enabledFileExtensions, List.of());
+  }
+
+  public static String filterPatchByEnabledFileExtensions(
+      String formattedPatch,
+      List<String> enabledFileExtensions,
+      List<String> disabledFileExtensions) {
     Matcher diffStartMatcher = DIFF_START_PATTERN.matcher(formattedPatch);
     if (!diffStartMatcher.find()) {
       return formattedPatch;
@@ -92,7 +99,9 @@ public class GerritClientPatchSetHelper {
       String diffSection =
           formattedPatch.substring(diffSectionStarts.get(i), diffSectionStarts.get(i + 1));
       String filename = extractFilenameFromPatchSection(diffSection);
-      if (filename != null && matchesExtensionList(filename, enabledFileExtensions)) {
+      if (filename != null
+          && isFileExtensionEnabled(
+              filename, enabledFileExtensions, disabledFileExtensions)) {
         filteredPatch.append(diffSection);
       }
     }
