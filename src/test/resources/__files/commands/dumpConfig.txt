@@ -58,9 +58,6 @@ enabledFileExtensions:
     bat
 filterCommentsRelevanceThreshold: 0.6
 gerritUserName: gpt
-ignoreOutdatedInlineComments: false
-ignoreResolvedAiComments: true
-inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiAddress:
 multiAgentMode: false
@@ -69,7 +66,6 @@ ollamaDomain: http://localhost:11434
 ollamaResponseLength: -1
 ollamaThink: false
 patchContextLines: 3
-patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
 storePassword:
 storeUrl:

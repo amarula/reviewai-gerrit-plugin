@@ -758,8 +758,6 @@ public class LangChainMultiAgentReviewClientTest {
     Configuration config = mock(Configuration.class);
     when(config.getGerritUserName()).thenReturn("reviewai");
     when(config.getGerritUserEmail()).thenReturn("");
-    when(config.getIgnoreResolvedAiComments()).thenReturn(false);
-    when(config.getIgnoreOutdatedInlineComments()).thenReturn(false);
     return config;
   }
 

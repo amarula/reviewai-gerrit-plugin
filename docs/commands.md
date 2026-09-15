@@ -325,9 +325,6 @@ enabledFileExtensions:
     (...)
 filterCommentsRelevanceThreshold: 0.6
 gerritUserName: gpt
-ignoreOutdatedInlineComments: false
-ignoreResolvedAiComments: true
-inlineCommentsAsResolved: false
 maxReviewLines: 1000
 mockAiAddress:
 multiAgentMode: false
@@ -336,7 +333,6 @@ ollamaDomain: http://localhost:11434
 ollamaResponseLength: -1
 ollamaThink: true
 patchContextLines: 3
-patchSetCommentsAsResolved: false
 selectiveLogLevelOverride:
 ```
 

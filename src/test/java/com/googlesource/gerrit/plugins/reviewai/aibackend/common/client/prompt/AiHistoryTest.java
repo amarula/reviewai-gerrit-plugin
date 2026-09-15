@@ -100,6 +100,29 @@ public class AiHistoryTest {
   }
 
   @Test
+  public void inactiveHistoryUsesFormerConfigurationDefaults() throws Exception {
+    AiHistoryFixture fixture = readFixture("inactiveHistoryUsesFormerConfigurationDefaults.json");
+    HashMap<String, GerritComment> commentMap = mapById(fixture.inlineComments);
+    GerritComment currentComment = commentMap.get(fixture.currentCommentId);
+    assertNotNull(currentComment);
+
+    AiHistory aiHistory =
+        new AiHistory(
+            config(),
+            new ChangeSetData(AI_ACCOUNT_ID),
+            new GerritClientData(
+                null,
+                List.of(),
+                new CommentData(List.of(), commentMap, new HashMap<>()),
+                1),
+            localizer());
+
+    assertEquals(
+        List.of("user:old patch set context", "user:current request"),
+        historySummary(aiHistory.retrieveHistory(currentComment, true)));
+  }
+
+  @Test
   public void nonAiDiscussionHistoryExcludesAiConversationMessages() throws Exception {
     AiHistoryFixture fixture =
         readFixture("nonAiDiscussionHistoryExcludesAiConversationMessages.json");
@@ -195,8 +218,6 @@ public class AiHistoryTest {
     Configuration config = mock(Configuration.class);
     when(config.getGerritUserName()).thenReturn("gpt");
     when(config.getGerritUserEmail()).thenReturn("");
-    when(config.getIgnoreResolvedAiComments()).thenReturn(false);
-    when(config.getIgnoreOutdatedInlineComments()).thenReturn(false);
     return config;
   }
 
