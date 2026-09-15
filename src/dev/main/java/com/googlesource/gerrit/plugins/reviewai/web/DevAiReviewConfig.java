@@ -103,8 +103,6 @@ public class DevAiReviewConfig implements RestReadView<ChangeResource> {
       output.codeContextPolicy = config.getCodeContextPolicy() != null
           ? config.getCodeContextPolicy().name() : null;
       output.aiReviewCommitMessages = config.getAiReviewCommitMessages();
-      output.ignoreResolvedAiComments = config.getIgnoreResolvedAiComments();
-      output.ignoreOutdatedInlineComments = config.getIgnoreOutdatedInlineComments();
       output.maxReviewLines = config.getMaxReviewLines();
       output.projectName = projectName;
 
@@ -139,12 +137,6 @@ public class DevAiReviewConfig implements RestReadView<ChangeResource> {
 
     @SerializedName("ai_review_commit_messages")
     public boolean aiReviewCommitMessages;
-
-    @SerializedName("ignore_resolved_ai_comments")
-    public boolean ignoreResolvedAiComments;
-
-    @SerializedName("ignore_outdated_inline_comments")
-    public boolean ignoreOutdatedInlineComments;
 
     @SerializedName("max_review_lines")
     public int maxReviewLines;

@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -118,6 +119,22 @@ public class GerritClientReviewTest {
     client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
 
     verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void publishesPatchSetAndInlineCommentsAsUnresolved() throws Exception {
+    ReviewBatch patchSetComment = new ReviewBatch("Patch set comment");
+    ReviewBatch inlineComment = new ReviewBatch("Inline comment");
+    inlineComment.setFilename("src/Example.java");
+    inlineComment.setLine(42);
+
+    client.setReview(change, List.of(patchSetComment, inlineComment), changeSetData);
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    ReviewInput reviewInput = reviewInputCaptor.getValue();
+    assertTrue(reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().unresolved);
+    assertTrue(reviewInput.comments.get("src/Example.java").getFirst().unresolved);
   }
 
   @Test

@@ -1,0 +1,42 @@
+{
+  "patchSetComments": [],
+  "inlineComments": [
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 1,
+      "id": "old-user-comment",
+      "line": 42,
+      "updated": "2026-04-09 10:00:00.000000",
+      "message": "old patch set context",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 7
+      },
+      "patch_set": 1,
+      "id": "resolved-ai-comment",
+      "line": 42,
+      "in_reply_to": "old-user-comment",
+      "unresolved": false,
+      "updated": "2026-04-09 10:01:00.000000",
+      "message": "resolved AI reply",
+      "filename": "src/main/java/Foo.java"
+    },
+    {
+      "author": {
+        "_account_id": 1001
+      },
+      "patch_set": 2,
+      "id": "current-user-comment",
+      "line": 42,
+      "in_reply_to": "resolved-ai-comment",
+      "updated": "2026-04-09 10:02:00.000000",
+      "message": "current request",
+      "filename": "src/main/java/Foo.java"
+    }
+  ],
+  "currentCommentId": "current-user-comment"
+}

@@ -45,7 +45,6 @@ public class AiHistory extends AiComment {
   private final HashMap<String, GerritComment> patchSetCommentMap;
   private final Set<String> patchSetCommentAdded;
   private final List<GerritComment> patchSetComments;
-  private final int revisionBase;
   private final Localizer localizer;
   private final String forgetThreadCutoff;
 
@@ -67,10 +66,9 @@ public class AiHistory extends AiComment {
     commentThreadIndex = new GerritCommentThreadIndex(commentMap.values());
     patchSetCommentMap = commentData.getPatchSetCommentMap();
     patchSetComments = retrievePatchSetComments(gerritClientData);
-    revisionBase = gerritClientData.getOneBasedRevisionBase();
     patchSetCommentAdded = new HashSet<>();
     forgetThreadCutoff = findForgetThreadCutoff();
-    log.debug("AiHistory initialized with comments and revision base: {}", revisionBase);
+    log.debug("AiHistory initialized with comments.");
   }
 
   public List<AiRequestMessage> retrieveHistory(
@@ -168,11 +166,7 @@ public class AiHistory extends AiComment {
   }
 
   private boolean isInactiveComment(GerritComment comment) {
-    boolean isInactive =
-        config.getIgnoreResolvedAiComments() && isFromAssistant(comment) && comment.isResolved()
-            || config.getIgnoreOutdatedInlineComments()
-                && comment.getOneBasedPatchSet() != revisionBase
-                && !comment.isPatchSetComment();
+    boolean isInactive = isFromAssistant(comment) && comment.isResolved();
     log.debug("Checking if comment is inactive: {}", isInactive);
     return isInactive;
   }

@@ -301,7 +301,6 @@ public class GerritClientReview extends GerritClientAccount {
             "Empty message from review not submitted for batch with ID: {}", reviewBatch.getId());
         continue;
       }
-      boolean unresolved;
       String filename = reviewBatch.getFilename();
       List<CommentInput> filenameComments = comments.getOrDefault(filename, new ArrayList<>());
       CommentInput filenameComment = new CommentInput();
@@ -323,15 +322,9 @@ public class GerritClientReview extends GerritClientAccount {
                       range.startLine,
                       range.endLine);
                 });
-        unresolved = !config.getInlineCommentsAsResolved();
-        log.debug("Comment for file '{}' is marked as unresolved: {}", filename, unresolved);
-      } else {
-        unresolved = !config.getPatchSetCommentsAsResolved();
-        log.debug(
-            "Patch set comment for file '{}' is marked as unresolved: {}", filename, unresolved);
       }
       filenameComment.inReplyTo = reviewBatch.getId();
-      filenameComment.unresolved = unresolved;
+      filenameComment.unresolved = true;
       filenameComments.add(filenameComment);
       comments.putIfAbsent(filename, filenameComments);
     }

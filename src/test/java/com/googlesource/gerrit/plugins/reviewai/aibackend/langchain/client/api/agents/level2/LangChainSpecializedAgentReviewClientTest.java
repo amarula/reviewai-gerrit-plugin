@@ -994,8 +994,6 @@ public class LangChainSpecializedAgentReviewClientTest {
     when(config.getAiReviewPatchSet()).thenReturn(true);
     when(config.getGerritUserName()).thenReturn("reviewai");
     when(config.getGerritUserEmail()).thenReturn("");
-    when(config.getIgnoreResolvedAiComments()).thenReturn(false);
-    when(config.getIgnoreOutdatedInlineComments()).thenReturn(false);
     return config;
   }
 

@@ -317,10 +317,6 @@ directive = End each reply with \"Hope this helps!\"
 - `filterCommentsRelevanceThreshold`: Any review comment assigned a relevance score by AI below this threshold will not
   be shown. The default threshold is set at 0.6.
 - `aiRelevanceRules`: This option allows customization of the rules AI uses to determine the relevance of a task.
-- `patchSetCommentsAsResolved`: Initially set to false, this option leaves AI's Patch Set comments as unresolved,
-  inviting further discussion. If activated, it marks AI's Patch Set comments as resolved.
-- `inlineCommentsAsResolved`: Initially set to false, this option leaves AI's inline comments as unresolved, inviting
-  further discussion. If activated, it marks AI's inline comments as resolved.
 - `selectiveLogLevelOverride`: This setting allows for overriding the log level of specific messages, ensuring they are
   logged even if their level is above the current setting. This is useful for debugging without the need to set the
   overall log level to DEBUG, which could result in excessive DEBUG messages from sources like gerrit and other plugins.
@@ -328,12 +324,6 @@ directive = End each reply with \"Hope this helps!\"
 - `aiFullFileReview`: Enabled by default. Activating this option sends both unchanged lines and changes to AI for
   review, offering additional context information. Deactivating it (set to false) results in only the changed lines
   being submitted for review.
-- `ignoreResolvedAiComments`: Determines if resolved comments from AI should be disregarded. The default setting is
-  true, which means resolved AI comments are not used for generating new comments or identifying duplicate content. If
-  set to false, resolved AI comments are factored into these processes.
-- `ignoreOutdatedInlineComments`: Determines if inline comments made on non-latest Patch Sets should be disregarded. By
-  default, this is set to false, meaning all inline comments are used for generating new responses and identifying
-  repetitions. If enabled (true), inline comments from previous Patch Sets are excluded from these considerations.
 - `maxReviewLines`: The default value is 1000. This sets a limit on the number of lines of code included in the review.
 - `patchContextLines`: The default value is 3. This sets how many unchanged context lines are included around each
   changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.

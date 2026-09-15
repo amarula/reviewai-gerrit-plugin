@@ -78,10 +78,6 @@ public class Configuration extends ConfigCore {
   private static final boolean DEFAULT_ENABLED_VOTING = false;
   private static final boolean DEFAULT_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE = true;
   private static final double DEFAULT_FILTER_COMMENTS_RELEVANCE_THRESHOLD = 0.6;
-  private static final boolean DEFAULT_INLINE_COMMENTS_AS_RESOLVED = false;
-  private static final boolean DEFAULT_PATCH_SET_COMMENTS_AS_RESOLVED = false;
-  private static final boolean DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS = false;
-  private static final boolean DEFAULT_IGNORE_RESOLVED_AI_COMMENTS = true;
   private static final boolean DEFAULT_MULTI_AGENT_MODE = false;
   private static final String DEFAULT_AGENT_SPECIALIZATION_LEVEL = "SINGLE_AGENT";
   private static final int DEFAULT_AI_CONNECTION_TIMEOUT = 180;
@@ -139,10 +135,6 @@ public class Configuration extends ConfigCore {
       "filterCommentsRelevanceThreshold";
   private static final String KEY_AI_MODELS_DEFAULT = AiProviderConfiguration.KEY_AI_MODELS_DEFAULT;
   private static final String KEY_AI_MAX_MEMORY_TOKENS = "aiMaxMemoryTokens";
-  private static final String KEY_INLINE_COMMENTS_AS_RESOLVED = "inlineCommentsAsResolved";
-  private static final String KEY_PATCH_SET_COMMENTS_AS_RESOLVED = "patchSetCommentsAsResolved";
-  private static final String KEY_IGNORE_OUTDATED_INLINE_COMMENTS = "ignoreOutdatedInlineComments";
-  private static final String KEY_IGNORE_RESOLVED_AI_COMMENTS = "ignoreResolvedAiComments";
   private static final String KEY_MULTI_AGENT_MODE = "multiAgentMode";
   private static final String KEY_AGENT_SPECIALIZATION_LEVEL = "agentSpecializationLevel";
   private static final String KEY_AI_CONNECTION_TIMEOUT = "aiConnectionTimeout";
@@ -338,18 +330,6 @@ public class Configuration extends ConfigCore {
     return getString(KEY_AI_COMMENT_TEMPERATURE, String.valueOf(DEFAULT_AI_COMMENT_TEMPERATURE));
   }
 
-  public boolean getInlineCommentsAsResolved() {
-    return getBoolean(KEY_INLINE_COMMENTS_AS_RESOLVED, DEFAULT_INLINE_COMMENTS_AS_RESOLVED);
-  }
-
-  public boolean getPatchSetCommentsAsResolved() {
-    return getBoolean(KEY_PATCH_SET_COMMENTS_AS_RESOLVED, DEFAULT_PATCH_SET_COMMENTS_AS_RESOLVED);
-  }
-
-  public boolean getIgnoreResolvedAiComments() {
-    return getBoolean(KEY_IGNORE_RESOLVED_AI_COMMENTS, DEFAULT_IGNORE_RESOLVED_AI_COMMENTS);
-  }
-
   public boolean getMultiAgentMode() {
     if (getString(KEY_AGENT_SPECIALIZATION_LEVEL, null) != null) {
       return getAgentSpecializationLevel() != AgentSpecializationLevel.SINGLE_AGENT;
@@ -432,10 +412,6 @@ public class Configuration extends ConfigCore {
 
   public String getAiAdministratorsGroup() {
     return getString(KEY_AI_ADMINISTRATORS_GROUP).trim();
-  }
-
-  public boolean getIgnoreOutdatedInlineComments() {
-    return getBoolean(KEY_IGNORE_OUTDATED_INLINE_COMMENTS, DEFAULT_IGNORE_OUTDATED_INLINE_COMMENTS);
   }
 
   public List<String> getSelectiveLogLevelOverride() {
