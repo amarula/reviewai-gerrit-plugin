@@ -72,6 +72,7 @@ public class Configuration extends ConfigCore {
             ".swift", ".kt", ".r", ".jl", ".go", ".scala", ".pl", ".pm", ".rs", ".dart", ".lua",
             ".sh", ".vb", ".bat"
           });
+  private static final String DEFAULT_DISABLED_FILE_EXTENSIONS = "";
   private static final List<String> DEFAULT_DIRECTIVES = new ArrayList<>();
   private static final int DEFAULT_MAX_REVIEW_LINES = 1000;
   private static final int DEFAULT_PATCH_CONTEXT_LINES = 3;
@@ -128,6 +129,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_MAX_REVIEW_LINES = "maxReviewLines";
   private static final String KEY_PATCH_CONTEXT_LINES = "patchContextLines";
   private static final String KEY_ENABLED_FILE_EXTENSIONS = "enabledFileExtensions";
+  private static final String KEY_DISABLED_FILE_EXTENSIONS = "disabledFileExtensions";
   private static final String KEY_ENABLED_VOTING = "enabledVoting";
   private static final String KEY_CONVERT_NEUTRAL_REVIEW_SCORE_TO_POSITIVE =
       "convertNeutralReviewScoreToPositive";
@@ -297,6 +299,11 @@ public class Configuration extends ConfigCore {
   public List<String> getEnabledFileExtensions() {
     return splitConfigRemoveDots(
         getString(KEY_ENABLED_FILE_EXTENSIONS, DEFAULT_ENABLED_FILE_EXTENSIONS));
+  }
+
+  public List<String> getDisabledFileExtensions() {
+    return splitConfigRemoveDots(
+        getString(KEY_DISABLED_FILE_EXTENSIONS, DEFAULT_DISABLED_FILE_EXTENSIONS));
   }
 
   public List<String> getDirective() {

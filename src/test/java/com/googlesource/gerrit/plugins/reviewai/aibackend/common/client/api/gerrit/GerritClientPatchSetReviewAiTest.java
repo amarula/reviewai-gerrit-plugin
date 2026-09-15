@@ -123,7 +123,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
   }
 
   @Test
-  public void getPatchSetExcludesFilesOutsideEnabledExtensions() throws Exception {
+  public void getPatchSetExcludesDisabledExtensions() throws Exception {
     when(config.getGerritApi()).thenReturn(gerritApi);
     when(gerritApi.changes()).thenReturn(changes);
     when(changes.id(PROJECT_NAME.get(), BRANCH_NAME.shortName(), CHANGE_ID.get()))
@@ -131,7 +131,8 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(changeApi.revision("revision-3")).thenReturn(revisionApi);
     when(revisionApi.patch()).thenReturn(BinaryResult.create(getMixedExtensionPatch()));
     when(config.getAiReviewCommitMessages()).thenReturn(false);
-    when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
+    when(config.getEnabledFileExtensions()).thenReturn(List.of("py", "txt"));
+    when(config.getDisabledFileExtensions()).thenReturn(List.of("txt"));
 
     when(revisionApi.file("allowed.py")).thenReturn(fileApi);
     DiffInfo diffInfo = new DiffInfo();

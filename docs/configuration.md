@@ -310,6 +310,9 @@ directive = End each reply with \"Hope this helps!\"
   **NOTE**: Extensions without a leading dot (e.g., 'py') are also accepted. Exact file names (e.g., 'Jenkinsfile',
   'Makefile', 'CMakeLists.txt') can also be listed to include extensionless or specific files. Dotfiles (e.g.,
   '.gitignore', '.editorconfig') are supported as well.
+- `disabledFileExtensions`: This excludes the given file types from review. It accepts the same extension, exact file
+  name, and dotfile formats as `enabledFileExtensions`. Disabled entries take precedence over enabled entries. The
+  default is empty.
 - `enabledVoting`: Initially disabled (false). If set to true, allows AI to cast a vote on each reviewed Patch Set by
   assigning a score.
 - `convertNeutralReviewScoreToPositive`: Enabled by default (true). When enabled, a neutral final review score (`0`)

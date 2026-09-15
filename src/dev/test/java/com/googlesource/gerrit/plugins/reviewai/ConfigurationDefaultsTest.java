@@ -59,6 +59,23 @@ public class ConfigurationDefaultsTest {
   }
 
   @Test
+  public void shouldDefaultDisabledFileExtensionsToEmptyWhenUnset() {
+    Configuration configuration = createConfiguration();
+
+    assertEquals(List.of(), configuration.getDisabledFileExtensions());
+  }
+
+  @Test
+  public void shouldReadConfiguredDisabledFileExtensions() throws Exception {
+    Configuration configuration =
+        createConfigurationFromResource(
+            "src/test/resources/__files/config/disabledFileExtensions.config");
+
+    assertEquals(
+        List.of("md", "txt", "Jenkinsfile"), configuration.getDisabledFileExtensions());
+  }
+
+  @Test
   public void shouldUseConfiguredAiAdministratorsGroup() {
     Config cfg = new Config();
     cfg.setString("plugin", PLUGIN_NAME, "aiAdministratorsGroup", "AI Owners");

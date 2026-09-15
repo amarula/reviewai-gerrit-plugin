@@ -67,6 +67,13 @@ public class FileUtils {
     return matches;
   }
 
+  public static boolean isFileExtensionEnabled(
+      String filename, List<String> enabledExtensions, List<String> disabledExtensions) {
+    return matchesExtensionList(filename, enabledExtensions)
+        && (disabledExtensions == null
+            || !matchesExtensionList(filename, disabledExtensions));
+  }
+
   public static String sanitizeFilename(String filename) {
     String sanitized = filename.replaceAll("[^-_a-zA-Z0-9]", "+");
     log.debug("Original filename: '{}', Sanitized filename: '{}'", filename, sanitized);
