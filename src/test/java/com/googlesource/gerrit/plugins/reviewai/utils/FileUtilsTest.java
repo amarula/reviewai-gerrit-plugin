@@ -60,6 +60,15 @@ public class FileUtilsTest {
   }
 
   @Test
+  public void enabledAllEnablesAnyFile() {
+    assertTrue(
+        FileUtils.isFileExtensionEnabled(
+            "src/unknown.extension", List.of("ALL"), List.of()));
+    assertTrue(
+        FileUtils.isFileExtensionEnabled("Makefile", List.of("ALL"), List.of()));
+  }
+
+  @Test
   public void disabledExtensionTakesPrecedenceOverEnabledExtension() {
     assertFalse(
         FileUtils.isFileExtensionEnabled(
@@ -71,5 +80,11 @@ public class FileUtilsTest {
     assertTrue(
         FileUtils.isFileExtensionEnabled(
             "src/main.py", List.of("py", "java"), List.of("java")));
+  }
+
+  @Test
+  public void disabledAllTakesPrecedenceOverEnabledAll() {
+    assertFalse(
+        FileUtils.isFileExtensionEnabled("src/main.py", List.of("ALL"), List.of("ALL")));
   }
 }
