@@ -41,7 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.matchesExtensionList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
@@ -49,6 +49,7 @@ public class GitRepoFiles {
   private final GitRepositoryManager repositoryManager;
   private GitFileChunkBuilder gitFileChunkBuilder;
   private List<String> enabledFileExtensions;
+  private List<String> disabledFileExtensions;
   private long fileSize;
 
   @Inject
@@ -65,6 +66,7 @@ public class GitRepoFiles {
     log.debug("Getting Repository files as JSON");
     gitFileChunkBuilder = new GitFileChunkBuilder(config);
     enabledFileExtensions = config.getEnabledFileExtensions();
+    disabledFileExtensions = config.getDisabledFileExtensions();
     try {
       List<Map<String, String>> chunkedFileContent =
           withRepositoryTree(change, this::listFilesWithContent);
@@ -108,6 +110,7 @@ public class GitRepoFiles {
       Configuration config, GerritChange change, String subdir) {
     log.debug("Getting repository file tree from subdir: {}", subdir);
     enabledFileExtensions = config.getEnabledFileExtensions();
+    disabledFileExtensions = config.getDisabledFileExtensions();
     String normalizedSubdir = normalizePath(subdir);
     try {
       return withRepositoryTree(
@@ -126,6 +129,7 @@ public class GitRepoFiles {
       Set<String> includedPaths) {
     log.debug("Searching repository for string: {}", searchString);
     enabledFileExtensions = config.getEnabledFileExtensions();
+    disabledFileExtensions = config.getDisabledFileExtensions();
     if (searchString == null || searchString.isEmpty()) {
       return Collections.emptyList();
     }
@@ -191,7 +195,7 @@ public class GitRepoFiles {
       while (treeWalk.next()) {
         String path = treeWalk.getPathString();
         if (!pathMatcher.matches(path)) continue;
-        if (!matchesExtensionList(path, enabledFileExtensions)) continue;
+        if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions)) continue;
         collector.collect(results, path, treeWalk);
       }
     }
@@ -208,7 +212,7 @@ public class GitRepoFiles {
 
         while (treeWalk.next()) {
           String path = treeWalk.getPathString();
-          if (!matchesExtensionList(path, enabledFileExtensions)) continue;
+          if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions)) continue;
           int lastSlashIndex = path.lastIndexOf('/');
           String dirPath = (lastSlashIndex != -1) ? path.substring(0, lastSlashIndex) : "";
           String content = getContent(reader, treeWalk);

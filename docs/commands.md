@@ -318,6 +318,7 @@ convertNeutralReviewScoreToPositive: true
 directive:
     First directive
     Second directive
+disabledFileExtensions:
 enabledFileExtensions:
     py
     java

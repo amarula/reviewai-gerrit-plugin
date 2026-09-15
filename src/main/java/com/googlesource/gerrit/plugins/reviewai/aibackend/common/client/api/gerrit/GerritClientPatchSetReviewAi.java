@@ -305,14 +305,17 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
     if (config.getAiReviewCommitMessages()) {
       String patchWithCommitMessage =
           filterPatchByEnabledFileExtensions(
-              filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
+              filterPatchWithCommitMessage(formattedPatch),
+              config.getEnabledFileExtensions(),
+              config.getDisabledFileExtensions());
       log.debug("Patch filtered to include commit messages: {}", patchWithCommitMessage);
       return patchWithCommitMessage;
     } else {
       String patchWithoutCommitMessage =
           filterPatchByEnabledFileExtensions(
               filterPatchWithoutCommitMessage(change, formattedPatch),
-              config.getEnabledFileExtensions());
+              config.getEnabledFileExtensions(),
+              config.getDisabledFileExtensions());
       log.debug("Patch filtered to exclude commit messages: {}", patchWithoutCommitMessage);
       return patchWithoutCommitMessage;
     }
@@ -323,7 +326,9 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
       case FULL -> {
         String fullPatch =
             filterPatchByEnabledFileExtensions(
-                filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
+                filterPatchWithCommitMessage(formattedPatch),
+                config.getEnabledFileExtensions(),
+                config.getDisabledFileExtensions());
         log.debug("Patch filtered by command scope to include the full Change Set: {}", fullPatch);
         yield fullPatch;
       }
@@ -331,7 +336,8 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
         String patchWithoutCommitMessage =
             filterPatchByEnabledFileExtensions(
                 filterPatchWithoutCommitMessage(change, formattedPatch),
-                config.getEnabledFileExtensions());
+                config.getEnabledFileExtensions(),
+                config.getDisabledFileExtensions());
         log.debug(
             "Patch filtered by command scope to exclude commit messages: {}",
             patchWithoutCommitMessage);
@@ -340,7 +346,9 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
       case COMMIT_MESSAGE -> {
         String patchWithCommitMessage =
             filterPatchByEnabledFileExtensions(
-                filterPatchWithCommitMessage(formattedPatch), config.getEnabledFileExtensions());
+                filterPatchWithCommitMessage(formattedPatch),
+                config.getEnabledFileExtensions(),
+                config.getDisabledFileExtensions());
         log.debug(
             "Patch filtered by command scope to include commit message and patch context: {}",
             patchWithCommitMessage);
