@@ -28,6 +28,8 @@ import java.util.Objects;
 
 @Slf4j
 public class FileUtils {
+  private static final String ALL_FILE_EXTENSIONS = "ALL";
+
   public static InputStreamReader getInputStreamReader(String filename) {
     try {
       InputStreamReader reader =
@@ -60,7 +62,8 @@ public class FileUtils {
 
   public static boolean matchesExtensionList(String filename, List<String> extensions) {
     boolean matches =
-        extensions.contains(getExtension(filename))
+        extensions.contains(ALL_FILE_EXTENSIONS)
+            || extensions.contains(getExtension(filename))
             || extensions.contains(getBasename(filename))
             || extensions.contains(stripLeadingDot(getBasename(filename)));
     log.debug("Filename '{}' matches extension list: {}", filename, matches);
