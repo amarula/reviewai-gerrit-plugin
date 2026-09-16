@@ -1,0 +1,1113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+      Reviewed shared collaborators, matched by exact rule, class, field and type.
+      These references preserve service/configuration identity; copying them is
+      inappropriate. Mutable model and collection ownership is reviewed separately.
+      Add entries only after confirming intentional sharing at the specific field.
+    -->
+
+    <!-- The facade delegates comment operations to the same stateful request client. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade"/>
+        <Field name="gerritClientComments" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+    </Match>
+
+    <!-- The suggestion adapter delegates to the existing configured review client. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainSuggestClient"/>
+        <Field name="client" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient"/>
+    </Match>
+
+    <!-- Request clients and commands intentionally share the persistent chat-memory service. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Field name="chatMemoryStore" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="chatMemoryStore" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient"/>
+        <Field name="chatMemoryStore" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient"/>
+        <Field name="chatMemoryStore" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore"/>
+    </Match>
+
+    <!-- The event module binds the existing Configuration instance. Helpers and clients must use the same request context and live settings. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernLedgerOperations"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptBase"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiResponsesChatModel$Builder"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle"/>
+        <Field name="config" type="com.googlesource.gerrit.plugins.reviewai.config.Configuration"/>
+    </Match>
+
+    <!-- The chat-memory adapter delegates reads and writes to the shared repository. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore"/>
+        <Field name="repository" type="com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository"/>
+    </Match>
+
+    <!-- Request status updates intentionally delegate to the existing scoped persistence handler. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore"/>
+        <Field name="pluginDataHandler" type="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler"/>
+    </Match>
+
+    <!-- Stores and providers must share the configured database service and its connection/server lifecycle; it is not a value object. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewChangeStateStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackMemoryStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore"/>
+        <Field name="db" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+    </Match>
+
+    <!-- Concern sanitation delegates to the shared operational review-state store. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer"/>
+        <Field name="reviewChangeStateStore" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewChangeStateStore"/>
+    </Match>
+
+    <!-- Review clients and reviewers delegate ledger publication to the same persistence service. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Field name="reviewConcernPublisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="reviewConcernPublisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer"/>
+        <Field name="reviewConcernPublisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher"/>
+    </Match>
+
+    <!-- Review feedback producers and lifecycle handlers delegate to the same publication service. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Field name="reviewFeedbackPublisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="reviewFeedbackPublisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle"/>
+        <Field name="publisher" type="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher"/>
+    </Match>
+
+    <!-- Clients and prompts retain the selected policy service so its configured behavior is shared. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient"/>
+        <Field name="codeContextPolicy" type="com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy"/>
+    </Match>
+
+    <!-- The listener delegates cleanup and cancellation to the injected lifecycle service. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.listener.GerritListener"/>
+        <Field name="closedChangeLifecycleEventHandler" type="com.googlesource.gerrit.plugins.reviewai.listener.ClosedChangeLifecycleEventHandler"/>
+    </Match>
+
+    <!-- The reviewer retains the injected feedback lifecycle service and its shared publishers. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer"/>
+        <Field name="reviewFeedbackLifecycle" type="com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle"/>
+    </Match>
+
+    <!-- Review clients and recorders share the conversation persistence service. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient"/>
+        <Field name="conversationStore" type="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder"/>
+        <Field name="conversationStore" type="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore"/>
+    </Match>
+
+    <!-- Mutable model ownership: exact fields reviewed independently of DI services. -->
+
+    <!-- Mutable review data carriers retain their Lombok/model semantics.
+      Gerrit adapters and Gson populate the JSON models; review stages normalize
+      and assemble them through setters. AiResponseContentMerger appends replies
+      through the getter and combines pending updates. CodeFinderDiff carries a
+      processed diff and its line map. CommentData/GerritClientData wrap the same
+      comments used by prompts and history. ChangeSetData.copy() and concern
+      operations perform explicit copies where stage isolation is required.
+      These fields are not immutable value objects; accessor copies would change
+      their intended sharing and mutation contracts. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem"/>
+        <Field name="history" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem$AiMessageItemBuilder"/>
+        <Field name="history" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/>
+        <Field name="pendingConcernUpdates" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/>
+        <Field name="replies" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment"/>
+        <Field name="author" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment$Author"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment"/>
+        <Field name="range" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff"/>
+        <Field name="metaA" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff$Meta"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff"/>
+        <Field name="metaB" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff$Meta"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail"/>
+        <Field name="labels" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail$Labels"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail"/>
+        <Field name="messages" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail$CodeReview"/>
+        <Field name="all" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail$Labels"/>
+        <Field name="codeReview" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail$CodeReview"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail$Permission"/>
+        <Field name="permittedVotingRange" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetFileDiff"/>
+        <Field name="content" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritReviewFileDiff"/>
+        <Field name="content" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritReviewFileDiff"/>
+        <Field name="metaA" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff$Meta"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritReviewFileDiff"/>
+        <Field name="metaB" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff$Meta"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch.CodeFinderDiff"/>
+        <Field name="charToLineMap" type="java.util.TreeMap"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch.CodeFinderDiff"/>
+        <Field name="content" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="concernWorkflowInput" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="conditionLabels" type="java.util.Map"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="parsedCommandOptions" type="java.util.Map"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="parsedCommands" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="pendingReviewFeedbackCommentIds" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="permittedVotingRange" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="previousReviewConcernLedger" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="reviewFeedbackClassificationInput" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="reviewFeedbackControlAuthorizedCommentIds" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="reviewFeedbackDismissalAuthorizedCommentIds" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+        <Field name="reviewFeedbackMemory" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData"/>
+        <Field name="addressedComments" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData"/>
+        <Field name="commentMap" type="java.util.HashMap"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData"/>
+        <Field name="commentProperties" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData"/>
+        <Field name="patchSetCommentMap" type="java.util.HashMap"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData"/>
+        <Field name="commentData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData"/>
+        <Field name="detailComments" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput"/>
+        <Field name="concerns" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput"/>
+        <Field name="reviewFeedback" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch"/>
+        <Field name="range" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern"/>
+        <Field name="locations" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern"/>
+        <Field name="mergedConcernIds" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern"/>
+        <Field name="reviewers" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger"/>
+        <Field name="reviewers" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput"/>
+        <Field name="comments" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput"/>
+        <Field name="concerns" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput"/>
+        <Field name="currentMemory" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput$Comment"/>
+        <Field name="targetComment" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput$TargetComment"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput$Comment"/>
+        <Field name="threadContext" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult"/>
+        <Field name="classifications" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult"/>
+        <Field name="concernFeedback" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult"/>
+        <Field name="conditionLabelDisabledSpecializedAgents" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationResult$Classification"/>
+        <Field name="reviewControlActions" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+        <Field name="concernFeedback" type="java.util.Map"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+        <Field name="conditionLabelDisabledSpecializedAgents" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+        <Field name="disabledReviewScopes" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+        <Field name="disabledSpecializedAgents" type="java.util.Set"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory"/>
+        <Field name="dismissedConcerns" type="java.util.Map"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns"/>
+        <Field name="concerns" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns"/>
+        <Field name="reviewer" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId"/>
+    </Match>
+
+    <!-- GerritEventContextModule binds one GerritChange and one ChangeSetData
+      per event injector. Clients, commands, prompts and reviewers retain this
+      request context so command/state updates are observed by later stages.
+      TopicReviewPatchSet carries the selected change to the topic merger.
+      Copying these fields would detach consumers from the intended context. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandParser"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiComment"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructions"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer"/>
+        <Field name="changeSetData" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewPatchSet"/>
+        <Field name="change" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange"/>
+    </Match>
+
+    <!-- Result carriers hand the assembled response, verification findings or
+      history entries to the next stage and REST serialization. They do not
+      promise immutable snapshots; retain the existing model identity. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient$ReviewRequestResult"/>
+        <Field name="responseContent" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient$CollectorResult"/>
+        <Field name="response" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient$CollectorResult"/>
+        <Field name="verificationCandidates" type="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.SpecializedReviewFindings"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo"/>
+        <Field name="entries" type="java.util.List"/>
+    </Match>
+
+    <!-- AiRequestDescriptor already uses List.copyOf in its canonical constructor
+      (including Gson record reconstruction). ApprovalData contains only strings,
+      so the generated approvals accessor exposes an immutable list of values. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.listener.AiRequestDescriptor"/>
+        <Field name="approvals" type="java.util.List"/>
+    </Match>
+
+    <!-- PluginDataHandler reads and writes both synchronize on fileLock, which is
+      shared by normalized data-file path across handler instances. getJsonValue
+      delegates to the locked getValue and then parses a local immutable string.
+      The setters' additional instance monitor does not protect state read by
+      these getters; adding it to the getters is unnecessary. -->
+    <Match>
+        <Bug pattern="UG_SYNC_SET_UNSYNC_GET"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler"/>
+        <Method name="getValue" params="java.lang.String" returns="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="UG_SYNC_SET_UNSYNC_GET"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler"/>
+        <Method name="getJsonValue" params="java.lang.String,java.lang.reflect.Type" returns="java.lang.Object"/>
+    </Match>
+
+    <!-- readJsonResource uses Gson to populate these private catalog fields from
+      config/aiPricing.json. defaultPricing validates currency/unit and models
+      before constructing route pricing. Java initializers or accessor changes
+      are unnecessary and could change missing-field validation semantics. -->
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiPricingCatalog$PricingCatalogData"/>
+        <Field name="currency" type="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiPricingCatalog$PricingCatalogData"/>
+        <Field name="unit" type="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiPricingCatalog$PricingCatalogData"/>
+        <Field name="models" type="java.util.List"/>
+    </Match>
+
+    <!-- Dialect upserts use literal table/column names, placeholders and update
+      clauses. External change IDs, keys, values, JSON and titles are bound with
+      PreparedStatement setters. Exclude only the reviewed method signatures. -->
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore"/>
+        <Method name="ensureAndLockLane" params="java.sql.Connection,com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef" returns="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler"/>
+        <Method name="setValue" params="java.lang.String,java.lang.String" returns="void"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler"/>
+        <Method name="migrateLegacyProperties" params="" returns="void"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernStore"/>
+        <Method name="upsertLedger" params="java.sql.Connection,com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger" returns="void"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackMemoryStore"/>
+        <Method name="save" params="java.sql.Connection,com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory" returns="void"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore"/>
+        <Method name="upsertConversationHeader" params="java.sql.Connection,java.lang.String,long,java.lang.String,java.lang.String,java.lang.Long" returns="void"/>
+    </Match>
+
+    <!-- deleteByChange is private and called only with four literal review-state
+      table names in clear(). The external change ID remains a bound parameter. -->
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewChangeStateStore"/>
+        <Method name="deleteByChange" params="java.sql.Connection,java.lang.String,java.lang.String" returns="void"/>
+    </Match>
+
+    <!-- Schema helpers are private and receive literal table/column names from
+      initReviewAgentConversationSchema. Database-metadata constraint names are
+      quoted and escaped by quoteIdentifier before dialect DDL construction. -->
+    <Match>
+        <Bug pattern="SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+        <Method name="addUserIdColumnIfMissing" params="java.sql.Statement,java.lang.String" returns="void"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+        <Method name="ensurePrimaryKeyIncludesUserId" params="java.sql.Connection,java.sql.Statement,java.lang.String,java.lang.String[]" returns="void"/>
+    </Match>
+
+    <!-- Match compiler-generated lambda methods exactly, without a wildcard.
+      initSchema selects between two literal dialect queries and binds version.
+      Conversation DDL uses literals plus the enum's CLOB/TEXT type. executeSchema
+      receives only code-owned DDL from its reviewed private-helper call sites. -->
+    <Match>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+        <Method name="lambda$initSchema$0" params="java.sql.Connection" returns="java.lang.Object"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+        <Method name="lambda$initReviewAgentConversationSchema$1" params="java.sql.Connection" returns="java.lang.Object"/>
+    </Match>
+    <Match>
+        <Bug pattern="SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb"/>
+        <Method name="lambda$executeSchema$2" params="java.lang.String[],java.sql.Connection" returns="java.lang.Object"/>
+    </Match>
+
+    <!-- Public fields are deliberate model APIs. GerritCodeRange maps Gerrit JSON
+      names and is read/written directly by range consumers. DiffContent.a/b/ab
+      are read directly by CodeFinder and populated reflectively by
+      FileDiffProcessed. Preserve public DTO and generated accessor semantics. -->
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+        <Field name="startLine" type="int"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+        <Field name="endLine" type="int"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+        <Field name="startCharacter" type="int"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+        <Field name="endCharacter" type="int"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent"/>
+        <Field name="a" type="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent"/>
+        <Field name="b" type="java.lang.String"/>
+    </Match>
+    <Match>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent"/>
+        <Field name="ab" type="java.lang.String"/>
+    </Match>
+
+    <!-- Private helpers are reached only after their public entry points assign
+      request-specific state. Retain the stateful design rather than widening
+      helper APIs solely for SpotBugs' constructor-flow analysis. -->
+    <Match>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+        <Or>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi"/><Method name="filterPatch"/><Field name="changeSetData"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi"/><Method name="filterPatchByReviewScope"/><Field name="changeSetData"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview"/><Method name="getCurrentCodeReviewValue"/><Field name="change"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles"/><Method name="listFilesWithContent"/><Field name="gitFileChunkBuilder"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.InlineCode"/><Method name="getLineSlice"/><Field name="range"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/><Method name="applyReviewScopeOption"/><Field name="baseOptions"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/><Method name="commandForceReview"/><Field name="baseOptions"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/><Method name="commandHelp"/><Field name="nextString"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptRequests"/><Method name="extractLastUserMessageFromHistory"/><Field name="messageHistory"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptRequests"/><Method name="removeLastMatchingUserMessage"/><Field name="messageHistory"/></And>
+        </Or>
+    </Match>
+
+    <!-- These classes repeat inherited interfaces deliberately. Removing them
+      changes public class metadata but does not improve behavior. -->
+    <Match>
+        <Bug pattern="RI_REDUNDANT_INTERFACES"/>
+        <Or>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptReview"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptRequests"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ReferencedAiDataPromptRequests"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.AiPromptReviewReiterated"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient"/>
+            <Class name="com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider"/>
+        </Or>
+    </Match>
+
+    <!-- Enum switches cover every current enum value. A default would conceal
+      future values instead of letting the compiler identify incomplete code. -->
+    <Match>
+        <Bug pattern="SF_SWITCH_NO_DEFAULT"/>
+        <Or>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/><Method name="executeCommand"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask"/><Method name="preProcessEvent"/></And>
+        </Or>
+    </Match>
+
+    <!-- Retain defensive null checks at API, generated-model and Lombok
+      boundaries. Their contracts can vary across Gerrit and provider versions. -->
+    <Match>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+        <Or>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.review.RepeatedCommentResolver"/><Method name="getAiComments"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase"/><Method name="buildConditionLabelSections"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructions"/><Method name="getProjectInstructions"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/><Method name="equals"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent"/><Method name="hashCode"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/><Method name="equals"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData"/><Method name="hashCode"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch"/><Method name="equals"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch"/><Method name="hashCode"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient"/><Method name="buildAiReviewMessages"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient"/><Method name="buildFullGerritHistoryMessages"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient"/><Method name="buildMessageThreadContext"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainMessageTextExtractor"/><Method name="extractText"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiResponsesChatModel"/><Method name="toChatResponse"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask"/><Method name="captureCommentEventContext"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTypeCommentAdded"/><Method name="enqueueAddressedComments"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder"/><Method name="getReviewBatchLocation"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer"/><Method name="retrieveReviewBatches"/></And>
+        </Or>
+    </Match>
+
+    <!-- This boundary maps all provider failures to the plugin's connection
+      failure type, records metrics, and handles request supersession. -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient"/>
+        <Method name="doAskSingleRawRequest"/>
+    </Match>
+
+    <!-- Public REST request/response fields and persisted request status are
+      read or populated by Gerrit's REST/Gson serialization, not Java callers. -->
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+        <Or>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewMessage$Input"/><Field name="message"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Input"/><Field name="action"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Input"/><Field name="conversation"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Input"/><Field name="title"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Input"/><Field name="turn"/></And>
+        </Or>
+    </Match>
+    <Match>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+        <Or>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt"/><Field name="isCommentEvent"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore$RequestStatus"/><Field name="responseText"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ConcernInfo"/><Field name="description"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ConcernInfo"/><Field name="locations"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ConcernInfo"/><Field name="status"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ConcernInfo"/><Field name="type"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$LocationInfo"/><Field name="filename"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ReviewerInfo"/><Field name="kind"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ReviewerInfo"/><Field name="name"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="author"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="autogenerated"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="filename"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="line"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="message"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="tag"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadComment"/><Field name="updated"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.AiReviewThreads$ThreadInfo"/><Field name="size"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Output"/><Field name="conversation"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversations$Output"/><Field name="conversations"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Model"/><Field name="model"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Model"/><Field name="modelId"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Model"/><Field name="provider"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Output"/><Field name="canAiReview"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Output"/><Field name="defaultModelId"/></And>
+            <And><Class name="com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentModel$Output"/><Field name="models"/></And>
+        </Or>
+    </Match>
+    <!-- Developer-only subclasses read this inherited field. They live under
+      src/dev and are outside SpotBugs' production-class analysis. -->
+    <Match>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksComposer"/>
+        <Field name="localizer" type="com.googlesource.gerrit.plugins.reviewai.localization.Localizer"/>
+    </Match>
+    <!-- Review pipeline collections are shared model data used by diff,
+      comment, history and prompt consumers. Preserve their existing mutable
+      APIs and object identity; shallow copies would not isolate model values. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientBase"/>
+        <Method name="getFileDiffsProcessed" params="" returns="java.util.HashMap"/>
+        <Field name="fileDiffsProcessed" type="java.util.HashMap"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments"/>
+        <Method name="getCommentProperties" params="" returns="java.util.List"/>
+        <Field name="commentProperties" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSet"/>
+        <Method name="getPatchSetFiles" params="" returns="java.util.List"/>
+        <Field name="patchSetFiles" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed"/>
+        <Method name="getCodeFinderDiffs" params="" returns="java.util.List"/>
+        <Field name="codeFinderDiffs" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed"/>
+        <Method name="getNewContent" params="" returns="java.util.List"/>
+        <Field name="newContent" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed"/>
+        <Method name="getReviewDiffContent" params="" returns="java.util.List"/>
+        <Field name="reviewDiffContent" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptBase"/>
+        <Method name="getCommentProperties" params="" returns="java.util.List"/>
+        <Field name="commentProperties" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiDataPromptBase"/>
+        <Method name="getMessageItems" params="" returns="java.util.List"/>
+        <Field name="messageItems" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory"/>
+        <Method name="getCommentMap" params="" returns="java.util.HashMap"/>
+        <Field name="commentMap" type="java.util.HashMap"/>
+    </Match>
+
+    <!-- CodeFinder reads the processed diff models without modifying them.
+      Each search clears both range fields before creating a new result; its
+      caller owns the returned range and no later search reuses that result. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.CodeFinder"/>
+        <Method name="&lt;init&gt;" params="java.util.List,java.lang.String" returns="void"/>
+        <Field name="codeFinderDiffs" type="java.util.List"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.CodeFinder"/>
+        <Method name="findCommentedCode" params="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem,int" returns="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+        <Field name="closestCodeRange" type="com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange"/>
+    </Match>
+
+    <!-- The chunk builder exposes accumulated model output for immediate JSON
+      conversion by GitRepoFiles. Retain its existing mutable builder API. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitFileChunkBuilder"/>
+        <Method name="getChunks" params="" returns="java.util.List"/>
+        <Field name="chunks" type="java.util.List"/>
+    </Match>
+
+    <!-- Parsed options are consumed synchronously. ClientCommandParser resets
+      options by allocating a new map before parsing the next command, so the
+      retained reference is not cleared or reused for another command. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExecutor"/>
+        <Method name="executeCommand" params="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase$CommandSet,java.util.Map,java.util.Map,java.lang.String" returns="void"/>
+        <Field name="baseOptions" type="java.util.Map"/>
+    </Match>
+    <!-- Prompt consumers read reply descriptions; substitutions for score and
+      relevance already use a local LinkedHashMap copy. Preserve the existing
+      public configuration getter rather than changing its collection contract. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt"/>
+        <Method name="getRepliesAttributes" params="" returns="java.util.Map"/>
+        <Field name="repliesAttributes" type="java.util.Map"/>
+    </Match>
+
+    <!-- Unknown enum settings are accumulated/cleared by ConfigCore and read
+      by SystemMessageFormatter to produce warnings. Consumers do not mutate
+      this set; retain the existing generated getter and live diagnostic state. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.config.ConfigCore"/>
+        <Method name="getUnknownEnumSettings" params="" returns="java.util.Set"/>
+        <Field name="unknownEnumSettings" type="java.util.Set"/>
+    </Match>
+
+    <!-- Developer command callers immediately format the display map without
+      modifying it. Mutations and persistence remain in DynamicConfigManager's
+      explicit methods. Preserve the existing display getter contract. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager"/>
+        <Method name="getDynamicConfigForDisplay" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration" returns="java.util.Map"/>
+        <Field name="dynamicConfig" type="java.util.Map"/>
+    </Match>
+</FindBugsFilter>
