@@ -350,7 +350,9 @@ public class ReviewAiDb {
                 "TURN_INDEX");
             String legacyTurnContentColumn = "turn_content_json";
             if (hasColumn(
-                c, "REVIEW_AGENT_CONVERSATION_TURNS", legacyTurnContentColumn.toUpperCase())) {
+                c,
+                "REVIEW_AGENT_CONVERSATION_TURNS",
+                legacyTurnContentColumn.toUpperCase(Locale.ROOT))) {
               s.executeUpdate(
                   "UPDATE review_agent_conversation_turns "
                       + "SET turn_metadata_json = "

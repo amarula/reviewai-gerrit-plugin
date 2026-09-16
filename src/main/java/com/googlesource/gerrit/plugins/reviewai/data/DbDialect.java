@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import java.util.Locale;
+
 /** SQL dialect abstraction for H2 (default, single-node) and PostgreSQL (multi-site). */
 public enum DbDialect {
   H2 {
@@ -137,7 +139,7 @@ public enum DbDialect {
     if (jdbcUrl == null) {
       return H2;
     }
-    String lower = jdbcUrl.toLowerCase();
+    String lower = jdbcUrl.toLowerCase(Locale.ROOT);
     if (lower.startsWith("jdbc:postgresql:")) {
       return POSTGRESQL;
     }

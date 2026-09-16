@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +57,7 @@ public class StringUtils {
     if (str == null || str.isEmpty()) {
       return str;
     }
-    return str.substring(0, 1).toUpperCase() + str.substring(1);
+    return str.substring(0, 1).toUpperCase(Locale.ROOT) + str.substring(1);
   }
 
   public static String convertPascalCaseToWords(String pascalCase) {
@@ -73,19 +74,19 @@ public class StringUtils {
     return camelCase
         .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
         .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
-        .toLowerCase();
+        .toLowerCase(Locale.ROOT);
   }
 
   public static String convertSnakeToPascalCase(String snakeCase) {
     if (snakeCase == null || snakeCase.isEmpty()) {
       return snakeCase;
     }
-    snakeCase = snakeCase.toLowerCase();
+    snakeCase = snakeCase.toLowerCase(Locale.ROOT);
     Pattern pattern = Pattern.compile("(?:^|_)(.)");
     Matcher matcher = pattern.matcher(snakeCase);
     StringBuilder result = new StringBuilder();
     while (matcher.find()) {
-      matcher.appendReplacement(result, matcher.group(1).toUpperCase());
+      matcher.appendReplacement(result, matcher.group(1).toUpperCase(Locale.ROOT));
     }
     matcher.appendTail(result);
 

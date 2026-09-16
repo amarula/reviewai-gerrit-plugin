@@ -98,7 +98,7 @@ public abstract class ConfigCore {
 
   protected boolean isDefinedKey(Class<?> configClass, String key) {
     try {
-      String configKey = PREFIX_KEY + convertCamelToSnakeCase(key).toUpperCase();
+      String configKey = PREFIX_KEY + convertCamelToSnakeCase(key).toUpperCase(Locale.ROOT);
       log.debug("Checking if config key `{}` for {} is defined", configKey, key);
       Field field = configClass.getDeclaredField(configKey);
       String value = getFieldConfigValue(field);

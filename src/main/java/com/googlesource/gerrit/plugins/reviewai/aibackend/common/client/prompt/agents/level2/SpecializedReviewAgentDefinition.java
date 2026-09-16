@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2;
 
 import com.google.gson.annotations.SerializedName;
+import java.util.Locale;
 import lombok.Data;
 
 @Data
@@ -42,6 +43,8 @@ public class SpecializedReviewAgentDefinition {
   }
 
   public static String normalizeName(String name) {
-    return name == null ? "" : name.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+    return name == null
+        ? ""
+        : name.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
   }
 }
