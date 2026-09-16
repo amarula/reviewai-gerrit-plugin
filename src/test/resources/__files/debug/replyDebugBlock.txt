@@ -1,0 +1,19 @@
+
+
+```
+DEBUGGING DETAILS
+
+hidden: true
+concernId: resource-1
+reply: Please close the resource.
+score: 4.0
+relevance: 0.75
+repeated: true
+duplicated: false
+conflicting: true
+sourceAgent: CORRECTNESS
+repetitionReplyId: previous-reply-1
+repeatedReason: Previously reported.
+duplicatedReason: No duplicate found.
+conflictingReason: Conflicts with an earlier suggestion.
+```
