@@ -39,6 +39,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.h2.tools.Server;
 
@@ -49,16 +50,19 @@ public class ReviewAiDb {
   private static final String TCP_HOST = "localhost";
   private static final int TCP_PORT = 9092;
   private static final String TCP_URL_PREFIX = "jdbc:h2:tcp://" + TCP_HOST + ":" + TCP_PORT + "/";
-  private static final Object TCP_SERVER_LOCK = new Object();
+  // Plugin reloads use separate classloaders, so ownership and its lock must be JVM-wide.
+  private static final String TCP_SERVER_OWNER_KEY = ReviewAiDb.class.getName() + ".tcpServerOwner";
+  private static final Object TCP_SERVER_LOCK = TCP_SERVER_OWNER_KEY.intern();
 
   private static Server tcpServer;
-  private static String managedJdbcUrl;
 
   public static final String KEY_STORE_URL = "storeUrl";
   public static final String KEY_STORE_USERNAME = "storeUsername";
   public static final String KEY_STORE_PASSWORD = "storePassword";
 
   private final Path pluginDataDir;
+  private final String tcpServerOwner = UUID.randomUUID().toString();
+  private boolean registeredTcpServerOwner;
   private volatile String jdbcUrl;
   private volatile DbDialect dialect;
   private volatile Properties connectionProperties;
@@ -402,7 +406,10 @@ public class ReviewAiDb {
       return;
     }
     synchronized (TCP_SERVER_LOCK) {
-      managedJdbcUrl = jdbcUrl;
+      if (!registeredTcpServerOwner) {
+        System.setProperty(TCP_SERVER_OWNER_KEY, tcpServerOwner);
+        registeredTcpServerOwner = true;
+      }
       if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
         return;
       }
@@ -418,27 +425,27 @@ public class ReviewAiDb {
   }
 
   /**
-   * Stops the managed TCP server <em>only</em> if this instance's JDBC URL is the one currently
-   * registered as {@link #managedJdbcUrl}.
+   * Shuts down the managed database and TCP server only if this instance still owns them.
    *
    * <p>During a plugin reload, Gerrit calls {@code start()} on the new plugin before {@code stop()}
-   * on the old one. The new {@code ReviewAiDb} constructor calls {@link #ensureTcpServerStarted()},
-   * which overwrites {@code managedJdbcUrl} with the new instance's URL. When the old instance's
-   * {@code stop()} fires, this guard prevents it from shutting down the TCP server that the new
-   * plugin is still using.
+   * on the old one. The new instance claims ownership on its first connection, using a JVM-wide
+   * token because each plugin has its own classloader. Equal JDBC URLs do not imply equal owners.
+   * Later connections from the old instance must not reclaim ownership.
    */
   public void stopManagedTcpServerIfOwner() {
     synchronized (TCP_SERVER_LOCK) {
-      if (managedJdbcUrl != null && managedJdbcUrl.equals(jdbcUrl)) {
-        try (Connection c = DriverManager.getConnection(managedJdbcUrl);
-            Statement s = c.createStatement()) {
-          s.execute("SHUTDOWN");
-        } catch (SQLException e) {
-          log.debug("Failed to shut down ReviewAI H2 database cleanly", e);
-        }
-        managedJdbcUrl = null;
+      if (!registeredTcpServerOwner
+          || !tcpServerOwner.equals(System.getProperty(TCP_SERVER_OWNER_KEY))) {
+        return;
       }
-      if (managedJdbcUrl == null && tcpServer != null) {
+      try (Connection c = DriverManager.getConnection(jdbcUrl, connectionProperties);
+          Statement s = c.createStatement()) {
+        s.execute("SHUTDOWN");
+      } catch (SQLException e) {
+        log.debug("Failed to shut down ReviewAI H2 database cleanly", e);
+      }
+      System.clearProperty(TCP_SERVER_OWNER_KEY);
+      if (tcpServer != null) {
         tcpServer.stop();
         tcpServer = null;
       }

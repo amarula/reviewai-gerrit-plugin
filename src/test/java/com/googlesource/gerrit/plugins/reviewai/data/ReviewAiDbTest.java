@@ -17,6 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.data;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -25,6 +28,10 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -33,6 +40,87 @@ import java.util.List;
 import org.junit.Test;
 
 public class ReviewAiDbTest extends TestBase {
+  @Test
+  public void oldInstanceCannotShutDownDatabaseAfterReloadWithSameUrl() throws Exception {
+    Path dataDir = tempFolder.getRoot().toPath();
+    ReviewAiDb oldDb = new ReviewAiDb(dataDir);
+    oldDb.initReviewConcernSchema();
+    ReviewAiDb newDb = new ReviewAiDb(dataDir);
+    try {
+      ReviewChangeStateStore stateStore = new ReviewChangeStateStore(newDb);
+      new ReviewConcernStore(newDb, "p~main~Ireload").save(new ReviewConcernLedger());
+      try (Connection activeConnection = newDb.getConnection()) {
+        // Work still finishing in the old plugin must not reclaim ownership.
+        try (Connection ignored = oldDb.getConnection()) {}
+        oldDb.stopManagedTcpServerIfOwner();
+
+        assertTrue(activeConnection.isValid(1));
+        assertEquals(List.of("p~main~Ireload"), stateStore.listChangeIds());
+
+        newDb.stopManagedTcpServerIfOwner();
+        assertFalse(activeConnection.isValid(1));
+      }
+    } finally {
+      newDb.stopManagedTcpServerIfOwner();
+      oldDb.stopManagedTcpServerIfOwner();
+    }
+  }
+
+  @Test
+  public void databaseOwnershipSurvivesPluginClassloaderReload() throws Exception {
+    Path dataDir = tempFolder.getRoot().toPath();
+    ReviewAiDb oldDb = new ReviewAiDb(dataDir);
+    String dbClassName = ReviewAiDb.class.getName();
+    try (URLClassLoader pluginClassLoader =
+        new URLClassLoader(
+            new URL[] {ReviewAiDb.class.getProtectionDomain().getCodeSource().getLocation()},
+            ReviewAiDb.class.getClassLoader()) {
+          @Override
+          protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (name.equals(dbClassName) || name.startsWith(dbClassName + "$")) {
+              synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                if (loaded == null) {
+                  loaded = findClass(name);
+                }
+                if (resolve) {
+                  resolveClass(loaded);
+                }
+                return loaded;
+              }
+            }
+            return super.loadClass(name, resolve);
+          }
+        }) {
+      oldDb.initReviewConcernSchema();
+      new ReviewConcernStore(oldDb, "p~main~Ireload").save(new ReviewConcernLedger());
+      Class<?> newDbClass = pluginClassLoader.loadClass(dbClassName);
+      assertNotSame(ReviewAiDb.class, newDbClass);
+      Object newDb = newDbClass.getConstructor(Path.class).newInstance(dataDir);
+      try (Connection activeConnection =
+          (Connection) newDbClass.getMethod("getConnection").invoke(newDb)) {
+        try (Connection ignored = oldDb.getConnection()) {}
+        oldDb.stopManagedTcpServerIfOwner();
+
+        assertTrue(activeConnection.isValid(1));
+        assertEquals(List.of("p~main~Ireload"), new ReviewChangeStateStore(oldDb).listChangeIds());
+
+        newDbClass.getMethod("stopManagedTcpServerIfOwner").invoke(newDb);
+        assertFalse(activeConnection.isValid(1));
+      } finally {
+        newDbClass.getMethod("stopManagedTcpServerIfOwner").invoke(newDb);
+      }
+    } finally {
+      oldDb.stopManagedTcpServerIfOwner();
+      // Release a server started by this classloader after the isolated owner has stopped.
+      ReviewAiDb cleanupDb = new ReviewAiDb(dataDir);
+      try (Connection ignored = cleanupDb.getConnection()) {
+      } finally {
+        cleanupDb.stopManagedTcpServerIfOwner();
+      }
+    }
+  }
+
   @Test
   public void appliesExternalDatabaseConfigBeforeSchemaInitialization() throws Exception {
     PluginConfigFactory configFactory = mock(PluginConfigFactory.class);
