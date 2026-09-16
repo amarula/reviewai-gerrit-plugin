@@ -299,10 +299,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         new LangChainSingleAgentConcernWorkflow(
             config,
             concernLedgerOperations,
-            this::reviewFeedback,
+            (data, change) -> reviewFeedback(data, change),
             (data, change, patchSet) ->
                 toConcernWorkflowResult(askSingleRequest(data, change, patchSet)),
-            this::reviewConcerns,
+            (data, change, concerns, incrementalPatch, fullPatch) ->
+                reviewConcerns(data, change, concerns, incrementalPatch, fullPatch),
             (data, change, concerns, incrementalPatch, fullPatch) ->
                 toConcernWorkflowResult(
                     findNewIssueReplies(data, change, concerns, incrementalPatch, fullPatch)));
