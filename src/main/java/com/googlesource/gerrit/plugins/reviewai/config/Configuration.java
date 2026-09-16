@@ -130,7 +130,10 @@ public class Configuration extends ConfigCore {
           KEY_AI_TOKENS,
           KEY_AI_PRICING);
 
+  // Accessed reflectively by ConfigCore for key validation and configuration dumps.
+  @SuppressWarnings("PMD.UnusedPrivateField")
   private static final String KEY_AI_DOMAIN = AiProviderConfiguration.KEY_AI_DOMAIN;
+
   private static final String KEY_REVIEW_COMMIT_MESSAGES = "aiReviewCommitMessages";
   private static final String KEY_REVIEW_PATCH_SET = "aiReviewPatchSet";
   private static final String KEY_FULL_FILE_REVIEW = "aiFullFileReview";
@@ -144,7 +147,11 @@ public class Configuration extends ConfigCore {
       "convertNeutralReviewScoreToPositive";
   private static final String KEY_FILTER_COMMENTS_RELEVANCE_THRESHOLD =
       "filterCommentsRelevanceThreshold";
+
+  // Accessed reflectively by ConfigCore for key validation and configuration dumps.
+  @SuppressWarnings("PMD.UnusedPrivateField")
   private static final String KEY_AI_MODELS_DEFAULT = AiProviderConfiguration.KEY_AI_MODELS_DEFAULT;
+
   private static final String KEY_AI_MAX_MEMORY_TOKENS = "aiMaxMemoryTokens";
   private static final String KEY_MULTI_AGENT_MODE = "multiAgentMode";
   private static final String KEY_AGENT_SPECIALIZATION_LEVEL = "agentSpecializationLevel";

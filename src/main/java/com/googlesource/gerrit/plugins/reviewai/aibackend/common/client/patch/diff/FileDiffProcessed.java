@@ -62,7 +62,7 @@ public class FileDiffProcessed {
     updateContent(gerritPatchSetFileDiff);
     updateRandomPlaceholder(gerritPatchSetFileDiff);
     log.debug(
-        "FileDiffProcessed initialized for {}", (isCommitMessage ? "commit message" : "file diff"));
+        "FileDiffProcessed initialized for {}", isCommitMessage ? "commit message" : "file diff");
   }
 
   private Optional<GerritCodeRange> findCommitMessageRange(

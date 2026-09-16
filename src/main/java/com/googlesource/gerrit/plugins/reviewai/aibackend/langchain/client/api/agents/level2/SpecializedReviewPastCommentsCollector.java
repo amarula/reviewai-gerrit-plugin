@@ -61,7 +61,7 @@ final class SpecializedReviewPastCommentsCollector {
           .getEntries()
           .stream()
           .filter(aiHistoryMessageFilter::shouldIncludeReviewComment)
-          .map(SpecializedReviewPastCommentsCollector::toPastComment)
+          .map(entry -> toPastComment(entry))
           .filter(comment -> comment.getId() != null)
           .toList();
     } catch (Exception e) {

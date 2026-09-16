@@ -17,8 +17,6 @@
 package com.googlesource.gerrit.plugins.reviewai.web;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasTable;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.setLongOrNull;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getLong;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getOrCreateObject;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
@@ -29,6 +27,7 @@ import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
@@ -314,7 +313,7 @@ public class ReviewAgentConversationStore {
       ps.setLong(2, userId);
       ps.setString(3, conversationId);
       ps.setString(4, title);
-      setLongOrNull(ps, 5, timestampMillis);
+      JdbcUtils.setLongOrNull(ps, 5, timestampMillis);
       ps.executeUpdate();
     }
   }
@@ -332,7 +331,9 @@ public class ReviewAgentConversationStore {
       ps.setLong(2, userId);
       ps.setString(3, conversationId);
       try (ResultSet rs = ps.executeQuery()) {
-        rs.next();
+        if (!rs.next()) {
+          throw new SQLException("Missing next turn index result");
+        }
         return rs.getInt(1);
       }
     }
@@ -359,9 +360,9 @@ public class ReviewAgentConversationStore {
       ps.setLong(2, userId);
       ps.setString(3, conversationId);
       ps.setInt(4, turnIndex);
-      setLongOrNull(ps, 5, null);
+      JdbcUtils.setLongOrNull(ps, 5, null);
       ps.setString(6, turnMetadataJson);
-      setLongOrNull(ps, 7, getTimestampMillis(turn));
+      JdbcUtils.setLongOrNull(ps, 7, getTimestampMillis(turn));
       ps.executeUpdate();
     }
   }
@@ -401,7 +402,7 @@ public class ReviewAgentConversationStore {
     }
   }
 
-  private java.util.List<JsonObject> getTurns(
+  private List<JsonObject> getTurns(
       Connection c, String changeId, String conversationId, long userId) throws SQLException {
     String canonicalConversationId = canonicalConversationId(conversationId);
     try (PreparedStatement ps =
@@ -416,7 +417,7 @@ public class ReviewAgentConversationStore {
       ps.setLong(2, userId);
       ps.setString(3, canonicalConversationId);
       try (ResultSet rs = ps.executeQuery()) {
-        java.util.List<JsonObject> turns = new java.util.ArrayList<>();
+        List<JsonObject> turns = new ArrayList<>();
         while (rs.next()) {
           turns.add(getGson().fromJson(rs.getString(1), JsonObject.class));
         }
@@ -471,7 +472,7 @@ public class ReviewAgentConversationStore {
             WHERE change_id = ? AND user_id = ? AND conversation_id = ? AND turn_index = ?
             """)) {
       ps.setString(1, getGson().toJson(turn));
-      setLongOrNull(ps, 2, getTimestampMillis(turn));
+      JdbcUtils.setLongOrNull(ps, 2, getTimestampMillis(turn));
       ps.setString(3, changeId);
       ps.setLong(4, userId);
       ps.setString(5, conversationId);
@@ -554,7 +555,7 @@ public class ReviewAgentConversationStore {
   }
 
   private String readLegacyMessageText(Connection c, long messageId) throws SQLException {
-    if (!hasTable(c, "LANGCHAIN_CHAT_MEMORY_MESSAGES")) {
+    if (!JdbcUtils.hasTable(c, "LANGCHAIN_CHAT_MEMORY_MESSAGES")) {
       return "";
     }
     try (PreparedStatement ps =

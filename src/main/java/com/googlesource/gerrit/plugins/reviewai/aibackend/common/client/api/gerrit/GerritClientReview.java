@@ -36,7 +36,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Chan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
@@ -62,10 +61,7 @@ public class GerritClientReview extends GerritClientAccount {
 
   @VisibleForTesting
   @Inject
-  public GerritClientReview(
-      Configuration config,
-      PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
+  public GerritClientReview(Configuration config, Localizer localizer) {
     super(config);
     this.localizer = localizer;
     concernBinder = new PublishedCommentConcernBinder();

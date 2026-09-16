@@ -425,7 +425,7 @@ public class ReviewTestBase extends TestBase {
             gerritClient,
             config,
             changeSetData,
-            Providers.of(new GerritClientReview(config, pluginDataHandlerProvider, localizer)),
+            Providers.of(new GerritClientReview(config, localizer)),
             getOpenAIClient(),
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),

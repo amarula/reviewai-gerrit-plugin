@@ -128,7 +128,7 @@ final class SpecializedReviewRepetitionMerger {
     if (response == null || response.getReplies() == null) {
       return response;
     }
-    response.getReplies().forEach(SpecializedReviewRepetitionMerger::clearRepeatedAnnotation);
+    response.getReplies().forEach((AiReplyItem reply) -> clearRepeatedAnnotation(reply));
     return response;
   }
 

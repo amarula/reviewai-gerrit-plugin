@@ -847,7 +847,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
       return LangChainChatMessages.build(aiHistory, gerritClientData, change).stream()
           .map(LangChainChatMessages::trimmed)
-          .map(this::formatThreadMessage)
+          .map(message -> formatThreadMessage(message))
           .filter(message -> !message.isBlank())
           .collect(Collectors.joining("\n\n"));
     } catch (Exception e) {

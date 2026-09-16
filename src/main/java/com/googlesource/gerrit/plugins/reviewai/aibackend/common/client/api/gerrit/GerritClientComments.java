@@ -19,7 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toAuthor;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toDateString;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils.getEpochSeconds;
 import static java.util.stream.Collectors.toList;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -46,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils;
 import java.util.*;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -245,7 +245,7 @@ public class GerritClientComments extends GerritClientAccount {
           String changeMessageId = commentObject.getChangeMessageId();
           String commentAuthorUsername = commentObject.getAuthor().getUsername();
           log.debug("Change Message Object: {}", commentObject);
-          long updatedTimeStamp = getEpochSeconds(commentObject.getUpdated());
+          long updatedTimeStamp = TimeUtils.getEpochSeconds(commentObject.getUpdated());
           if (commentAuthorUsername.equals(authorUsername)
               && updatedTimeStamp
                   >= change.getEventTimeStamp() - MAX_SECS_GAP_BETWEEN_EVENT_AND_COMMENT) {

@@ -194,14 +194,13 @@ public class ReviewAiLifecycle implements LifecycleListener {
             "Unable to inspect an event listener for plugin '{}': {}", pluginName, e.getMessage());
         continue;
       }
-      if (listenerClassName.equals(listener.getClass().getName())) {
-        if (ref.compareAndSet(extension, null)) {
-          items.remove(ref);
-          log.info(
-              "Removed stale GerritListener for plugin '{}': {}",
-              pluginName,
-              describeListener(listener));
-        }
+      if (listenerClassName.equals(listener.getClass().getName())
+          && ref.compareAndSet(extension, null)) {
+        items.remove(ref);
+        log.info(
+            "Removed stale GerritListener for plugin '{}': {}",
+            pluginName,
+            describeListener(listener));
       }
     }
   }

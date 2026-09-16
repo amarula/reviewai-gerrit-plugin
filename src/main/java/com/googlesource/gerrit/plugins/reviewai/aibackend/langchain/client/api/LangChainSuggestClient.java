@@ -210,7 +210,7 @@ public class LangChainSuggestClient {
     return SuggestedEditSupport.responseReplies(responseContent).stream()
         .filter(reply -> reply.getScore() != null && reply.getScore() < 0)
         .filter(reply -> !reply.isDuplicated())
-        .map(this::copyReply)
+        .map(reply -> copyReply(reply))
         .toList();
   }
 

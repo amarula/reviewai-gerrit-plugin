@@ -67,8 +67,7 @@ public class CodeReviewPluginIT {
     List<ReviewBatch> reviewBatches = new ArrayList<>();
     reviewBatches.add(new ReviewBatch("message"));
 
-    GerritClientReview gerritClientReview =
-        new GerritClientReview(config, pluginDataHandlerProvider, localizer);
+    GerritClientReview gerritClientReview = new GerritClientReview(config, localizer);
     gerritClientReview.setReview(new GerritChange("Your changeId"), reviewBatches, changeSetData);
   }
 }

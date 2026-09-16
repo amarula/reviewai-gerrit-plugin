@@ -445,7 +445,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             change,
             gerritClient == null ? null : gerritClient.getClientData(change),
             currentMemory,
-            this::askSingleRawResponseTextWithFallback);
+            (data, requestChange, requestPatchSet) ->
+                askSingleRawResponseTextWithFallback(data, requestChange, requestPatchSet));
     changeSetData.setReviewFeedbackClassified(true);
     return feedback;
   }

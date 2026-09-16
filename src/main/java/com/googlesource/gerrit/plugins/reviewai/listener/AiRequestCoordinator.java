@@ -341,7 +341,7 @@ public class AiRequestCoordinator {
               .toList();
       if (!interrupted.isEmpty()) {
         log.warn("Abandoned {} expired AI request(s)", interrupted.size());
-        interrupted.forEach(this::notifyRecovery);
+        interrupted.forEach(request -> notifyRecovery(request));
       }
     }
     store.listQueuedChanges(Integer.MAX_VALUE).forEach(this::schedule);

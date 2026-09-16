@@ -56,7 +56,8 @@ final class AiRequestDispatcher {
   }
 
   void start() {
-    coordinator.start(this::processPersistedRequest, this::recoverAbandonedRequest);
+    coordinator.start(
+        request -> processPersistedRequest(request), request -> recoverAbandonedRequest(request));
   }
 
   void stop() {

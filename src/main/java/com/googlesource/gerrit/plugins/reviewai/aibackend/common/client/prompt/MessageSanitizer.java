@@ -42,7 +42,7 @@ public class MessageSanitizer {
         parseOutOfDelimiters(
             message,
             "\\s*" + CODE_DELIMITER + "\\w*\\s*",
-            MessageSanitizer::sanitizeOutsideInlineCodeBlocks,
+            content -> sanitizeOutsideInlineCodeBlocks(content),
             CODE_DELIMITER_BEGIN,
             CODE_DELIMITER_END);
     log.debug("Sanitized AI message: {}", sanitizedMessage);
@@ -54,7 +54,7 @@ public class MessageSanitizer {
     // Sanitize the content outside the inline code blocks (delimited by INLINE_CODE_DELIMITER).
     String sanitizedMessage =
         parseOutOfDelimiters(
-            message, INLINE_CODE_DELIMITER, MessageSanitizer::sanitizeGerritComment);
+            message, INLINE_CODE_DELIMITER, content -> sanitizeGerritComment(content));
     log.debug("Sanitized message outside inline code blocks: {}", sanitizedMessage);
     return sanitizedMessage;
   }

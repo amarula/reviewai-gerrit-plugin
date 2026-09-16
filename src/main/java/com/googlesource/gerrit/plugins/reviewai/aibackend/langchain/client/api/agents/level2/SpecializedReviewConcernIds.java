@@ -150,7 +150,7 @@ final class SpecializedReviewConcernIds {
     copy.setScore(concern.getScore());
     copy.setRelevance(concern.getRelevance());
     copy.setLocations(
-        concern.getLocations().stream().map(SpecializedReviewConcernIds::copyLocation).toList());
+        concern.getLocations().stream().map(location -> copyLocation(location)).toList());
     return copy;
   }
 

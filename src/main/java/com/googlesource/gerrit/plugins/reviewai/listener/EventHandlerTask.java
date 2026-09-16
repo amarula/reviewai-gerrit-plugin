@@ -193,10 +193,11 @@ public class EventHandlerTask implements Runnable {
       return false;
     }
 
-    while (true) {
+    IEventHandlerType.PreprocessResult preprocessResult;
+    do {
       eventHandlerType = getEventHandlerType();
       log.debug("Event handler type resolved for event: {}", eventType);
-      IEventHandlerType.PreprocessResult preprocessResult = eventHandlerType.preprocessEvent();
+      preprocessResult = eventHandlerType.preprocessEvent();
       captureCommentEventContext();
       switch (preprocessResult) {
         case EXIT -> {
@@ -206,11 +207,9 @@ public class EventHandlerTask implements Runnable {
         case SWITCH_TO_PATCH_SET_CREATED -> {
           log.debug("Switching to patch set created event type");
           processing_event_type = SupportedEvents.PATCH_SET_CREATED;
-          continue;
         }
       }
-      break;
-    }
+    } while (preprocessResult == IEventHandlerType.PreprocessResult.SWITCH_TO_PATCH_SET_CREATED);
     log.debug("Preprocessing completed successfully for event type: {}", eventType);
     return true;
   }

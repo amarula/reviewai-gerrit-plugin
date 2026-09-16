@@ -110,7 +110,7 @@ public class GerritClientReviewTest {
     lenient()
         .when(localizer.getText("message.review.concern.resolution.skipped"))
         .thenReturn("the concern's review scope is disabled.");
-    client = new GerritClientReview(config, pluginDataHandlerProvider, localizer);
+    client = new GerritClientReview(config, localizer);
   }
 
   @Test

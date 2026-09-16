@@ -241,13 +241,13 @@ public final class LangChainChatMessages {
       Method from = type.getMethod("from", String.class);
       return type.cast(from.invoke(null, text));
     } catch (Exception ignore) {
-    }
-    try {
-      Constructor<T> constructor = type.getConstructor(String.class);
-      return constructor.newInstance(text);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to instantiate message of type " + type.getSimpleName(), e);
+      try {
+        Constructor<T> constructor = type.getConstructor(String.class);
+        return constructor.newInstance(text);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Failed to instantiate message of type " + type.getSimpleName(), e);
+      }
     }
   }
 }

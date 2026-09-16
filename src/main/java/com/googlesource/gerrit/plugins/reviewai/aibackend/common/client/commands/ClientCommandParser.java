@@ -324,7 +324,7 @@ public class ClientCommandParser extends ClientCommandBase {
         return true;
       }
     } else if (commandOptions == null
-        || !(new HashSet<>(commandOptions).containsAll(baseOptions.keySet()))) {
+        || !new HashSet<>(commandOptions).containsAll(baseOptions.keySet())) {
       log.debug("Invalid option for command `{}`: {}", command, baseOptions);
       changeSetData.setReviewSystemMessage(
           SystemMessageFormatter.getLocalizedWarningMessage(

@@ -111,9 +111,9 @@ public class GerritClientPatchSet extends GerritClientAccount {
 
     GerritPatchSetFileDiff gerritPatchSetFileDiff = new GerritPatchSetFileDiff();
     Optional.ofNullable(diff.metaA)
-        .ifPresent(meta -> gerritPatchSetFileDiff.setMetaA(GerritClientPatchSet.toMeta(meta)));
+        .ifPresent(meta -> gerritPatchSetFileDiff.setMetaA(toMeta(meta)));
     Optional.ofNullable(diff.metaB)
-        .ifPresent(meta -> gerritPatchSetFileDiff.setMetaB(GerritClientPatchSet.toMeta(meta)));
+        .ifPresent(meta -> gerritPatchSetFileDiff.setMetaB(toMeta(meta)));
     Optional.ofNullable(diff.content)
         .ifPresent(
             content ->

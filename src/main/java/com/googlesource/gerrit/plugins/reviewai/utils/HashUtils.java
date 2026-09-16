@@ -51,12 +51,6 @@ public class HashUtils {
     return digestHex("MD5", data);
   }
 
-  private static String sha1(String data) {
-    String hexResult = digestHex("SHA-1", data);
-    log.debug("SHA-1 hash in hex: {}", hexResult);
-    return hexResult;
-  }
-
   private static String digestHex(String algorithm, String data) {
     try {
       MessageDigest digest = MessageDigest.getInstance(algorithm);

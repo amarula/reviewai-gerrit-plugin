@@ -20,7 +20,6 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -36,7 +35,7 @@ public final class AiPromptConcernReview extends AiPromptBase {
   private static final String COMMIT_MESSAGE_REVIEWER = "COMMIT_MESSAGE";
   private static final String COMMIT_MESSAGE_ROLE_INSTRUCTIONS =
       (String)
-          AiPrompt.getJsonPromptValues("agents/level1/commit-message/prompts")
+          getJsonPromptValues("agents/level1/commit-message/prompts")
               .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES");
 
   public AiPromptConcernReview(
