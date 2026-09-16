@@ -24,7 +24,9 @@ import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.TokenCountEstimator;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -59,7 +61,10 @@ class LangChainTokenEstimatorProvider {
             CompletableFuture.supplyAsync(() -> createEstimator(provider))
                 .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         log.info("Initialized {} token estimator for model {}", provider, estimatorModel);
-      } catch (Exception e) {
+      } catch (InterruptedException | ExecutionException | TimeoutException | RuntimeException e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
         log.warn(
             "Failed to initialize {} token estimator for model {}. Using approximate estimator.",
             provider,
