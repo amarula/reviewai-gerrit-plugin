@@ -32,7 +32,8 @@ public class ReviewAiAvatarServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
-    try (InputStream avatar = getClass().getResourceAsStream(AVATAR_RESOURCE_PATH)) {
+    try (InputStream avatar =
+        ReviewAiAvatarServlet.class.getResourceAsStream(AVATAR_RESOURCE_PATH)) {
       if (avatar == null) {
         response.sendError(HttpServletResponse.SC_NOT_FOUND);
         return;
