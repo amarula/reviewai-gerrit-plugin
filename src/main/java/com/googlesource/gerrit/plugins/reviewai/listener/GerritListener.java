@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
+import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.EVENT_CLASS_MAP;
+
 import com.google.gerrit.common.Nullable;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
@@ -26,11 +28,8 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerBaseProvider;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.Objects;
-
-import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.EVENT_CLASS_MAP;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GerritListener implements EventListener {

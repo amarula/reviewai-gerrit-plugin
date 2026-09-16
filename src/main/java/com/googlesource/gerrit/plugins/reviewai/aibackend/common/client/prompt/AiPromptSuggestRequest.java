@@ -20,7 +20,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Revi
 import java.util.Map;
 
 public final class AiPromptSuggestRequest {
-  private static final Map<String, Object> PROMPTS = AiPrompt.getJsonPromptValues("promptsAiSuggest");
+  private static final Map<String, Object> PROMPTS =
+      AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
   private AiPromptSuggestRequest() {}
 

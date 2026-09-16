@@ -155,8 +155,7 @@ public class AiRequestCoordinator {
 
   public Optional<AiRequest> requestReviewSupersession(
       GerritChangeRef change, long newerPatchSetNumber) {
-    return cancelRunningReview(
-        change, "Superseded by patch set " + newerPatchSetNumber);
+    return cancelRunningReview(change, "Superseded by patch set " + newerPatchSetNumber);
   }
 
   public Optional<AiRequest> requestReviewSupersession(GerritChangeRef change, String reason) {
@@ -219,10 +218,7 @@ public class AiRequestCoordinator {
   private void drain(GerritChangeRef change) {
     try {
       while (!stopping) {
-        AiRequest request =
-            store
-                .claimNext(change, ownerId, leaseExpiration())
-                .orElse(null);
+        AiRequest request = store.claimNext(change, ownerId, leaseExpiration()).orElse(null);
         if (request == null) {
           return;
         }
@@ -314,10 +310,7 @@ public class AiRequestCoordinator {
   private ScheduledFuture<?> startLeaseRenewal(AiRequest request) {
     long renewalInterval = Math.max(1, leaseMillis / 3);
     return leaseExecutor.scheduleWithFixedDelay(
-        () -> renewLease(request),
-        renewalInterval,
-        renewalInterval,
-        TimeUnit.MILLISECONDS);
+        () -> renewLease(request), renewalInterval, renewalInterval, TimeUnit.MILLISECONDS);
   }
 
   private void renewLease(AiRequest request) {
@@ -371,8 +364,7 @@ public class AiRequestCoordinator {
     return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
   }
 
-  private static void awaitTermination(
-      ScheduledExecutorService executor, String executorName) {
+  private static void awaitTermination(ScheduledExecutorService executor, String executorName) {
     try {
       if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
         log.warn("AI {} executor did not terminate within timeout", executorName);

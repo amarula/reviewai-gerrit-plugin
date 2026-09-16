@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -25,8 +27,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 @Slf4j
 public class AiPromptSuggest extends AiPromptReview {
@@ -50,11 +50,14 @@ public class AiPromptSuggest extends AiPromptReview {
   public String getDefaultAiAssistantInstructions() {
     return joinWithDoubleNewLine(
         List.of(
-            buildSection(prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_ROLE"), prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE")),
             buildSection(
-                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_TASK"),
-                getSuggestionTaskInstructions()),
-            buildSection(prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_RESPONSE_FORMAT"), prompt("DEFAULT_AI_SUGGEST_RESPONSE_FORMAT"))));
+                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_ROLE"),
+                prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE")),
+            buildSection(
+                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_TASK"), getSuggestionTaskInstructions()),
+            buildSection(
+                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_RESPONSE_FORMAT"),
+                prompt("DEFAULT_AI_SUGGEST_RESPONSE_FORMAT"))));
   }
 
   private String getSuggestionTaskInstructions() {

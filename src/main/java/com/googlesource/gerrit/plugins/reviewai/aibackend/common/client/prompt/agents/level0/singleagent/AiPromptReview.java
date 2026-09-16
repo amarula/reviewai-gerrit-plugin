@@ -21,22 +21,21 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.apache.commons.collections4.MapUtils.isEmpty;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptReview extends AiPromptBase implements IAiPrompt {
@@ -57,7 +56,6 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     return (String) getCachedReviewPrompts().get(key);
   }
 
-
   private final ICodeContextPolicy codeContextPolicy;
 
   public AiPromptReview(
@@ -73,7 +71,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   public static String getRoutedReviewAgentInstructions(ReviewAssistantStage stage) {
     return switch (stage) {
-      case REVIEW_COMMIT_MESSAGE -> staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
+      case REVIEW_COMMIT_MESSAGE ->
+          staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
       case REVIEW_CODE,
           CLASSIFY_REVIEW_FEEDBACK,
           REVIEW_CONCERNS,
@@ -115,7 +114,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                 .getConfiguredAiSystemPromptInstructions()
                 .orElseGet(
                     () ->
-                        resolveReviewInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
+                        resolveReviewInstructions(
+                            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
     sections.addAll(buildConditionLabelSections());
     sections.addAll(buildReviewFeedbackSections());
     sections.add(
@@ -124,7 +124,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
             getScopeAndReviewConstraints()));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getAiAssistantInstructionsReview()));
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
+            getAiAssistantInstructionsReview()));
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
@@ -140,8 +141,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
-            getPatchSetReviewPrompt()
-                + getCommitMessageLocationInstructionsIfNeeded()));
+            getPatchSetReviewPrompt() + getCommitMessageLocationInstructionsIfNeeded()));
     if (includeCommitMessageReviewRequirement()) {
       sections.add(
           buildSection(
@@ -189,7 +189,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   }
 
   protected String getScopeAndReviewConstraints() {
-    List<String> constraints = new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT")));
+    List<String> constraints =
+        new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT")));
     List<String> commonInstructions = new ArrayList<>();
     addCommonAiAssistantInstructions(commonInstructions, false);
     commonInstructions.stream()
@@ -200,7 +201,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String getMandatoryResponseFormat() {
     return joinWithNewLine(
-        splitString(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT").strip(), "\n").stream()
+        splitString(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT").strip(), "\n")
+            .stream()
             .map(String::strip)
             .filter(line -> !line.isEmpty())
             .filter(line -> !line.startsWith("//"))
@@ -212,8 +214,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   }
 
   protected List<String> buildReviewFeedbackSections() {
-    AgentSpecializationLevel level =
-        config == null ? null : config.getAgentSpecializationLevel();
+    AgentSpecializationLevel level = config == null ? null : config.getAgentSpecializationLevel();
     if (level == null) {
       return List.of();
     }

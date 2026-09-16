@@ -17,10 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent;
+import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-
-import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data

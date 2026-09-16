@@ -66,8 +66,7 @@ public class AiRequestDescriptorTest extends TestBase {
 
     AiRequest claimed =
         store.claimNext(descriptor.changeRef(), OWNER_ID, Long.MAX_VALUE).orElseThrow();
-    AiRequestDescriptor restoredDescriptor =
-        AiRequestDescriptor.fromJson(claimed.payloadJson());
+    AiRequestDescriptor restoredDescriptor = AiRequestDescriptor.fromJson(claimed.payloadJson());
     PatchSetEvent restored = restoredDescriptor.toEvent();
 
     assertTrue(restored instanceof CommentAddedEvent);
@@ -89,8 +88,7 @@ public class AiRequestDescriptorTest extends TestBase {
   public void patchSetCreatedEventCanBeReconstructed() {
     PatchSetCreatedEvent original = patchSetCreatedEvent();
 
-    AiRequestDescriptor descriptor =
-        AiRequestDescriptor.from(original, "patch-set-created-event");
+    AiRequestDescriptor descriptor = AiRequestDescriptor.from(original, "patch-set-created-event");
     PatchSetEvent restored = AiRequestDescriptor.fromJson(descriptor.toJson()).toEvent();
 
     assertTrue(restored instanceof PatchSetCreatedEvent);

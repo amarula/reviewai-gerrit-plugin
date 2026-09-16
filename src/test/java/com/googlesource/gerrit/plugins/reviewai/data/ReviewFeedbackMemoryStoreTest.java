@@ -171,8 +171,7 @@ public class ReviewFeedbackMemoryStoreTest extends TestBase {
   }
 
   private static ReviewFeedbackMemory loadMemory(String resource) throws Exception {
-    String json =
-        Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
+    String json = Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
     return getGson().fromJson(json, ReviewFeedbackMemory.class);
   }
 

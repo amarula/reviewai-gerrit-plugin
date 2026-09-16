@@ -140,15 +140,13 @@ final class SpecializedReviewConcernOwnership {
       return currentReviewer;
     }
     concern.setOwnerAgent(owner.get());
-    return new ConcernReviewerId(
-        ConcernReviewerId.Kind.SPECIALIZED_AGENT, owner.get());
+    return new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, owner.get());
   }
 
   private static Optional<String> soleSourceOwner(ReviewConcern concern) {
     Set<String> owners = new LinkedHashSet<>();
     for (ConcernReviewerId reviewer : concern.getReviewers()) {
-      if (reviewer != null
-          && reviewer.getKind() == ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
+      if (reviewer != null && reviewer.getKind() == ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
         canonicalOwner(reviewer.getName()).ifPresent(owners::add);
       }
     }

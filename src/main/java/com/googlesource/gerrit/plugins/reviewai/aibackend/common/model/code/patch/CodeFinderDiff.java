@@ -17,10 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent;
+import java.util.TreeMap;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.util.TreeMap;
 
 @AllArgsConstructor
 @Data

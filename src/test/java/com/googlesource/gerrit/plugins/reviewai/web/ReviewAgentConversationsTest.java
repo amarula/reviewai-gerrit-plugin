@@ -16,7 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn;
+import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasTable;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.when;
 
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.Change;
@@ -28,16 +34,10 @@ import com.google.gerrit.server.change.ChangeResource;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
-
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.DriverManager;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -45,14 +45,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn;
-import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasTable;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.mockito.Mockito.when;
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ReviewAgentConversationsTest extends TestBase {
@@ -66,7 +63,8 @@ public class ReviewAgentConversationsTest extends TestBase {
 
   @Before
   public void setUp() throws Exception {
-    Change change = new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
+    Change change =
+        new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
     change.setCurrentPatchSet(PatchSet.id(change.getId(), 1), "", "");
     when(changeResource.getChange()).thenReturn(change);
     when(changeResource.getUser()).thenReturn(currentUser);
@@ -74,9 +72,7 @@ public class ReviewAgentConversationsTest extends TestBase {
     when(currentUser.getAccountId()).thenReturn(Account.id(1000));
     jdbcUrl = "jdbc:h2:mem:" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
     conversationStore = new ReviewAgentConversationStore(jdbcUrl, tempFolder.getRoot().toPath());
-    view =
-        new ReviewAgentConversations(
-            conversationStore, aiReviewPermission);
+    view = new ReviewAgentConversations(conversationStore, aiReviewPermission);
   }
 
   @Test
@@ -96,7 +92,8 @@ public class ReviewAgentConversationsTest extends TestBase {
     assertNotNull(getResponse.value().conversation);
     assertEquals(uuidFor("conversation-1"), getResponse.value().conversation.id);
     assertEquals("First conversation", getResponse.value().conversation.title);
-    assertEquals("Hello", getResponse.value().conversation.turns.get(0).get("message").getAsString());
+    assertEquals(
+        "Hello", getResponse.value().conversation.turns.get(0).get("message").getAsString());
   }
 
   @Test
@@ -706,15 +703,13 @@ public class ReviewAgentConversationsTest extends TestBase {
 
   private boolean hasResponsePartsTable(java.sql.Connection c) throws Exception {
     try (var rs =
-        c.getMetaData()
-            .getTables(null, null, "REVIEW_AGENT_CONVERSATION_RESPONSE_PARTS", null)) {
+        c.getMetaData().getTables(null, null, "REVIEW_AGENT_CONVERSATION_RESPONSE_PARTS", null)) {
       return rs.next();
     }
   }
 
   private String uuidFor(String conversationId) {
-    return UUID.nameUUIDFromBytes(
-            conversationId.toLowerCase().getBytes(StandardCharsets.UTF_8))
+    return UUID.nameUUIDFromBytes(conversationId.toLowerCase().getBytes(StandardCharsets.UTF_8))
         .toString();
   }
 }

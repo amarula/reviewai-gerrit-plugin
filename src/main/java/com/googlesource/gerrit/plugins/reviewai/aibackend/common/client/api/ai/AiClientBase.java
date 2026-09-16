@@ -16,11 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 public abstract class AiClientBase extends ClientBase {
 

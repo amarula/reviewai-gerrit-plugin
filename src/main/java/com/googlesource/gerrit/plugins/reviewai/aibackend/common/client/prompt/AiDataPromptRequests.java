@@ -16,18 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.OPENAI_ROLE_USER;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.OPENAI_ROLE_USER;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiDataPromptRequests extends AiDataPromptBase {
@@ -59,8 +58,7 @@ public class AiDataPromptRequests extends AiDataPromptBase {
     GerritComment commentProperty = commentProperties.get(i);
     if (shouldUseNonAiConversationHistory()) {
       setRequestFromCommentProperty(messageItem, i);
-      setHistory(
-          messageItem, aiMessageHistory.retrieveNonAiConversationHistory(commentProperty));
+      setHistory(messageItem, aiMessageHistory.retrieveNonAiConversationHistory(commentProperty));
       log.debug("Message item after setting request content: {}", messageItem);
       return messageItem;
     }

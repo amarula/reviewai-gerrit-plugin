@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.server.data.PatchSetAttribute;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -31,7 +32,6 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.Map;
 import java.util.Optional;
@@ -78,8 +78,7 @@ public class ClientCommandExecutorTest {
             reviewFeedbackPublisher,
             new DisabledClientCommandExtension());
 
-    executor.executeCommand(
-        ClientCommandBase.CommandSet.FORGET_THREAD, Map.of(), Map.of(), "");
+    executor.executeCommand(ClientCommandBase.CommandSet.FORGET_THREAD, Map.of(), Map.of(), "");
 
     verify(chatMemoryStore).deleteMessagesForChangeSet("change~1", 1);
     verify(changeDataHandler).removeValue(OpenAiConversation.getMessagesConversationKey());

@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
@@ -26,7 +27,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.ArrayList;
@@ -46,8 +46,7 @@ public final class ReviewConcernLedgerOperations {
     this.config = config;
   }
 
-  public ReviewerConcerns reviewerConcerns(
-      ReviewConcernLedger ledger, ConcernReviewerId reviewer) {
+  public ReviewerConcerns reviewerConcerns(ReviewConcernLedger ledger, ConcernReviewerId reviewer) {
     ledger.normalize();
     return ledger.getReviewers().stream()
         .filter(entry -> reviewer.equals(entry.getReviewer()))
@@ -69,8 +68,7 @@ public final class ReviewConcernLedgerOperations {
       List<ReviewConcern> concerns = new ArrayList<>();
       for (ReviewConcern concern : reviewerConcerns.getConcerns()) {
         ReviewConcern updatedConcern = concern.copy();
-        String skippedReason =
-            skippedReason(feedback, reviewerConcerns.getReviewer(), concern);
+        String skippedReason = skippedReason(feedback, reviewerConcerns.getReviewer(), concern);
         if (skippedReason != null && concern.getStatus() != ConcernStatus.DISMISSED) {
           updatedConcern.setStatus(ConcernStatus.SKIPPED);
           updatedConcern.setStatusReason(skippedReason);
@@ -92,8 +90,7 @@ public final class ReviewConcernLedgerOperations {
     if (response == null) {
       return null;
     }
-    ReviewerConcerns concerns =
-        mapNewConcerns(response.getReplies(), reviewer, Set.of(), false);
+    ReviewerConcerns concerns = mapNewConcerns(response.getReplies(), reviewer, Set.of(), false);
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ledger.setReviewers(List.of(concerns));
     attachPendingLedger(response, change, ledger);
@@ -105,8 +102,7 @@ public final class ReviewConcernLedgerOperations {
       GerritChange change,
       ReviewConcernLedger previousLedger,
       ReviewerConcerns reviewedConcerns) {
-    return completeFollowUp(
-        response, change, previousLedger, reviewedConcerns, true);
+    return completeFollowUp(response, change, previousLedger, reviewedConcerns, true);
   }
 
   public AiResponseContent completeFollowUp(
@@ -123,8 +119,7 @@ public final class ReviewConcernLedgerOperations {
             .map(ReviewConcern::getId)
             .collect(Collectors.toSet());
     ReviewerConcerns newConcerns =
-        mapNewConcerns(
-            response.getReplies(), reviewedConcerns.getReviewer(), existingIds, true);
+        mapNewConcerns(response.getReplies(), reviewedConcerns.getReviewer(), existingIds, true);
     List<ReviewConcern> currentConcerns = new ArrayList<>(reviewedConcerns.getConcerns());
     currentConcerns.addAll(newConcerns.getConcerns());
     ReviewerConcerns currentReviewerConcerns = new ReviewerConcerns();
@@ -134,10 +129,7 @@ public final class ReviewConcernLedgerOperations {
     List<AiReplyItem> replies =
         reviewedConcerns.getConcerns().stream()
             .filter(concern -> concern.getStatus() == ConcernStatus.PRESENT)
-            .map(
-                concern ->
-                    toPresentReply(
-                        previousLedger, reviewedConcerns.getReviewer(), concern))
+            .map(concern -> toPresentReply(previousLedger, reviewedConcerns.getReviewer(), concern))
             .collect(Collectors.toCollection(ArrayList::new));
     if (response.getReplies() != null) {
       replies.addAll(response.getReplies());
@@ -213,8 +205,7 @@ public final class ReviewConcernLedgerOperations {
       case DISMISSED -> "Previously dismissed AI concern is actionable again:";
       case SKIPPED -> "Previously skipped AI concern is actionable after review resumed:";
       case PRESENT, UNCERTAIN ->
-          throw new IllegalArgumentException(
-              "Cannot reactivate concern from " + previousStatus);
+          throw new IllegalArgumentException("Cannot reactivate concern from " + previousStatus);
     };
   }
 

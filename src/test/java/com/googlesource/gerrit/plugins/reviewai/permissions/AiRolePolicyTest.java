@@ -29,15 +29,13 @@ public class AiRolePolicyTest {
   @Test
   public void moderatorCanForgetConversationButCannotUseAdministratorFeatures() {
     assertTrue(AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_MODERATOR_FEATURES));
-    assertFalse(
-        AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
+    assertFalse(AiRolePolicy.isAllowed(AiRole.MODERATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }
 
   @Test
   public void administratorInheritsModeratorPermissions() {
     assertTrue(AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_MODERATOR_FEATURES));
-    assertTrue(
-        AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
+    assertTrue(AiRolePolicy.isAllowed(AiRole.ADMINISTRATOR, AiAction.USE_ADMINISTRATOR_FEATURES));
   }
 
   @Test
@@ -47,8 +45,7 @@ public class AiRolePolicyTest {
         AiCommandAccessPolicy.requiredAction(CommandSet.FORGET_THREAD, Map.of()).orElseThrow());
     assertEquals(
         AiAction.USE_ADMINISTRATOR_FEATURES,
-        AiCommandAccessPolicy.requiredAction(
-                CommandSet.REVIEW, Map.of(BaseOptionSet.DEBUG, ""))
+        AiCommandAccessPolicy.requiredAction(CommandSet.REVIEW, Map.of(BaseOptionSet.DEBUG, ""))
             .orElseThrow());
   }
 }

@@ -110,8 +110,7 @@ final class AiPricingCatalog {
     return rate(values, name, null);
   }
 
-  private static BigDecimal rate(
-      Map<String, String> values, String name, BigDecimal defaultValue) {
+  private static BigDecimal rate(Map<String, String> values, String name, BigDecimal defaultValue) {
     if (!values.containsKey(name)) {
       return defaultValue;
     }
@@ -125,8 +124,7 @@ final class AiPricingCatalog {
   private static Map<AiModelRoute, ModelPricing> defaultPricing() {
     PricingCatalogData data = readJsonResource(DEFAULT_PRICING_RESOURCE, PricingCatalogData.class);
     if (data == null || !"USD".equals(data.currency) || !"perMillionTokens".equals(data.unit)) {
-      throw new IllegalStateException(
-          "Pricing catalog must contain USD rates per million tokens");
+      throw new IllegalStateException("Pricing catalog must contain USD rates per million tokens");
     }
     if (data.models == null) {
       throw new IllegalStateException("Pricing catalog does not contain a models array");

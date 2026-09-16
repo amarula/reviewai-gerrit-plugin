@@ -16,7 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
@@ -28,9 +32,14 @@ import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -40,25 +49,12 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @RunWith(MockitoJUnitRunner.class)
 public class GerritClientPatchSetReviewAiTest extends TestBase {
   private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String VERBOSE_RENAME_PATCH_FILE =
       "__files/openai/gerritVerboseRenamePatch.txt";
-  private static final String MIXED_EXTENSION_PATCH_FILE =
-      "__files/openai/mixedExtensionPatch.txt";
+  private static final String MIXED_EXTENSION_PATCH_FILE = "__files/openai/mixedExtensionPatch.txt";
   private static final String INCREMENTAL_CURRENT_PATCH_FILE =
       "__files/openai/incrementalCurrentPatch.txt";
   private static final String CONTEXT_LINES_PATCH_FILE =
@@ -67,8 +63,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       "__files/openai/contextPatchOriginal.py";
   private static final String CONTEXT_PATCH_MODIFIED_FILE =
       "__files/openai/contextPatchModified.py";
-  private static final String REBASE_SAME_FILE_BASE_FILE =
-      "__files/openai/rebaseSameFileBase.py";
+  private static final String REBASE_SAME_FILE_BASE_FILE = "__files/openai/rebaseSameFileBase.py";
   private static final String REBASE_SAME_FILE_PREVIOUS_FILE =
       "__files/openai/rebaseSameFilePrevious.py";
   private static final String REBASE_SAME_FILE_UPSTREAM_FILE =
@@ -167,10 +162,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(repositoryManager.openRepository(any()))
         .thenAnswer(
             invocation ->
-                new FileRepositoryBuilder()
-                    .setGitDir(gitDir.toFile())
-                    .setMustExist(true)
-                    .build());
+                new FileRepositoryBuilder().setGitDir(gitDir.toFile()).setMustExist(true).build());
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getPatchContextLines()).thenReturn(3);
@@ -205,10 +197,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(repositoryManager.openRepository(any()))
         .thenAnswer(
             invocation ->
-                new FileRepositoryBuilder()
-                    .setGitDir(gitDir.toFile())
-                    .setMustExist(true)
-                    .build());
+                new FileRepositoryBuilder().setGitDir(gitDir.toFile()).setMustExist(true).build());
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getPatchContextLines()).thenReturn(3);
@@ -283,10 +272,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(repositoryManager.openRepository(any()))
         .thenAnswer(
             invocation ->
-                new FileRepositoryBuilder()
-                    .setGitDir(gitDir.toFile())
-                    .setMustExist(true)
-                    .build());
+                new FileRepositoryBuilder().setGitDir(gitDir.toFile()).setMustExist(true).build());
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getPatchContextLines()).thenReturn(3);
@@ -323,7 +309,11 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
       Path workTree = git.getRepository().getWorkTree().toPath();
 
       RevCommit base =
-          git.commit().setAllowEmpty(true).setMessage("base").setAuthor("Test", "test@example.com").call();
+          git.commit()
+              .setAllowEmpty(true)
+              .setMessage("base")
+              .setAuthor("Test", "test@example.com")
+              .call();
 
       Files.writeString(workTree.resolve("allowed.py"), "print('before')\n");
       git.add().addFilepattern("allowed.py").call();
@@ -353,8 +343,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
       Files.writeString(changedFile, readResource(REBASE_SAME_FILE_BASE_FILE));
       git.add().addFilepattern("allowed.py").call();
-      RevCommit base =
-          git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
+      RevCommit base = git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
 
       Files.writeString(changedFile, readResource(REBASE_SAME_FILE_PREVIOUS_FILE));
       git.add().addFilepattern("allowed.py").call();
@@ -385,8 +374,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
 
       Files.writeString(changedFile, readResource(REBASE_SAME_FILE_BASE_FILE));
       git.add().addFilepattern("allowed.py").call();
-      RevCommit base =
-          git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
+      RevCommit base = git.commit().setMessage("base").setAuthor("Test", "test@example.com").call();
 
       Files.writeString(changedFile, readResource(previousPatchFile));
       git.add().addFilepattern("allowed.py").call();
@@ -449,10 +437,7 @@ public class GerritClientPatchSetReviewAiTest extends TestBase {
     when(repositoryManager.openRepository(any()))
         .thenAnswer(
             invocation ->
-                new FileRepositoryBuilder()
-                    .setGitDir(gitDir.toFile())
-                    .setMustExist(true)
-                    .build());
+                new FileRepositoryBuilder().setGitDir(gitDir.toFile()).setMustExist(true).build());
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     when(config.getEnabledFileExtensions()).thenReturn(List.of("py"));
     when(config.getPatchContextLines()).thenReturn(3);

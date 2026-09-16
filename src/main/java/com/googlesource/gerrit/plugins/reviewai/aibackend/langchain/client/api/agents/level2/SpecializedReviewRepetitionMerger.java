@@ -34,8 +34,7 @@ final class SpecializedReviewRepetitionMerger {
       SpecializedReviewFindings targetFindings, SpecializedReviewFindings sourceFindings) {
     targetFindings.normalize();
     sourceFindings.normalize();
-    Map<String, ReviewConcern> sourceConcernsByRawId =
-        sourceConcernsByRawId(sourceFindings);
+    Map<String, ReviewConcern> sourceConcernsByRawId = sourceConcernsByRawId(sourceFindings);
     for (ReviewConcern targetConcern : targetFindings.getConcerns()) {
       List<String> rawConcernIds = SpecializedReviewConcernIds.rawConcernIds(targetConcern);
       boolean repeated =
@@ -78,8 +77,7 @@ final class SpecializedReviewRepetitionMerger {
               && rawConcernIds.stream()
                   .allMatch(
                       id ->
-                          annotationsById.containsKey(id)
-                              && annotationsById.get(id).isRepeated());
+                          annotationsById.containsKey(id) && annotationsById.get(id).isRepeated());
       log.debug(
           "Level 2 historical repetition merge: concernId={}, mergedConcernIds={}, repeated={}",
           concern.getId(),
@@ -115,14 +113,12 @@ final class SpecializedReviewRepetitionMerger {
       ReviewConcern concern = matchedConcern.get();
       applyRepeatedAnnotation(reply, concern);
       log.debug(
-          "Level 2 final reply inherited repeated annotation from concernId={}",
-          concern.getId());
+          "Level 2 final reply inherited repeated annotation from concernId={}", concern.getId());
     }
     return response;
   }
 
-  static SpecializedReviewFindings clearRepeatedAnnotations(
-      SpecializedReviewFindings findings) {
+  static SpecializedReviewFindings clearRepeatedAnnotations(SpecializedReviewFindings findings) {
     findings.normalize();
     findings.getConcerns().forEach(SpecializedReviewRepetitionMerger::clearRepeatedAnnotation);
     return findings;
@@ -148,10 +144,7 @@ final class SpecializedReviewRepetitionMerger {
   }
 
   static Optional<ReviewConcern> matchedConcernForReply(
-      AiReplyItem reply,
-      List<ReviewConcern> concerns,
-      int replyIndex,
-      int replyCount) {
+      AiReplyItem reply, List<ReviewConcern> concerns, int replyIndex, int replyCount) {
     // The verification stage returns one reply for each supplied concern in the same order. Use
     // that unambiguous mapping before location matching: multiple agents can validly report
     // distinct concerns on the same source line.
@@ -166,14 +159,12 @@ final class SpecializedReviewRepetitionMerger {
     return Optional.empty();
   }
 
-  private static boolean matchesAnyLocation(
-      AiReplyItem reply, ReviewConcern concern) {
+  private static boolean matchesAnyLocation(AiReplyItem reply, ReviewConcern concern) {
     concern.normalize();
     return concern.getLocations().stream().anyMatch(location -> matchesLocation(reply, location));
   }
 
-  private static boolean matchesLocation(
-      AiReplyItem reply, ConcernLocation location) {
+  private static boolean matchesLocation(AiReplyItem reply, ConcernLocation location) {
     boolean filenameMatches =
         reply.getFilename() != null
             && location.getFilename() != null
@@ -202,8 +193,7 @@ final class SpecializedReviewRepetitionMerger {
   }
 
   private static void applyRepeatedAnnotation(
-      ReviewConcern concern,
-      SpecializedReviewFindings.HistoricalRepetitionAnnotation annotation) {
+      ReviewConcern concern, SpecializedReviewFindings.HistoricalRepetitionAnnotation annotation) {
     concern.setRepeated(true);
     concern.setPreviousCommentId(nullToEmpty(annotation.getPastCommentId()));
     concern.setRepeatedReason(nullToEmpty(annotation.getReason()));
@@ -216,8 +206,7 @@ final class SpecializedReviewRepetitionMerger {
     targetConcern.setRepeatedReason(nullToEmpty(sourceConcern.getRepeatedReason()));
   }
 
-  private static void applyRepeatedAnnotation(
-      AiReplyItem reply, ReviewConcern concern) {
+  private static void applyRepeatedAnnotation(AiReplyItem reply, ReviewConcern concern) {
     reply.setRepeated(true);
     reply.setRepetitionReplyId(nullToEmpty(concern.getPreviousCommentId()));
     reply.setRepeatedReason(nullToEmpty(concern.getRepeatedReason()));

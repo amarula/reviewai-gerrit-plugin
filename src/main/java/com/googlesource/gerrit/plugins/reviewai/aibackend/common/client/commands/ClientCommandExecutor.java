@@ -16,6 +16,15 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -25,20 +34,10 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class ClientCommandExecutor extends ClientCommandBase {
@@ -275,8 +274,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     if (!baseOptions.containsKey(BaseOptionSet.SCOPE)) {
       return;
     }
-    ReviewScope scope =
-        ReviewScope.fromCommandOption(baseOptions.get(BaseOptionSet.SCOPE));
+    ReviewScope scope = ReviewScope.fromCommandOption(baseOptions.get(BaseOptionSet.SCOPE));
     changeSetData.setReviewScope(scope);
     switch (scope) {
       case FULL -> log.info("Forced review command scoped to the full Change Set");

@@ -34,8 +34,7 @@ public class ReviewAiMetricsTest {
   public void specializedAgentStageWithoutAgentNameUsesGenericStage() {
     assertEquals(
         "REVIEW_SPECIALIZED_AGENT",
-        ReviewAiMetrics.aiRequestStageLabel(
-            ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT, " "));
+        ReviewAiMetrics.aiRequestStageLabel(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT, " "));
   }
 
   @Test

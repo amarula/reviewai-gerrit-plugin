@@ -60,8 +60,7 @@ public final class ReviewConcernPublisher {
         .ifPresent(
             ledger -> {
               bindPublishedCommentIds(ledger, publishedCommentIdsByConcern);
-              if (change.getPatchSetRevision() != null
-                  && !change.getPatchSetRevision().isBlank()) {
+              if (change.getPatchSetRevision() != null && !change.getPatchSetRevision().isBlank()) {
                 ledger.setLastReviewedCommit(change.getPatchSetRevision());
               }
               new ReviewConcernStore(db, change.getFullChangeId()).save(ledger);

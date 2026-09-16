@@ -33,7 +33,8 @@ class ReviewAgentGerritMessageIdFinder {
             .flatMap(comments -> comments.values().stream())
             .flatMap(List::stream)
             .filter(comment -> postedMessage.equals(comment.message))
-            .filter(comment -> comment.changeMessageId != null && !comment.changeMessageId.isBlank())
+            .filter(
+                comment -> comment.changeMessageId != null && !comment.changeMessageId.isBlank())
             .max(
                 Comparator.comparing(
                         ReviewAgentGerritMessageIdFinder::getCommentUpdated,

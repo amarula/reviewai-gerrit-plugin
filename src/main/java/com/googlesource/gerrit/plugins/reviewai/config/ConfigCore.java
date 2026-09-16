@@ -16,6 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.CollectionUtils.arrayToList;
+import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.*;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
@@ -23,15 +26,11 @@ import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.utils.StringUtils;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.CollectionUtils.arrayToList;
-import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.*;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class ConfigCore {
@@ -216,12 +215,9 @@ public abstract class ConfigCore {
 
   protected List<String> splitListIntoItemsWithProjectOverride(
       String key, List<String> defaultValue) {
-    log.debug(
-        "Retrieving and splitting Project or Global configuration items for key {}", key);
+    log.debug("Retrieving and splitting Project or Global configuration items for key {}", key);
     List<PluginConfig> scopes =
-        projectConfig.getString(key) == null
-            ? List.of(globalConfig)
-            : List.of(projectConfig);
+        projectConfig.getString(key) == null ? List.of(globalConfig) : List.of(projectConfig);
     return splitListIntoItems(key, defaultValue, scopes);
   }
 

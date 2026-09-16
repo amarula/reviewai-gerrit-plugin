@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class FileUtils {
@@ -73,8 +72,7 @@ public class FileUtils {
   public static boolean isFileExtensionEnabled(
       String filename, List<String> enabledExtensions, List<String> disabledExtensions) {
     return matchesExtensionList(filename, enabledExtensions)
-        && (disabledExtensions == null
-            || !matchesExtensionList(filename, disabledExtensions));
+        && (disabledExtensions == null || !matchesExtensionList(filename, disabledExtensions));
   }
 
   public static String sanitizeFilename(String filename) {

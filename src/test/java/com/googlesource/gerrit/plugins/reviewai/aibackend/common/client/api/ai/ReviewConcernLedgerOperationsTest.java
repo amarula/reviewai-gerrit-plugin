@@ -58,8 +58,7 @@ public class ReviewConcernLedgerOperationsTest {
     ReviewFeedbackMemory feedback = new ReviewFeedbackMemory();
     feedback.setDisabledReviewScopes(Set.of(ReviewScope.COMMIT_MESSAGE));
 
-    ReviewConcernLedger result =
-        ledgerOperations().markDisabledConcernsSkipped(ledger, feedback);
+    ReviewConcernLedger result = ledgerOperations().markDisabledConcernsSkipped(ledger, feedback);
 
     List<ReviewConcern> commitConcerns = result.getReviewers().getFirst().getConcerns();
     assertEquals(ConcernStatus.SKIPPED, commitConcerns.get(0).getStatus());
@@ -68,7 +67,8 @@ public class ReviewConcernLedgerOperationsTest {
         commitConcerns.get(0).getStatusReason());
     assertEquals(ConcernStatus.SKIPPED, commitConcerns.get(1).getStatus());
     assertEquals(ConcernStatus.DISMISSED, commitConcerns.get(2).getStatus());
-    assertEquals(ConcernStatus.PRESENT, result.getReviewers().get(1).getConcerns().getFirst().getStatus());
+    assertEquals(
+        ConcernStatus.PRESENT, result.getReviewers().get(1).getConcerns().getFirst().getStatus());
   }
 
   @Test
@@ -86,8 +86,7 @@ public class ReviewConcernLedgerOperationsTest {
     ReviewFeedbackMemory feedback = new ReviewFeedbackMemory();
     feedback.setDisabledSpecializedAgents(Set.of("TESTABILITY"));
 
-    ReviewConcernLedger result =
-        ledgerOperations().markDisabledConcernsSkipped(ledger, feedback);
+    ReviewConcernLedger result = ledgerOperations().markDisabledConcernsSkipped(ledger, feedback);
 
     ReviewConcern testabilityConcern = result.getReviewers().getFirst().getConcerns().getFirst();
     assertEquals(ConcernStatus.SKIPPED, testabilityConcern.getStatus());
@@ -95,8 +94,7 @@ public class ReviewConcernLedgerOperationsTest {
         "TESTABILITY review skipped because its specialized agent is disabled.",
         testabilityConcern.getStatusReason());
     assertEquals(
-        ConcernStatus.PRESENT,
-        result.getReviewers().get(1).getConcerns().getFirst().getStatus());
+        ConcernStatus.PRESENT, result.getReviewers().get(1).getConcerns().getFirst().getStatus());
   }
 
   @Test

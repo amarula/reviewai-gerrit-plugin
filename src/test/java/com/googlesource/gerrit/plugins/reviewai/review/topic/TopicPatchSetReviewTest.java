@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review.topic;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -25,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.gerrit.server.data.PatchSetAttribute;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import java.nio.file.Files;
@@ -35,14 +34,14 @@ import org.junit.Test;
 
 public class TopicPatchSetReviewTest {
   private static final Path PATCH_SET_RESOURCE =
-      TestResourceLoader.getTestResourcePath().resolve("__files/langchain/suggestOriginalPatchSet.txt");
+      TestResourceLoader.getTestResourcePath()
+          .resolve("__files/langchain/suggestOriginalPatchSet.txt");
 
   @Test
   public void topicMergerPrefixesPatchFilenamesAndAddsOriginMetadata() throws Exception {
     TopicPatchSetReviewMerger merger = new TopicPatchSetReviewMerger();
     GerritChange change = change("project~branch~change1", 3);
-    TopicReviewPatchSet patchSet =
-        merger.patchSet(change, 1, Files.readString(PATCH_SET_RESOURCE));
+    TopicReviewPatchSet patchSet = merger.patchSet(change, 1, Files.readString(PATCH_SET_RESOURCE));
 
     String mergedPatchSet = merger.buildMergedPatchSet(List.of(patchSet));
 

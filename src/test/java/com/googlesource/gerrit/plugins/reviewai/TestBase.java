@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
+import static org.mockito.Mockito.lenient;
+
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.Project;
@@ -26,8 +28,6 @@ import java.nio.file.Path;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mock;
-
-import static org.mockito.Mockito.lenient;
 
 public class TestBase {
   protected static final Project.NameKey PROJECT_NAME = Project.NameKey.parse("myProject");

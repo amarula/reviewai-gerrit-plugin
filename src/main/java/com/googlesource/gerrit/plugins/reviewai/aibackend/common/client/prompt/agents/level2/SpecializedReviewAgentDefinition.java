@@ -22,8 +22,10 @@ import lombok.Data;
 @Data
 public class SpecializedReviewAgentDefinition {
   private String name;
+
   @SerializedName("short_description")
   private String shortDescription;
+
   private String instructions;
 
   public boolean isValid() {

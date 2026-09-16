@@ -16,30 +16,30 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.gerrit.extensions.api.changes.NotifyHandling;
-import com.google.gerrit.extensions.api.changes.ChangeApi;
-import com.google.gerrit.extensions.client.Comment;
 import com.google.gerrit.entities.LabelId;
+import com.google.gerrit.extensions.api.changes.ChangeApi;
+import com.google.gerrit.extensions.api.changes.NotifyHandling;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewInput.CommentInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
+import com.google.gerrit.extensions.client.Comment;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,9 +51,7 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
-
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GerritClientReview extends GerritClientAccount {
@@ -175,7 +173,9 @@ public class GerritClientReview extends GerritClientAccount {
       ChangeApi changeApi = change.getChangeApi(config);
       appendConcernResolutionComments(
           reviewInput, getInactiveConcernResolutionComments(change, changeApi, response));
-      if (reviewInput.comments == null && reviewInput.message == null && reviewInput.labels == null) {
+      if (reviewInput.comments == null
+          && reviewInput.message == null
+          && reviewInput.labels == null) {
         log.debug("No comments, messages, or labels to post for review.");
         return Map.of();
       }
@@ -183,8 +183,7 @@ public class GerritClientReview extends GerritClientAccount {
       change.requireCurrentRevision(changeApi);
       Optional<Set<String>> existingCommentIds =
           concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
-      ReviewResult result =
-          change.getRevisionApi(changeApi).review(reviewInput);
+      ReviewResult result = change.getRevisionApi(changeApi).review(reviewInput);
 
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);
@@ -206,7 +205,8 @@ public class GerritClientReview extends GerritClientAccount {
     }
     resolutionComments.forEach(
         (filename, comments) ->
-            reviewInput.comments
+            reviewInput
+                .comments
                 .computeIfAbsent(filename, unused -> new ArrayList<>())
                 .addAll(comments));
   }
@@ -342,8 +342,7 @@ public class GerritClientReview extends GerritClientAccount {
         Comparator.comparing(
                 (CommentInfo comment) -> comment.updated,
                 Comparator.nullsFirst(Comparator.naturalOrder()))
-            .thenComparing(
-                comment -> comment.id, Comparator.nullsFirst(Comparator.naturalOrder()));
+            .thenComparing(comment -> comment.id, Comparator.nullsFirst(Comparator.naturalOrder()));
     Queue<CommentInfo> unvisited = new PriorityQueue<>(threadOrder);
     Set<String> visitedCommentIds = new HashSet<>();
     CommentInfo latest = root;

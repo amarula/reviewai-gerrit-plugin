@@ -16,14 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -95,13 +94,10 @@ public class OnDemandCodeContextToolsTest extends TestBase {
     assertEquals(
         "CONTEXT NOT PROVIDED", tools.execute("get_content", "{\"file_path\":\"COMMIT_MSG\"}"));
     assertEquals(
-        "CONTEXT NOT PROVIDED",
-        tools.execute("get_content", "{\"file_path\":\"/COMMIT_MSG\"}"));
+        "CONTEXT NOT PROVIDED", tools.execute("get_content", "{\"file_path\":\"/COMMIT_MSG\"}"));
     assertEquals(
         "CONTEXT NOT PROVIDED",
-        tools.execute(
-            "get_content",
-            "{\"file_path\":\"reviewai-topic-change-1/COMMIT_MSG\"}"));
+        tools.execute("get_content", "{\"file_path\":\"reviewai-topic-change-1/COMMIT_MSG\"}"));
     verifyNoInteractions(gitRepoFiles);
   }
 
@@ -166,9 +162,7 @@ public class OnDemandCodeContextToolsTest extends TestBase {
   public void grepPreservesColonInChangedFilePath() throws Exception {
     String match = "schemas/v1:beta.py:1: match";
     when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("schemas/v1:beta.py"));
-    when(
-            gitRepoFiles.grepPatchSet(
-                config, change, "typing", Set.of("schemas/v1:beta.py")))
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", Set.of("schemas/v1:beta.py")))
         .thenReturn(List.of(match));
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");

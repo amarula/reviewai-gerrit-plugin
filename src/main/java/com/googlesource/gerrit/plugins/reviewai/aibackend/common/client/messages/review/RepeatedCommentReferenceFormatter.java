@@ -56,8 +56,7 @@ public final class RepeatedCommentReferenceFormatter {
               reference ->
                   repeatedCommentReferences.compute(
                       reference,
-                      (ignored, reason) ->
-                          hasText(reason) ? reason : normalizedReason(replyItem)));
+                      (ignored, reason) -> hasText(reason) ? reason : normalizedReason(replyItem)));
     }
 
     if (repeatedCommentReferences.isEmpty()) {

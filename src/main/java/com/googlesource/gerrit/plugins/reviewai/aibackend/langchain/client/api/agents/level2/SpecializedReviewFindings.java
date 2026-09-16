@@ -53,16 +53,14 @@ class SpecializedReviewFindings {
 
     static AgentFindings from(String agent, SpecializedReviewFindings findings) {
       findings.normalize();
-      String owner =
-          SpecializedReviewConcernOwnership.canonicalOwner(agent).orElse("");
+      String owner = SpecializedReviewConcernOwnership.canonicalOwner(agent).orElse("");
       return new AgentFindings(
           owner,
           inScope(owner, findings.getConcerns()),
           inScope(owner, findings.getDismissedConcerns()));
     }
 
-    private static List<ReviewConcern> inScope(
-        String owner, List<ReviewConcern> concerns) {
+    private static List<ReviewConcern> inScope(String owner, List<ReviewConcern> concerns) {
       if (owner.isEmpty()) {
         return List.of();
       }
@@ -101,7 +99,9 @@ class SpecializedReviewFindings {
         List<AgentFindings> rawConcerns, List<PastComment> pastComments) {
       List<AgentFindings> concernsOnly =
           rawConcerns.stream()
-              .map(findings -> new AgentFindings(findings.getAgent(), findings.getConcerns(), List.of()))
+              .map(
+                  findings ->
+                      new AgentFindings(findings.getAgent(), findings.getConcerns(), List.of()))
               .toList();
       return new HistoricalRepetitionInput(concernsOnly, pastComments);
     }

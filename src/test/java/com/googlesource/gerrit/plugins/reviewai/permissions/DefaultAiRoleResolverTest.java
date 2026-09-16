@@ -63,16 +63,14 @@ public class DefaultAiRoleResolverTest {
   public void resolvesModeratorWhenUserCanApplyCodeReviewPlusTwo() {
     when(permissionBackendForChange.testOrFalse(CODE_REVIEW_PLUS_TWO)).thenReturn(true);
 
-    assertEquals(
-        AiRole.MODERATOR, roleResolver.resolve(config, user, PROJECT, CHANGE_ID));
+    assertEquals(AiRole.MODERATOR, roleResolver.resolve(config, user, PROJECT, CHANGE_ID));
   }
 
   @Test
   public void resolvesModeratorWhenUserCanSubmit() {
     when(permissionBackendForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
 
-    assertEquals(
-        AiRole.MODERATOR, roleResolver.resolve(config, user, PROJECT, CHANGE_ID));
+    assertEquals(AiRole.MODERATOR, roleResolver.resolve(config, user, PROJECT, CHANGE_ID));
   }
 
   @Test

@@ -16,17 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai;
 
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import static com.google.gerrit.extensions.client.ChangeKind.REWORK;
+import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.EVENT_CLASS_MAP;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+import static org.mockito.Mockito.*;
+
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.AccountGroup;
 import com.google.gerrit.entities.InternalGroup;
 import com.google.gerrit.extensions.annotations.PluginData;
-import com.google.gerrit.server.IdentifiedUser;
-import com.google.gerrit.server.account.AccountCache;
-import com.google.gerrit.server.account.AccountState;
-import com.google.gerrit.server.account.GroupCache;
-import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.*;
 import com.google.gerrit.extensions.api.changes.ChangeApi.CommentsRequest;
@@ -34,6 +34,11 @@ import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gerrit.server.IdentifiedUser;
+import com.google.gerrit.server.account.AccountCache;
+import com.google.gerrit.server.account.AccountState;
+import com.google.gerrit.server.account.GroupCache;
+import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.ChangeAttribute;
@@ -49,10 +54,19 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
@@ -63,38 +77,19 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritEventContextModule;
-import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewConversationRecorder;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.review.ReviewFeedbackLifecycle;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
-
-import lombok.NonNull;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.stubbing.Answer;
-
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
@@ -104,14 +99,17 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
-
-import static com.google.gerrit.extensions.client.ChangeKind.REWORK;
-import static com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerTask.EVENT_CLASS_MAP;
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
-import static org.mockito.Mockito.*;
+import lombok.NonNull;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 public class ReviewTestBase extends TestBase {
   protected static final Path basePath = TestResourceLoader.getTestResourcePath();
@@ -212,8 +210,7 @@ public class ReviewTestBase extends TestBase {
         .thenAnswer(returnDefaultArgument);
 
     // Mock the Global Config values that differ from the ones provided by Default
-    when(globalConfig.getString(Mockito.eq("aiDomain"), Mockito.anyString()))
-        .thenReturn(AI_DOMAIN);
+    when(globalConfig.getString(Mockito.eq("aiDomain"), Mockito.anyString())).thenReturn(AI_DOMAIN);
     when(globalConfig.getString("gerritUserName")).thenReturn(GERRIT_AI_USERNAME);
     when(globalConfig.getInt(Mockito.eq("aiConnectionMaxRetryAttempts"), Mockito.anyInt()))
         .thenReturn(1);
@@ -272,7 +269,8 @@ public class ReviewTestBase extends TestBase {
                     .withStatus(200)
                     .withBody(
                         Base64.getEncoder()
-                            .encodeToString(promptsSource.getBytes(java.nio.charset.StandardCharsets.UTF_8)))));
+                            .encodeToString(
+                                promptsSource.getBytes(java.nio.charset.StandardCharsets.UTF_8)))));
   }
 
   private void mockGerritAccountsQueryApiCall(String username, int expectedAccountId) {
@@ -348,9 +346,7 @@ public class ReviewTestBase extends TestBase {
                   protected void configure() {
                     install(
                         new GerritEventContextModule(
-                            config,
-                            event,
-                            new EventBuildFeatures(getClientCommandExtension())));
+                            config, event, new EventBuildFeatures(getClientCommandExtension())));
 
                     bind(GerritClient.class).toInstance(gerritClient);
                     bind(ConfigCreator.class).toInstance(mockConfigCreator);
@@ -366,8 +362,7 @@ public class ReviewTestBase extends TestBase {
                     bind(ClientCommandExtension.class).toInstance(getClientCommandExtension());
                     bind(GitRepositoryManager.class).toInstance(repositoryManager);
                     bind(ReviewAiMetrics.class).toInstance(new ReviewAiMetrics());
-                    bind(ReviewFeedbackPublisher.class)
-                        .toInstance(reviewFeedbackPublisher);
+                    bind(ReviewFeedbackPublisher.class).toInstance(reviewFeedbackPublisher);
                     bind(Path.class)
                         .annotatedWith(PluginData.class)
                         .toInstance(
@@ -404,8 +399,7 @@ public class ReviewTestBase extends TestBase {
     when(aiReviewPermission.isAiReviewConfigured(any())).thenReturn(true);
 
     localizer = new Localizer(config);
-    reviewFeedbackPublisher =
-        new ReviewFeedbackPublisher(getTestReviewAiDb());
+    reviewFeedbackPublisher = new ReviewFeedbackPublisher(getTestReviewAiDb());
     IGerritClientPatchSet gerritClientPatchSet = getGerritClientPatchSet();
     gerritClient =
         new GerritClient(
@@ -431,17 +425,13 @@ public class ReviewTestBase extends TestBase {
             gerritClient,
             config,
             changeSetData,
-            Providers.of(
-                new GerritClientReview(config, pluginDataHandlerProvider, localizer)),
+            Providers.of(new GerritClientReview(config, pluginDataHandlerProvider, localizer)),
             getOpenAIClient(),
             localizer,
             new PatchSetReviewConversationRecorder(changeSetData, reviewAgentConversationStore),
             new ReviewConcernPublisher(getTestReviewAiDb()),
             new ReviewFeedbackLifecycle(
-                reviewFeedbackPublisher,
-                config,
-                identifiedUserFactory,
-                getAiRoleResolver()),
+                reviewFeedbackPublisher, config, identifiedUserFactory, getAiRoleResolver()),
             aiReviewApplicabilityChecker,
             "http://localhost:9575");
     mockConfigCreator = mock(ConfigCreator.class);

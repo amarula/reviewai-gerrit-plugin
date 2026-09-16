@@ -16,12 +16,20 @@
 
 package com.googlesource.gerrit.plugins.reviewai.listener;
 
+import static com.google.inject.Scopes.SINGLETON;
+
 import com.google.gerrit.extensions.config.FactoryModule;
 import com.google.gerrit.server.events.Event;
 import com.google.inject.Singleton;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -29,15 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.google.inject.Scopes.SINGLETON;
 
 @Slf4j
 public class GerritEventContextModule extends FactoryModule {
@@ -46,10 +46,7 @@ public class GerritEventContextModule extends FactoryModule {
   private final EventBuildFeatures buildFeatures;
 
   public GerritEventContextModule(Configuration config, Event event) {
-    this(
-        config,
-        event,
-        new EventBuildFeatures(new DisabledClientCommandExtension()));
+    this(config, event, new EventBuildFeatures(new DisabledClientCommandExtension()));
   }
 
   public GerritEventContextModule(

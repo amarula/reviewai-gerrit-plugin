@@ -33,8 +33,7 @@ import java.util.regex.Pattern;
 /** Resolves current Gerrit values for labels referenced by an AI review condition. */
 public final class AiReviewConditionLabelResolver {
   private static final Pattern LABEL_EXPRESSION =
-      Pattern.compile(
-          "(?i)(?:^|[\\s(])-?label:(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^\\s()]+)");
+      Pattern.compile("(?i)(?:^|[\\s(])-?label:(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^\\s()]+)");
   private static final Pattern TRAILING_NUMERIC_VOTE = Pattern.compile("^(.*?)[+-]\\d+$");
 
   private final Map<String, Map<String, GerritConditionLabel>> currentLabelsByChange =

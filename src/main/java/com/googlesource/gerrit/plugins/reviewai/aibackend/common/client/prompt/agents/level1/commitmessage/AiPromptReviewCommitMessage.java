@@ -16,18 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPrompt {
@@ -40,15 +39,15 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
     super(config, changeSetData, change, codeContextPolicy);
     loadPromptMap("agents/level1/commit-message/prompts");
     this.defaultAiMessageReview = getDefaultAiMessageReview();
-    log.debug(
-        "Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
+    log.debug("Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
     instructions.addAll(
         List.of(
-            resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES")),
+            resolveCommitMessageInstructions(
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES")),
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(
@@ -70,7 +69,8 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
-            resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))
+            resolveCommitMessageInstructions(
+                    prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))
                 + "\n\nReturn the feedback using this plugin's mandatory JSON response format, "
                 + "not the standalone Gerrit UI Markdown code-block output format."));
     sections.addAll(buildReviewFeedbackSections());

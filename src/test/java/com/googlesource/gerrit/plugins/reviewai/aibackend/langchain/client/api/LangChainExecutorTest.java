@@ -75,8 +75,7 @@ public class LangChainExecutorTest {
     ToolExecutionRequest secondToolRequest = toolRequest("call_2");
     RecordingChatModel model =
         new RecordingChatModel(
-            AiMessage.from(List.of(firstToolRequest, secondToolRequest)),
-            AiMessage.from("done"));
+            AiMessage.from(List.of(firstToolRequest, secondToolRequest)), AiMessage.from("done"));
     ChatMemory memory =
         TokenWindowChatMemory.builder()
             .id("review")
@@ -86,12 +85,7 @@ public class LangChainExecutorTest {
 
     AiMessage result =
         new LangChainExecutor(
-                config,
-                null,
-                List.of(treeToolSpecification()),
-                true,
-                gitRepoFiles,
-                null)
+                config, null, List.of(treeToolSpecification()), true, gitRepoFiles, null)
             .execute(model, change, memory);
 
     assertEquals("done", result.text());
@@ -163,12 +157,7 @@ public class LangChainExecutorTest {
 
     AiMessage result =
         new LangChainExecutor(
-                config,
-                null,
-                List.of(treeToolSpecification()),
-                true,
-                gitRepoFiles,
-                null)
+                config, null, List.of(treeToolSpecification()), true, gitRepoFiles, null)
             .execute(model, change, memory);
 
     assertEquals("done", result.text());
@@ -207,12 +196,7 @@ public class LangChainExecutorTest {
 
     AiMessage result =
         new LangChainExecutor(
-                config,
-                null,
-                List.of(treeToolSpecification()),
-                true,
-                gitRepoFiles,
-                null)
+                config, null, List.of(treeToolSpecification()), true, gitRepoFiles, null)
             .execute(model, change, changeSetData, memory);
 
     assertEquals("done", result.text());

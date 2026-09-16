@@ -16,16 +16,15 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import lombok.extern.slf4j.Slf4j;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.COMMIT_MESSAGE_FILTER_OUT_PREFIXES;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_COMMIT_MESSAGE_PREFIX;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.COMMIT_MESSAGE_FILTER_OUT_PREFIXES;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_COMMIT_MESSAGE_PREFIX;
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GerritClientPatchSetHelper {
@@ -95,8 +94,7 @@ public class GerritClientPatchSetHelper {
           formattedPatch.substring(diffSectionStarts.get(i), diffSectionStarts.get(i + 1));
       String filename = extractFilenameFromPatchSection(diffSection);
       if (filename != null
-          && isFileExtensionEnabled(
-              filename, enabledFileExtensions, disabledFileExtensions)) {
+          && isFileExtensionEnabled(filename, enabledFileExtensions, disabledFileExtensions)) {
         filteredPatch.append(diffSection);
       }
     }

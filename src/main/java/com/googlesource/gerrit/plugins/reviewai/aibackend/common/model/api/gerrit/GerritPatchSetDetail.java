@@ -17,9 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit;
 
 import com.google.gson.annotations.SerializedName;
-import lombok.Data;
-
 import java.util.List;
+import lombok.Data;
 
 // TODO remove once migration to GerritApi is finished and
 // com.google.gerrit.extensions.common.ChangeInfo is used

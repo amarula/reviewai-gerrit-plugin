@@ -46,8 +46,7 @@ public class AiReviewThreadsTest {
   public void setUp() throws IOException {
     String json =
         Files.readString(
-            TestResourceLoader.getTestResourcePath()
-                .resolve("__files/gerritCommentThreads.json"));
+            TestResourceLoader.getTestResourcePath().resolve("__files/gerritCommentThreads.json"));
     comments = getGson().fromJson(json, new TypeToken<List<GerritComment>>() {}.getType());
     setAuthor("ai-concern", AI_ACCOUNT_ID, "ReviewAI");
     setAuthor("ai-ack", AI_ACCOUNT_ID, "ReviewAI");
@@ -82,7 +81,8 @@ public class AiReviewThreadsTest {
 
     assertEquals("abc123", output.concernLedger.lastReviewedCommit);
     assertEquals("CORRECTNESS", output.concernLedger.reviewers.get(0).name);
-    assertEquals("ai-concern", output.concernLedger.reviewers.get(0).concerns.get(0).previousCommentId);
+    assertEquals(
+        "ai-concern", output.concernLedger.reviewers.get(0).concerns.get(0).previousCommentId);
     assertEquals(List.of("concern-1"), output.threads.get(0).concernIds);
   }
 
@@ -95,9 +95,7 @@ public class AiReviewThreadsTest {
     memory.setConcernFeedback(Map.of("concern-1", "The framework owns this connection."));
 
     AiReviewThreads.annotateWithFeedback(
-        output,
-        memory,
-        List.of(new ReviewFeedbackStore.FeedbackComment("user-reply", "PENDING")));
+        output, memory, List.of(new ReviewFeedbackStore.FeedbackComment("user-reply", "PENDING")));
 
     assertEquals("Focus on resource lifecycles.", output.feedbackMemory.genericFeedback);
     assertEquals("PENDING", output.feedbackComments.get(0).processingState);

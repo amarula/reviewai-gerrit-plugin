@@ -28,11 +28,10 @@ import com.google.gerrit.server.project.ProjectCache;
 import com.google.gerrit.server.project.SectionMatcher;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import lombok.extern.slf4j.Slf4j;
 
 @Singleton
 @Slf4j
@@ -75,8 +74,7 @@ public class AiReviewPermission {
                               hasAiReviewAllow(getAiReviewPermission(sectionMatcher.getSection()))))
           .orElse(false);
     } catch (RuntimeException e) {
-      log.warn(
-          "Failed to inspect AI review configuration for project {}", projectNameKey, e);
+      log.warn("Failed to inspect AI review configuration for project {}", projectNameKey, e);
       return false;
     }
   }
@@ -146,9 +144,7 @@ public class AiReviewPermission {
     boolean isDisallowed(boolean serviceUserDefaultAllow) {
       // Service Users and inherited ALLOWs from parent projects override inherited DENYs
       // from more distant ancestors. Local DENYs and blocks always win.
-      return hasBlock
-          || hasLocalDeny
-          || hasInheritedDeny && !hasAllow && !serviceUserDefaultAllow;
+      return hasBlock || hasLocalDeny || hasInheritedDeny && !hasAllow && !serviceUserDefaultAllow;
     }
 
     private void applyRule(boolean localProject, PermissionRule rule) {

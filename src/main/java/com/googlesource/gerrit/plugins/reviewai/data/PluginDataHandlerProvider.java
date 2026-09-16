@@ -16,15 +16,14 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.sanitizeFilename;
+
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import lombok.extern.slf4j.Slf4j;
-
 import java.nio.file.Path;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.sanitizeFilename;
+import lombok.extern.slf4j.Slf4j;
 
 @Singleton
 @Slf4j

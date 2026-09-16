@@ -16,9 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import com.google.gerrit.entities.LabelId;
+import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.backslashBackslashesAndDoubleQuotes;
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
+import com.google.gerrit.entities.LabelId;
 import com.google.gerrit.entities.Project;
 import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.AccountInfo;
@@ -27,19 +31,13 @@ import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.ChangeMessageInfo;
 import com.google.gerrit.extensions.common.LabelInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetDetail;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.backslashBackslashesAndDoubleQuotes;
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
-
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
@@ -49,6 +47,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GerritClientDetail {
@@ -96,8 +95,7 @@ public class GerritClientDetail {
     for (GerritPatchSetDetail.Permission permission : permissions) {
       if (ReviewAiUser.matches(permission.getAccountId(), aiAccountId)) {
         log.debug(
-            "PatchSet voting range detected for AI user: {}",
-            permission.getPermittedVotingRange());
+            "PatchSet voting range detected for AI user: {}", permission.getPermittedVotingRange());
         return permission.getPermittedVotingRange();
       }
     }

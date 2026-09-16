@@ -59,11 +59,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store,
-            requestExecutor,
-            leaseExecutor,
-            LEASE_MILLIS,
-            RECOVERY_INTERVAL_MILLIS);
+            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
     coordinator.start(request -> ProcessingOutcome.COMPLETED);
   }
 
@@ -119,11 +115,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store,
-            requestExecutor,
-            leaseExecutor,
-            LEASE_MILLIS,
-            RECOVERY_INTERVAL_MILLIS);
+            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
 
     coordinator.start(
         request -> {
@@ -139,8 +131,7 @@ public class AiRequestCoordinatorTest extends TestBase {
   public void abandonsExpiredOwnerAndProcessesNextRequest() throws Exception {
     coordinator.stop();
     store.admit(message("request-1", "event-1"));
-    assertEquals(
-        "request-1", store.claimNext(CHANGE, "old-owner", 0L).orElseThrow().requestId());
+    assertEquals("request-1", store.claimNext(CHANGE, "old-owner", 0L).orElseThrow().requestId());
     store.admit(message("request-2", "event-2"));
     CountDownLatch processed = new CountDownLatch(1);
     CountDownLatch recovered = new CountDownLatch(1);
@@ -149,11 +140,7 @@ public class AiRequestCoordinatorTest extends TestBase {
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store,
-            requestExecutor,
-            leaseExecutor,
-            LEASE_MILLIS,
-            RECOVERY_INTERVAL_MILLIS);
+            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
 
     coordinator.start(
         request -> {
@@ -195,9 +182,7 @@ public class AiRequestCoordinatorTest extends TestBase {
   @Test
   public void supersededOutcomeReleasesLaneForNextRequest() throws Exception {
     CountDownLatch processed = new CountDownLatch(1);
-    coordinator.admit(
-        review("review-1", "patch-set-1"),
-        request -> ProcessingOutcome.SUPERSEDED);
+    coordinator.admit(review("review-1", "patch-set-1"), request -> ProcessingOutcome.SUPERSEDED);
     coordinator.admit(
         message("request-2", "event-2"),
         request -> {
@@ -234,8 +219,7 @@ public class AiRequestCoordinatorTest extends TestBase {
         });
     assertTrue(oldReviewStarted.await(5, TimeUnit.SECONDS));
 
-    AiRequest requested =
-        coordinator.requestReviewSupersession(CHANGE, 2).orElseThrow();
+    AiRequest requested = coordinator.requestReviewSupersession(CHANGE, 2).orElseThrow();
     AiRequestStore.Admission incoming =
         coordinator.admit(
             review("review-2", "patch-set-2"),
@@ -274,8 +258,7 @@ public class AiRequestCoordinatorTest extends TestBase {
         });
     assertTrue(reviewStarted.await(5, TimeUnit.SECONDS));
 
-    AiRequest cancelled =
-        coordinator.cancelRunningReview(CHANGE, "Change merged").orElseThrow();
+    AiRequest cancelled = coordinator.cancelRunningReview(CHANGE, "Change merged").orElseThrow();
     finishInFlightQuery.countDown();
 
     assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, cancelled.state());

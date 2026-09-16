@@ -29,7 +29,6 @@ import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.web.model.ReviewAgentConversationInfo;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -50,8 +49,7 @@ public class ReviewAgentConversations
 
   @Inject
   ReviewAgentConversations(
-      ReviewAgentConversationStore conversationStore,
-      AiReviewPermission aiReviewPermission) {
+      ReviewAgentConversationStore conversationStore, AiReviewPermission aiReviewPermission) {
     this.conversationStore = conversationStore;
     this.aiReviewPermission = aiReviewPermission;
   }
@@ -301,15 +299,21 @@ public class ReviewAgentConversations
   public static class Input {
     public String action;
 
-    @SerializedName(value = "conversationId", alternate = {"conversation_id"})
+    @SerializedName(
+        value = "conversationId",
+        alternate = {"conversation_id"})
     public String conversationId;
 
     public String title;
 
-    @SerializedName(value = "timestampMillis", alternate = {"timestamp_millis"})
+    @SerializedName(
+        value = "timestampMillis",
+        alternate = {"timestamp_millis"})
     public Long timestampMillis;
 
-    @SerializedName(value = "turnIndex", alternate = {"turn_index"})
+    @SerializedName(
+        value = "turnIndex",
+        alternate = {"turn_index"})
     public Integer turnIndex;
 
     public JsonObject turn;

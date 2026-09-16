@@ -29,10 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class SpecializedReviewPayloads {
   private record HistoricalRepetitionIdCheck(
-      List<String> actual,
-      List<String> duplicates,
-      List<String> unknown,
-      List<String> missing) {
+      List<String> actual, List<String> duplicates, List<String> unknown, List<String> missing) {
     boolean matches() {
       return duplicates.isEmpty() && unknown.isEmpty() && missing.isEmpty();
     }
@@ -44,8 +41,7 @@ final class SpecializedReviewPayloads {
       List<SpecializedReviewFindings.AgentFindings> specializedFindings, String triageContext) {
     return getGson()
         .toJson(
-            SpecializedReviewFindings.ConsolidationInput.from(
-                specializedFindings, triageContext));
+            SpecializedReviewFindings.ConsolidationInput.from(specializedFindings, triageContext));
   }
 
   static String buildHistoricalRepetitionInput(
@@ -157,9 +153,7 @@ final class SpecializedReviewPayloads {
     SpecializedReviewFindings.HistoricalRepetitionResult result =
         new SpecializedReviewFindings.HistoricalRepetitionResult();
     result.setAnnotations(
-        expectedConcernIds.stream()
-            .map(SpecializedReviewPayloads::nonRepeatedAnnotation)
-            .toList());
+        expectedConcernIds.stream().map(SpecializedReviewPayloads::nonRepeatedAnnotation).toList());
     return result;
   }
 

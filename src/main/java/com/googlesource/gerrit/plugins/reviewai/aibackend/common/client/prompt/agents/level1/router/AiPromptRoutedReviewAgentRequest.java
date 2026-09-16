@@ -44,8 +44,7 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
     return switch (changeSetData.getReviewAssistantStage()) {
       case REVIEW_COMMIT_MESSAGE ->
           prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
-      default ->
-          prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
+      default -> prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
     };
   }
 }

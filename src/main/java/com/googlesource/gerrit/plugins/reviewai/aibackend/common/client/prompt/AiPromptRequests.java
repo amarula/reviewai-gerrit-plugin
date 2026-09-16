@@ -16,17 +16,16 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithSpace;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithSpace;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
@@ -84,8 +83,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
 
   private String getCommentRequestPrompt(int commentPropertiesSize) {
     log.debug(
-        "Constructing AI comment request prompt for {} comment properties.",
-        commentPropertiesSize);
+        "Constructing AI comment request prompt for {} comment properties.", commentPropertiesSize);
     return joinWithSpace(
         new ArrayList<>(
             List.of(
@@ -94,6 +92,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
                 prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES"),
                 prompt("DEFAULT_AI_REPLIES_PROMPT_INLINE"),
                 String.format(
-                    prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK"), commentPropertiesSize))));
+                    prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK"),
+                    commentPropertiesSize))));
   }
 }

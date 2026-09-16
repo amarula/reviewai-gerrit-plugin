@@ -18,16 +18,15 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.gerrit.extensions.client.ChangeKind;
 import com.google.gerrit.server.data.PatchSetAttribute;
-import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import java.util.List;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class EventHandlerTypePatchSetReview implements IEventHandlerType {

@@ -16,6 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.common.net.HttpHeaders;
@@ -23,29 +30,21 @@ import com.google.gerrit.extensions.api.changes.FileApi;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.extensions.restapi.BinaryResult;
+import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gerrit.extensions.restapi.RestApiException;
 import com.googlesource.gerrit.plugins.reviewai.ReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import java.io.ByteArrayInputStream;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.entity.ContentType;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-
-import java.io.ByteArrayInputStream;
-import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @Slf4j
 public class OpenAiLangChainReviewTestBase extends ReviewTestBase {

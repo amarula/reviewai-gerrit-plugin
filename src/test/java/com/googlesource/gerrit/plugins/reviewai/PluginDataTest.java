@@ -19,12 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
-import java.nio.file.Files;
-import java.util.Properties;
-
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
+import java.nio.file.Files;
+import java.util.Properties;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -130,10 +129,8 @@ public class PluginDataTest extends TestBase {
 
     assertEquals("review-code-conversation", firstHandler.getValue("conversationId.review_code"));
     assertEquals(
-        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}",
-        firstHandler.getValue("dynamicConfig"));
-    assertFalse(
-        Files.exists(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data")));
+        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}", firstHandler.getValue("dynamicConfig"));
+    assertFalse(Files.exists(tempFolder.getRoot().toPath().resolve(CHANGE_ID + ".data")));
   }
 
   @Test
@@ -150,8 +147,7 @@ public class PluginDataTest extends TestBase {
     PluginDataHandler handler = provider.getChangeScope();
 
     assertEquals(
-        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}",
-        handler.getValue("dynamicConfig"));
+        "{\"selectedAiModel\":\"OpenAI/gpt-5.4-mini\"}", handler.getValue("dynamicConfig"));
     assertNull(handler.getValue("reviewAgentConversations"));
   }
 
@@ -166,8 +162,7 @@ public class PluginDataTest extends TestBase {
     String initialRequestId = statusStore.getLatestPendingRequestId().orElseThrow();
     statusStore.move("request-1", "message-1");
 
-    assertEquals(
-        "message-1", statusStore.getPendingRequestId(initialRequestId).orElseThrow());
+    assertEquals("message-1", statusStore.getPendingRequestId(initialRequestId).orElseThrow());
   }
 
   @Test
@@ -181,9 +176,7 @@ public class PluginDataTest extends TestBase {
     statusStore.move("request-1", "message-1");
     statusStore.move("request-2", "message-2");
 
-    assertEquals(
-        "message-1",
-        statusStore.getPendingRequestIdForEvent("message-1").orElseThrow());
+    assertEquals("message-1", statusStore.getPendingRequestIdForEvent("message-1").orElseThrow());
     assertTrue(statusStore.getPendingRequestIdForEvent("unknown-message").isEmpty());
   }
 
@@ -197,9 +190,7 @@ public class PluginDataTest extends TestBase {
 
     assertEquals(
         "provisional-request",
-        statusStore
-            .getPendingRequestIdForEvent("unresolved-message")
-            .orElseThrow());
+        statusStore.getPendingRequestIdForEvent("unresolved-message").orElseThrow());
   }
 
   @Test
@@ -230,7 +221,8 @@ public class PluginDataTest extends TestBase {
     statusStore.pending("message-request", "/message What changed?");
     statusStore.pending("review-request", "/review");
 
-    statusStore.completedForEvent("unavailable-message-id", "ReviewAI **WARNING**: Review superseded.");
+    statusStore.completedForEvent(
+        "unavailable-message-id", "ReviewAI **WARNING**: Review superseded.");
 
     assertEquals(
         ReviewAgentRequestStatusStore.STATUS_PENDING, statusStore.get("message-request").status);

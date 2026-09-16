@@ -16,8 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git;
 
-import lombok.Data;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 
 @Data
 @AllArgsConstructor

@@ -64,8 +64,7 @@ public class ReviewConcernStatusUpdaterTest {
   @Test
   public void appliesDismissedStatusAndAllowsLaterReassessment() {
     ReviewConcern present = concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
-    ReviewConcern dismissed =
-        concern("concern-2", ConcernStatus.DISMISSED, "Accepted by the user");
+    ReviewConcern dismissed = concern("concern-2", ConcernStatus.DISMISSED, "Accepted by the user");
 
     List<ReviewConcern> results =
         ReviewConcernStatusUpdater.apply(
@@ -83,8 +82,7 @@ public class ReviewConcernStatusUpdaterTest {
 
   @Test
   public void rejectsNewDismissalWithoutAuthorizedModeratorDecision() {
-    ReviewConcern existing =
-        concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
+    ReviewConcern existing = concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
     ReviewConcern dismissed =
         concern("concern-1", ConcernStatus.DISMISSED, "User requested dismissal");
 

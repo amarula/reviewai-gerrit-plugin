@@ -44,9 +44,7 @@ public class ReviewConcernTest {
     concern.setPreviousCommentId("comment-1");
     concern.setMergedConcernIds(List.of("raw-1", "raw-2"));
     concern.setReviewers(
-        List.of(
-            new ConcernReviewerId(
-                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
+        List.of(new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
     concern.setLocations(List.of(location));
 
     String serializedConcern = getGson().toJson(concern);

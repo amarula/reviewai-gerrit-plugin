@@ -86,9 +86,7 @@ final class PublishedCommentConcernBinder {
           continue;
         }
         Optional<PublishedComment> publishedComment =
-            publishedComments.stream()
-                .filter(comment -> matches(batch, comment))
-                .findFirst();
+            publishedComments.stream().filter(comment -> matches(batch, comment)).findFirst();
         if (publishedComment.isEmpty()) {
           log.warn("Could not bind published comment for concern {}", batch.getConcernId());
           continue;
@@ -110,7 +108,8 @@ final class PublishedCommentConcernBinder {
     return changeApi.commentsRequest().get().entrySet().stream()
         .flatMap(
             entry ->
-                entry.getValue().stream().map(comment -> new PublishedComment(entry.getKey(), comment)))
+                entry.getValue().stream()
+                    .map(comment -> new PublishedComment(entry.getKey(), comment)))
         .collect(Collectors.toCollection(ArrayList::new));
   }
 

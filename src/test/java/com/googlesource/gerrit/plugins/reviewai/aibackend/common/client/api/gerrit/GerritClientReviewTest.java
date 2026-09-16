@@ -30,13 +30,13 @@ import static org.mockito.Mockito.when;
 import com.google.common.reflect.TypeToken;
 import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Change;
-import com.google.gerrit.extensions.api.changes.ChangeApi.CommentsRequest;
+import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
+import com.google.gerrit.extensions.api.changes.ChangeApi.CommentsRequest;
 import com.google.gerrit.extensions.api.changes.Changes;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
-import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
@@ -62,10 +62,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.mockito.ArgumentCaptor;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -95,8 +95,7 @@ public class GerritClientReviewTest {
     changeSetData = new ChangeSetData(1);
     when(config.getGerritApi()).thenReturn(gerritApi);
     when(gerritApi.changes()).thenReturn(changes);
-    when(changes.id("project", "main", "I1234567890"))
-        .thenReturn(changeApi, refreshedChangeApi);
+    when(changes.id("project", "main", "I1234567890")).thenReturn(changeApi, refreshedChangeApi);
     when(changeApi.current()).thenReturn(revisionApi);
     when(revisionApi.review(any(ReviewInput.class))).thenReturn(reviewResult);
     lenient()
@@ -257,8 +256,7 @@ public class GerritClientReviewTest {
     CommentInfo skippedComment = openTaggedComment("skipped-comment");
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
     when(commentsRequest.get())
-        .thenReturn(
-            Map.of("src/Example.java", List.of(dismissedComment, skippedComment)));
+        .thenReturn(Map.of("src/Example.java", List.of(dismissedComment, skippedComment)));
     changeSetData.setReviewSystemMessage("Main review message");
 
     client.setReviewAndGetPublishedCommentIds(
@@ -292,8 +290,7 @@ public class GerritClientReviewTest {
     root.setUpdated(Instant.parse("2026-08-27T10:00:00Z"));
     CommentInfo resolution = reply("resolution", root.id, false, "2026-08-27T10:01:00Z");
     when(changeApi.commentsRequest()).thenReturn(commentsRequest);
-    when(commentsRequest.get())
-        .thenReturn(Map.of("src/Example.java", List.of(root, resolution)));
+    when(commentsRequest.get()).thenReturn(Map.of("src/Example.java", List.of(root, resolution)));
     changeSetData.setReviewSystemMessage("Main review message");
 
     client.setReviewAndGetPublishedCommentIds(

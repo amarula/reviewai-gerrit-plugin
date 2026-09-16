@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -27,13 +25,14 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -59,7 +58,6 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -83,8 +81,7 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/langchain/suggestPatchSetFixReply.txt";
   private static final String INCREMENTAL_PATCH_RESOURCE =
       "__files/langchain/newIssueIncrementalPatch.txt";
-  private static final String FULL_PATCH_RESOURCE =
-      "__files/langchain/newIssueFullPatch.txt";
+  private static final String FULL_PATCH_RESOURCE = "__files/langchain/newIssueFullPatch.txt";
   private static final String FEEDBACK_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemory.json";
   private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
@@ -92,7 +89,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(false);
@@ -108,14 +106,11 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(0, client.feedbackCalls);
     assertEquals(List.of(true, true), client.recordedForcedStagedReview);
     assertEquals("body-REVIEW_COMMIT_MESSAGE", client.getRequestBody());
-    ReviewConcernLedger ledger =
-        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    ReviewConcernLedger ledger = response.getPendingConcernUpdates().get("change~1").orElseThrow();
     assertEquals(2, ledger.getReviewers().size());
     assertEquals(
         List.of("PATCHSET", "COMMIT_MESSAGE"),
-        ledger.getReviewers().stream()
-            .map(entry -> entry.getReviewer().getName())
-            .toList());
+        ledger.getReviewers().stream().map(entry -> entry.getReviewer().getName()).toList());
   }
 
   @Test
@@ -133,11 +128,7 @@ public class LangChainMultiAgentReviewClientTest {
         client.ask(changeSetData, change, readTestResource(FULL_PATCH_RESOURCE));
 
     assertEquals(
-        List.of(
-            "review-PATCHSET",
-            "find-PATCHSET",
-            "review-COMMIT_MESSAGE",
-            "find-COMMIT_MESSAGE"),
+        List.of("review-PATCHSET", "find-PATCHSET", "review-COMMIT_MESSAGE", "find-COMMIT_MESSAGE"),
         client.concernEvents);
     assertEquals(3, response.getReplies().size());
     assertTrue(response.getReplies().getFirst().isRepeated());
@@ -146,8 +137,7 @@ public class LangChainMultiAgentReviewClientTest {
         response.getReplies().stream()
             .noneMatch(reply -> "commit-old".equals(reply.getConcernId())));
 
-    ReviewConcernLedger ledger =
-        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    ReviewConcernLedger ledger = response.getPendingConcernUpdates().get("change~1").orElseThrow();
     assertEquals(3, ledger.getReviewers().size());
     ReviewerConcerns patchset = reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET");
     ReviewerConcerns commitMessage =
@@ -156,8 +146,7 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(ConcernStatus.PRESENT, patchset.getConcerns().getFirst().getStatus());
     assertEquals(2, commitMessage.getConcerns().size());
     assertEquals(ConcernStatus.FIXED, commitMessage.getConcerns().getFirst().getStatus());
-    assertNotNull(
-        reviewer(ledger, ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    assertNotNull(reviewer(ledger, ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
   }
 
   @Test
@@ -176,8 +165,7 @@ public class LangChainMultiAgentReviewClientTest {
         client.ask(changeSetData, change, readTestResource(FULL_PATCH_RESOURCE));
 
     assertEquals(List.of("review-PATCHSET", "find-PATCHSET"), client.concernEvents);
-    ReviewConcernLedger ledger =
-        response.getPendingConcernUpdates().get("change~1").orElseThrow();
+    ReviewConcernLedger ledger = response.getPendingConcernUpdates().get("change~1").orElseThrow();
     ReviewConcern commitConcern =
         reviewer(ledger, ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE")
             .getConcerns()
@@ -190,7 +178,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void forcedScopedReviewBypassesParallelSplit() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
@@ -209,7 +198,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void forcedReviewCommentUsesPatchsetAndCommitMessageAgents() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);
     GerritChange change = mock(GerritChange.class);
@@ -228,7 +218,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void messageUsesRoutingAgentToSelectCommitMessageAgent() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.routedStage = ReviewAssistantStage.REVIEW_COMMIT_MESSAGE;
     ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = mock(GerritChange.class);
@@ -247,7 +238,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void doesNotClassifyFeedbackBeforeRoutingComment() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ReviewFeedbackMemory memory = readFeedbackMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(memory);
@@ -266,7 +258,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void classifiesFeedbackOnceBeforeParallelScopedReviews() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.classifiedFeedback = readFeedbackMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
@@ -284,9 +277,9 @@ public class LangChainMultiAgentReviewClientTest {
   }
 
   @Test
-  public void classifiedDisabledCommitMessageScopeFiltersStageBeforeFanOut()
-      throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+  public void classifiedDisabledCommitMessageScopeFiltersStageBeforeFanOut() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.classifiedFeedback = readDisabledCommitMessageMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setPendingReviewFeedbackCommentIds(List.of("comment-1"));
@@ -302,7 +295,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void persistedDisabledCommitMessageScopeFiltersLaterReviews() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(readDisabledCommitMessageMemory());
     GerritChange change = mock(GerritChange.class);
@@ -335,8 +329,7 @@ public class LangChainMultiAgentReviewClientTest {
 
     assertTrue(patchsetInstructions.contains(memory.getGenericFeedback()));
     assertTrue(commitMessageInstructions.contains(memory.getGenericFeedback()));
-    assertTrue(
-        commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
+    assertTrue(commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
   }
 
   @Test
@@ -363,7 +356,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestPatchsetScopeRequestsSuggestionsForEachReviewReply() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.reviewReplies =
         List.of(
             reviewReply("First issue", "a.py", 2, "return value.strip().lower()"),
@@ -395,20 +389,22 @@ public class LangChainMultiAgentReviewClientTest {
 
     assertNotNull(response.getReplies());
     assertEquals(2, response.getReplies().size());
-    assertEquals(readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE), response.getReplies().get(0).getReply());
+    assertEquals(
+        readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE),
+        response.getReplies().get(0).getReply());
     assertEquals("a.py", response.getReplies().get(0).getFilename());
     assertEquals(Integer.valueOf(2), response.getReplies().get(0).getLineNumber());
     assertEquals("return value.strip().lower()", response.getReplies().get(0).getCodeSnippet());
     assertEquals("b.py", response.getReplies().get(1).getFilename());
-    response.getReplies().forEach(
-        reply -> {
-          assertNull(reply.getId());
-          assertNull(reply.getScore());
-        });
+    response
+        .getReplies()
+        .forEach(
+            reply -> {
+              assertNull(reply.getId());
+              assertNull(reply.getScore());
+            });
     assertEquals(
-        List.of(
-            ReviewAssistantStage.REVIEW_CODE,
-            ReviewAssistantStage.REVIEW_CODE),
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_CODE),
         client.recordedStages);
     assertEquals(List.of(false, true), client.recordedSuggestModes);
     assertEquals(patchSet, client.recordedPatchSets.get(0));
@@ -418,7 +414,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestPatchsetScopeUsesExistingReviewContextWithoutInitialReview() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.existingReviewContext = true;
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
@@ -440,7 +437,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestIncludesRepeatedNegativeReviewInSingleSuggestionRequest() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     AiReplyItem repeatedNegative =
         reviewReply("Repeated but still negative", "a.py", 2, "return value");
     repeatedNegative.setRepeated(true);
@@ -462,7 +460,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestResponseCanContainMultipleEditsForOneReviewReply() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.suggestionReplies =
         List.of(
             codeSuggestionReply(0, "```suggestion\nfirst replacement\n```"),
@@ -483,7 +482,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestRejectsCodeEditWithoutItsOwnTarget() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.suggestionReplies =
         List.of(
             AiReplyItem.builder()
@@ -505,14 +505,16 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestCommitMessageUsesCommitMessageInlineLocation() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
     GerritChange change = mock(GerritChange.class);
     when(change.getIsCommentEvent()).thenReturn(true);
     when(change.getFullChangeId()).thenReturn("change~1");
-    String patchSet = readTestResource("__files/langchain/suggestOriginalPatchSetWithCommitMessage.txt");
+    String patchSet =
+        readTestResource("__files/langchain/suggestOriginalPatchSetWithCommitMessage.txt");
 
     AiResponseContent response = client.ask(changeSetData, change, patchSet);
 
@@ -528,7 +530,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestPublishesOnlyOneAllInclusiveCommitMessageEdit() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     client.commitMessageReviewReplies =
         List.of(
             reviewReply("Clarify the subject", "ignored", 1, "ignored"),
@@ -560,7 +563,8 @@ public class LangChainMultiAgentReviewClientTest {
 
   @Test
   public void suggestWithoutScopeProcessesPatchsetAndCommitMessage() throws Exception {
-    RecordingLangChainMultiAgentReviewClient client = new RecordingLangChainMultiAgentReviewClient();
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     GerritChange change = mock(GerritChange.class);
@@ -580,11 +584,13 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(2, response.getReplies().size());
     assertEquals("a.py", response.getReplies().get(0).getFilename());
     assertEquals("/COMMIT_MSG", response.getReplies().get(1).getFilename());
-    response.getReplies().forEach(
-        reply -> {
-          assertNull(reply.getId());
-          assertNull(reply.getScore());
-        });
+    response
+        .getReplies()
+        .forEach(
+            reply -> {
+              assertNull(reply.getId());
+              assertNull(reply.getScore());
+            });
     assertEquals(
         List.of(
             ReviewAssistantStage.REVIEW_CODE,
@@ -672,9 +678,7 @@ public class LangChainMultiAgentReviewClientTest {
   }
 
   private static List<String> summarizeMessages(List<ChatMessage> messages) {
-    return messages.stream()
-        .map(message -> message.type() + ":" + messageText(message))
-        .toList();
+    return messages.stream().map(message -> message.type() + ":" + messageText(message)).toList();
   }
 
   private static String messageText(ChatMessage message) {
@@ -750,8 +754,7 @@ public class LangChainMultiAgentReviewClientTest {
   private static ReviewFeedbackMemory readDisabledCommitMessageMemory() throws Exception {
     return GsonUtils.getGson()
         .fromJson(
-            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE),
-            ReviewFeedbackMemory.class);
+            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
   }
 
   private static Configuration config() {
@@ -883,10 +886,7 @@ public class LangChainMultiAgentReviewClientTest {
       AiResponseContent response = new AiResponseContent("");
       response.setReplies(
           new ArrayList<>(
-              List.of(
-                  AiReplyItem.builder()
-                      .reply("New issue from " + reviewerName)
-                      .build())));
+              List.of(AiReplyItem.builder().reply("New issue from " + reviewerName).build())));
       return new ReviewRequestResult(response, "body-find-" + reviewerName) {};
     }
   }
@@ -898,7 +898,8 @@ public class LangChainMultiAgentReviewClientTest {
     private final List<Boolean> recordedSuggestModes = new ArrayList<>();
     private final List<String> recordedPatchSets = new ArrayList<>();
     private final List<ReviewFeedbackMemory> recordedFeedback = new ArrayList<>();
-    private String patchSetSuggestion = readTestResourceUnchecked(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+    private String patchSetSuggestion =
+        readTestResourceUnchecked(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
     private List<AiReplyItem> reviewReplies =
         List.of(reviewReply("Review issue", "a.py", 2, "return value.strip().lower()"));
     private List<AiReplyItem> commitMessageReviewReplies =
@@ -999,8 +1000,7 @@ public class LangChainMultiAgentReviewClientTest {
                           1, readTestResourceUnchecked(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE))))
               : new ArrayList<>(
                   List.of(
-                      reviewReply(
-                          "Code review issue", "a.py", 2, "return value.strip().lower()"),
+                      reviewReply("Code review issue", "a.py", 2, "return value.strip().lower()"),
                       AiReplyItem.builder()
                           .reply("Commit message review issue")
                           .score(-1.0)

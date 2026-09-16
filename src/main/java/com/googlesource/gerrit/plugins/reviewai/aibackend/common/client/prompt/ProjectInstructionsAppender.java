@@ -27,10 +27,10 @@ import java.util.List;
 /**
  * Appends repository-level project instructions after prompt creation.
  *
- * <p>Project instructions are loaded from files in the target repository. That requires
- * {@link GitRepoFiles}, which in production is backed by Gerrit's {@code GitRepositoryManager}.
- * Keeping that repository-access dependency here lets prompt classes and {@code AiPromptFactory}
- * stay focused on prompt text construction, instead of threading {@link GitRepoFiles} through many
+ * <p>Project instructions are loaded from files in the target repository. That requires {@link
+ * GitRepoFiles}, which in production is backed by Gerrit's {@code GitRepositoryManager}. Keeping
+ * that repository-access dependency here lets prompt classes and {@code AiPromptFactory} stay
+ * focused on prompt text construction, instead of threading {@link GitRepoFiles} through many
  * prompt constructors that do not need it.
  *
  * <p>The {@link #append(IAiPrompt, GerritChange, String)} guard also preserves the previous

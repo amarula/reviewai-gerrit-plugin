@@ -19,7 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.web;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.common.ChangeInfo;
-import com.google.gerrit.extensions.common.ChangeMessageInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestReadView;
@@ -57,8 +56,7 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
   private static final int MAX_MESSAGE_LENGTH = 500;
   private static final Comparator<GerritComment> COMMENT_ORDER =
       Comparator.comparing(
-              AiReviewThreads::timestamp,
-              Comparator.nullsLast(Comparator.naturalOrder()))
+              AiReviewThreads::timestamp, Comparator.nullsLast(Comparator.naturalOrder()))
           .thenComparing(GerritComment::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
   private final ConfigCreator configCreator;
@@ -91,11 +89,14 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       ChangeInfo changeInfo = changeApi.get();
       Map<String, List<GerritComment>> mergedComments =
           AiReviewHistory.mergeComments(
-              inlineComments, Optional.ofNullable(changeInfo).map(info -> info.messages).orElse(null));
+              inlineComments,
+              Optional.ofNullable(changeInfo).map(info -> info.messages).orElse(null));
       Output output = buildOutput(flatten(mergedComments), config.getUserId().get());
       GerritChange gerritChange =
           new GerritChange(resource.getProject(), change.getDest(), change.getKey());
-      reviewConcernPublisher.load(gerritChange).ifPresent(ledger -> annotateWithLedger(output, ledger));
+      reviewConcernPublisher
+          .load(gerritChange)
+          .ifPresent(ledger -> annotateWithLedger(output, ledger));
       annotateWithFeedback(
           output,
           reviewFeedbackPublisher.load(gerritChange).orElse(null),
@@ -138,7 +139,9 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       for (ReviewConcern concern : reviewer.getConcerns()) {
         String commentId = concern.getPreviousCommentId();
         if (commentId != null && !commentId.isBlank()) {
-          concernIdsByCommentId.computeIfAbsent(commentId, ignored -> new ArrayList<>()).add(concern.getId());
+          concernIdsByCommentId
+              .computeIfAbsent(commentId, ignored -> new ArrayList<>())
+              .add(concern.getId());
         }
       }
     }
@@ -439,8 +442,7 @@ public class AiReviewThreads implements RestReadView<ChangeResource> {
       dismissedConcerns = memory.getDismissedConcerns();
       disabledReviewScopes = memory.getDisabledReviewScopes();
       disabledSpecializedAgents = memory.getDisabledSpecializedAgents();
-      conditionLabelDisabledSpecializedAgents =
-          memory.getConditionLabelDisabledSpecializedAgents();
+      conditionLabelDisabledSpecializedAgents = memory.getConditionLabelDisabledSpecializedAgents();
     }
   }
 

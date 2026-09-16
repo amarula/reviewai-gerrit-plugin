@@ -97,8 +97,7 @@ public final class AiPromptConcernReview extends AiPromptBase {
   private String specializedRoleInstructions() {
     ConcernReviewerId reviewer = reviewer();
     String instructions = changeSetData.getSpecializedAgentInstructions();
-    if (reviewer == null
-        || reviewer.getKind() != ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
+    if (reviewer == null || reviewer.getKind() != ConcernReviewerId.Kind.SPECIALIZED_AGENT) {
       return null;
     }
     if (COMMIT_MESSAGE_REVIEWER.equals(reviewer.getName())) {

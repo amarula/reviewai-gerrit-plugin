@@ -16,13 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import static com.googlesource.gerrit.plugins.reviewai.utils.RegexUtils.joinAlternation;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
+
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class DebugCodeBlocksCleaner {
   private final Pattern debugMessagePattern;

@@ -55,8 +55,9 @@ class LangChainTokenEstimatorProvider {
       String estimatorModel = getEstimatorModel(provider);
       try {
         log.info("Initializing {} token estimator for model {}", provider, estimatorModel);
-        cachedEstimator = CompletableFuture.supplyAsync(() -> createEstimator(provider))
-            .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        cachedEstimator =
+            CompletableFuture.supplyAsync(() -> createEstimator(provider))
+                .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         log.info("Initialized {} token estimator for model {}", provider, estimatorModel);
       } catch (Exception e) {
         log.warn(

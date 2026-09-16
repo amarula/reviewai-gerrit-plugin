@@ -70,7 +70,8 @@ public class ReviewAgentConversationStore {
     initSchema();
   }
 
-  ReviewAgentConversationStore(String jdbcUrl, Path pluginDataDir) throws SQLException, IOException {
+  ReviewAgentConversationStore(String jdbcUrl, Path pluginDataDir)
+      throws SQLException, IOException {
     this(new ReviewAiDb(pluginDataDir, jdbcUrl));
   }
 
@@ -174,7 +175,8 @@ public class ReviewAgentConversationStore {
       Long timestampMillis) {
     try (Connection c = db.getConnection()) {
       String canonicalConversationId = canonicalConversationId(conversationId);
-      upsertConversationHeader(c, changeId, userId, canonicalConversationId, title, timestampMillis);
+      upsertConversationHeader(
+          c, changeId, userId, canonicalConversationId, title, timestampMillis);
       insertTurn(
           c,
           changeId,
@@ -201,7 +203,8 @@ public class ReviewAgentConversationStore {
       int turnIndex) {
     try (Connection c = db.getConnection()) {
       String canonicalConversationId = canonicalConversationId(conversationId);
-      upsertConversationHeader(c, changeId, userId, canonicalConversationId, title, timestampMillis);
+      upsertConversationHeader(
+          c, changeId, userId, canonicalConversationId, title, timestampMillis);
       if (hasTurn(c, changeId, userId, canonicalConversationId, turnIndex)) {
         updateTurn(c, changeId, userId, canonicalConversationId, turnIndex, turn);
       } else {
@@ -298,12 +301,14 @@ public class ReviewAgentConversationStore {
       String title,
       Long timestampMillis)
       throws SQLException {
-    String upsertSql = db.getDialect().upsert(
-        "review_agent_conversations",
-        "change_id, user_id, conversation_id, title, timestamp_millis, updated_at",
-        "?, ?, ?, ?, ?, CURRENT_TIMESTAMP",
-        "change_id, user_id, conversation_id",
-        "title = EXCLUDED.title, timestamp_millis = EXCLUDED.timestamp_millis, updated_at = CURRENT_TIMESTAMP");
+    String upsertSql =
+        db.getDialect()
+            .upsert(
+                "review_agent_conversations",
+                "change_id, user_id, conversation_id, title, timestamp_millis, updated_at",
+                "?, ?, ?, ?, ?, CURRENT_TIMESTAMP",
+                "change_id, user_id, conversation_id",
+                "title = EXCLUDED.title, timestamp_millis = EXCLUDED.timestamp_millis, updated_at = CURRENT_TIMESTAMP");
     try (PreparedStatement ps = c.prepareStatement(upsertSql)) {
       ps.setString(1, changeId);
       ps.setLong(2, userId);
@@ -397,11 +402,10 @@ public class ReviewAgentConversationStore {
   }
 
   private java.util.List<JsonObject> getTurns(
-      Connection c, String changeId, String conversationId, long userId)
-      throws SQLException {
+      Connection c, String changeId, String conversationId, long userId) throws SQLException {
     String canonicalConversationId = canonicalConversationId(conversationId);
     try (PreparedStatement ps =
-            c.prepareStatement(
+        c.prepareStatement(
             """
             SELECT turn_metadata_json
             FROM review_agent_conversation_turns

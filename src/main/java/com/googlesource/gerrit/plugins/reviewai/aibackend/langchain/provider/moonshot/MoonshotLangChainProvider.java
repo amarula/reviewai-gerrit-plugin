@@ -42,8 +42,7 @@ public class MoonshotLangChainProvider extends OpenAiCompatibleLangChainProvider
     } catch (IllegalArgumentException e) {
       if (isMoonshotModel(model)) {
         log.info(
-            "Moonshot model {} is not registered in jtokkit; using cl100k-based estimator.",
-            model);
+            "Moonshot model {} is not registered in jtokkit; using cl100k-based estimator.", model);
         log.debug("Moonshot token estimator fallback due to {}", e.getMessage(), e);
         return Optional.of(new FallbackTokenCountEstimator());
       }

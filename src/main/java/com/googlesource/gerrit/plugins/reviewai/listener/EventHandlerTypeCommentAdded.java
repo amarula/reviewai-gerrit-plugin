@@ -19,19 +19,19 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.google.gerrit.server.data.ApprovalAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.AiReviewConditionLabelResolver;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
@@ -109,8 +109,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
     boolean commentsRetrieved =
         sourceChangeMessageId == null
             ? gerritClient.retrieveComments(change, userRole)
-            : gerritClient.retrieveComments(
-                change, userRole, sourceChangeMessageId);
+            : gerritClient.retrieveComments(change, userRole, sourceChangeMessageId);
     enqueueAddressedComments();
     if (!commentsRetrieved) {
       log.debug("No new comments found for full change ID: {}", change.getFullChangeId());
@@ -157,8 +156,7 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   public void processEvent() throws Exception {
     log.debug(
         "Processing event to review comments on full change ID: {}", change.getFullChangeId());
-    reviewer.review(
-        change, AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES));
+    reviewer.review(change, AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES));
     log.debug(
         "Completed processing event for reviewing comments on full change ID: {}",
         change.getFullChangeId());

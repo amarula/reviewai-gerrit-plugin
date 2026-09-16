@@ -78,8 +78,7 @@ public class ReviewChangeStateStoreTest extends TestBase {
   }
 
   @Test
-  public void materializesLegacyConversationMessageBeforeDeletingLangChainState()
-      throws Exception {
+  public void materializesLegacyConversationMessageBeforeDeletingLangChainState() throws Exception {
     String userMessage = readResource(USER_MESSAGE_RESOURCE);
     LangChainMemoryId memoryId = new LangChainMemoryId(CHANGE_ID, 1, "requests");
     chatMemoryStore.updateMessages(memoryId, List.of(UserMessage.from(userMessage)));
@@ -102,8 +101,7 @@ public class ReviewChangeStateStoreTest extends TestBase {
         assertNull(results.getObject(1));
         JsonObject metadata = getGson().fromJson(results.getString(2), JsonObject.class);
         assertEquals(
-            userMessage,
-            metadata.getAsJsonObject("user_input").get("user_question").getAsString());
+            userMessage, metadata.getAsJsonObject("user_input").get("user_question").getAsString());
         assertFalse(results.next());
       }
     }

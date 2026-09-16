@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static java.util.stream.Collectors.toList;
@@ -26,6 +24,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -38,7 +37,6 @@ import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import org.junit.Test;
@@ -87,15 +85,11 @@ public class AiHistoryTest {
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
-                null,
-                List.of(),
-                new CommentData(List.of(), commentMap, patchSetCommentMap),
-                0),
+                null, List.of(), new CommentData(List.of(), commentMap, patchSetCommentMap), 0),
             localizer());
 
     assertEquals(
-        List.of(
-            "user:new question", "assistant:new answer", "user:final follow-up"),
+        List.of("user:new question", "assistant:new answer", "user:final follow-up"),
         historySummary(aiHistory.retrieveHistory(currentComment)));
   }
 
@@ -111,10 +105,7 @@ public class AiHistoryTest {
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
-                null,
-                List.of(),
-                new CommentData(List.of(), commentMap, new HashMap<>()),
-                1),
+                null, List.of(), new CommentData(List.of(), commentMap, new HashMap<>()), 1),
             localizer());
 
     assertEquals(
@@ -135,10 +126,7 @@ public class AiHistoryTest {
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
             new GerritClientData(
-                null,
-                List.of(),
-                new CommentData(List.of(), commentMap, new HashMap<>()),
-                0),
+                null, List.of(), new CommentData(List.of(), commentMap, new HashMap<>()), 0),
             localizer());
 
     assertEquals(
@@ -151,12 +139,12 @@ public class AiHistoryTest {
     HashMap<String, GerritComment> patchSetCommentMap =
         mapById(
             List.of(
-                patchSetComment("noise-1", "DYNAMIC CONFIGURATION SETTINGS\n\nmultiAgentMode: false"),
+                patchSetComment(
+                    "noise-1", "DYNAMIC CONFIGURATION SETTINGS\n\nmultiAgentMode: false"),
                 patchSetComment("noise-2", "```\nDYNAMIC CONFIGURATION SETTINGS\nfoo: bar\n```"),
                 patchSetComment("noise-3", "ReviewAI Message: Dynamic configuration modified"),
                 patchSetComment(
-                    "noise-4",
-                    "Uploaded patch set 2.\n\nOutdated Votes:\n* Code-Review-1"),
+                    "noise-4", "Uploaded patch set 2.\n\nOutdated Votes:\n* Code-Review-1"),
                 patchSetComment("real-1", "Please check null handling.")));
 
     AiHistory aiHistory =

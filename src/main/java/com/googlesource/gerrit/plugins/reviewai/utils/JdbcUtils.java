@@ -47,8 +47,7 @@ public class JdbcUtils {
     DatabaseMetaData metadata = c.getMetaData();
     String metadataTableName = metadataIdentifier(metadata, tableName);
     String metadataColumnName = metadataIdentifier(metadata, columnName);
-    try (ResultSet rs =
-        metadata.getColumns(null, null, metadataTableName, metadataColumnName)) {
+    try (ResultSet rs = metadata.getColumns(null, null, metadataTableName, metadataColumnName)) {
       return rs.next();
     }
   }

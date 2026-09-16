@@ -18,9 +18,9 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -74,8 +74,7 @@ class ReviewAgentEventRequestStatusUpdater {
   }
 
   void completeSupersededRequest(AiRequest request, Long newerPatchSetNumber) {
-    String message =
-        SupersededReviewNotifier.getMessage(localizer, request, newerPatchSetNumber);
+    String message = SupersededReviewNotifier.getMessage(localizer, request, newerPatchSetNumber);
     statusStore.completedForEvent(request.sourceEventId(), message);
   }
 

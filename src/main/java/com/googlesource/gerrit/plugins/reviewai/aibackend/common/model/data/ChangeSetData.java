@@ -24,16 +24,15 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Co
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
-import lombok.Data;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.Data;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RequiredArgsConstructor
 @Data
@@ -164,8 +163,7 @@ public class ChangeSetData {
     copy.setPendingReviewFeedbackCommentIds(pendingReviewFeedbackCommentIds);
     copy.setReviewFeedbackDismissalAuthorizedCommentIds(
         reviewFeedbackDismissalAuthorizedCommentIds);
-    copy.setReviewFeedbackControlAuthorizedCommentIds(
-        reviewFeedbackControlAuthorizedCommentIds);
+    copy.setReviewFeedbackControlAuthorizedCommentIds(reviewFeedbackControlAuthorizedCommentIds);
     copy.setModeratorFeaturesAllowed(moderatorFeaturesAllowed);
     copy.setReviewFeedbackClassified(reviewFeedbackClassified);
     copy.setAiRequestCancellation(aiRequestCancellation);

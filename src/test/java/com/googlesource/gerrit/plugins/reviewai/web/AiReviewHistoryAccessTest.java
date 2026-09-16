@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static org.mockito.Mockito.doThrow;
+
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.server.change.ChangeResource;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritAiReviewHistoryCollector;
@@ -24,8 +26,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-
-import static org.mockito.Mockito.doThrow;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AiReviewHistoryAccessTest {

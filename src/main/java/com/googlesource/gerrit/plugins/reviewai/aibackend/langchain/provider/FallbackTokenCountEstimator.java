@@ -29,4 +29,3 @@ public class FallbackTokenCountEstimator implements TokenCountEstimator {
     return delegate.estimateTokenCountInMessages(messages);
   }
 }
-

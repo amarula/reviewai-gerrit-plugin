@@ -65,8 +65,7 @@ public class ReviewAiDbTest extends TestBase {
 
     ReviewAiDb reloadedDb =
         new ReviewAiDb(
-            tempFolder.getRoot().toPath(),
-            buildEmbeddedTestJdbcUrl(tempFolder.getRoot().toPath()));
+            tempFolder.getRoot().toPath(), buildEmbeddedTestJdbcUrl(tempFolder.getRoot().toPath()));
     reloadedDb.initSchema();
     try (Connection c = reloadedDb.getConnection();
         Statement s = c.createStatement();
@@ -82,7 +81,8 @@ public class ReviewAiDbTest extends TestBase {
   public void preservesExistingVersionHistory() throws Exception {
     ReviewAiDb db = getTestReviewAiDb();
     Timestamp originalAppliedAt;
-    try (Connection c = db.getConnection(); Statement s = c.createStatement()) {
+    try (Connection c = db.getConnection();
+        Statement s = c.createStatement()) {
       s.execute(readDbResource("existingVersions.sql"));
       try (ResultSet rows = s.executeQuery(readDbResource("versions.sql"))) {
         assertTrue(rows.next());
@@ -220,8 +220,7 @@ public class ReviewAiDbTest extends TestBase {
     when(config.getString(ReviewAiDb.KEY_STORE_PASSWORD)).thenReturn("secret");
 
     ReviewAiDb db =
-        new ReviewAiDb(
-            tempFolder.getRoot().toPath(), "reviewai-gerrit-plugin", configFactory);
+        new ReviewAiDb(tempFolder.getRoot().toPath(), "reviewai-gerrit-plugin", configFactory);
 
     assertEquals(DbDialect.POSTGRESQL, db.getDialect());
     verify(config).getString(ReviewAiDb.KEY_STORE_USERNAME);
@@ -238,8 +237,7 @@ public class ReviewAiDbTest extends TestBase {
     when(metadata.storesLowerCaseIdentifiers()).thenReturn(true);
     when(metadata.getIdentifierQuoteString()).thenReturn("\"");
     ResultSet conversationPrimaryKey =
-        primaryKey(
-            "review_agent_conversations_pkey", List.of("change_id", "conversation_id"));
+        primaryKey("review_agent_conversations_pkey", List.of("change_id", "conversation_id"));
     ResultSet turnPrimaryKey =
         primaryKey(
             "review_agent_conversation_turns_pkey",
@@ -249,18 +247,13 @@ public class ReviewAiDbTest extends TestBase {
     when(metadata.getPrimaryKeys(null, null, "review_agent_conversation_turns"))
         .thenReturn(turnPrimaryKey);
     ResultSet noLegacyTurnContent = mock(ResultSet.class);
-    when(metadata.getColumns(
-            null,
-            null,
-            "review_agent_conversation_turns",
-            "turn_content_json"))
+    when(metadata.getColumns(null, null, "review_agent_conversation_turns", "turn_content_json"))
         .thenReturn(noLegacyTurnContent);
     when(noLegacyTurnContent.next()).thenReturn(false);
 
     ReviewAiDb db =
         org.mockito.Mockito.spy(
-            new ReviewAiDb(
-                tempFolder.getRoot().toPath(), "jdbc:postgresql://localhost/reviewai"));
+            new ReviewAiDb(tempFolder.getRoot().toPath(), "jdbc:postgresql://localhost/reviewai"));
     doReturn(connection).when(db).getConnection();
 
     db.initReviewAgentConversationSchema();

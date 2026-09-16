@@ -29,10 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class SpecializedReviewConcernIds {
   private record RawIdCheck(
-      List<String> actual,
-      List<String> duplicates,
-      List<String> unknown,
-      List<String> missing) {
+      List<String> actual, List<String> duplicates, List<String> unknown, List<String> missing) {
     boolean matches(boolean requireCompleteCoverage) {
       return duplicates.isEmpty()
           && unknown.isEmpty()
@@ -92,8 +89,7 @@ final class SpecializedReviewConcernIds {
     RawIdCheck rawIdCheck = checkRawIds(consolidatedFindings, expectedConcernIds);
     if (rawIdCheck.matches(true)) {
       log.debug(
-          "Level 2 consolidation output matched current raw concern IDs: {}",
-          rawIdCheck.actual());
+          "Level 2 consolidation output matched current raw concern IDs: {}", rawIdCheck.actual());
       return consolidatedFindings;
     }
 
@@ -110,7 +106,8 @@ final class SpecializedReviewConcernIds {
   }
 
   static SpecializedReviewFindings currentRunConflictResolutionOrFallback(
-      SpecializedReviewFindings conflictResolvedFindings, SpecializedReviewFindings fallbackFindings) {
+      SpecializedReviewFindings conflictResolvedFindings,
+      SpecializedReviewFindings fallbackFindings) {
     conflictResolvedFindings.normalize();
     fallbackFindings.normalize();
     Set<String> expectedConcernIds = new LinkedHashSet<>(mergedConcernIds(fallbackFindings));
@@ -153,9 +150,7 @@ final class SpecializedReviewConcernIds {
     copy.setScore(concern.getScore());
     copy.setRelevance(concern.getRelevance());
     copy.setLocations(
-        concern.getLocations().stream()
-            .map(SpecializedReviewConcernIds::copyLocation)
-            .toList());
+        concern.getLocations().stream().map(SpecializedReviewConcernIds::copyLocation).toList());
     return copy;
   }
 

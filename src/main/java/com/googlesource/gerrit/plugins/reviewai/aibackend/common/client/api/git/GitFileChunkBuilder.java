@@ -16,14 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git.FileEntry;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GitFileChunkBuilder {

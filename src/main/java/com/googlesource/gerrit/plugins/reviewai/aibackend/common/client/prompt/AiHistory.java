@@ -16,25 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageCleaner;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiHistory extends AiComment {
@@ -220,8 +219,7 @@ public class AiHistory extends AiComment {
         && timestamp.compareTo(forgetThreadCutoff) <= 0;
   }
 
-  private void addMessageToHistory(
-      List<AiRequestMessage> messageHistory, GerritComment comment) {
+  private void addMessageToHistory(List<AiRequestMessage> messageHistory, GerritComment comment) {
     log.debug("Adding message to history - comment: {}", comment);
     if (excludeAiConversationMessages && isAiConversationMessage(comment)) {
       log.debug("Message not added to history because it is part of the AI conversation.");
@@ -259,14 +257,17 @@ public class AiHistory extends AiComment {
   }
 
   private boolean isAiConversationMessage(GerritComment comment) {
-    return isFromAssistant(comment) || isAddressedToAssistant(comment) || isReplyToAssistant(comment);
+    return isFromAssistant(comment)
+        || isAddressedToAssistant(comment)
+        || isReplyToAssistant(comment);
   }
 
   private boolean isAddressedToAssistant(GerritComment comment) {
     if (comment == null || comment.getMessage() == null) {
       return false;
     }
-    ClientMessageCleaner cleaner = new ClientMessageCleaner(config, comment.getMessage(), localizer);
+    ClientMessageCleaner cleaner =
+        new ClientMessageCleaner(config, comment.getMessage(), localizer);
     boolean hasMention =
         !cleaner.removeMentions().getMessage().trim().equals(comment.getMessage().trim());
     return hasMention || ClientCommandBase.COMMAND_PATTERN.matcher(comment.getMessage()).find();

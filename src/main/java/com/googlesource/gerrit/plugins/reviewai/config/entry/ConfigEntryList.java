@@ -16,15 +16,14 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config.entry;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.jsonArrayToList;
+
 import com.google.gerrit.server.config.PluginConfig;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.config.entry.IConfigEntry;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.jsonArrayToList;
 
 public class ConfigEntryList extends ConfigEntryBase implements IConfigEntry {
 

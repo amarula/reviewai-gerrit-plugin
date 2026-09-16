@@ -16,10 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.InlineCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
@@ -28,12 +24,15 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class AiDataPromptBase implements IAiDataPrompt {
@@ -84,8 +83,7 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
     return messageItem;
   }
 
-  protected void setHistory(
-      AiMessageItem messageItem, List<AiRequestMessage> messageHistory) {
+  protected void setHistory(AiMessageItem messageItem, List<AiRequestMessage> messageHistory) {
     if (!messageHistory.isEmpty()) {
       messageItem.setHistory(messageHistory);
       log.debug("Set message history for message item.");

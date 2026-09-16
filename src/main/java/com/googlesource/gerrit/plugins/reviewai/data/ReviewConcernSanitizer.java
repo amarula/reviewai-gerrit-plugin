@@ -90,8 +90,7 @@ public class ReviewConcernSanitizer {
     } catch (ResourceNotFoundException e) {
       shouldClear = true;
     } catch (Exception e) {
-      log.warn(
-          "Could not resolve status of change {}; keeping its review state", changeId, e);
+      log.warn("Could not resolve status of change {}; keeping its review state", changeId, e);
       return false;
     }
 

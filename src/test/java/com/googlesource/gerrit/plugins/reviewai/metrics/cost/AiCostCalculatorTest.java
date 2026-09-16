@@ -50,8 +50,7 @@ public class AiCostCalculatorTest {
 
     assertEquals(
         2_500L,
-        AiCostCalculator.calculateNanoUsd(
-                pricing, new DetailedTokenUsage(1, 0, 1, 0, 1))
+        AiCostCalculator.calculateNanoUsd(pricing, new DetailedTokenUsage(1, 0, 1, 0, 1))
             .orElseThrow());
     assertEquals(
         1_360_005_000L,
@@ -100,8 +99,7 @@ public class AiCostCalculatorTest {
 
     assertEquals(
         701_050L,
-        AiCostCalculator.calculateNanoUsd(
-                pricing, new DetailedTokenUsage(101, 100, 201, 1, 1))
+        AiCostCalculator.calculateNanoUsd(pricing, new DetailedTokenUsage(101, 100, 201, 1, 1))
             .orElseThrow());
   }
 

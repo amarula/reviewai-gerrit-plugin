@@ -55,9 +55,7 @@ public class PatchSetReviewerTest {
   public void emptyAiResponseRetainsPositiveNeutralVote() {
     PatchSetReviewer reviewer = reviewer();
 
-    assertEquals(
-        Integer.valueOf(1),
-        reviewer.getReviewScore(change(), new AiResponseContent("")));
+    assertEquals(Integer.valueOf(1), reviewer.getReviewScore(change(), new AiResponseContent("")));
   }
 
   @Test

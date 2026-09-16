@@ -68,8 +68,7 @@ public class AiRequestStore {
         throw e;
       }
     } catch (SQLException e) {
-      throw new RuntimeException(
-          "Failed to admit AI request " + submission.requestId(), e);
+      throw new RuntimeException("Failed to admit AI request " + submission.requestId(), e);
     }
   }
 
@@ -226,8 +225,7 @@ public class AiRequestStore {
     return abandonExpiredRequests(expiredBeforeMillis, failureText).size();
   }
 
-  public List<AiRequest> abandonExpiredRequests(
-      long expiredBeforeMillis, String failureText) {
+  public List<AiRequest> abandonExpiredRequests(long expiredBeforeMillis, String failureText) {
     List<String> expiredRequestIds = new ArrayList<>();
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
@@ -503,8 +501,7 @@ public class AiRequestStore {
     }
   }
 
-  private void insert(
-      Connection connection, AiRequestSubmission submission, AiRequest.State state)
+  private void insert(Connection connection, AiRequestSubmission submission, AiRequest.State state)
       throws SQLException {
     long now = System.currentTimeMillis();
     try (PreparedStatement statement =
@@ -581,8 +578,7 @@ public class AiRequestStore {
   private Optional<AiRequest> getForUpdate(Connection connection, String requestId)
       throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement(
-            "SELECT * FROM ai_requests WHERE request_id = ? FOR UPDATE")) {
+        connection.prepareStatement("SELECT * FROM ai_requests WHERE request_id = ? FOR UPDATE")) {
       statement.setString(1, requestId);
       try (ResultSet results = statement.executeQuery()) {
         return results.next() ? Optional.of(read(results)) : Optional.empty();
@@ -667,8 +663,7 @@ public class AiRequestStore {
   }
 
   private static void bindChange(
-      PreparedStatement statement, int parameterIndex, GerritChangeRef change)
-      throws SQLException {
+      PreparedStatement statement, int parameterIndex, GerritChangeRef change) throws SQLException {
     statement.setString(parameterIndex, change.instanceId());
     statement.setInt(parameterIndex + 1, change.changeNumber());
   }

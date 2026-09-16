@@ -24,11 +24,7 @@ public final class ModelCompatibility {
   private static final String GPT_6_MODEL_PREFIX = "gpt-6";
   private static final String KIMI_K_MODEL_PREFIX = "kimi-k";
   private static final Set<String> TEMPERATURE_UNSUPPORTED_MODEL_PREFIXES =
-      Set.of(
-          GPT_5_5_MODEL_PREFIX,
-          GPT_5_6_MODEL_PREFIX,
-          GPT_6_MODEL_PREFIX,
-          KIMI_K_MODEL_PREFIX);
+      Set.of(GPT_5_5_MODEL_PREFIX, GPT_5_6_MODEL_PREFIX, GPT_6_MODEL_PREFIX, KIMI_K_MODEL_PREFIX);
 
   private ModelCompatibility() {}
 

@@ -16,8 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j

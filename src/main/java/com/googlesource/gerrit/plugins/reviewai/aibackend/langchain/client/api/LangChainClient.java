@@ -36,8 +36,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
@@ -194,7 +194,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
                 FORMAT_SPECIALIZED_HISTORICAL_REPETITION_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
     this.specializedConflictResolutionResponseFormat =
-        new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_CONFLICT_RESOLUTION_SCHEMA_RESOURCE)
+        new LangChainStructuredResponseFactory(
+                FORMAT_SPECIALIZED_CONFLICT_RESOLUTION_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
     this.specializedVerificationResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_VERIFICATION_SCHEMA_RESOURCE)
@@ -231,16 +232,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             requireInitialToolUse,
             gitRepoFiles,
             costTracker,
-            responseFormat ->
-                getProviderResponseFormat(config, this.contextTools, responseFormat));
+            responseFormat -> getProviderResponseFormat(config, this.contextTools, responseFormat));
     this.newIssueFinder = new LangChainNewIssueFinder(config);
     this.reviewFeedbackClassifier =
         new LangChainReviewFeedbackClassifier(
             config,
             costTracker,
             localizer,
-            responseFormat ->
-                getProviderResponseFormat(config, List.of(), responseFormat));
+            responseFormat -> getProviderResponseFormat(config, List.of(), responseFormat));
     ResponseFormat specializedToolExecutorResponseFormat =
         getProviderResponseFormat(config, contextTools, specializedRepliesResponseFormat);
     this.specializedRepliesToolExecutor =
@@ -301,13 +300,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             config,
             concernLedgerOperations,
             this::reviewFeedback,
-            (data, change, patchSet) -> toConcernWorkflowResult(
-                askSingleRequest(data, change, patchSet)),
+            (data, change, patchSet) ->
+                toConcernWorkflowResult(askSingleRequest(data, change, patchSet)),
             this::reviewConcerns,
             (data, change, concerns, incrementalPatch, fullPatch) ->
                 toConcernWorkflowResult(
-                    findNewIssueReplies(
-                        data, change, concerns, incrementalPatch, fullPatch)));
+                    findNewIssueReplies(data, change, concerns, incrementalPatch, fullPatch)));
     log.debug("Initialized LangChainClient");
   }
 
@@ -339,7 +337,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       ICodeContextPolicy codeContextPolicy,
       GerritClient gerritClient,
       Localizer localizer) {
-    this(config, codeContextPolicy, gerritClient, localizer, null, null, null, new ReviewAiMetrics());
+    this(
+        config,
+        codeContextPolicy,
+        gerritClient,
+        localizer,
+        null,
+        null,
+        null,
+        new ReviewAiMetrics());
   }
 
   @Override
@@ -423,8 +429,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         });
   }
 
-  protected ReviewFeedbackMemory reviewFeedback(
-      ChangeSetData changeSetData, GerritChange change) throws Exception {
+  protected ReviewFeedbackMemory reviewFeedback(ChangeSetData changeSetData, GerritChange change)
+      throws Exception {
     ReviewFeedbackMemory currentMemory = changeSetData.getReviewFeedbackMemory();
     boolean hasPendingComments =
         changeSetData.getPendingReviewFeedbackCommentIds() != null
@@ -449,8 +455,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
         changeSetData.getPendingReviewFeedbackCommentIds() != null
             && !changeSetData.getPendingReviewFeedbackCommentIds().isEmpty();
     boolean hasConditionLabels =
-        changeSetData.getConditionLabels() != null
-            && !changeSetData.getConditionLabels().isEmpty();
+        changeSetData.getConditionLabels() != null && !changeSetData.getConditionLabels().isEmpty();
     return hasPendingComments || hasConditionLabels;
   }
 
@@ -658,14 +663,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return shouldUseConversationHistory(changeSetData)
-        && !isForgetThreadRequested(changeSetData);
+    return shouldUseConversationHistory(changeSetData) && !isForgetThreadRequested(changeSetData);
   }
 
   protected boolean shouldUseConversationHistory(ChangeSetData changeSetData) {
     return changeSetData == null
-        || changeSetData.getReviewAssistantStage()
-            != ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK;
+        || changeSetData.getReviewAssistantStage() != ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK;
   }
 
   protected boolean isForgetThreadRequested(ChangeSetData changeSetData) {
@@ -686,8 +689,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     }
     if (!messages.isEmpty()) {
       log.info(
-          "Clearing LangChain memory {} because stored system instructions are stale",
-          memory.id());
+          "Clearing LangChain memory {} because stored system instructions are stale", memory.id());
       memory.clear();
     }
     memory.add(LangChainChatMessages.systemMessage(systemInstructions));
@@ -754,14 +756,13 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     if (forgetThreadRequested) {
       conversation.clearCurrentConversation();
     }
-    boolean existingConversation =
-        !forgetThreadRequested && conversation.hasExistingConversation();
-    return new ConversationResolution(
-        conversation.resolveConversationId(), existingConversation);
+    boolean existingConversation = !forgetThreadRequested && conversation.hasExistingConversation();
+    return new ConversationResolution(conversation.resolveConversationId(), existingConversation);
   }
 
   @VisibleForTesting
-  protected OpenAiConversation openAiConversation(ChangeSetData changeSetData, GerritChange change) {
+  protected OpenAiConversation openAiConversation(
+      ChangeSetData changeSetData, GerritChange change) {
     return new OpenAiConversation(
         config,
         pluginDataHandlerProvider,
@@ -779,8 +780,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldUseOpenAiConversation(AiProviderType providerType) {
-    return shouldUseOpenAiResponses(providerType)
-        && (config == null || !config.getAiProviderZdr());
+    return shouldUseOpenAiResponses(providerType) && (config == null || !config.getAiProviderZdr());
   }
 
   protected boolean requireOpenAiScopeForExistingReviewContext() {
@@ -852,8 +852,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
             case REVIEW_CONCERNS -> concernReviewer.getResponseFormat();
             case CLASSIFY_REVIEW_FEEDBACK -> reviewFeedbackClassifier.getResponseFormat();
             case REVIEW_SPECIALIZED_TRIAGE -> specializedTriageResponseFormat;
-            case REVIEW_SPECIALIZED_CONSOLIDATION ->
-                specializedConsolidationResponseFormat;
+            case REVIEW_SPECIALIZED_CONSOLIDATION -> specializedConsolidationResponseFormat;
             case REVIEW_SPECIALIZED_HISTORICAL_REPETITION ->
                 specializedHistoricalRepetitionResponseFormat;
             case REVIEW_SPECIALIZED_CONFLICT_RESOLUTION ->

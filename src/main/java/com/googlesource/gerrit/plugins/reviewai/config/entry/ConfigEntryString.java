@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.config.entry;
 
 import com.google.gerrit.server.config.PluginConfig;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.config.entry.IConfigEntry;
-
 import java.util.Map;
 
 public class ConfigEntryString extends ConfigEntryBase implements IConfigEntry {

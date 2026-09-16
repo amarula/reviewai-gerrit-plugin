@@ -40,7 +40,8 @@ class TreeOutputCompressor {
   }
 
   String format(List<String> paths, String subdir) {
-    List<String> providedPaths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
+    List<String> providedPaths =
+        paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
     String fullOutput = String.join("\n", providedPaths);
     if (fullOutput.length() <= maxLength) {
       return fullOutput;

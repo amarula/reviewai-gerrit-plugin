@@ -16,9 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.gson.reflect.TypeToken;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
 import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.core.ObjectMappers;
@@ -30,16 +34,14 @@ import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseFormatTextJsonSchemaConfig;
 import com.openai.models.responses.ResponseFunctionToolCall;
-import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseIncludable;
+import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseOutputItem;
 import com.openai.models.responses.ResponseOutputMessage;
 import com.openai.models.responses.ResponseStatus;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.ResponseUsage;
 import com.openai.models.responses.ToolChoiceOptions;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.metrics.cost.DetailedTokenUsage;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -66,14 +68,11 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-
 @Slf4j
 public class OpenAiResponsesChatModel implements ChatModel {
   private static final boolean STRICT_RESPONSE_SCHEMA = true;
   private static final boolean STRICT_TOOL_SCHEMA = false;
-  private static final String RESPONSE_OUTPUT_ITEMS_ATTRIBUTE =
-      "openai.responses.output_items";
+  private static final String RESPONSE_OUTPUT_ITEMS_ATTRIBUTE = "openai.responses.output_items";
   private static final JsonMapper OPENAI_JSON_MAPPER = ObjectMappers.jsonMapper();
 
   private final Configuration config;
@@ -150,9 +149,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
       builder.conversation(conversationId);
     }
     if (stateless) {
-      builder
-          .store(false)
-          .include(List.of(ResponseIncludable.REASONING_ENCRYPTED_CONTENT));
+      builder.store(false).include(List.of(ResponseIncludable.REASONING_ENCRYPTED_CONTENT));
     }
     if (instructions != null) {
       builder.instructions(instructions);
@@ -203,7 +200,8 @@ public class OpenAiResponsesChatModel implements ChatModel {
       if (message instanceof SystemMessage) {
         continue;
       } else if (message instanceof UserMessage userMessage) {
-        inputItems.add(toEasyInputMessage(EasyInputMessage.Role.USER, extractUserText(userMessage)));
+        inputItems.add(
+            toEasyInputMessage(EasyInputMessage.Role.USER, extractUserText(userMessage)));
       } else if (message instanceof AiMessage aiMessage) {
         if (stateless && appendStoredResponseOutputItems(inputItems, aiMessage)) {
           continue;
@@ -352,8 +350,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
   private Map<String, JsonValue> toJsonValueMap(Object object) {
     Map<String, Object> source =
         getGson()
-            .fromJson(
-                getGson().toJson(object), new TypeToken<Map<String, Object>>() {}.getType());
+            .fromJson(getGson().toJson(object), new TypeToken<Map<String, Object>>() {}.getType());
     Map<String, JsonValue> values = new LinkedHashMap<>();
     if (source == null) {
       return values;
@@ -463,8 +460,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
         && ResponseStatus.INCOMPLETE.equals(response.status().get())) {
       return FinishReason.LENGTH;
     }
-    if (response.status().isPresent()
-        && ResponseStatus.COMPLETED.equals(response.status().get())) {
+    if (response.status().isPresent() && ResponseStatus.COMPLETED.equals(response.status().get())) {
       return FinishReason.STOP;
     }
     return FinishReason.OTHER;

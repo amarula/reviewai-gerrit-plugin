@@ -16,11 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch.CodeFinderDiff;
@@ -48,8 +47,7 @@ public class CodeFinderTest {
       throws IOException {
     List<String> lines = readResourceLines(BLE_TEST_CHUNK);
     int managerLineNumber = lines.indexOf(ORIGINAL_MANAGER_LINE) + 1;
-    List<String> snippetLines =
-        lines.subList(managerLineNumber - 1, managerLineNumber + 2);
+    List<String> snippetLines = lines.subList(managerLineNumber - 1, managerLineNumber + 2);
     CodeFinder codeFinder = createCodeFinder(lines);
     AiReplyItem replyItem =
         AiReplyItem.builder()

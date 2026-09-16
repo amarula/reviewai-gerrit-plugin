@@ -48,8 +48,7 @@ public class AiReviewConditionLabelResolverTest {
             "Build-Check",
             new GerritConditionLabel(List.of(), null)),
         resolver.resolve(
-            CHANGE_ID,
-            "label:Verified=+1 OR (label:\"Code-Review>=2\" AND -label:Build-Check-1)"));
+            CHANGE_ID, "label:Verified=+1 OR (label:\"Code-Review>=2\" AND -label:Build-Check-1)"));
   }
 
   @Test
@@ -59,9 +58,7 @@ public class AiReviewConditionLabelResolverTest {
         CHANGE_ID,
         Map.of(
             "Verified",
-            label(
-                "CI verification",
-                approval(1001, -1), approval(1002, 1), approval(1003, 1))));
+            label("CI verification", approval(1001, -1), approval(1002, 1), approval(1003, 1))));
 
     assertEquals(
         Map.of(

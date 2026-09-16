@@ -44,8 +44,7 @@ final class LangChainNewIssueFinder {
     ChangeSetData finderData = changeSetData.copy();
     finderData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     finderData.setForcedStagedReview(true);
-    finderData.setReviewAssistantStageConversationSuffix(
-        conversationSuffix(reviewedConcerns));
+    finderData.setReviewAssistantStageConversationSuffix(conversationSuffix(reviewedConcerns));
     finderData.setConcernWorkflowInput(
         LangChainConcernWorkflowInputFactory.create(
             config,
@@ -65,7 +64,6 @@ final class LangChainNewIssueFinder {
 
   @FunctionalInterface
   interface RequestExecutor<T> {
-    T execute(ChangeSetData changeSetData, GerritChange change, String patchSet)
-        throws Exception;
+    T execute(ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception;
   }
 }

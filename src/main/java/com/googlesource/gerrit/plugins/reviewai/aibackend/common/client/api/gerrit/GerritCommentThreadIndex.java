@@ -34,8 +34,7 @@ import java.util.function.Predicate;
 public class GerritCommentThreadIndex {
   private static final Comparator<GerritComment> COMMENT_ORDER =
       Comparator.comparing(
-              GerritCommentThreadIndex::timestamp,
-              Comparator.nullsLast(Comparator.naturalOrder()))
+              GerritCommentThreadIndex::timestamp, Comparator.nullsLast(Comparator.naturalOrder()))
           .thenComparing(GerritComment::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
   private final Map<String, GerritComment> commentsById = new HashMap<>();

@@ -58,7 +58,6 @@ public final class ReviewAiUser {
     if (aiAccountId != null && matches(author.accountId, aiAccountId.get())) {
       return true;
     }
-    return Objects.equals(aiUserName, author.username)
-        || Objects.equals(aiUserEmail, author.email);
+    return Objects.equals(aiUserName, author.username) || Objects.equals(aiUserEmail, author.email);
   }
 }

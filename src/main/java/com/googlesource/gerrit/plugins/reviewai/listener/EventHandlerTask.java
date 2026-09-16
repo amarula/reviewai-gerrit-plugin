@@ -26,26 +26,25 @@ import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
-import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
-import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
+import com.googlesource.gerrit.plugins.reviewai.web.AiReviewPermission;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class EventHandlerTask implements Runnable {
@@ -145,8 +144,7 @@ public class EventHandlerTask implements Runnable {
 
   public Result execute(String requestedSourceEventId) {
     PreparedEventHandlerTask preparedTask = prepareForIntake(requestedSourceEventId);
-    if (preparedTask.decision().disposition()
-        == AiRequestIntakeDecision.Disposition.IGNORE) {
+    if (preparedTask.decision().disposition() == AiRequestIntakeDecision.Disposition.IGNORE) {
       preparedTask.discard();
       return Result.NOT_SUPPORTED;
     }
@@ -222,9 +220,7 @@ public class EventHandlerTask implements Runnable {
       return AiRequestIntakeClassifier.patchSetReview();
     }
     return AiRequestIntakeClassifier.comment(
-        commentAddressed,
-        Boolean.TRUE.equals(changeSetData.getDeferredReview()),
-        changeSetData);
+        commentAddressed, Boolean.TRUE.equals(changeSetData.getDeferredReview()), changeSetData);
   }
 
   private void captureCommentEventContext() {
@@ -246,10 +242,8 @@ public class EventHandlerTask implements Runnable {
 
   private IEventHandlerType getEventHandlerType() {
     Change.Id changeId = change.getChangeNumber().map(Change::id).orElse(null);
-    AiRole userRole =
-        roleResolver.resolve(config, eventUser, change.getProjectNameKey(), changeId);
-    administratorUser =
-        AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES);
+    AiRole userRole = roleResolver.resolve(config, eventUser, change.getProjectNameKey(), changeId);
+    administratorUser = AiRolePolicy.isAllowed(userRole, AiAction.USE_ADMINISTRATOR_FEATURES);
     return switch (processing_event_type) {
       case PATCH_SET_CREATED ->
           new EventHandlerTypePatchSetReview(
@@ -326,5 +320,4 @@ public class EventHandlerTask implements Runnable {
       return Optional.empty();
     }
   }
-
 }

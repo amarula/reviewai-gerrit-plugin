@@ -74,13 +74,11 @@ public class AiRequestIntakeClassifierTest {
 
   @Test
   public void invalidatesActiveReviewForConversationMutations() {
-    for (CommandSet command :
-        new CommandSet[] {CommandSet.FORGET_THREAD, CommandSet.CONFIGURE}) {
+    for (CommandSet command : new CommandSet[] {CommandSet.FORGET_THREAD, CommandSet.CONFIGURE}) {
       ChangeSetData data = changeSetData();
       addCommand(data, command);
 
-      AiRequestIntakeDecision decision =
-          AiRequestIntakeClassifier.comment(true, false, data);
+      AiRequestIntakeDecision decision = AiRequestIntakeClassifier.comment(true, false, data);
       assertEquals(AiRequestIntakeDecision.Disposition.DIRECT, decision.disposition());
       assertEquals(true, decision.supersedesActiveReview());
     }
@@ -91,8 +89,7 @@ public class AiRequestIntakeClassifierTest {
     ChangeSetData data = changeSetData();
     addCommand(data, CommandSet.DIRECTIVES);
 
-    AiRequestIntakeDecision decision =
-        AiRequestIntakeClassifier.comment(true, false, data);
+    AiRequestIntakeDecision decision = AiRequestIntakeClassifier.comment(true, false, data);
     assertEquals(AiRequestIntakeDecision.Disposition.DIRECT, decision.disposition());
     assertEquals(false, decision.supersedesActiveReview());
   }
@@ -124,9 +121,7 @@ public class AiRequestIntakeClassifierTest {
   }
 
   private static void assertPersistent(
-      AiRequestIntakeDecision decision,
-      AiRequest.Kind kind,
-      AiRequest.AdmissionPolicy policy) {
+      AiRequestIntakeDecision decision, AiRequest.Kind kind, AiRequest.AdmissionPolicy policy) {
     assertEquals(AiRequestIntakeDecision.Disposition.PERSIST, decision.disposition());
     assertEquals(kind, decision.kind());
     assertEquals(policy, decision.admissionPolicy());

@@ -16,12 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
-
-import java.util.List;
-
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.prettyStringifyObject;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import java.util.List;
 
 public class DebugCodeBlocksReview extends DebugCodeBlocksComposer {
   private static final String HIDDEN_REPLY = "hidden: %s";

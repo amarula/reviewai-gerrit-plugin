@@ -27,20 +27,26 @@ import lombok.experimental.SuperBuilder;
 public class AiReplyItem extends AiDialogueItem {
   @SerializedName("concern_id")
   private String concernId;
+
   private String reply;
   private Double score;
   private Double relevance;
   private boolean repeated;
   private boolean duplicated;
   private boolean conflicting;
+
   @SerializedName("source_agent")
   private String sourceAgent;
+
   @SerializedName("repetition_reply_id")
   private String repetitionReplyId;
+
   @SerializedName("repeated_reason")
   private String repeatedReason;
+
   @SerializedName("duplicated_reason")
   private String duplicatedReason;
+
   @SerializedName("conflicting_reason")
   private String conflictingReason;
 }

@@ -68,8 +68,7 @@ public class GerritClient {
     return gerritClientFacade.retrieveComments(change, userRole);
   }
 
-  public boolean retrieveComments(
-      GerritChange change, AiRole userRole, String changeMessageId) {
+  public boolean retrieveComments(GerritChange change, AiRole userRole, String changeMessageId) {
     return gerritClientFacade.retrieveComments(change, userRole, changeMessageId);
   }
 

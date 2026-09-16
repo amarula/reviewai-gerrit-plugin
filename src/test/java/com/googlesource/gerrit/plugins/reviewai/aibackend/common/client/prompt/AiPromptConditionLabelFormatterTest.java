@@ -43,8 +43,7 @@ public class AiPromptConditionLabelFormatterTest {
         AiPromptConditionLabelFormatter.format(
             Map.of(
                 "Verified",
-                new GerritConditionLabel(
-                    List.of((short) -1, (short) 1), "CI verification"),
+                new GerritConditionLabel(List.of((short) -1, (short) 1), "CI verification"),
                 "Code-Review",
                 new GerritConditionLabel(List.of(), null)),
             localizer::getText));
@@ -62,16 +61,12 @@ public class AiPromptConditionLabelFormatterTest {
     assertEquals(
         expected,
         AiPromptConditionLabelFormatter.format(
-            Map.of(
-                "Verified",
-                new GerritConditionLabel(List.of((short) 0, (short) 1), null)),
+            Map.of("Verified", new GerritConditionLabel(List.of((short) 0, (short) 1), null)),
             localizer::getText));
     assertEquals(
         expected,
         AiPromptConditionLabelFormatter.format(
-            Map.of(
-                "Verified",
-                new GerritConditionLabel(List.of((short) 0, (short) 1), "  ")),
+            Map.of("Verified", new GerritConditionLabel(List.of((short) 0, (short) 1), "  ")),
             localizer::getText));
   }
 

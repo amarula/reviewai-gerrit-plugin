@@ -168,9 +168,7 @@ public class ClientCommandParserTest {
       ChangeSetData changeSetData = new ChangeSetData(1);
       ClientCommandParser parser = parserForRole(changeSetData, AiRole.ADMINISTRATOR);
 
-      assertTrue(
-          parser.parseCommands(
-              "/forget_thread /show --config /review --debug", false));
+      assertTrue(parser.parseCommands("/forget_thread /show --config /review --debug", false));
 
       assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
       assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.SHOW));

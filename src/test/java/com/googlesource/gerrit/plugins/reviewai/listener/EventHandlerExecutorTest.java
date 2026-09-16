@@ -57,8 +57,7 @@ public class EventHandlerExecutorTest {
     Injector injector = mock(Injector.class);
     Injector childInjector = mock(Injector.class);
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
-    TopicPatchSetReviewCoordinator topicCoordinator =
-        mock(TopicPatchSetReviewCoordinator.class);
+    TopicPatchSetReviewCoordinator topicCoordinator = mock(TopicPatchSetReviewCoordinator.class);
     EventHandlerTask task = mock(EventHandlerTask.class);
     PreparedEventHandlerTask preparedTask = mock(PreparedEventHandlerTask.class);
     AtomicReference<AiRequestSubmission> admitted = new AtomicReference<>();
@@ -69,8 +68,7 @@ public class EventHandlerExecutorTest {
     when(preparedTask.decision())
         .thenReturn(
             AiRequestIntakeDecision.persistent(
-                AiRequest.Kind.REVIEW,
-                AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
+                AiRequest.Kind.REVIEW, AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
     doAnswer(
             invocation -> {
               invocation.<Runnable>getArgument(0).run();
@@ -97,9 +95,7 @@ public class EventHandlerExecutorTest {
     executor.execute(mock(Configuration.class), event);
 
     assertEquals(AiRequest.Kind.REVIEW, admitted.get().kind());
-    assertEquals(
-        AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
-        admitted.get().admissionPolicy());
+    assertEquals(AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED, admitted.get().admissionPolicy());
     assertEquals(
         AiRequestDescriptor.EventType.PATCH_SET_CREATED,
         AiRequestDescriptor.fromJson(admitted.get().payloadJson()).eventType());
@@ -149,8 +145,7 @@ public class EventHandlerExecutorTest {
 
     executor.execute(config, event);
 
-    verify(notifier)
-        .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq(3L));
+    verify(notifier).publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq(3L));
     verify(statusUpdater).completeSupersededRequest(supersededRequest, 3L);
     verify(coordinator).submitIntake(any());
   }
@@ -201,8 +196,7 @@ public class EventHandlerExecutorTest {
     executor.execute(config, event);
 
     verify(notifier)
-        .publish(
-            eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
+        .publish(eq(config), any(GerritChange.class), eq(supersededRequest), eq((Long) null));
     verify(statusUpdater).completeSupersededRequest(supersededRequest, null);
     verify(preparedTask).execute();
   }
@@ -221,8 +215,7 @@ public class EventHandlerExecutorTest {
     when(preparedTask.decision())
         .thenReturn(
             AiRequestIntakeDecision.persistent(
-                AiRequest.Kind.REVIEW,
-                AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
+                AiRequest.Kind.REVIEW, AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED));
     when(preparedTask.sourceEventId()).thenReturn("change-message-id");
     when(preparedTask.reject()).thenReturn(EventHandlerTask.Result.OK);
     doAnswer(
@@ -253,8 +246,7 @@ public class EventHandlerExecutorTest {
   }
 
   @Test
-  public void marksExactPendingStatusFailedWhenExpiredRequestIsRecovered()
-      throws Exception {
+  public void marksExactPendingStatusFailedWhenExpiredRequestIsRecovered() throws Exception {
     Injector injector = mock(Injector.class);
     Injector childInjector = mock(Injector.class);
     AiRequestCoordinator coordinator = mock(AiRequestCoordinator.class);
@@ -283,8 +275,7 @@ public class EventHandlerExecutorTest {
             mock(TopicPatchSetReviewCoordinator.class),
             mock(ClientCommandExtension.class));
     String sourceEventId = "change-message-id";
-    AiRequestDescriptor descriptor =
-        AiRequestDescriptor.from(commentAddedEvent(), sourceEventId);
+    AiRequestDescriptor descriptor = AiRequestDescriptor.from(commentAddedEvent(), sourceEventId);
     AiRequestSubmission submission =
         new AiRequestSubmission(
             "request-id",
@@ -297,8 +288,7 @@ public class EventHandlerExecutorTest {
         ArgumentCaptor.forClass(AiRequestCoordinator.RecoveryProcessor.class);
 
     executor.start();
-    verify(coordinator)
-        .start(any(AiRequestCoordinator.RequestProcessor.class), recovery.capture());
+    verify(coordinator).start(any(AiRequestCoordinator.RequestProcessor.class), recovery.capture());
     recovery.getValue().recover(request(submission, AiRequest.State.ABANDONED));
 
     verify(pendingRequest).fail(any());
@@ -308,8 +298,7 @@ public class EventHandlerExecutorTest {
     return request(submission, AiRequest.State.QUEUED);
   }
 
-  private static AiRequest request(
-      AiRequestSubmission submission, AiRequest.State state) {
+  private static AiRequest request(AiRequestSubmission submission, AiRequest.State state) {
     return new AiRequest(
         1,
         submission.requestId(),
@@ -364,8 +353,7 @@ public class EventHandlerExecutorTest {
     return event;
   }
 
-  private static ChangeAttribute changeAttribute(
-      Project.NameKey project, BranchNameKey branch) {
+  private static ChangeAttribute changeAttribute(Project.NameKey project, BranchNameKey branch) {
     ChangeAttribute attribute = new ChangeAttribute();
     attribute.project = project.get();
     attribute.branch = branch.branch();

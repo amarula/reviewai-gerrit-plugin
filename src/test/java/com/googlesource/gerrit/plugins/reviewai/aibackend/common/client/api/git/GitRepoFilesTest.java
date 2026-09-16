@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,12 +26,12 @@ import com.google.gerrit.entities.BranchNameKey;
 import com.google.gerrit.entities.Project;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import org.eclipse.jgit.api.Git;
@@ -176,7 +174,8 @@ public class GitRepoFilesTest extends TestBase {
     git.branchCreate().setName(SPECIALIZED_BRANCH).call();
     git.checkout().setName(SPECIALIZED_BRANCH).call();
     Path workTree = git.getRepository().getWorkTree().toPath();
-    Files.copy(SPECIALIZED_BRANCH_CONTENT, workTree.resolve(SPECIALIZED_BRANCH_CONTENT.getFileName()));
+    Files.copy(
+        SPECIALIZED_BRANCH_CONTENT, workTree.resolve(SPECIALIZED_BRANCH_CONTENT.getFileName()));
     git.add().addFilepattern(SPECIALIZED_BRANCH_CONTENT.getFileName().toString()).call();
     return git.commit()
         .setMessage("Add specialized branch content")

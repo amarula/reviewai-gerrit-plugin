@@ -22,9 +22,9 @@ import com.google.gerrit.server.IdentifiedUser;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackStore;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
@@ -71,12 +71,9 @@ public final class ReviewFeedbackLifecycle {
     }
     ReviewFeedbackStore.Claim claim = publisher.claimPending(change);
     changeSetData.setPendingReviewFeedbackCommentIds(claim.commentIds());
-    Set<String> moderatorAuthorizedCommentIds =
-        moderatorAuthorizedCommentIds(change, claim);
-    changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(
-        moderatorAuthorizedCommentIds);
-    changeSetData.setReviewFeedbackControlAuthorizedCommentIds(
-        moderatorAuthorizedCommentIds);
+    Set<String> moderatorAuthorizedCommentIds = moderatorAuthorizedCommentIds(change, claim);
+    changeSetData.setReviewFeedbackDismissalAuthorizedCommentIds(moderatorAuthorizedCommentIds);
+    changeSetData.setReviewFeedbackControlAuthorizedCommentIds(moderatorAuthorizedCommentIds);
     return claim.isEmpty() ? Session.empty() : new Session(claim);
   }
 
@@ -84,9 +81,7 @@ public final class ReviewFeedbackLifecycle {
       GerritChange change, ReviewFeedbackStore.Claim claim) {
     Change.Id changeId = change.getChangeNumber().map(Change::id).orElse(null);
     return claim.authorAccountIds().entrySet().stream()
-        .filter(
-            entry ->
-                canUseModeratorFeatures(change, changeId, entry.getValue()))
+        .filter(entry -> canUseModeratorFeatures(change, changeId, entry.getValue()))
         .map(java.util.Map.Entry::getKey)
         .collect(Collectors.toUnmodifiableSet());
   }
@@ -111,24 +106,19 @@ public final class ReviewFeedbackLifecycle {
   }
 
   void settle(
-      GerritChange change,
-      ChangeSetData changeSetData,
-      Session session,
-      boolean reviewSucceeded) {
+      GerritChange change, ChangeSetData changeSetData, Session session, boolean reviewSucceeded) {
     if (!session.isActive()) {
       return;
     }
     if (reviewSucceeded && changeSetData.isReviewFeedbackClassified()) {
-      publisher.complete(
-          change, session.claim, changeSetData.getReviewFeedbackMemory());
+      publisher.complete(change, session.claim, changeSetData.getReviewFeedbackMemory());
     } else {
       publisher.release(change, session.claim);
     }
     session.settled = true;
   }
 
-  void release(
-      GerritChange change, Session session, Exception failure) {
+  void release(GerritChange change, Session session, Exception failure) {
     if (!session.isActive()) {
       return;
     }

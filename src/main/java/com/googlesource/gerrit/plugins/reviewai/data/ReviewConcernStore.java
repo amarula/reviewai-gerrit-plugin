@@ -105,8 +105,7 @@ public final class ReviewConcernStore {
   public static void clear(ReviewAiDb db, String changeId) {
     try (Connection connection = db.getConnection();
         PreparedStatement statement =
-            connection.prepareStatement(
-                "DELETE FROM review_concern_ledgers WHERE change_id = ?")) {
+            connection.prepareStatement("DELETE FROM review_concern_ledgers WHERE change_id = ?")) {
       statement.setString(1, changeId);
       statement.executeUpdate();
     } catch (SQLException e) {
@@ -124,9 +123,7 @@ public final class ReviewConcernStore {
             """)) {
       statement.setString(1, changeId);
       try (ResultSet results = statement.executeQuery()) {
-        return results.next()
-            ? new LedgerMetadata(results.getInt(1), results.getString(2))
-            : null;
+        return results.next() ? new LedgerMetadata(results.getInt(1), results.getString(2)) : null;
       }
     }
   }
@@ -187,8 +184,7 @@ public final class ReviewConcernStore {
     }
   }
 
-  private void upsertLedger(Connection connection, ReviewConcernLedger ledger)
-      throws SQLException {
+  private void upsertLedger(Connection connection, ReviewConcernLedger ledger) throws SQLException {
     String sql =
         db.getDialect()
             .upsert(
@@ -209,8 +205,7 @@ public final class ReviewConcernStore {
 
   private void deleteReviewerRows(Connection connection) throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement(
-            "DELETE FROM review_concern_reviewers WHERE change_id = ?")) {
+        connection.prepareStatement("DELETE FROM review_concern_reviewers WHERE change_id = ?")) {
       statement.setString(1, changeId);
       statement.executeUpdate();
     }
@@ -301,7 +296,9 @@ public final class ReviewConcernStore {
         throw new IllegalArgumentException("Review concern ledger contains a missing reviewer");
       }
       ConcernReviewerId reviewer = reviewerConcerns.getReviewer();
-      if (reviewer.getKind() == null || reviewer.getName() == null || reviewer.getName().isBlank()) {
+      if (reviewer.getKind() == null
+          || reviewer.getName() == null
+          || reviewer.getName().isBlank()) {
         throw new IllegalArgumentException("Review concern ledger contains an invalid reviewer");
       }
       String reviewerKey = reviewer.getKind().name() + '\u0000' + reviewer.getName();

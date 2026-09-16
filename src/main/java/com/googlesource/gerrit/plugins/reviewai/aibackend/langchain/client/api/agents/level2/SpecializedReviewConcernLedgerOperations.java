@@ -50,9 +50,7 @@ final class SpecializedReviewConcernLedgerOperations {
       SpecializedReviewFindings verificationCandidates,
       List<SpecializedReviewFindings.AgentFindings> rawFindings) {
     ReviewConcernLedger updates = new ReviewConcernLedger();
-    if (response == null
-        || response.getReplies() == null
-        || verificationCandidates == null) {
+    if (response == null || response.getReplies() == null || verificationCandidates == null) {
       return updates;
     }
 
@@ -91,23 +89,17 @@ final class SpecializedReviewConcernLedgerOperations {
 
       List<ConcernReviewerId> reviewers =
           sourceAgents.stream()
-              .map(
-                  agent ->
-                      new ConcernReviewerId(
-                          ConcernReviewerId.Kind.SPECIALIZED_AGENT, agent))
+              .map(agent -> new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, agent))
               .toList();
       Optional<String> owner =
-          SpecializedReviewConcernOwnership.canonicalOwner(
-              verifiedConcern.getOwnerAgent());
+          SpecializedReviewConcernOwnership.canonicalOwner(verifiedConcern.getOwnerAgent());
       if (owner.isEmpty()) {
-        throw new IllegalStateException(
-            "Verified specialized concern has no valid owner_agent");
+        throw new IllegalStateException("Verified specialized concern has no valid owner_agent");
       }
       ReviewConcern ledgerConcern = verifiedLedgerConcern(verifiedConcern, reply, reviewers);
       reply.setConcernId(ledgerConcern.getId());
       ConcernReviewerId reviewer =
-          new ConcernReviewerId(
-              ConcernReviewerId.Kind.SPECIALIZED_AGENT, owner.get());
+          new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, owner.get());
       List<ReviewConcern> reviewerUpdates =
           concernsByReviewer.computeIfAbsent(reviewer, unused -> new ArrayList<>());
       if (reviewerUpdates.stream()
@@ -169,8 +161,7 @@ final class SpecializedReviewConcernLedgerOperations {
           continue;
         }
         replies.add(
-            ledgerOperations.toPresentReply(
-                previousLedger, reviewed.getReviewer(), concern));
+            ledgerOperations.toPresentReply(previousLedger, reviewed.getReviewer(), concern));
       }
     }
     replies.addAll(response.getReplies());
@@ -198,9 +189,7 @@ final class SpecializedReviewConcernLedgerOperations {
       String agent = normalizedAgentName(agentFindings.getAgent());
       for (ReviewConcern concern : agentFindings.getConcerns()) {
         for (String concernId : SpecializedReviewConcernIds.rawConcernIds(concern)) {
-          agentsByConcernId
-              .computeIfAbsent(concernId, unused -> new LinkedHashSet<>())
-              .add(agent);
+          agentsByConcernId.computeIfAbsent(concernId, unused -> new LinkedHashSet<>()).add(agent);
         }
       }
     }
@@ -208,9 +197,7 @@ final class SpecializedReviewConcernLedgerOperations {
   }
 
   private ReviewConcern verifiedLedgerConcern(
-      ReviewConcern verifiedConcern,
-      AiReplyItem reply,
-      List<ConcernReviewerId> reviewers) {
+      ReviewConcern verifiedConcern, AiReplyItem reply, List<ConcernReviewerId> reviewers) {
     ReviewConcern ledgerConcern = SpecializedReviewConcernIds.copyConcern(verifiedConcern);
     List<String> rawConcernIds = SpecializedReviewConcernIds.rawConcernIds(verifiedConcern);
     if (ledgerConcern.getId() == null || ledgerConcern.getId().isBlank()) {
@@ -257,6 +244,5 @@ final class SpecializedReviewConcernLedgerOperations {
   }
 
   record AgentFollowUp(
-      SpecializedReviewFindings.AgentFindings findings,
-      ReviewerConcerns reviewedConcerns) {}
+      SpecializedReviewFindings.AgentFindings findings, ReviewerConcerns reviewedConcerns) {}
 }

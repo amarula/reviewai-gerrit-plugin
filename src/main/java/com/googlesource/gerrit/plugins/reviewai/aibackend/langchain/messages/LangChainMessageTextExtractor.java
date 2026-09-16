@@ -17,10 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages;
 
 import dev.langchain4j.data.message.ChatMessage;
-import lombok.extern.slf4j.Slf4j;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public final class LangChainMessageTextExtractor {

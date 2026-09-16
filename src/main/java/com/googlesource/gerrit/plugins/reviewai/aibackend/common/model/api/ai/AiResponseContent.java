@@ -17,11 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import java.util.List;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-
-import java.util.List;
 
 @Data
 @RequiredArgsConstructor

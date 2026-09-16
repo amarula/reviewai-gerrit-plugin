@@ -16,14 +16,23 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.entities.Change;
 import com.google.gerrit.entities.PatchSet;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.git.FileEntry;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
@@ -33,16 +42,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 public class GitRepoFiles {
@@ -88,8 +87,7 @@ public class GitRepoFiles {
   }
 
   private String getFileContentAtRevision(
-      GerritChange change, String path, RevTreeResolver treeResolver)
-      throws FileNotFoundException {
+      GerritChange change, String path, RevTreeResolver treeResolver) throws FileNotFoundException {
     try {
       String content =
           withRepositoryTreeReader(
@@ -123,10 +121,7 @@ public class GitRepoFiles {
   }
 
   public List<String> grepPatchSet(
-      Configuration config,
-      GerritChange change,
-      String searchString,
-      Set<String> includedPaths) {
+      Configuration config, GerritChange change, String searchString, Set<String> includedPaths) {
     log.debug("Searching repository for string: {}", searchString);
     enabledFileExtensions = config.getEnabledFileExtensions();
     disabledFileExtensions = config.getDisabledFileExtensions();
@@ -185,10 +180,7 @@ public class GitRepoFiles {
   }
 
   private List<String> collectMatchingFiles(
-      Repository repository,
-      RevTree tree,
-      PathMatcher pathMatcher,
-      MatchingFileCollector collector)
+      Repository repository, RevTree tree, PathMatcher pathMatcher, MatchingFileCollector collector)
       throws IOException {
     List<String> results = new ArrayList<>();
     try (TreeWalk treeWalk = newRecursiveTreeWalk(repository, tree)) {
@@ -212,7 +204,8 @@ public class GitRepoFiles {
 
         while (treeWalk.next()) {
           String path = treeWalk.getPathString();
-          if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions)) continue;
+          if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions))
+            continue;
           int lastSlashIndex = path.lastIndexOf('/');
           String dirPath = (lastSlashIndex != -1) ? path.substring(0, lastSlashIndex) : "";
           String content = getContent(reader, treeWalk);
@@ -233,9 +226,7 @@ public class GitRepoFiles {
   }
 
   private <T> T withRepositoryTree(
-      GerritChange change,
-      RevTreeResolver treeResolver,
-      RepositoryTreeCallback<T> callback)
+      GerritChange change, RevTreeResolver treeResolver, RepositoryTreeCallback<T> callback)
       throws IOException {
     try (Repository repository = openRepository(change)) {
       return callback.execute(repository, treeResolver.resolve(repository, change));
@@ -243,9 +234,7 @@ public class GitRepoFiles {
   }
 
   private <T> T withRepositoryTreeReader(
-      GerritChange change,
-      RevTreeResolver treeResolver,
-      RepositoryTreeReaderCallback<T> callback)
+      GerritChange change, RevTreeResolver treeResolver, RepositoryTreeReaderCallback<T> callback)
       throws IOException {
     return withRepositoryTree(
         change,

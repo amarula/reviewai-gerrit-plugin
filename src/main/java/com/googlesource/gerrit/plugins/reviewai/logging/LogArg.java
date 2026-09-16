@@ -47,10 +47,7 @@ public final class LogArg {
   }
 
   private void render(
-      StringBuilder buffer,
-      Object obj,
-      int depth,
-      IdentityHashMap<Object, Boolean> seen) {
+      StringBuilder buffer, Object obj, int depth, IdentityHashMap<Object, Boolean> seen) {
 
     if (obj == null) {
       buffer.append("null");
@@ -67,7 +64,10 @@ public final class LogArg {
       return;
     }
 
-    if (obj instanceof Number || obj instanceof Boolean || obj instanceof Character || obj instanceof Enum<?>) {
+    if (obj instanceof Number
+        || obj instanceof Boolean
+        || obj instanceof Character
+        || obj instanceof Enum<?>) {
       buffer.append(obj);
       return;
     }
@@ -100,10 +100,7 @@ public final class LogArg {
   }
 
   private void renderArray(
-      StringBuilder buffer,
-      Object array,
-      int depth,
-      IdentityHashMap<Object, Boolean> seen) {
+      StringBuilder buffer, Object array, int depth, IdentityHashMap<Object, Boolean> seen) {
 
     buffer.append("[");
     int length = Array.getLength(array);
@@ -150,10 +147,7 @@ public final class LogArg {
   }
 
   private void renderMap(
-      StringBuilder buffer,
-      Map<?, ?> map,
-      int depth,
-      IdentityHashMap<Object, Boolean> seen) {
+      StringBuilder buffer, Map<?, ?> map, int depth, IdentityHashMap<Object, Boolean> seen) {
 
     buffer.append("{");
     int i = 0;
@@ -179,10 +173,7 @@ public final class LogArg {
   }
 
   private void renderObjectFields(
-      StringBuilder buffer,
-      Object obj,
-      int depth,
-      IdentityHashMap<Object, Boolean> seen) {
+      StringBuilder buffer, Object obj, int depth, IdentityHashMap<Object, Boolean> seen) {
 
     Class<?> clazz = obj.getClass();
     buffer.append(clazz.getSimpleName()).append("{");

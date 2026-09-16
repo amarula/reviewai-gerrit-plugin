@@ -60,8 +60,7 @@ public final class AiRequestIntakeClassifier {
   }
 
   private static AiRequestIntakeDecision rejectedWhenOccupied(AiRequest.Kind kind) {
-    return AiRequestIntakeDecision.persistent(
-        kind, AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED);
+    return AiRequestIntakeDecision.persistent(kind, AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED);
   }
 
   private static AiRequestIntakeDecision queued(AiRequest.Kind kind) {

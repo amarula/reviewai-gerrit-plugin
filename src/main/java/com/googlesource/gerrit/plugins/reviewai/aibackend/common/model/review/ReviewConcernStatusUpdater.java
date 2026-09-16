@@ -58,8 +58,7 @@ public final class ReviewConcernStatusUpdater {
                   && existing.getStatus() != ConcernStatus.DISMISSED
                   && !authorizedDismissals.contains(existing.getId())) {
                 throw new IllegalArgumentException(
-                    "DISMISSED requires an authorized moderator decision for "
-                        + existing.getId());
+                    "DISMISSED requires an authorized moderator decision for " + existing.getId());
               }
               ReviewConcern updated = existing.copy();
               updated.setStatus(update.getStatus());
@@ -69,8 +68,7 @@ public final class ReviewConcernStatusUpdater {
         .toList();
   }
 
-  private static Map<String, ReviewConcern> indexById(
-      List<ReviewConcern> concerns, String source) {
+  private static Map<String, ReviewConcern> indexById(List<ReviewConcern> concerns, String source) {
     if (concerns == null) {
       throw new IllegalArgumentException(source + " concerns are required");
     }

@@ -68,10 +68,7 @@ final class AiRequestDispatcher {
   }
 
   void requestActiveReviewSupersession(
-      Context context,
-      Configuration config,
-      PatchSetEvent event,
-      Long newerPatchSetNumber) {
+      Context context, Configuration config, PatchSetEvent event, Long newerPatchSetNumber) {
     GerritChange currentChange = new GerritChange(event);
     GerritChangeRef change = changeRef(event);
     Optional<AiRequest> requested =
@@ -79,32 +76,29 @@ final class AiRequestDispatcher {
             ? coordinator.requestReviewSupersession(
                 change, AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON)
             : coordinator.requestReviewSupersession(change, newerPatchSetNumber);
-    requested
-        .ifPresent(
-            request -> {
-              try {
-                context
-                    .injector()
-                    .getInstance(ReviewAgentEventRequestStatusUpdater.class)
-                    .completeSupersededRequest(request, newerPatchSetNumber);
-              } catch (Exception e) {
-                log.error(
-                    "Could not complete sidebar request status for superseded AI request {}",
-                    request.requestId(),
-                    e);
-              }
-              try {
-                context
-                    .injector()
-                    .getInstance(SupersededReviewNotifier.class)
-                    .publish(config, currentChange, request, newerPatchSetNumber);
-              } catch (Exception e) {
-                log.error(
-                    "Could not report early supersession of AI request {}",
-                    request.requestId(),
-                    e);
-              }
-            });
+    requested.ifPresent(
+        request -> {
+          try {
+            context
+                .injector()
+                .getInstance(ReviewAgentEventRequestStatusUpdater.class)
+                .completeSupersededRequest(request, newerPatchSetNumber);
+          } catch (Exception e) {
+            log.error(
+                "Could not complete sidebar request status for superseded AI request {}",
+                request.requestId(),
+                e);
+          }
+          try {
+            context
+                .injector()
+                .getInstance(SupersededReviewNotifier.class)
+                .publish(config, currentChange, request, newerPatchSetNumber);
+          } catch (Exception e) {
+            log.error(
+                "Could not report early supersession of AI request {}", request.requestId(), e);
+          }
+        });
   }
 
   private void intake(Context context, Configuration config, PatchSetEvent event) {
@@ -183,8 +177,7 @@ final class AiRequestDispatcher {
         .getPendingRequest(descriptor.sourceEventId())
         .fail(
             SystemMessageFormatter.getLocalizedWarningMessage(
-                context.injector().getInstance(Localizer.class),
-                "message.ai.request.interrupted"));
+                context.injector().getInstance(Localizer.class), "message.ai.request.interrupted"));
   }
 
   private static String resolveSourceEventId(PatchSetEvent event, String sourceEventId) {

@@ -61,8 +61,8 @@ class LangChainExecutor {
     AiRequestCancellation cancellation = changeSetData.getAiRequestCancellation();
     cancellation.throwIfSupersessionRequested();
     log.debug(
-        "Starting LangChain execution with {} memory messages, initialToolChoice={}, tools={}, " +
-            "structuredResponse={}",
+        "Starting LangChain execution with {} memory messages, initialToolChoice={}, tools={}, "
+            + "structuredResponse={}",
         memory.messages().size(),
         getInitialToolChoice(),
         getToolNames(),

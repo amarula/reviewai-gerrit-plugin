@@ -38,8 +38,7 @@ public class GerritCommentThreadIndexTest {
   public void setUp() throws IOException {
     String json =
         Files.readString(
-            TestResourceLoader.getTestResourcePath()
-                .resolve("__files/gerritCommentThreads.json"));
+            TestResourceLoader.getTestResourcePath().resolve("__files/gerritCommentThreads.json"));
     comments = getGson().fromJson(json, new TypeToken<List<GerritComment>>() {}.getType());
     index = new GerritCommentThreadIndex(comments);
   }
@@ -63,8 +62,7 @@ public class GerritCommentThreadIndexTest {
   @Test
   public void childrenAreOrderedWithoutCrossingSiblingBranches() {
     assertEquals(
-        List.of("user-reply", "sibling-reply"),
-        ids(index.childrenOf(comment("ai-concern"))));
+        List.of("user-reply", "sibling-reply"), ids(index.childrenOf(comment("ai-concern"))));
     assertEquals(
         List.of("review-command", "ai-concern", "sibling-reply"),
         ids(index.lineage(comment("sibling-reply"))));

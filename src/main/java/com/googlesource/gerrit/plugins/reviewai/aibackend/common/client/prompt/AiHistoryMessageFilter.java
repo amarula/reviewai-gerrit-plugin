@@ -16,10 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
+
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.CODE_DELIMITER;
 
 public class AiHistoryMessageFilter {
   public boolean shouldIncludeReviewComment(AiReviewHistoryInfo.Entry entry) {

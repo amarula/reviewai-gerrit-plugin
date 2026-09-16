@@ -33,8 +33,7 @@ final class SpecializedReviewStageExecutor {
     this.executor = executor;
   }
 
-  <T> CompletableFuture<T> supplyAsync(
-      ChangeSetData changeSetData, StageCall<T> stageCall) {
+  <T> CompletableFuture<T> supplyAsync(ChangeSetData changeSetData, StageCall<T> stageCall) {
     return changeSetData.getAiRequestCancellation().supplyAsync(stageCall::run, executor);
   }
 

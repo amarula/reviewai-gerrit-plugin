@@ -45,8 +45,7 @@ public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
   @Override
   public String getDefaultAiAssistantInstructions() {
     List<String> instructions =
-        new ArrayList<>(
-            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK")));
+        new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK")));
     instructions.addAll(buildConditionLabelSections());
     instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CATEGORIES"));
     instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_MEMORY"));

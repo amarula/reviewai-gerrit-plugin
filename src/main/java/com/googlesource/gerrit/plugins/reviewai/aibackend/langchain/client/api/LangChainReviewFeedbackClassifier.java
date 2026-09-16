@@ -46,7 +46,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import dev.langchain4j.model.chat.request.ResponseFormat;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -105,11 +104,8 @@ final class LangChainReviewFeedbackClassifier {
     }
 
     ReviewFeedbackClassificationResult result =
-        getGson()
-            .fromJson(
-                unwrapJsonCode(responseText), ReviewFeedbackClassificationResult.class);
-    ReviewFeedbackMemory memory =
-        toMemory(input, result, hasConditionLabels(changeSetData));
+        getGson().fromJson(unwrapJsonCode(responseText), ReviewFeedbackClassificationResult.class);
+    ReviewFeedbackMemory memory = toMemory(input, result, hasConditionLabels(changeSetData));
     if (hasUnauthorizedDismissal(input, result)) {
       appendReviewNotice(
           changeSetData,
@@ -146,8 +142,7 @@ final class LangChainReviewFeedbackClassifier {
     List<ReviewConcern> concerns = concerns(ledger);
     Map<String, String> concernIdsByCommentId = new LinkedHashMap<>();
     for (ReviewConcern concern : concerns) {
-      if (concern.getPreviousCommentId() != null
-          && !concern.getPreviousCommentId().isBlank()) {
+      if (concern.getPreviousCommentId() != null && !concern.getPreviousCommentId().isBlank()) {
         concernIdsByCommentId.putIfAbsent(concern.getPreviousCommentId(), concern.getId());
       }
     }
@@ -157,8 +152,7 @@ final class LangChainReviewFeedbackClassifier {
         commentData == null || commentData.getCommentMap() == null
             ? Map.of()
             : commentData.getCommentMap();
-    GerritCommentThreadIndex threadIndex =
-        new GerritCommentThreadIndex(commentsById.values());
+    GerritCommentThreadIndex threadIndex = new GerritCommentThreadIndex(commentsById.values());
     List<ReviewFeedbackClassificationInput.Comment> comments = new ArrayList<>();
     List<String> pendingCommentIds = changeSetData.getPendingReviewFeedbackCommentIds();
     if (pendingCommentIds == null) {
@@ -189,10 +183,7 @@ final class LangChainReviewFeedbackClassifier {
       comments.add(
           new ReviewFeedbackClassificationInput.Comment(
               new TargetComment(
-                  comment.getId(),
-                  comment.getMessage(),
-                  comment.getFilename(),
-                  comment.getLine()),
+                  comment.getId(), comment.getMessage(), comment.getFilename(), comment.getLine()),
               threadConcernId,
               threadContext,
               isDismissalAuthorized(changeSetData, commentId),
@@ -206,8 +197,7 @@ final class LangChainReviewFeedbackClassifier {
       return false;
     }
     String withoutCommands = COMMAND_PATTERN.matcher(message).replaceAll("");
-    String withoutLeadingMention =
-        withoutCommands.replaceFirst("^\\s*@\\S+\\s*", "");
+    String withoutLeadingMention = withoutCommands.replaceFirst("^\\s*@\\S+\\s*", "");
     return !withoutLeadingMention.isBlank();
   }
 
@@ -240,8 +230,9 @@ final class LangChainReviewFeedbackClassifier {
       throw new IllegalStateException("Review feedback classifier returned an empty result");
     }
     Set<String> expectedCommentIds = new HashSet<>();
-    input.getComments().forEach(
-        comment -> expectedCommentIds.add(comment.getTargetComment().getId()));
+    input
+        .getComments()
+        .forEach(comment -> expectedCommentIds.add(comment.getTargetComment().getId()));
     Set<String> concernIds = new HashSet<>();
     input.getConcerns().forEach(concern -> concernIds.add(concern.getId()));
     Set<String> classifiedCommentIds = new HashSet<>();
@@ -275,8 +266,7 @@ final class LangChainReviewFeedbackClassifier {
           || !concernIds.contains(feedback.getConcernId())
           || feedback.getSummary() == null
           || feedback.getSummary().isBlank()
-          || concernFeedback.putIfAbsent(
-                  feedback.getConcernId(), feedback.getSummary().trim())
+          || concernFeedback.putIfAbsent(feedback.getConcernId(), feedback.getSummary().trim())
               != null) {
         throw new IllegalStateException("Review feedback contains an invalid concern summary");
       }
@@ -284,9 +274,7 @@ final class LangChainReviewFeedbackClassifier {
     ReviewFeedbackMemory memory = new ReviewFeedbackMemory();
     String genericFeedback = result.getGenericFeedback();
     memory.setGenericFeedback(
-        genericFeedback == null || genericFeedback.isBlank()
-            ? null
-            : genericFeedback.trim());
+        genericFeedback == null || genericFeedback.isBlank() ? null : genericFeedback.trim());
     memory.setConcernFeedback(concernFeedback);
     Map<String, String> dismissedConcerns =
         input.getCurrentMemory().getDismissedConcerns() == null
@@ -300,26 +288,22 @@ final class LangChainReviewFeedbackClassifier {
       }
       String rationale = concernFeedback.get(classification.getConcernId());
       if (rationale == null) {
-        throw new IllegalStateException(
-            "Concern dismissal requires a concern feedback summary");
+        throw new IllegalStateException("Concern dismissal requires a concern feedback summary");
       }
       dismissedConcerns.put(classification.getConcernId(), rationale);
     }
     memory.setDismissedConcerns(dismissedConcerns);
-    Set<ReviewScope> disabledReviewScopes =
-        new HashSet<>(currentDisabledReviewScopes(input));
+    Set<ReviewScope> disabledReviewScopes = new HashSet<>(currentDisabledReviewScopes(input));
     Set<String> previousConditionLabelAgents =
         currentConditionLabelDisabledSpecializedAgents(input);
-    Set<String> disabledSpecializedAgents =
-        new HashSet<>(currentDisabledSpecializedAgents(input));
+    Set<String> disabledSpecializedAgents = new HashSet<>(currentDisabledSpecializedAgents(input));
     disabledSpecializedAgents.removeAll(previousConditionLabelAgents);
     Map<String, Classification> classificationsByCommentId = new LinkedHashMap<>();
     result
         .getClassifications()
         .forEach(
             classification ->
-                classificationsByCommentId.put(
-                    classification.getCommentId(), classification));
+                classificationsByCommentId.put(classification.getCommentId(), classification));
     for (ReviewFeedbackClassificationInput.Comment comment : input.getComments()) {
       if (!comment.isReviewControlAllowed()) {
         continue;
@@ -328,12 +312,10 @@ final class LangChainReviewFeedbackClassifier {
           classificationsByCommentId
               .get(comment.getTargetComment().getId())
               .getReviewControlActions()) {
-        applyReviewControlAction(
-            disabledReviewScopes, disabledSpecializedAgents, action);
+        applyReviewControlAction(disabledReviewScopes, disabledSpecializedAgents, action);
       }
     }
-    Set<String> conditionLabelAgents =
-        validatedConditionLabelDisabledSpecializedAgents(result);
+    Set<String> conditionLabelAgents = validatedConditionLabelDisabledSpecializedAgents(result);
     if (!hasConditionLabels && !conditionLabelAgents.isEmpty()) {
       throw new IllegalStateException(
           "Review feedback cannot exclude agents without Condition Labels");
@@ -349,8 +331,7 @@ final class LangChainReviewFeedbackClassifier {
       ReviewFeedbackClassificationResult result) {
     Set<String> disabledSpecializedAgents = new HashSet<>();
     if (result.getConditionLabelDisabledSpecializedAgents() == null) {
-      throw new IllegalStateException(
-          "Review feedback Condition Label exclusions are missing");
+      throw new IllegalStateException("Review feedback Condition Label exclusions are missing");
     }
     for (String agent : result.getConditionLabelDisabledSpecializedAgents()) {
       String normalizedAgent = SpecializedReviewAgentDefinition.normalizeName(agent);
@@ -363,29 +344,21 @@ final class LangChainReviewFeedbackClassifier {
     return Set.copyOf(disabledSpecializedAgents);
   }
 
-  private Set<ReviewScope> currentDisabledReviewScopes(
-      ReviewFeedbackClassificationInput input) {
-    Set<ReviewScope> disabledReviewScopes =
-        input.getCurrentMemory().getDisabledReviewScopes();
+  private Set<ReviewScope> currentDisabledReviewScopes(ReviewFeedbackClassificationInput input) {
+    Set<ReviewScope> disabledReviewScopes = input.getCurrentMemory().getDisabledReviewScopes();
     return disabledReviewScopes == null ? Set.of() : Set.copyOf(disabledReviewScopes);
   }
 
-  private Set<String> currentDisabledSpecializedAgents(
-      ReviewFeedbackClassificationInput input) {
-    Set<String> disabledSpecializedAgents =
-        input.getCurrentMemory().getDisabledSpecializedAgents();
-    return disabledSpecializedAgents == null
-        ? Set.of()
-        : Set.copyOf(disabledSpecializedAgents);
+  private Set<String> currentDisabledSpecializedAgents(ReviewFeedbackClassificationInput input) {
+    Set<String> disabledSpecializedAgents = input.getCurrentMemory().getDisabledSpecializedAgents();
+    return disabledSpecializedAgents == null ? Set.of() : Set.copyOf(disabledSpecializedAgents);
   }
 
   private Set<String> currentConditionLabelDisabledSpecializedAgents(
       ReviewFeedbackClassificationInput input) {
     Set<String> disabledSpecializedAgents =
         input.getCurrentMemory().getConditionLabelDisabledSpecializedAgents();
-    return disabledSpecializedAgents == null
-        ? Set.of()
-        : Set.copyOf(disabledSpecializedAgents);
+    return disabledSpecializedAgents == null ? Set.of() : Set.copyOf(disabledSpecializedAgents);
   }
 
   private void applyReviewControlAction(
@@ -436,8 +409,7 @@ final class LangChainReviewFeedbackClassifier {
     }
     if (!classification.getReviewControlActions().isEmpty()
         && classification.getCategory() != Category.GENERIC) {
-      throw new IllegalStateException(
-          "Only generic review feedback may control review agents");
+      throw new IllegalStateException("Only generic review feedback may control review agents");
     }
     for (ReviewControlAction action : classification.getReviewControlActions()) {
       validateReviewControlAction(action);
@@ -470,8 +442,7 @@ final class LangChainReviewFeedbackClassifier {
   }
 
   private boolean hasUnauthorizedDismissal(
-      ReviewFeedbackClassificationInput input,
-      ReviewFeedbackClassificationResult result) {
+      ReviewFeedbackClassificationInput input, ReviewFeedbackClassificationResult result) {
     return result.getClassifications().stream()
         .anyMatch(
             classification ->
@@ -479,8 +450,7 @@ final class LangChainReviewFeedbackClassifier {
                     && !isDismissalAllowed(input, classification.getCommentId()));
   }
 
-  private boolean isDismissalAllowed(
-      ReviewFeedbackClassificationInput input, String commentId) {
+  private boolean isDismissalAllowed(ReviewFeedbackClassificationInput input, String commentId) {
     return input.getComments().stream()
         .filter(comment -> comment.getTargetComment().getId().equals(commentId))
         .map(ReviewFeedbackClassificationInput.Comment::isDismissalAllowed)
@@ -488,16 +458,14 @@ final class LangChainReviewFeedbackClassifier {
         .orElse(false);
   }
 
-  private boolean isDismissalAuthorized(
-      ChangeSetData changeSetData, String commentId) {
+  private boolean isDismissalAuthorized(ChangeSetData changeSetData, String commentId) {
     Set<String> authorizedCommentIds =
         changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds();
     return authorizedCommentIds != null && authorizedCommentIds.contains(commentId);
   }
 
   private boolean hasUnauthorizedReviewControl(
-      ReviewFeedbackClassificationInput input,
-      ReviewFeedbackClassificationResult result) {
+      ReviewFeedbackClassificationInput input, ReviewFeedbackClassificationResult result) {
     return result.getClassifications().stream()
         .anyMatch(
             classification ->
@@ -514,10 +482,8 @@ final class LangChainReviewFeedbackClassifier {
         .orElse(false);
   }
 
-  private boolean isReviewControlAuthorized(
-      ChangeSetData changeSetData, String commentId) {
-    Set<String> authorizedCommentIds =
-        changeSetData.getReviewFeedbackControlAuthorizedCommentIds();
+  private boolean isReviewControlAuthorized(ChangeSetData changeSetData, String commentId) {
+    Set<String> authorizedCommentIds = changeSetData.getReviewFeedbackControlAuthorizedCommentIds();
     return authorizedCommentIds != null && authorizedCommentIds.contains(commentId);
   }
 

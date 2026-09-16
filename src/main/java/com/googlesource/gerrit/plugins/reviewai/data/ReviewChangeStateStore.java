@@ -97,8 +97,8 @@ public final class ReviewChangeStateStore {
     }
   }
 
-  private static void materializeLegacyConversationMessages(
-      Connection connection, String changeId) throws SQLException {
+  private static void materializeLegacyConversationMessages(Connection connection, String changeId)
+      throws SQLException {
     List<LegacyConversationTurn> turns = new ArrayList<>();
     try (PreparedStatement statement =
         connection.prepareStatement(
@@ -162,8 +162,8 @@ public final class ReviewChangeStateStore {
     return "";
   }
 
-  private static void deleteByChange(
-      Connection connection, String tableName, String changeId) throws SQLException {
+  private static void deleteByChange(Connection connection, String tableName, String changeId)
+      throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement("DELETE FROM " + tableName + " WHERE change_id = ?")) {
       statement.setString(1, changeId);

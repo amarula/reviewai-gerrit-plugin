@@ -123,14 +123,14 @@ public final class ReviewFeedbackMemoryStore {
     try (Connection connection = db.getConnection()) {
       clear(connection);
     } catch (SQLException e) {
-      throw new RuntimeException("Failed to clear review feedback memory for change " + changeId, e);
+      throw new RuntimeException(
+          "Failed to clear review feedback memory for change " + changeId, e);
     }
   }
 
   void clear(Connection connection) throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement(
-            "DELETE FROM review_feedback_memories WHERE change_id = ?")) {
+        connection.prepareStatement("DELETE FROM review_feedback_memories WHERE change_id = ?")) {
       statement.setString(1, changeId);
       statement.executeUpdate();
     }
@@ -173,10 +173,7 @@ public final class ReviewFeedbackMemoryStore {
       for (Map.Entry<String, String> entry : memory.getDismissedConcerns().entrySet()) {
         String concernId = entry.getKey();
         String rationale = entry.getValue();
-        if (concernId == null
-            || concernId.isBlank()
-            || rationale == null
-            || rationale.isBlank()) {
+        if (concernId == null || concernId.isBlank() || rationale == null || rationale.isBlank()) {
           throw new IllegalArgumentException(
               "Dismissed concerns require a concern ID and a rationale");
         }
@@ -211,8 +208,7 @@ public final class ReviewFeedbackMemoryStore {
       memory.setConditionLabelDisabledSpecializedAgents(Set.of());
     } else {
       memory.setConditionLabelDisabledSpecializedAgents(
-          normalizeSpecializedAgents(
-              memory.getConditionLabelDisabledSpecializedAgents()));
+          normalizeSpecializedAgents(memory.getConditionLabelDisabledSpecializedAgents()));
     }
     if (!memory
         .getDisabledSpecializedAgents()

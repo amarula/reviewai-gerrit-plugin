@@ -68,7 +68,9 @@ final class LangChainJsonSchemaParser {
       case "object" -> buildObjectSchema(schemaObject);
       case "array" -> buildArraySchema(schemaObject);
       case "string" ->
-          schemaObject.has("enum") ? buildEnumSchema(schemaObject) : buildStringSchema(schemaObject);
+          schemaObject.has("enum")
+              ? buildEnumSchema(schemaObject)
+              : buildStringSchema(schemaObject);
       case "integer" -> buildIntegerSchema(schemaObject);
       case "number" -> buildNumberSchema(schemaObject);
       case "boolean" -> buildBooleanSchema(schemaObject);
@@ -151,7 +153,8 @@ final class LangChainJsonSchemaParser {
     return builder.build();
   }
 
-  private static void setDescription(JsonObject schemaObject, Consumer<String> descriptionConsumer) {
+  private static void setDescription(
+      JsonObject schemaObject, Consumer<String> descriptionConsumer) {
     String description = getString(schemaObject, "description");
     if (description != null) {
       descriptionConsumer.accept(description);

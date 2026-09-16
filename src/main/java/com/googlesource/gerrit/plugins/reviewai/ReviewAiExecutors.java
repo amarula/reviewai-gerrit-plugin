@@ -40,8 +40,7 @@ public class ReviewAiExecutors {
     int maximumPoolSize =
         pluginConfigFactory
             .getFromGerritConfig(pluginName)
-            .getInt(
-                KEY_AGENT_EXECUTOR_MAXIMUM_POOL_SIZE, DEFAULT_AGENT_EXECUTOR_MAXIMUM_POOL_SIZE);
+            .getInt(KEY_AGENT_EXECUTOR_MAXIMUM_POOL_SIZE, DEFAULT_AGENT_EXECUTOR_MAXIMUM_POOL_SIZE);
     this.agentExecutor = workQueue.createQueue(maximumPoolSize, "ReviewAI agent executor");
   }
 

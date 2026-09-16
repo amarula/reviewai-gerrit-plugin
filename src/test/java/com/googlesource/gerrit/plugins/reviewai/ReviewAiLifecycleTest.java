@@ -73,19 +73,15 @@ public class ReviewAiLifecycleTest {
   @Test
   public void startProactivelyRemovesStaleListenerAndSucceeds() {
     DynamicSet<EventListener> eventListeners = new DynamicSet<>();
-    RegistrationHandle staleHandle =
-        eventListeners.add(PLUGIN_NAME, new TargetEventListener());
+    RegistrationHandle staleHandle = eventListeners.add(PLUGIN_NAME, new TargetEventListener());
 
-    assertTrue(
-        "Sanity check: stale listener should be registered",
-        hasAnyEntry(eventListeners));
+    assertTrue("Sanity check: stale listener should be registered", hasAnyEntry(eventListeners));
 
     // The stale TargetEventListener should be detected and removed proactively.
     newLifecycle(eventListeners).start();
 
     assertFalse(
-        "Stale listener should have been removed",
-        hasAnyTargetListenerEntry(eventListeners));
+        "Stale listener should have been removed", hasAnyTargetListenerEntry(eventListeners));
     // staleHandle.remove() is now a no-op because the entry was already CAS'd to null
     staleHandle.remove();
   }
@@ -190,8 +186,7 @@ public class ReviewAiLifecycleTest {
     // 3. New plugin starts successfully because old listeners were cleaned up
 
     DynamicSet<EventListener> eventListeners = new DynamicSet<>();
-    RegistrationHandle handle =
-        eventListeners.add(PLUGIN_NAME, new TargetEventListener());
+    RegistrationHandle handle = eventListeners.add(PLUGIN_NAME, new TargetEventListener());
 
     assertTrue(
         "Sanity check: listener should be registered before removal",
@@ -206,8 +201,8 @@ public class ReviewAiLifecycleTest {
 
   /**
    * Tests the actual Gerrit 3.14.2 reload ordering: new {@code start()} fires first and registers
-   * the new listener, then old {@code stop()} fires. The old {@code stop()} must NOT remove the
-   * new listener from the shared {@link DynamicSet}.
+   * the new listener, then old {@code stop()} fires. The old {@code stop()} must NOT remove the new
+   * listener from the shared {@link DynamicSet}.
    */
   @Test
   public void stopDoesNotRemoveListenersRegisteredByAnotherLifecycle() {
@@ -217,18 +212,14 @@ public class ReviewAiLifecycleTest {
     ReviewAiLifecycle oldLifecycle = newLifecycle(eventListeners);
     oldLifecycle.start();
 
-    assertTrue(
-        "Old listener should be registered after old start()",
-        hasAnyEntry(eventListeners));
+    assertTrue("Old listener should be registered after old start()", hasAnyEntry(eventListeners));
 
     // Simulate new plugin incarnation: start() detects the stale old listener,
     // removes it via removeStaleListeners(), and registers the new one
     ReviewAiLifecycle newLifecycle = newLifecycle(eventListeners);
     newLifecycle.start();
 
-    assertTrue(
-        "New listener should be registered after new start()",
-        hasAnyEntry(eventListeners));
+    assertTrue("New listener should be registered after new start()", hasAnyEntry(eventListeners));
 
     // Old plugin stop() fires (AFTER new start() — this is Gerrit's actual ordering)
     oldLifecycle.stop();

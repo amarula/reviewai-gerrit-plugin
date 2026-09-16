@@ -20,11 +20,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import java.util.List;
 import java.util.Map;
@@ -82,8 +82,7 @@ public class GerritClientFacade {
     return gerritClientComments.retrieveComments(change, userRole);
   }
 
-  public boolean retrieveComments(
-      GerritChange change, AiRole userRole, String changeMessageId) {
+  public boolean retrieveComments(GerritChange change, AiRole userRole, String changeMessageId) {
     return gerritClientComments.retrieveComments(change, userRole, changeMessageId);
   }
 

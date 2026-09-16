@@ -16,12 +16,14 @@
 
 package com.googlesource.gerrit.plugins.reviewai.config;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt.getJsonPromptValues;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -30,9 +32,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt.getJsonPromptValues;
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 
 public class Configuration extends ConfigCore {
   // Config Constants
@@ -44,16 +43,26 @@ public class Configuration extends ConfigCore {
   public static final String DEEPSEEK_DOMAIN = AiProviderConfiguration.DEEPSEEK_DOMAIN;
   public static final String MOONSHOT_DOMAIN = AiProviderConfiguration.MOONSHOT_DOMAIN;
   public static final String OLLAMA_DOMAIN = AiProviderConfiguration.OLLAMA_DOMAIN;
-  public static final String DEFAULT_OPENAI_AI_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_AI_MODEL;
-  public static final String DEFAULT_GEMINI_AI_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_AI_MODEL;
-  public static final String DEFAULT_DEEPSEEK_AI_MODEL = AiProviderConfiguration.DEFAULT_DEEPSEEK_AI_MODEL;
-  public static final String DEFAULT_MOONSHOT_AI_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_AI_MODEL;
-  public static final String DEFAULT_OLLAMA_AI_MODEL = AiProviderConfiguration.DEFAULT_OLLAMA_AI_MODEL;
-  public static final String DEFAULT_OPENAI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
-  public static final String DEFAULT_GEMINI_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
-  public static final String DEFAULT_DEEPSEEK_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_DEEPSEEK_ESTIMATOR_MODEL;
-  public static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
-  public static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = AiProviderConfiguration.DEFAULT_OLLAMA_ESTIMATOR_MODEL;
+  public static final String DEFAULT_OPENAI_AI_MODEL =
+      AiProviderConfiguration.DEFAULT_OPENAI_AI_MODEL;
+  public static final String DEFAULT_GEMINI_AI_MODEL =
+      AiProviderConfiguration.DEFAULT_GEMINI_AI_MODEL;
+  public static final String DEFAULT_DEEPSEEK_AI_MODEL =
+      AiProviderConfiguration.DEFAULT_DEEPSEEK_AI_MODEL;
+  public static final String DEFAULT_MOONSHOT_AI_MODEL =
+      AiProviderConfiguration.DEFAULT_MOONSHOT_AI_MODEL;
+  public static final String DEFAULT_OLLAMA_AI_MODEL =
+      AiProviderConfiguration.DEFAULT_OLLAMA_AI_MODEL;
+  public static final String DEFAULT_OPENAI_ESTIMATOR_MODEL =
+      AiProviderConfiguration.DEFAULT_OPENAI_ESTIMATOR_MODEL;
+  public static final String DEFAULT_GEMINI_ESTIMATOR_MODEL =
+      AiProviderConfiguration.DEFAULT_GEMINI_ESTIMATOR_MODEL;
+  public static final String DEFAULT_DEEPSEEK_ESTIMATOR_MODEL =
+      AiProviderConfiguration.DEFAULT_DEEPSEEK_ESTIMATOR_MODEL;
+  public static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL =
+      AiProviderConfiguration.DEFAULT_MOONSHOT_ESTIMATOR_MODEL;
+  public static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL =
+      AiProviderConfiguration.DEFAULT_OLLAMA_ESTIMATOR_MODEL;
   public static final double DEFAULT_AI_REVIEW_TEMPERATURE = 0.2;
   public static final double DEFAULT_AI_COMMENT_TEMPERATURE = 1.0;
 
@@ -374,7 +383,8 @@ public class Configuration extends ConfigCore {
 
   public int getAiMaxConcurrentRequests() {
     return Math.max(
-        0, getIntAllowingProjectZero(
+        0,
+        getIntAllowingProjectZero(
             KEY_AI_MAX_CONCURRENT_REQUESTS, DEFAULT_AI_MAX_CONCURRENT_REQUESTS));
   }
 
@@ -451,8 +461,7 @@ public class Configuration extends ConfigCore {
       return Optional.of(Arrays.stream(CodeContextPolicies.values()).map(Enum::name).toList());
     }
     if (KEY_AGENT_SPECIALIZATION_LEVEL.equals(key)) {
-      return Optional.of(
-          Arrays.stream(AgentSpecializationLevel.values()).map(Enum::name).toList());
+      return Optional.of(Arrays.stream(AgentSpecializationLevel.values()).map(Enum::name).toList());
     }
     return Optional.empty();
   }

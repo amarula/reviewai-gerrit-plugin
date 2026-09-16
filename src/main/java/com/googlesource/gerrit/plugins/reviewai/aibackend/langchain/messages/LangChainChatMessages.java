@@ -16,14 +16,16 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.google.gson.JsonSyntaxException;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -36,8 +38,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 public final class LangChainChatMessages {
   private LangChainChatMessages() {}
@@ -246,7 +246,8 @@ public final class LangChainChatMessages {
       Constructor<T> constructor = type.getConstructor(String.class);
       return constructor.newInstance(text);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to instantiate message of type " + type.getSimpleName(), e);
+      throw new RuntimeException(
+          "Failed to instantiate message of type " + type.getSimpleName(), e);
     }
   }
 }

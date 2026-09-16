@@ -34,8 +34,7 @@ public final class AiCostTracker {
   public AiCostTracker(Configuration config, ReviewAiMetrics metrics) {
     this.config = config;
     this.metrics = metrics;
-    this.pricingCatalog =
-        new AiPricingCatalog(config == null ? null : config.getAiPricing());
+    this.pricingCatalog = new AiPricingCatalog(config == null ? null : config.getAiPricing());
   }
 
   public void record(ChatResponse response) {

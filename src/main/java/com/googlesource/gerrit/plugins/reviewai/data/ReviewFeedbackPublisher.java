@@ -49,9 +49,7 @@ public final class ReviewFeedbackPublisher {
   }
 
   public void complete(
-      GerritChange change,
-      ReviewFeedbackStore.Claim claim,
-      ReviewFeedbackMemory memory) {
+      GerritChange change, ReviewFeedbackStore.Claim claim, ReviewFeedbackMemory memory) {
     store(change).complete(claim, memory);
   }
 

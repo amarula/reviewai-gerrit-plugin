@@ -67,7 +67,8 @@ class LangChainDirectSuggestClient {
         suggestion.setCodeSnippet(SuggestedEditSupport.extractCommitMessage(patchSet));
       }
       if (SuggestedEditSupport.hasSuggestionFence(suggestion)
-          && (commitMessageSuggestion || SuggestedEditSupport.hasCodeSuggestionTarget(suggestion))) {
+          && (commitMessageSuggestion
+              || SuggestedEditSupport.hasCodeSuggestionTarget(suggestion))) {
         suggestions.add(suggestion);
         commitMessageSuggestionAdded |= commitMessageSuggestion;
       } else {

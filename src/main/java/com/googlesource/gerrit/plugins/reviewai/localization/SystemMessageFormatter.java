@@ -78,11 +78,7 @@ public final class SystemMessageFormatter {
   }
 
   public static String getMessagePrefixPattern(Localizer localizer) {
-    return String.join(
-        "|",
-        getMessagePrefixes(localizer).stream()
-            .map(Pattern::quote)
-            .toList());
+    return String.join("|", getMessagePrefixes(localizer).stream().map(Pattern::quote).toList());
   }
 
   public static void appendConfigurationWarningMessages(
@@ -97,10 +93,7 @@ public final class SystemMessageFormatter {
       return List.of();
     }
     return unknownEnumSettings.stream()
-        .map(
-            key ->
-                getLocalizedWarningMessage(
-                    localizer, UNKNOWN_ENUM_CONFIG_WARNING_KEY, key))
+        .map(key -> getLocalizedWarningMessage(localizer, UNKNOWN_ENUM_CONFIG_WARNING_KEY, key))
         .toList();
   }
 

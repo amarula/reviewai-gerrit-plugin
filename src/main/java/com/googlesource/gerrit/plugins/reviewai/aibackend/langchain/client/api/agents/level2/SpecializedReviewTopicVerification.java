@@ -97,8 +97,7 @@ final class SpecializedReviewTopicVerification {
     return topicPatches;
   }
 
-  private static boolean concernBelongsToTopicPrefix(
-      ReviewConcern concern, String prefix) {
+  private static boolean concernBelongsToTopicPrefix(ReviewConcern concern, String prefix) {
     concern.normalize();
     return locationsBelongToTopicPrefix(concern.getLocations(), prefix);
   }
@@ -110,7 +109,8 @@ final class SpecializedReviewTopicVerification {
     }
     return locations.stream()
         .map(ConcernLocation::getFilename)
-        .anyMatch(filename -> filename == null || filename.isBlank() || filename.startsWith(prefix));
+        .anyMatch(
+            filename -> filename == null || filename.isBlank() || filename.startsWith(prefix));
   }
 
   private record TopicPatchOrigin(int start, String prefix) {}

@@ -59,8 +59,7 @@ public class ReviewConcernSanitizerTest extends TestBase {
   public void removesMergedAbandonedAndMissingLedgersKeepsOpenOnesUsingFullChangeIds()
       throws Exception {
     new ReviewConcernStore(db, "p~main~Imerged").save(new ReviewConcernLedger());
-    new ReviewFeedbackMemoryStore(db, "p~main~Iabandoned")
-        .save(new ReviewFeedbackMemory());
+    new ReviewFeedbackMemoryStore(db, "p~main~Iabandoned").save(new ReviewFeedbackMemory());
     new ReviewFeedbackStore(db, "p~main~Iabandoned").enqueue(List.of("comment-1"));
     new ReviewConcernStore(db, "p~main~Inew").save(new ReviewConcernLedger());
     new LangChainChatMemoryRepository(db)

@@ -16,18 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages;
 
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_COMMENTS;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandCleaner;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksCleaner;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandCleaner;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksCleaner;
+import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.regex.Pattern;
-
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_COMMENTS;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_DEFAULT_MESSAGE_PATCH_SET;
 
 @Slf4j
 public class ClientMessageCleaner extends ClientMessageBase {

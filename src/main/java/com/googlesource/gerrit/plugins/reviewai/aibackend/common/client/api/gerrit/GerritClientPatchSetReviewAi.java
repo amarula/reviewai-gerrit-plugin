@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.*;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
@@ -23,10 +25,16 @@ import com.google.gerrit.extensions.common.CommitInfo;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
@@ -39,15 +47,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
-
-import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.*;
 
 @Slf4j
 public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
@@ -98,8 +97,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
   public String getIncrementalPatchSet(ChangeSetData changeSetData, GerritChange change)
       throws Exception {
     Optional<String> lastReviewedCommit = lastReviewedCommit(changeSetData);
-    int patchSetNumber =
-        change.getPatchSetAttribute().map(attribute -> attribute.number).orElse(1);
+    int patchSetNumber = change.getPatchSetAttribute().map(attribute -> attribute.number).orElse(1);
     if (lastReviewedCommit.isEmpty() && patchSetNumber <= 1) {
       return getPatchSet(changeSetData, change);
     }
@@ -120,8 +118,7 @@ public class GerritClientPatchSetReviewAi extends GerritClientPatchSet
           baseCommit = previousCommit.commit;
         } catch (Exception e) {
           log.warn(
-              "Could not resolve the previous patch set commit. Using current patch output.",
-              e);
+              "Could not resolve the previous patch set commit. Using current patch output.", e);
           return filterPatch(formattedPatch);
         }
       }

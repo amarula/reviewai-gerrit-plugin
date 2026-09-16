@@ -85,8 +85,7 @@ public class ClosedChangeLifecycleEventHandler {
   }
 
   private void cancelActiveReview(GerritChangeRef changeRef, GerritChange change, Event event) {
-    String reason =
-        event instanceof ChangeMergedEvent ? "Change merged" : "Change abandoned";
+    String reason = event instanceof ChangeMergedEvent ? "Change merged" : "Change abandoned";
     try {
       aiRequestCoordinator.cancelRunningReview(changeRef, reason);
     } catch (Exception e) {

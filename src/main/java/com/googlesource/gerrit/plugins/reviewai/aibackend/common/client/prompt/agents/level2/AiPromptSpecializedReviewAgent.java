@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -23,8 +25,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage {
 
@@ -44,7 +44,9 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     }
 
     List<String> sections = new ArrayList<>();
-    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
+    sections.add(
+        buildSection(
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
     sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildConditionLabelSections());
     sections.addAll(buildReviewFeedbackSections());
@@ -84,7 +86,8 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
-            resolveCommitMessageInstructions(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
+            resolveCommitMessageInstructions(
+                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
     sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildReviewFeedbackSections());
     sections.add(
@@ -142,8 +145,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
   private String expectedOwnerAgent() {
     return changeSetData.getSpecializedAgentName() == null
         ? "COMMIT_MESSAGE"
-        : SpecializedReviewAgentDefinition.normalizeName(
-            changeSetData.getSpecializedAgentName());
+        : SpecializedReviewAgentDefinition.normalizeName(changeSetData.getSpecializedAgentName());
   }
 
   private String getSpecializedReplyFieldDefinitions(boolean includeInlineLocationFields) {

@@ -65,26 +65,22 @@ final class LangChainSingleAgentConcernWorkflow {
         && config.getAgentSpecializationLevel() == AgentSpecializationLevel.SINGLE_AGENT;
   }
 
-  ReviewResult review(
-      ChangeSetData changeSetData, GerritChange change, String fullPatchSet)
+  ReviewResult review(ChangeSetData changeSetData, GerritChange change, String fullPatchSet)
       throws Exception {
     ReviewFeedbackMemory feedback = feedbackReview.review(changeSetData, change);
     changeSetData.setReviewFeedbackMemory(feedback);
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
     if (previousLedger == null) {
-      ReviewResult firstReview =
-          initialReview.review(changeSetData, change, fullPatchSet);
+      ReviewResult firstReview = initialReview.review(changeSetData, change, fullPatchSet);
       if (firstReview == null) {
         return null;
       }
       return new ReviewResult(
-          ledgerOperations.initializeLedger(
-              firstReview.responseContent(), change, REVIEWER),
+          ledgerOperations.initializeLedger(firstReview.responseContent(), change, REVIEWER),
           firstReview.requestBody());
     }
 
-    ReviewerConcerns existingConcerns =
-        ledgerOperations.reviewerConcerns(previousLedger, REVIEWER);
+    ReviewerConcerns existingConcerns = ledgerOperations.reviewerConcerns(previousLedger, REVIEWER);
     existingConcerns.normalize();
     if (existingConcerns.getConcerns().isEmpty()
         && (changeSetData.getIncrementalPatchSet() == null
@@ -92,8 +88,7 @@ final class LangChainSingleAgentConcernWorkflow {
       if (!Boolean.TRUE.equals(changeSetData.getForcedReview())) {
         return null;
       }
-      ReviewResult forcedReview =
-          initialReview.review(changeSetData, change, fullPatchSet);
+      ReviewResult forcedReview = initialReview.review(changeSetData, change, fullPatchSet);
       if (forcedReview == null) {
         return null;
       }
@@ -134,14 +129,12 @@ final class LangChainSingleAgentConcernWorkflow {
 
   @FunctionalInterface
   interface FeedbackReview {
-    ReviewFeedbackMemory review(ChangeSetData changeSetData, GerritChange change)
-        throws Exception;
+    ReviewFeedbackMemory review(ChangeSetData changeSetData, GerritChange change) throws Exception;
   }
 
   @FunctionalInterface
   interface InitialReview {
-    ReviewResult review(
-        ChangeSetData changeSetData, GerritChange change, String patchSet)
+    ReviewResult review(ChangeSetData changeSetData, GerritChange change, String patchSet)
         throws Exception;
   }
 

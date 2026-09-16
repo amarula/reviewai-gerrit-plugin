@@ -16,12 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 public abstract class DebugCodeBlocksComposer {
   private static final String TITLE_PREFIX = "### ";

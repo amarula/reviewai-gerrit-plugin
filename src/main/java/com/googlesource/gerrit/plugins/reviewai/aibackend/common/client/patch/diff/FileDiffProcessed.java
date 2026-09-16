@@ -16,23 +16,22 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.code.patch.CodeFinderDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.patch.diff.DiffContent;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.RandomStringUtils;
-
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeMap;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
 
 @Slf4j
 public class FileDiffProcessed {

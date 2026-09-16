@@ -16,6 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.gerrit.entities.AccessSection;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.AccountGroup;
@@ -32,22 +38,15 @@ import com.google.gerrit.server.project.ProjectCache;
 import com.google.gerrit.server.project.ProjectState;
 import com.google.gerrit.server.project.SectionMatcher;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AiReviewPermissionTest extends TestBase {
@@ -84,16 +83,14 @@ public class AiReviewPermissionTest extends TestBase {
     AccessSection accessSection = AccessSection.builder("refs/heads/*").build();
     setupMatchingAccessSection(accessSection);
 
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
   }
 
   @Test
   public void allowAiReviewRuleAllowsReview() {
     setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.ALLOW));
 
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
   }
 
   @Test
@@ -116,8 +113,7 @@ public class AiReviewPermissionTest extends TestBase {
         matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
         matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
 
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
   }
 
   @Test
@@ -128,8 +124,7 @@ public class AiReviewPermissionTest extends TestBase {
         matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
         matcher(PARENT_PROJECT, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
 
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
+    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
   }
 
   @Test
@@ -274,9 +269,7 @@ public class AiReviewPermissionTest extends TestBase {
     return AccessSection.builder("refs/heads/*")
         .addPermission(
             Permission.builder(AiReviewPermission.AI_REVIEW_ACCESS_PERMISSION)
-                .add(
-                    PermissionRule.builder(DUMMY_GROUP)
-                        .setAction(action)))
+                .add(PermissionRule.builder(DUMMY_GROUP).setAction(action)))
         .build();
   }
 

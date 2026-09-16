@@ -16,25 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getNoEscapedGson;
+import static java.util.stream.Collectors.toList;
 
 import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.DiffInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPatchSetFileDiff;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritReviewFileDiff;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.FileUtils.isFileExtensionEnabled;
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getNoEscapedGson;
-import static java.util.stream.Collectors.toList;
 
 @Slf4j
 public class GerritClientPatchSet extends GerritClientAccount {
@@ -97,8 +96,7 @@ public class GerritClientPatchSet extends GerritClientAccount {
       for (String filename : patchSetFiles) {
         isCommitMessage = filename.equals("/COMMIT_MSG");
         if (!isCommitMessage
-            && !isFileExtensionEnabled(
-                filename, enabledFileExtensions, disabledFileExtensions)) {
+            && !isFileExtensionEnabled(filename, enabledFileExtensions, disabledFileExtensions)) {
           continue;
         }
         DiffInfo diff = revisionApi.file(filename).diff(revisionBase);

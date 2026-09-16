@@ -102,7 +102,8 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void doesNotStartDeferredReviewWhenExpressionDoesNotMatch() {
-    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
 
     assertEquals(PreprocessResult.EXIT, handler.preprocessEvent());
 
@@ -151,19 +152,15 @@ public class EventHandlerTypeCommentAddedTest {
             new GerritClientData(
                 null,
                 List.of(),
-                new CommentData(
-                    List.of(), List.of(comment), new HashMap<>(), new HashMap<>()),
+                new CommentData(List.of(), List.of(comment), new HashMap<>(), new HashMap<>()),
                 0));
     when(changeSetData.getForcedReview()).thenReturn(true);
 
-    assertEquals(
-        PreprocessResult.SWITCH_TO_PATCH_SET_CREATED,
-        handler.preprocessEvent());
+    assertEquals(PreprocessResult.SWITCH_TO_PATCH_SET_CREATED, handler.preprocessEvent());
 
     verify(reviewFeedbackPublisher)
         .enqueueFeedback(
-            eq(change),
-            eq(List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42))));
+            eq(change), eq(List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42))));
   }
 
   @Test
@@ -199,7 +196,8 @@ public class EventHandlerTypeCommentAddedTest {
 
   @Test
   public void existingAiVoteDoesNotPreventReviewAfterConditionLabelChanges() {
-    event.approvals = Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
+    event.approvals =
+        Suppliers.ofInstance(new ApprovalAttribute[] {approval("Verified", "0", "1")});
     when(gerritClient.getCodeReviewValue(change)).thenReturn(1);
     when(applicabilityChecker.isApplicable(change, EXPRESSION)).thenReturn(true);
 

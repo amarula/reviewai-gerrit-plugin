@@ -106,7 +106,9 @@ public class TopicPatchSetReviewCoordinator {
     static Optional<TopicKey> from(GerritChange change) {
       return change
           .getTopic()
-          .map(topic -> new TopicKey(change.getProjectName(), change.getBranchNameKey().branch(), topic));
+          .map(
+              topic ->
+                  new TopicKey(change.getProjectName(), change.getBranchNameKey().branch(), topic));
     }
   }
 }

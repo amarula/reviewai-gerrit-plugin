@@ -16,9 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
-import com.openai.client.OpenAIClient;
-import com.openai.core.http.HttpResponseFor;
-import com.openai.models.conversations.Conversation;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.model.OpenAiResponse;
@@ -26,11 +25,11 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
-import lombok.extern.slf4j.Slf4j;
-
+import com.openai.client.OpenAIClient;
+import com.openai.core.http.HttpResponseFor;
+import com.openai.models.conversations.Conversation;
 import java.util.Locale;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.jsonToClass;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class OpenAiConversation {
@@ -45,8 +44,7 @@ public class OpenAiConversation {
   private final String conversationKey;
 
   public OpenAiConversation(
-      Configuration config,
-      PluginDataHandlerProvider pluginDataHandlerProvider) {
+      Configuration config, PluginDataHandlerProvider pluginDataHandlerProvider) {
     this(config, pluginDataHandlerProvider, KEY_CONVERSATION_ID);
   }
 
@@ -83,8 +81,7 @@ public class OpenAiConversation {
   }
 
   public static String getSuggestConversationKey(ReviewScope reviewScope) {
-    String scope =
-        reviewScope == null ? "full" : reviewScope.name().toLowerCase(Locale.ROOT);
+    String scope = reviewScope == null ? "full" : reviewScope.name().toLowerCase(Locale.ROOT);
     return SUGGEST_CONVERSATION_KEY_PREFIX + "." + scope;
   }
 

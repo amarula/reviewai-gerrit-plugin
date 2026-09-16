@@ -36,12 +36,10 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
 public class LangChainNewIssueFinderTest {
-  private static final String RESPONSE_RESOURCE =
-      "__files/langchain/newIssueFinderResponse.json";
+  private static final String RESPONSE_RESOURCE = "__files/langchain/newIssueFinderResponse.json";
   private static final String INCREMENTAL_PATCH_RESOURCE =
       "__files/langchain/newIssueIncrementalPatch.txt";
-  private static final String FULL_PATCH_RESOURCE =
-      "__files/langchain/newIssueFullPatch.txt";
+  private static final String FULL_PATCH_RESOURCE = "__files/langchain/newIssueFullPatch.txt";
 
   @Test
   public void nonePolicyProvidesFullPatchAsSupportingContext() throws Exception {
@@ -70,14 +68,11 @@ public class LangChainNewIssueFinderTest {
         ReviewAssistantStage.FIND_NEW_ISSUES,
         capturedRequest.requestData.getReviewAssistantStage());
     assertTrue(capturedRequest.requestData.getForcedStagedReview());
-    assertSame(
-        concerns,
-        capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
+    assertSame(concerns, capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
     assertEquals(
         incrementalPatch,
         capturedRequest.requestData.getConcernWorkflowInput().getIncrementalPatch());
-    assertEquals(
-        fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals(fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
     assertEquals("", capturedRequest.patchSet);
   }
 
@@ -104,7 +99,8 @@ public class LangChainNewIssueFinderTest {
 
   @Test
   public void emptyIncrementalPatchSkipsNewIssueFinderRequest() throws Exception {
-    LangChainNewIssueFinder finder = new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE));
+    LangChainNewIssueFinder finder =
+        new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE));
 
     String result =
         finder.find(
@@ -123,8 +119,7 @@ public class LangChainNewIssueFinderTest {
 
   private static ReviewerConcerns reviewerConcerns() {
     ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(
-        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
     return concerns;
   }
 

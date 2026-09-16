@@ -64,7 +64,10 @@ final class DevMockAiConfigurationBridge {
   }
 
   static Optional<AiModelRoute> resolveFallbackRoute(
-      Configuration config, String responseText, List<String> modelRoutes, String configuredDefault) {
+      Configuration config,
+      String responseText,
+      List<String> modelRoutes,
+      String configuredDefault) {
     return invoke(
             config,
             "resolveFallbackRoute",
@@ -86,7 +89,8 @@ final class DevMockAiConfigurationBridge {
       Configuration config, String methodName, Class<?>[] parameterTypes, Object... args) {
     try {
       Class<?> mockAiConfigurationClass = Class.forName(MOCK_AI_CONFIGURATION_CLASS);
-      Constructor<?> constructor = mockAiConfigurationClass.getDeclaredConstructor(Configuration.class);
+      Constructor<?> constructor =
+          mockAiConfigurationClass.getDeclaredConstructor(Configuration.class);
       constructor.setAccessible(true);
       Object mockAiConfiguration = constructor.newInstance(config);
       Method method = mockAiConfigurationClass.getDeclaredMethod(methodName, parameterTypes);

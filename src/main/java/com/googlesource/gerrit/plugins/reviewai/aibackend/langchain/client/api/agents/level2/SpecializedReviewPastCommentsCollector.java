@@ -57,10 +57,7 @@ final class SpecializedReviewPastCommentsCollector {
     try {
       return aiReviewHistoryCollector
           .collect(
-              config,
-              localizer,
-              changeSetData.getAiAccountId(),
-              gerritClient.getClientData(change))
+              config, localizer, changeSetData.getAiAccountId(), gerritClient.getClientData(change))
           .getEntries()
           .stream()
           .filter(aiHistoryMessageFilter::shouldIncludeReviewComment)

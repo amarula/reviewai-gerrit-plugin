@@ -36,10 +36,17 @@ public enum DbDialect {
         String valuePlaceholders,
         String conflictColumns,
         String updateSetClause) {
-      return "MERGE INTO " + table
-          + " (" + insertColumns + ")"
-          + " KEY(" + conflictColumns + ")"
-          + " VALUES (" + valuePlaceholders + ")";
+      return "MERGE INTO "
+          + table
+          + " ("
+          + insertColumns
+          + ")"
+          + " KEY("
+          + conflictColumns
+          + ")"
+          + " VALUES ("
+          + valuePlaceholders
+          + ")";
     }
 
     @Override
@@ -71,11 +78,19 @@ public enum DbDialect {
         String valuePlaceholders,
         String conflictColumns,
         String updateSetClause) {
-      return "INSERT INTO " + table
-          + " (" + insertColumns + ")"
-          + " VALUES (" + valuePlaceholders + ")"
-          + " ON CONFLICT (" + conflictColumns + ")"
-          + " DO UPDATE SET " + updateSetClause;
+      return "INSERT INTO "
+          + table
+          + " ("
+          + insertColumns
+          + ")"
+          + " VALUES ("
+          + valuePlaceholders
+          + ")"
+          + " ON CONFLICT ("
+          + conflictColumns
+          + ")"
+          + " DO UPDATE SET "
+          + updateSetClause;
     }
 
     @Override

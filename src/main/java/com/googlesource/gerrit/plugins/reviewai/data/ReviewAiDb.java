@@ -186,7 +186,9 @@ public class ReviewAiDb {
             + ", change_id VARCHAR(512) NOT NULL"
             + ", patch_set INT NOT NULL"
             + ", scope VARCHAR(64) NOT NULL"
-            + ", message_json " + getDialect().clobType() + " NOT NULL"
+            + ", message_json "
+            + getDialect().clobType()
+            + " NOT NULL"
             + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
             + ")",
         "CREATE INDEX IF NOT EXISTS idx_langchain_chat_memory_messages_scope_lookup"
@@ -198,7 +200,9 @@ public class ReviewAiDb {
         "CREATE TABLE IF NOT EXISTS plugin_data ("
             + "scope VARCHAR(512) NOT NULL"
             + ", data_key VARCHAR(255) NOT NULL"
-            + ", data_value " + getDialect().clobType() + " NOT NULL"
+            + ", data_value "
+            + getDialect().clobType()
+            + " NOT NULL"
             + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
             + ", PRIMARY KEY(scope, data_key)"
             + ")");
@@ -265,8 +269,7 @@ public class ReviewAiDb {
             + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
             + ", PRIMARY KEY(change_id, comment_id)"
             + ")",
-        "ALTER TABLE review_feedback_comments"
-            + " ADD COLUMN IF NOT EXISTS author_account_id INT",
+        "ALTER TABLE review_feedback_comments" + " ADD COLUMN IF NOT EXISTS author_account_id INT",
         "CREATE INDEX IF NOT EXISTS idx_review_feedback_comments_pending"
             + " ON review_feedback_comments(change_id, processing_state, updated_at)");
   }
@@ -282,10 +285,13 @@ public class ReviewAiDb {
             + ", request_kind VARCHAR(32) NOT NULL"
             + ", admission_policy VARCHAR(32) NOT NULL"
             + ", request_state VARCHAR(32) NOT NULL"
-            + ", payload_json " + getDialect().clobType() + " NOT NULL"
+            + ", payload_json "
+            + getDialect().clobType()
+            + " NOT NULL"
             + ", owner_id VARCHAR(255)"
             + ", lease_expires_at_millis BIGINT"
-            + ", result_text " + getDialect().clobType()
+            + ", result_text "
+            + getDialect().clobType()
             + ", created_at_millis BIGINT NOT NULL"
             + ", updated_at_millis BIGINT NOT NULL"
             + ")",
@@ -323,7 +329,9 @@ public class ReviewAiDb {
                     + ", conversation_id VARCHAR(255) NOT NULL"
                     + ", turn_index INT NOT NULL"
                     + ", user_message_id BIGINT"
-                    + ", turn_metadata_json " + getDialect().clobType() + " NOT NULL"
+                    + ", turn_metadata_json "
+                    + getDialect().clobType()
+                    + " NOT NULL"
                     + ", timestamp_millis BIGINT"
                     + ", updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
                     + ", PRIMARY KEY(change_id, user_id, conversation_id, turn_index)"
@@ -361,9 +369,7 @@ public class ReviewAiDb {
 
   private void addUserIdColumnIfMissing(Statement s, String tableName) throws SQLException {
     s.executeUpdate(
-        "ALTER TABLE "
-            + tableName
-            + " ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0");
+        "ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0");
   }
 
   private void ensurePrimaryKeyIncludesUserId(
@@ -376,8 +382,7 @@ public class ReviewAiDb {
     if (primaryKey.name() == null || primaryKey.name().isBlank()) {
       throw new SQLException("Could not determine primary key constraint for " + tableName);
     }
-    s.executeUpdate(
-        getDialect().dropPrimaryKey(tableName, quoteIdentifier(c, primaryKey.name())));
+    s.executeUpdate(getDialect().dropPrimaryKey(tableName, quoteIdentifier(c, primaryKey.name())));
     try {
       s.executeUpdate(
           "ALTER TABLE "

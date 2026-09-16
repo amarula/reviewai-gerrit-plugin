@@ -30,8 +30,8 @@ import static org.mockito.Mockito.when;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -40,8 +40,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
@@ -66,12 +66,9 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/langchain/singleAgentConcernReviewResponse.json";
   private static final String NEW_ISSUES_RESPONSE =
       "__files/langchain/singleAgentNewIssuesResponse.json";
-  private static final String INCREMENTAL_PATCH =
-      "__files/langchain/newIssueIncrementalPatch.txt";
-  private static final String FULL_PATCH =
-      "__files/langchain/newIssueFullPatch.txt";
-  private static final String FEEDBACK_COMMENTS =
-      "__files/feedback/level0FeedbackComments.json";
+  private static final String INCREMENTAL_PATCH = "__files/langchain/newIssueIncrementalPatch.txt";
+  private static final String FULL_PATCH = "__files/langchain/newIssueFullPatch.txt";
+  private static final String FEEDBACK_COMMENTS = "__files/feedback/level0FeedbackComments.json";
   private static final String FEEDBACK_RESPONSE =
       "__files/feedback/level0FeedbackClassificationResponse.json";
   private static final String DISMISS_FEEDBACK_RESPONSE =
@@ -82,8 +79,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
       "__files/langchain/singleAgentDismissConcernReviewResponse.json";
   private static final String LABEL_FEEDBACK_RESPONSE =
       "__files/feedback/labelFeedbackClassificationResponse.json";
-  private static final String FEEDBACK_MEMORY =
-      "__files/feedback/reviewFeedbackMemory.json";
+  private static final String FEEDBACK_MEMORY = "__files/feedback/reviewFeedbackMemory.json";
   private static final String CHANGE_ID = "project~change-1";
 
   @Test
@@ -91,8 +87,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     TestClient client = new TestClient();
     ChangeSetData data = new ChangeSetData(1);
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
     assertTrue(response.getReplies().getFirst().isRepeated());
@@ -101,8 +96,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(ConcernReviewerId.Kind.SINGLE_AGENT, stored.getReviewer().getKind());
     assertEquals("PATCHSET", stored.getReviewer().getName());
     assertEquals(
-        response.getReplies().getFirst().getConcernId(),
-        stored.getConcerns().getFirst().getId());
+        response.getReplies().getFirst().getConcernId(), stored.getConcerns().getFirst().getId());
     assertTrue(Boolean.TRUE.equals(stored.getConcerns().getFirst().getRepeated()));
   }
 
@@ -114,8 +108,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setPreviousReviewConcernLedger(previousLedger());
     data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     assertEquals(
         List.of(ReviewAssistantStage.REVIEW_CONCERNS, ReviewAssistantStage.FIND_NEW_ISSUES),
@@ -124,11 +117,9 @@ public class LangChainSingleAgentConcernWorkflowTest {
         readTestResource(INCREMENTAL_PATCH),
         client.concernData.getConcernWorkflowInput().getIncrementalPatch());
     assertEquals(
-        readTestResource(FULL_PATCH),
-        client.concernData.getConcernWorkflowInput().getFullPatch());
+        readTestResource(FULL_PATCH), client.concernData.getConcernWorkflowInput().getFullPatch());
     assertEquals(
-        readTestResource(FULL_PATCH),
-        client.finderData.getConcernWorkflowInput().getFullPatch());
+        readTestResource(FULL_PATCH), client.finderData.getConcernWorkflowInput().getFullPatch());
     assertEquals(2, response.getReplies().size());
 
     var repeated = response.getReplies().getFirst();
@@ -154,7 +145,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
   @Test
   public void regressionOfAFixedConcernIsPublishedAsANewComment() throws Exception {
     TestClient client = new TestClient();
-    client.concernReviewResponse = "__files/langchain/singleAgentRegressionConcernReviewResponse.json";
+    client.concernReviewResponse =
+        "__files/langchain/singleAgentRegressionConcernReviewResponse.json";
     ChangeSetData data = new ChangeSetData(1);
     ReviewConcernLedger ledger = previousLedger();
     ReviewConcern oldFixed = ledger.getReviewers().getFirst().getConcerns().get(1);
@@ -163,8 +155,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setPreviousReviewConcernLedger(ledger);
     data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     AiReplyItem regression =
         response.getReplies().stream()
@@ -185,8 +176,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     ChangeSetData data = new ChangeSetData(1);
     ReviewConcernLedger ledger = previousLedger();
     ledger.getReviewers().getFirst().getConcerns().getFirst().setPreviousCommentId("ai-concern");
-    ledger.getReviewers().getFirst().getConcerns().get(1)
-        .setPreviousCommentId("70d29130_a03c5345");
+    ledger.getReviewers().getFirst().getConcerns().get(1).setPreviousCommentId("70d29130_a03c5345");
     data.setPreviousReviewConcernLedger(ledger);
     data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
     data.setForcedReview(true);
@@ -216,8 +206,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(5, feedbackInput.getComments().size());
     assertEquals("old-present", feedbackInput.getComments().getFirst().getThreadConcernId());
     assertEquals(
-        "user-feedback",
-        feedbackInput.getComments().getFirst().getTargetComment().getId());
+        "user-feedback", feedbackInput.getComments().getFirst().getTargetComment().getId());
     assertEquals(
         List.of("USER", "AI"),
         feedbackInput.getComments().getFirst().getThreadContext().stream()
@@ -225,18 +214,15 @@ public class LangChainSingleAgentConcernWorkflowTest {
             .toList());
     var scopeDirective = feedbackInput.getComments().get(3);
     assertEquals("old-fixed", scopeDirective.getThreadConcernId());
-    assertEquals(
-        "Skip commit message review",
-        scopeDirective.getTargetComment().getMessage());
+    assertEquals("Skip commit message review", scopeDirective.getTargetComment().getMessage());
     assertTrue(scopeDirective.isReviewControlAllowed());
     assertEquals(
         List.of("AI", "USER", "AI"),
-        scopeDirective.getThreadContext().stream()
-            .map(message -> message.getRole())
-            .toList());
+        scopeDirective.getThreadContext().stream().map(message -> message.getRole()).toList());
     assertEquals(
         "The null fallback is intentional for legacy callers.",
-        client.concernData
+        client
+            .concernData
             .getConcernWorkflowInput()
             .getReviewFeedback()
             .getConcernFeedback()
@@ -248,8 +234,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
         Set.of(ReviewScope.COMMIT_MESSAGE),
         data.getReviewFeedbackMemory().getDisabledReviewScopes());
     assertEquals(
-        Set.of("TESTABILITY"),
-        data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+        Set.of("TESTABILITY"), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
   }
 
   @Test
@@ -277,8 +262,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
         client.feedbackData.getReviewFeedbackClassificationInput().getComments().stream()
             .noneMatch(comment -> comment.isReviewControlAllowed()));
     assertEquals(Set.of(), data.getReviewFeedbackMemory().getDisabledReviewScopes());
-    assertEquals(
-        Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+    assertEquals(Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
     assertTrue(data.getReviewNoticeMessage().contains("moderator privileges are required"));
   }
 
@@ -302,8 +286,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
 
     client.ask(data, change, readTestResource(FULL_PATCH));
 
-    assertEquals(
-        Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
+    assertEquals(Set.of(), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
   }
 
   @Test
@@ -313,9 +296,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setPreviousReviewConcernLedger(previousLedger());
     data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
     data.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
 
     client.ask(data, change(false), readTestResource(FULL_PATCH));
 
@@ -325,16 +306,12 @@ public class LangChainSingleAgentConcernWorkflowTest {
             ReviewAssistantStage.REVIEW_CONCERNS,
             ReviewAssistantStage.FIND_NEW_ISSUES),
         client.stages);
-    assertTrue(
-        client.feedbackData.getReviewFeedbackClassificationInput().getComments().isEmpty());
+    assertTrue(client.feedbackData.getReviewFeedbackClassificationInput().getComments().isEmpty());
+    assertEquals(
+        Set.of("CORRECTNESS"), data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
     assertEquals(
         Set.of("CORRECTNESS"),
-        data.getReviewFeedbackMemory().getDisabledSpecializedAgents());
-    assertEquals(
-        Set.of("CORRECTNESS"),
-        data
-            .getReviewFeedbackMemory()
-            .getConditionLabelDisabledSpecializedAgents());
+        data.getReviewFeedbackMemory().getConditionLabelDisabledSpecializedAgents());
   }
 
   @Test
@@ -348,11 +325,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
     ChangeSetData data = dismissalChangeSetData();
     data.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of("dismiss-request"));
 
-    AiResponseContent response =
-        client.ask(data, change, readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change, readTestResource(FULL_PATCH));
 
     assertTrue(
-        client.feedbackData
+        client
+            .feedbackData
             .getReviewFeedbackClassificationInput()
             .getComments()
             .getFirst()
@@ -372,11 +349,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
     client.feedbackResponse = DISMISS_FEEDBACK_RESPONSE;
     ChangeSetData data = dismissalChangeSetData();
 
-    AiResponseContent response =
-        client.ask(data, change, readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change, readTestResource(FULL_PATCH));
 
     assertFalse(
-        client.feedbackData
+        client
+            .feedbackData
             .getReviewFeedbackClassificationInput()
             .getComments()
             .getFirst()
@@ -391,10 +368,8 @@ public class LangChainSingleAgentConcernWorkflowTest {
   @Test
   public void scopedConcernInputIncludesReviewFeedback() throws Exception {
     ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(
-        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
-    concerns.setConcerns(
-        List.of(concern("old-present", ConcernStatus.PRESENT, "Old dereference")));
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    concerns.setConcerns(List.of(concern("old-present", ConcernStatus.PRESENT, "Old dereference")));
     ReviewFeedbackMemory memory =
         getGson().fromJson(readTestResource(FEEDBACK_MEMORY), ReviewFeedbackMemory.class);
 
@@ -416,8 +391,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     ledger.getReviewers().getFirst().getConcerns().getFirst().setPreviousCommentId("ai-concern");
     data.setPreviousReviewConcernLedger(ledger);
 
-    AiResponseContent response =
-        client.ask(data, change, readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change, readTestResource(FULL_PATCH));
 
     assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
     assertNull(response.getPendingConcernUpdates());
@@ -435,8 +409,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
         new GerritClientData(
             null,
             List.of(),
-            new CommentData(
-                List.of(), List.of(command), commentsById, new HashMap<>()),
+            new CommentData(List.of(), List.of(command), commentsById, new HashMap<>()),
             0);
     GerritClient gerritClient = mock(GerritClient.class);
     GerritChange change = change(true);
@@ -449,9 +422,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
 
     client.ask(data, change, readTestResource(FULL_PATCH));
 
-    assertEquals(
-        List.of(ReviewAssistantStage.REVIEW_CONCERNS),
-        client.stages);
+    assertEquals(List.of(ReviewAssistantStage.REVIEW_CONCERNS), client.stages);
   }
 
   @Test
@@ -462,8 +433,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setPreviousReviewConcernLedger(previousLedger());
     data.setIncrementalPatchSet("");
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     assertEquals(List.of(ReviewAssistantStage.REVIEW_CONCERNS), client.stages);
     assertEquals(1, response.getReplies().size());
@@ -479,8 +449,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setPreviousReviewConcernLedger(specializedLedger());
     data.setIncrementalPatchSet("");
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     assertNull(response);
     assertTrue(client.stages.isEmpty());
@@ -495,8 +464,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     data.setIncrementalPatchSet("");
     data.setForcedReview(true);
 
-    AiResponseContent response =
-        client.ask(data, change(false), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(false), readTestResource(FULL_PATCH));
 
     assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
     assertNotNull(response);
@@ -510,24 +478,19 @@ public class LangChainSingleAgentConcernWorkflowTest {
     ChangeSetData data = new ChangeSetData(1);
     data.setPreviousReviewConcernLedger(previousLedger());
 
-    AiResponseContent response =
-        client.ask(data, change(true), readTestResource(FULL_PATCH));
+    AiResponseContent response = client.ask(data, change(true), readTestResource(FULL_PATCH));
 
     assertEquals(List.of(ReviewAssistantStage.REVIEW_CODE), client.stages);
     assertNull(response.getPendingConcernUpdates());
   }
 
   private static ReviewConcernLedger pendingLedger(AiResponseContent response) {
-    return response
-        .getPendingConcernUpdates()
-        .get(CHANGE_ID)
-        .orElseThrow();
+    return response.getPendingConcernUpdates().get(CHANGE_ID).orElseThrow();
   }
 
   private static ReviewConcernLedger previousLedger() {
     ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(
-        new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
     concerns.setConcerns(
         List.of(
             concern("old-present", ConcernStatus.PRESENT, "Old dereference"),
@@ -583,11 +546,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     HashMap<String, GerritComment> commentsById = new HashMap<>();
     fixture.allComments.forEach(comment -> commentsById.put(comment.getId(), comment));
     return new GerritClientData(
-        null,
-        List.of(),
-        new CommentData(
-            List.of(), List.of(), commentsById, new HashMap<>()),
-        0);
+        null, List.of(), new CommentData(List.of(), List.of(), commentsById, new HashMap<>()), 0);
   }
 
   private static GerritClientData dismissalClientData() throws IOException {
@@ -601,25 +560,17 @@ public class LangChainSingleAgentConcernWorkflowTest {
     dismissal.setMessage("Dismiss this concern");
     commentsById.put(dismissal.getId(), dismissal);
     return new GerritClientData(
-        null,
-        List.of(),
-        new CommentData(List.of(), List.of(), commentsById, new HashMap<>()),
-        0);
+        null, List.of(), new CommentData(List.of(), List.of(), commentsById, new HashMap<>()), 0);
   }
 
-  private static GerritClientData reviewControlClientData(
-      String commentId, String message) {
+  private static GerritClientData reviewControlClientData(String commentId, String message) {
     GerritComment comment = new GerritComment();
     comment.setId(commentId);
     comment.setMessage(message);
     HashMap<String, GerritComment> commentsById = new HashMap<>();
     commentsById.put(commentId, comment);
     return new GerritClientData(
-        null,
-        List.of(),
-        new CommentData(
-            List.of(), List.of(), commentsById, new HashMap<>()),
-        0);
+        null, List.of(), new CommentData(List.of(), List.of(), commentsById, new HashMap<>()), 0);
   }
 
   private static ChangeSetData dismissalChangeSetData() throws IOException {
@@ -662,10 +613,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
         feedbackData = changeSetData;
         return rawReviewRequestResult(
             readTestResource(
-                changeSetData
-                        .getReviewFeedbackClassificationInput()
-                        .getComments()
-                        .isEmpty()
+                changeSetData.getReviewFeedbackClassificationInput().getComments().isEmpty()
                     ? LABEL_FEEDBACK_RESPONSE
                     : feedbackResponse),
             "review feedback request");
@@ -686,8 +634,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
 
     private static Configuration configuration() {
       Configuration config = mock(Configuration.class);
-      when(config.getAgentSpecializationLevel())
-          .thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
+      when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
       when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
       when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
       when(config.resolveMockAiFallbackRoute(anyString())).thenReturn(Optional.empty());

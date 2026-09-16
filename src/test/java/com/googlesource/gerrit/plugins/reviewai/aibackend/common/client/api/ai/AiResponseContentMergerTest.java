@@ -37,17 +37,10 @@ public class AiResponseContentMergerTest {
     AiResponseContent commitResponse = response("COMMIT_MESSAGE");
 
     AiResponseContent merged =
-        AiResponseContentMerger.merge(
-            new ArrayList<>(List.of(patchsetResponse, commitResponse)));
+        AiResponseContentMerger.merge(new ArrayList<>(List.of(patchsetResponse, commitResponse)));
 
     assertEquals(
-        2,
-        merged
-            .getPendingConcernUpdates()
-            .get("change")
-            .orElseThrow()
-            .getReviewers()
-            .size());
+        2, merged.getPendingConcernUpdates().get("change").orElseThrow().getReviewers().size());
     assertFalse(getGson().toJson(merged).contains("pendingConcernUpdates"));
   }
 

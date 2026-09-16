@@ -63,8 +63,7 @@ public class ReviewFeedbackStoreTest extends TestBase {
 
   @Test
   public void claimPreservesFeedbackAuthorForDeferredAuthorization() {
-    store.enqueueFeedback(
-        List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42)));
+    store.enqueueFeedback(List.of(new ReviewFeedbackStore.FeedbackRequest("comment-1", 42)));
 
     ReviewFeedbackStore.Claim claim = store.claimPending();
 

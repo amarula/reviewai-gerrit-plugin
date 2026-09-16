@@ -18,8 +18,8 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
+import com.googlesource.gerrit.plugins.reviewai.data.langchain.LangChainChatMemoryRepository;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageDeserializer;
 import dev.langchain4j.data.message.ChatMessageSerializer;
@@ -62,9 +62,7 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
         }
       }
       log.debug(
-          "Loaded {} chat messages from LangChain memory store for {}",
-          result.size(),
-          memoryId);
+          "Loaded {} chat messages from LangChain memory store for {}", result.size(), memoryId);
       return result;
     } catch (Exception e) {
       log.warn("Failed to get chat memory messages for {}; returning empty list", memoryId, e);
@@ -107,16 +105,12 @@ public class PluginChatMemoryStore implements ChatMemoryStore {
   }
 
   public void deleteMessagesForChangeSet(String changeId, int patchSet) {
-    log.debug(
-        "Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
+    log.debug("Clearing LangChain memory store for change {} patch set {}", changeId, patchSet);
     try {
       repository.deleteMessagesForChangeSet(changeId, patchSet);
     } catch (Exception e) {
       log.warn(
-          "Failed to clear chat memory messages for change {} patch set {}",
-          changeId,
-          patchSet,
-          e);
+          "Failed to clear chat memory messages for change {} patch set {}", changeId, patchSet, e);
     }
   }
 

@@ -16,12 +16,16 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_SELECTED_AI_MODEL;
+import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.isDefaultSelectedAiModel;
+
 import com.google.gerrit.common.Nullable;
+import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
-import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestModifyView;
@@ -30,11 +34,11 @@ import com.google.gerrit.server.config.GerritInstanceId;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -52,10 +56,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_DYNAMIC_CONFIG;
-import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.KEY_SELECTED_AI_MODEL;
-import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicConfigManager.isDefaultSelectedAiModel;
 
 @Slf4j
 public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewMessage.Input> {
@@ -120,12 +120,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     this.gerritInstanceId = gerritInstanceId;
     reviewAgentResponseService =
         new ReviewAgentResponseService(
-            repositoryManager,
-            pluginDataPath,
-            chatMemoryStore,
-            db,
-            roleResolver,
-            commandExtension);
+            repositoryManager, pluginDataPath, chatMemoryStore, db, roleResolver, commandExtension);
     gerritMessageIdFinder = new ReviewAgentGerritMessageIdFinder();
   }
 
@@ -168,11 +163,9 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       statusStore.pending(requestId, message);
     }
     String postedMessage = "@" + config.getGerritUserName() + " " + message;
-    ReviewInput reviewInput =
-        ReviewInput.create().patchSetLevelComment(postedMessage);
+    ReviewInput reviewInput = ReviewInput.create().patchSetLevelComment(postedMessage);
     String outputRequestId = requestId;
-    ChangeApi changeApi =
-        gerritApi.changes().id(projectName, resource.getChange().getChangeId());
+    ChangeApi changeApi = gerritApi.changes().id(projectName, resource.getChange().getChangeId());
     ReviewResult reviewResult;
     try {
       reviewResult = changeApi.current().review(reviewInput);
@@ -198,29 +191,43 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
   public static class Input {
     public String message;
 
-    @SerializedName(value = "model_id", alternate = {"modelId"})
+    @SerializedName(
+        value = "model_id",
+        alternate = {"modelId"})
     public String modelId;
 
-    @SerializedName(value = "model_name", alternate = {"modelName"})
+    @SerializedName(
+        value = "model_name",
+        alternate = {"modelName"})
     public String modelName;
 
-    @SerializedName(value = "review_agent", alternate = {"reviewAgent"})
+    @SerializedName(
+        value = "review_agent",
+        alternate = {"reviewAgent"})
     public Boolean reviewAgent;
 
-    @SerializedName(value = "request_id", alternate = {"requestId"})
+    @SerializedName(
+        value = "request_id",
+        alternate = {"requestId"})
     public String requestId;
   }
 
   public static class Output {
     public final boolean ok;
 
-    @SerializedName(value = "response_text", alternate = {"responseText"})
+    @SerializedName(
+        value = "response_text",
+        alternate = {"responseText"})
     public final String responseText;
 
-    @SerializedName(value = "wait_for_assistant_reply", alternate = {"waitForAssistantReply"})
+    @SerializedName(
+        value = "wait_for_assistant_reply",
+        alternate = {"waitForAssistantReply"})
     public final boolean waitForAssistantReply;
 
-    @SerializedName(value = "request_id", alternate = {"requestId"})
+    @SerializedName(
+        value = "request_id",
+        alternate = {"requestId"})
     public final String requestId;
 
     public Output(boolean ok, String responseText) {
@@ -231,7 +238,8 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       this(ok, responseText, waitForAssistantReply, null);
     }
 
-    public Output(boolean ok, String responseText, boolean waitForAssistantReply, String requestId) {
+    public Output(
+        boolean ok, String responseText, boolean waitForAssistantReply, String requestId) {
       this.ok = ok;
       this.responseText = responseText;
       this.waitForAssistantReply = waitForAssistantReply;
@@ -264,9 +272,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     GerritChange change =
         new GerritChange(
-            resource.getProject(),
-            resource.getChange().getDest(),
-            resource.getChange().getKey());
+            resource.getProject(), resource.getChange().getDest(), resource.getChange().getKey());
     requestCoordinator
         .requestReviewSupersession(
             new GerritChangeRef(gerritInstanceId, resource.getChange().getId().get()),
@@ -288,9 +294,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
                 supersededReviewNotifier.publish(config, change, request, null);
               } catch (Exception e) {
                 log.error(
-                    "Could not report early supersession of AI request {}",
-                    request.requestId(),
-                    e);
+                    "Could not report early supersession of AI request {}", request.requestId(), e);
               }
             });
   }

@@ -48,7 +48,8 @@ public class AiPromptSpecializedHistoricalRepetition extends AiPromptSpecialized
 
   @Override
   protected String getCollectorResponseFormat() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT");
+    return prompt(
+        "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT");
   }
 
   @Override

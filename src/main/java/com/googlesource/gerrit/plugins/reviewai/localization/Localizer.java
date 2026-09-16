@@ -18,11 +18,10 @@ package com.googlesource.gerrit.plugins.reviewai.localization;
 
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class Localizer {

@@ -77,7 +77,8 @@ public class OpenAiLangChainProviderTest {
             .getModel()
             .chat(
                 ChatRequest.builder()
-                    .messages(List.of(SystemMessage.from("system message"), UserMessage.from("Say ok")))
+                    .messages(
+                        List.of(SystemMessage.from("system message"), UserMessage.from("Say ok")))
                     .build());
 
     assertTrue(langChainProvider.getModel() instanceof OpenAiResponsesChatModel);
@@ -255,8 +256,7 @@ public class OpenAiLangChainProviderTest {
         postRequestedFor(urlEqualTo("/v1/responses"))
             .withRequestBody(matchingJsonPath("$.store", equalTo("false")))
             .withRequestBody(
-                matchingJsonPath(
-                    "$.include[0]", equalTo("reasoning.encrypted_content"))));
+                matchingJsonPath("$.include[0]", equalTo("reasoning.encrypted_content"))));
     WireMock.verify(
         0,
         postRequestedFor(urlEqualTo("/v1/responses"))
@@ -306,8 +306,7 @@ public class OpenAiLangChainProviderTest {
             .build();
 
     ChatResponse firstResponse =
-        model.chat(
-            ChatRequest.builder().messages(userMessage).parameters(parameters).build());
+        model.chat(ChatRequest.builder().messages(userMessage).parameters(parameters).build());
     AiMessage restoredAiMessage =
         (AiMessage)
             ChatMessageDeserializer.messageFromJson(
@@ -331,15 +330,11 @@ public class OpenAiLangChainProviderTest {
     WireMock.verify(
         1,
         postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(matchingJsonPath("$.input[1].type", equalTo("reasoning")))
             .withRequestBody(
-                matchingJsonPath("$.input[1].type", equalTo("reasoning")))
-            .withRequestBody(
-                matchingJsonPath(
-                    "$.input[1].encrypted_content", equalTo("encrypted-reasoning")))
-            .withRequestBody(
-                matchingJsonPath("$.input[2].type", equalTo("function_call")))
-            .withRequestBody(
-                matchingJsonPath("$.input[3].type", equalTo("function_call_output"))));
+                matchingJsonPath("$.input[1].encrypted_content", equalTo("encrypted-reasoning")))
+            .withRequestBody(matchingJsonPath("$.input[2].type", equalTo("function_call")))
+            .withRequestBody(matchingJsonPath("$.input[3].type", equalTo("function_call_output"))));
   }
 
   @Test
@@ -357,7 +352,8 @@ public class OpenAiLangChainProviderTest {
         getEstimatorModelName((OpenAiTokenCountEstimator) estimator.get()));
   }
 
-  private static String getEstimatorModelName(OpenAiTokenCountEstimator estimator) throws Exception {
+  private static String getEstimatorModelName(OpenAiTokenCountEstimator estimator)
+      throws Exception {
     Field field = OpenAiTokenCountEstimator.class.getDeclaredField("modelName");
     field.setAccessible(true);
     return (String) field.get(estimator);
@@ -369,9 +365,7 @@ public class OpenAiLangChainProviderTest {
 
   private static String responseBody(String resource) {
     try (InputStream inputStream =
-        OpenAiLangChainProviderTest.class
-            .getClassLoader()
-            .getResourceAsStream(resource)) {
+        OpenAiLangChainProviderTest.class.getClassLoader().getResourceAsStream(resource)) {
       if (inputStream == null) {
         throw new IllegalStateException("Missing test resource: " + resource);
       }

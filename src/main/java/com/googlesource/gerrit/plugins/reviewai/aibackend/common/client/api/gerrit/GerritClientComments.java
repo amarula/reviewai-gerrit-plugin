@@ -16,6 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toAuthor;
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toDateString;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils.getEpochSeconds;
+import static java.util.stream.Collectors.toList;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.server.data.AccountAttribute;
@@ -25,6 +31,11 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -32,25 +43,12 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
-import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageParser;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
+import java.util.*;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
-import static java.util.stream.Collectors.toList;
-
-import java.util.*;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils.getEpochSeconds;
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toAuthor;
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toDateString;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 
 @Slf4j
 public class GerritClientComments extends GerritClientAccount {
@@ -207,8 +205,7 @@ public class GerritClientComments extends GerritClientAccount {
         .orElse(false);
   }
 
-  private List<GerritComment> fetchComments(
-      GerritChange change, String requestedChangeMessageId)
+  private List<GerritComment> fetchComments(GerritChange change, String requestedChangeMessageId)
       throws Exception {
     try (ManualRequestContext ignored = config.openRequestContext()) {
       Map<String, List<CommentInfo>> comments =
@@ -278,8 +275,7 @@ public class GerritClientComments extends GerritClientAccount {
     }
   }
 
-  private void addComments(
-      GerritChange change, AiRole userRole, String requestedChangeMessageId) {
+  private void addComments(GerritChange change, AiRole userRole, String requestedChangeMessageId) {
     log.debug("Adding last comments for change: {}", change.getFullChangeId());
     ClientMessageParser messageParser =
         new ClientMessageParser(
@@ -296,8 +292,7 @@ public class GerritClientComments extends GerritClientAccount {
             reviewFeedbackPublisher,
             commandExtension);
     try {
-      List<GerritComment> latestComments =
-          fetchComments(change, requestedChangeMessageId);
+      List<GerritComment> latestComments = fetchComments(change, requestedChangeMessageId);
       if (latestComments == null) {
         return;
       }

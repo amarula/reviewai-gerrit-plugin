@@ -16,20 +16,19 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+
 import com.google.gson.reflect.TypeToken;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPrompt {
@@ -101,9 +100,9 @@ public class AiPrompt {
   }
 
   /**
-   * Loads a JSON prompt file into this instance's promptValues map.
-   * Later loads override earlier values for the same key, which correctly
-   * handles subclass overrides (e.g. DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS).
+   * Loads a JSON prompt file into this instance's promptValues map. Later loads override earlier
+   * values for the same key, which correctly handles subclass overrides (e.g.
+   * DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS).
    */
   protected void loadPromptMap(String promptFilename) {
     Map<String, Object> values = getJsonPromptValues(promptFilename);
@@ -195,8 +194,7 @@ public class AiPrompt {
         new ArrayList<>(
             List.of(
                 String.format(
-                    getDefaultAiReviewPromptCommitMessages(),
-                    getDefaultAiHowToFindCommitMessage()),
+                    getDefaultAiReviewPromptCommitMessages(), getDefaultAiHowToFindCommitMessage()),
                 getDefaultAiReviewPromptInstructionsCommitMessages())));
   }
 

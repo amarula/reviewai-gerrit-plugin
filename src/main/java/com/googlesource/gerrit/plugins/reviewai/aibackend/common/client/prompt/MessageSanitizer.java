@@ -16,12 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import lombok.extern.slf4j.Slf4j;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class MessageSanitizer {

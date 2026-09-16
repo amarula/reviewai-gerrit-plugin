@@ -16,15 +16,14 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
 import com.google.common.collect.ImmutableBiMap;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class ClientCommandBase extends ClientBase {

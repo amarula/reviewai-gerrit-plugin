@@ -19,7 +19,6 @@ package com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.cli
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-
 import java.util.HashMap;
 import java.util.List;
 

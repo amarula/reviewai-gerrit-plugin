@@ -31,7 +31,8 @@ public class TopicReviewReplyMapper {
     if (!filename.startsWith(topicFilenamePrefix)) {
       return Optional.empty();
     }
-    return Optional.of(copyWithFilename(replyItem, filename.substring(topicFilenamePrefix.length())));
+    return Optional.of(
+        copyWithFilename(replyItem, filename.substring(topicFilenamePrefix.length())));
   }
 
   private AiReplyItem copyWithFilename(AiReplyItem replyItem, String filename) {

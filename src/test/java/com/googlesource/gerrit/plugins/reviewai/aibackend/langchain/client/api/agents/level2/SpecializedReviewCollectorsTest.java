@@ -30,8 +30,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedConflictResolution;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedConsolidation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedHistoricalRepetition;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedVerification;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedVerification;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -120,10 +120,7 @@ public class SpecializedReviewCollectorsTest {
         findings(
             List.of(
                 concern(
-                    "c-r1",
-                    List.of("r1"),
-                    "First issue",
-                    "reviewai-topic-change-1/src/One.java"),
+                    "c-r1", List.of("r1"), "First issue", "reviewai-topic-change-1/src/One.java"),
                 concern(
                     "c-r2",
                     List.of("r2"),
@@ -171,10 +168,7 @@ public class SpecializedReviewCollectorsTest {
           findings(
               List.of(
                   concern(
-                      "c-r1",
-                      List.of("r1"),
-                      "First issue",
-                      "reviewai-topic-change-1/src/One.java"),
+                      "c-r1", List.of("r1"), "First issue", "reviewai-topic-change-1/src/One.java"),
                   concern(
                       "c-r2",
                       List.of("r2"),
@@ -232,12 +226,7 @@ public class SpecializedReviewCollectorsTest {
     AiResponseContent response =
         client
             .askCollectorResult(
-                new ChangeSetData(1),
-                change(),
-                "Patch",
-                sourceFindings(),
-                null,
-                false)
+                new ChangeSetData(1), change(), "Patch", sourceFindings(), null, false)
             .response();
 
     assertEquals(
@@ -287,14 +276,11 @@ public class SpecializedReviewCollectorsTest {
             historyEntry("p4", "ReviewAI Message: Dynamic configuration modified")));
     assertFalse(
         filter.shouldIncludeReviewComment(
-            historyEntry(
-                "p5",
-                "Uploaded patch set 2.\n\nOutdated Votes:\n* Code-Review-1")));
+            historyEntry("p5", "Uploaded patch set 2.\n\nOutdated Votes:\n* Code-Review-1")));
     assertTrue(
         filter.shouldIncludeReviewComment(
             historyEntry(
-                "p6",
-                "The new parser should reject null user input before dereferencing it.")));
+                "p6", "The new parser should reject null user input before dereferencing it.")));
   }
 
   @Test
@@ -323,8 +309,7 @@ public class SpecializedReviewCollectorsTest {
         client.applyHistoricalRepetition(
             consolidatedConcern("c1", List.of("r1", "r2")),
             historicalRepetitionResult(
-                annotation("r1", true, "p10", "Same concern."),
-                annotation("r2", false, "", "")));
+                annotation("r1", true, "p10", "Same concern."), annotation("r2", false, "", "")));
 
     ReviewConcern concern = result.getConcerns().getFirst();
     assertEquals("c-r1", concern.getId());
@@ -361,12 +346,9 @@ public class SpecializedReviewCollectorsTest {
         consolidatedConcern("c-raw-current-r1", List.of("raw-current-r1"));
     conflictResolvedFindings.getConcerns().getFirst().setOwnerAgent("SECURITY");
 
-    SpecializedReviewConcernOwnership.preserveOwners(
-        conflictResolvedFindings, annotatedFindings);
+    SpecializedReviewConcernOwnership.preserveOwners(conflictResolvedFindings, annotatedFindings);
 
-    assertEquals(
-        "CORRECTNESS",
-        conflictResolvedFindings.getConcerns().getFirst().getOwnerAgent());
+    assertEquals("CORRECTNESS", conflictResolvedFindings.getConcerns().getFirst().getOwnerAgent());
   }
 
   @Test
@@ -400,8 +382,7 @@ public class SpecializedReviewCollectorsTest {
     SpecializedReviewFindings consolidated =
         consolidatedConcern("c-raw-code-quality", List.of("raw-code-quality"));
 
-    SpecializedReviewConcernOwnership.retainSupportedOwners(
-        consolidated, rawFindings, Set.of());
+    SpecializedReviewConcernOwnership.retainSupportedOwners(consolidated, rawFindings, Set.of());
 
     assertTrue(consolidated.getConcerns().isEmpty());
   }
@@ -506,8 +487,7 @@ public class SpecializedReviewCollectorsTest {
             "CORRECTNESS",
             findings(
                 List.of(
-                    concern(
-                        "r1", List.of(), "First issue", "reviewai-topic-change-1/src/One.java"),
+                    concern("r1", List.of(), "First issue", "reviewai-topic-change-1/src/One.java"),
                     concern(
                         "r2",
                         List.of(),
@@ -579,8 +559,7 @@ public class SpecializedReviewCollectorsTest {
     return findings(List.of(concern(id, mergedConcernIds, description, "src/Test.java")));
   }
 
-  private static SpecializedReviewFindings findings(
-      List<ReviewConcern> concerns) {
+  private static SpecializedReviewFindings findings(List<ReviewConcern> concerns) {
     SpecializedReviewFindings findings = new SpecializedReviewFindings();
     findings.setConcerns(concerns);
     findings.setDismissedConcerns(List.of());
@@ -711,7 +690,8 @@ public class SpecializedReviewCollectorsTest {
       stages.add(ReviewAssistantStage.REVIEW_SPECIALIZED_VERIFICATION);
       verificationInput = input;
       verificationInputs.add(input);
-      verificationConversationSuffixes.add(changeSetData.getReviewAssistantStageConversationSuffix());
+      verificationConversationSuffixes.add(
+          changeSetData.getReviewAssistantStageConversationSuffix());
       if (verificationStarted != null) {
         verificationStarted.countDown();
         try {

@@ -16,12 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai;
 
+import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-
-import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data

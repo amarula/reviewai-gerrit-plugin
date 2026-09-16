@@ -58,8 +58,7 @@ public final class AiPromptConditionLabelFormatter {
     return "- " + entry.getKey() + ": " + values + "\n  Description: " + description;
   }
 
-  private static String getDefaultDescription(
-      String labelName, Function<String, String> localize) {
+  private static String getDefaultDescription(String labelName, Function<String, String> localize) {
     String descriptionKey = DEFAULT_DESCRIPTION_KEYS.get(labelName);
     return descriptionKey == null ? "" : localize.apply(descriptionKey);
   }

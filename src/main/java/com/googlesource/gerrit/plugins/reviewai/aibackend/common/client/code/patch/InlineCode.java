@@ -16,17 +16,16 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithNewLine;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class InlineCode {

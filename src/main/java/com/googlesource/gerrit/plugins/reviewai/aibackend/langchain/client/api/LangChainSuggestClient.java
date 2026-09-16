@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSuggestRequest;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
@@ -31,8 +33,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Slf4j
 public class LangChainSuggestClient {
@@ -69,14 +69,16 @@ public class LangChainSuggestClient {
   }
 
   protected AiResponseContent askExistingReviewContext(
-      LangChainClient directClient, ChangeSetData changeSetData, GerritChange change, String patchSet)
+      LangChainClient directClient,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      String patchSet)
       throws Exception {
     return new LangChainDirectSuggestClient(directClient).ask(changeSetData, change, patchSet);
   }
 
   private List<AiReplyItem> askReview(
-      ChangeSetData changeSetData, GerritChange change, String patchSet)
-      throws Exception {
+      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
     AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
     if (reviewResponse == null) {
@@ -171,7 +173,8 @@ public class LangChainSuggestClient {
       boolean commitMessageSuggestion =
           SuggestedEditSupport.isCommitMessageFile(reviewReply.getFilename());
       if (commitMessageSuggestion && commitMessageSuggestionAdded) {
-        log.warn("Ignoring additional AI commit-message suggestion for negative review ID {}", reviewId);
+        log.warn(
+            "Ignoring additional AI commit-message suggestion for negative review ID {}", reviewId);
         continue;
       }
       suggestion.setScore(null);
@@ -197,7 +200,8 @@ public class LangChainSuggestClient {
     Set<Integer> missingReviewIds = new HashSet<>(reviewsById.keySet());
     missingReviewIds.removeAll(suggestedReviewIds);
     if (!missingReviewIds.isEmpty()) {
-      log.warn("AI did not provide a valid suggested edit for negative review IDs {}", missingReviewIds);
+      log.warn(
+          "AI did not provide a valid suggested edit for negative review IDs {}", missingReviewIds);
     }
     return suggestions;
   }

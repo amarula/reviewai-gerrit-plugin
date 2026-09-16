@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -33,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernLedgerOperations;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -63,7 +62,6 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -84,12 +82,10 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/aibackend/common/client/prompt/patchSetHistoryStartsAfterLatestForgetThreadCommand.json";
   private static final String SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE =
       "__files/langchain/suggestPreviousReviewContextAfterForget.json";
-  private static final String MESSAGE_RESPONSE_RESOURCE =
-      "__files/langchain/messageResponse.json";
+  private static final String MESSAGE_RESPONSE_RESOURCE = "__files/langchain/messageResponse.json";
   private static final String INCREMENTAL_PATCH_RESOURCE =
       "__files/langchain/newIssueIncrementalPatch.txt";
-  private static final String FULL_PATCH_RESOURCE =
-      "__files/langchain/newIssueFullPatch.txt";
+  private static final String FULL_PATCH_RESOURCE = "__files/langchain/newIssueFullPatch.txt";
   private static final String FEEDBACK_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemory.json";
   private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
@@ -100,10 +96,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void reviewRunsEnabledSpecializedAgentsAndCollector() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("CORRECTNESS", true),
-            plan("SECURITY", false));
+    client.triage = triage(plan("CORRECTNESS", true), plan("SECURITY", false));
     ChangeSetData changeSetData = new ChangeSetData(1);
     GerritChange change = change(false);
 
@@ -116,14 +109,10 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals(List.of(true), client.historicalRepetitionSelections);
     assertEquals("Collected review", response.getReplies().getFirst().getReply());
     ReviewerConcerns stored =
-        reviewer(
-            pendingLedger(response),
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "CORRECTNESS");
+        reviewer(pendingLedger(response), ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     assertEquals(1, stored.getConcerns().size());
     assertEquals(
-        response.getReplies().getFirst().getConcernId(),
-        stored.getConcerns().getFirst().getId());
+        response.getReplies().getFirst().getConcernId(), stored.getConcerns().getFirst().getId());
   }
 
   @Test
@@ -227,11 +216,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         List.of(
             AiReplyItem.builder().reply("Relevant reply").relevance(0.9).build(),
             AiReplyItem.builder().reply("Irrelevant reply").relevance(0.3).build(),
-            AiReplyItem.builder()
-                .reply("Duplicated reply")
-                .relevance(0.9)
-                .duplicated(true)
-                .build(),
+            AiReplyItem.builder().reply("Duplicated reply").relevance(0.9).duplicated(true).build(),
             AiReplyItem.builder()
                 .reply("Conflicting reply")
                 .relevance(0.9)
@@ -280,8 +265,7 @@ public class LangChainSpecializedAgentReviewClientTest {
                 "CODE_QUALITY", findings(codeQualityConcern)),
             SpecializedReviewFindings.AgentFindings.from(
                 "CORRECTNESS", findings(correctnessConcern)));
-    ReviewConcern verifiedConcern =
-        finding("Correctness", "Shared issue").getConcerns().getFirst();
+    ReviewConcern verifiedConcern = finding("Correctness", "Shared issue").getConcerns().getFirst();
     verifiedConcern.setId("c-raw-r1");
     verifiedConcern.setMergedConcernIds(List.of("raw-r1", "raw-r2"));
     verifiedConcern.setOwnerAgent("CORRECTNESS");
@@ -298,10 +282,7 @@ public class LangChainSpecializedAgentReviewClientTest {
 
     assertEquals(1, updates.getReviewers().size());
     ReviewerConcerns owned =
-        reviewer(
-            updates,
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "CORRECTNESS");
+        reviewer(updates, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     assertEquals(1, owned.getConcerns().size());
     assertEquals("CORRECTNESS", owned.getConcerns().getFirst().getOwnerAgent());
     assertEquals(2, owned.getConcerns().getFirst().getReviewers().size());
@@ -309,8 +290,7 @@ public class LangChainSpecializedAgentReviewClientTest {
 
   @Test
   public void verifiedConcernRequiresOwnerAgent() {
-    ReviewConcern rawConcern =
-        finding("Correctness", "Issue").getConcerns().getFirst();
+    ReviewConcern rawConcern = finding("Correctness", "Issue").getConcerns().getFirst();
     rawConcern.setId("raw-r1");
     ReviewConcern verifiedConcern = rawConcern.copy();
     verifiedConcern.setId("c-raw-r1");
@@ -333,9 +313,7 @@ public class LangChainSpecializedAgentReviewClientTest {
                         SpecializedReviewFindings.AgentFindings.from(
                             "CORRECTNESS", findings(rawConcern)))));
 
-    assertEquals(
-        "Verified specialized concern has no valid owner_agent",
-        thrown.getMessage());
+    assertEquals("Verified specialized concern has no valid owner_agent", thrown.getMessage());
   }
 
   @Test
@@ -344,30 +322,21 @@ public class LangChainSpecializedAgentReviewClientTest {
     concern.setType("Correctness");
     concern.setReviewers(
         List.of(
-            new ConcernReviewerId(
-                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CODE_QUALITY"),
-            new ConcernReviewerId(
-                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
+            new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CODE_QUALITY"),
+            new ConcernReviewerId(ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")));
     ReviewConcernLedger ledger = new ReviewConcernLedger();
     ledger.setReviewers(
         List.of(
             reviewerConcerns(
-                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-                "CODE_QUALITY",
-                concern.copy()),
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CODE_QUALITY", concern.copy()),
             reviewerConcerns(
-                ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-                "CORRECTNESS",
-                concern.copy())));
+                ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS", concern.copy())));
 
     SpecializedReviewConcernOwnership.normalizeLedger(ledger);
 
     assertEquals(1, ledger.getReviewers().size());
     ReviewerConcerns owned =
-        reviewer(
-            ledger,
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "CORRECTNESS");
+        reviewer(ledger, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     assertEquals(1, owned.getConcerns().size());
     assertEquals("CORRECTNESS", owned.getConcerns().getFirst().getOwnerAgent());
   }
@@ -375,10 +344,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void reviewClassifiesFeedbackInParallelAndFiltersDisabledAgent() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("TESTABILITY", true),
-            plan("CORRECTNESS", true));
+    client.triage = triage(plan("TESTABILITY", true), plan("CORRECTNESS", true));
     client.classifiedFeedback = readDisabledTestabilityMemory();
     ReviewFeedbackMemory previousFeedback = new ReviewFeedbackMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
@@ -397,10 +363,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void reviewMarksStoredConcernsForDisabledSpecializedAgentSkipped() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("TESTABILITY", true),
-            plan("CORRECTNESS", true));
+    client.triage = triage(plan("TESTABILITY", true), plan("CORRECTNESS", true));
     client.classifiedFeedback = readDisabledTestabilityMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setPreviousReviewConcernLedger(ledgerWithTestabilityConcerns());
@@ -411,14 +374,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     AiResponseContent response =
         client.ask(changeSetData, change(false), readTestResource(FULL_PATCH_RESOURCE));
 
-    assertEquals(
-        List.of("review-CORRECTNESS", "find-CORRECTNESS"),
-        client.concernEvents);
+    assertEquals(List.of("review-CORRECTNESS", "find-CORRECTNESS"), client.concernEvents);
     ReviewerConcerns testability =
-        reviewer(
-            pendingLedger(response),
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "TESTABILITY");
+        reviewer(pendingLedger(response), ConcernReviewerId.Kind.SPECIALIZED_AGENT, "TESTABILITY");
     assertEquals(2, testability.getConcerns().size());
     assertTrue(
         testability.getConcerns().stream()
@@ -434,16 +392,11 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void reviewClassifiesConditionLabelsWithoutPendingFeedback() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("TESTABILITY", true),
-            plan("CORRECTNESS", true));
+    client.triage = triage(plan("TESTABILITY", true), plan("CORRECTNESS", true));
     client.classifiedFeedback = readDisabledTestabilityMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
 
     client.ask(changeSetData, change(false), readTestResource(PATCH_SET_RESOURCE));
 
@@ -455,10 +408,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void reviewWithoutPendingFeedbackUsesPersistedDisabledScopes() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("COMMIT_MESSAGE", true),
-            plan("CORRECTNESS", true));
+    client.triage = triage(plan("COMMIT_MESSAGE", true), plan("CORRECTNESS", true));
     ReviewFeedbackMemory memory = readDisabledCommitMessageMemory();
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewFeedbackMemory(memory);
@@ -474,33 +424,23 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void firstReviewStoresOnlyConcernPublishedByCollector() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("CORRECTNESS", true),
-            plan("SECURITY", true));
+    client.triage = triage(plan("CORRECTNESS", true), plan("SECURITY", true));
 
     AiResponseContent response =
         client.ask(new ChangeSetData(1), change(false), readTestResource(PATCH_SET_RESOURCE));
 
     ReviewConcernLedger ledger = pendingLedger(response);
     assertEquals(1, ledger.getReviewers().size());
-    reviewer(
-        ledger,
-        ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-        "CORRECTNESS");
+    reviewer(ledger, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     assertTrue(
         ledger.getReviewers().stream()
             .noneMatch(entry -> "SECURITY".equals(entry.getReviewer().getName())));
   }
 
   @Test
-  public void followUpRunsConcernReviewBeforeNewIssueFinderForEachSpecialist()
-      throws Exception {
+  public void followUpRunsConcernReviewBeforeNewIssueFinderForEachSpecialist() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("CORRECTNESS", true),
-            plan("COMMIT_MESSAGE", false));
+    client.triage = triage(plan("CORRECTNESS", true), plan("COMMIT_MESSAGE", false));
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setPreviousReviewConcernLedger(specializedLedger());
     String incrementalPatch = readTestResource(INCREMENTAL_PATCH_RESOURCE);
@@ -518,8 +458,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         client.concernEvents);
     assertEquals(List.of(incrementalPatch, incrementalPatch), client.incrementalPatches);
     assertEquals(List.of(fullPatch, fullPatch), client.fullPatches);
-    assertEquals(
-        List.of(incrementalPatch, incrementalPatch), client.concernIncrementalPatches);
+    assertEquals(List.of(incrementalPatch, incrementalPatch), client.concernIncrementalPatches);
     assertEquals(List.of(fullPatch, fullPatch), client.concernFullPatches);
     assertEquals(List.of("CORRECTNESS", "COMMIT_MESSAGE"), client.collectorAgents);
     assertEquals(List.of(false), client.historicalRepetitionSelections);
@@ -530,15 +469,9 @@ public class LangChainSpecializedAgentReviewClientTest {
     ReviewConcernLedger ledger = pendingLedger(response);
     assertEquals(3, ledger.getReviewers().size());
     ReviewerConcerns correctness =
-        reviewer(
-            ledger,
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "CORRECTNESS");
+        reviewer(ledger, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS");
     ReviewerConcerns commitMessage =
-        reviewer(
-            ledger,
-            ConcernReviewerId.Kind.SPECIALIZED_AGENT,
-            "COMMIT_MESSAGE");
+        reviewer(ledger, ConcernReviewerId.Kind.SPECIALIZED_AGENT, "COMMIT_MESSAGE");
     assertEquals(2, correctness.getConcerns().size());
     assertEquals(ConcernStatus.PRESENT, correctness.getConcerns().getFirst().getStatus());
     assertEquals(1, commitMessage.getConcerns().size());
@@ -549,10 +482,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void commitMessageScopeRunsOnlyCommitMessageSpecialist() throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    client.triage =
-        triage(
-            plan("COMMIT_MESSAGE", true),
-            plan("CORRECTNESS", true));
+    client.triage = triage(plan("COMMIT_MESSAGE", true), plan("CORRECTNESS", true));
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewScope(ReviewScope.COMMIT_MESSAGE);
     GerritChange change = change(false);
@@ -579,7 +509,8 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void commentMessageUsesDedicatedMessageRequestWithoutSpecializedRouting() throws Exception {
+  public void commentMessageUsesDedicatedMessageRequestWithoutSpecializedRouting()
+      throws Exception {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
     client.triage = triage(plan("CORRECTNESS", true));
     ChangeSetData changeSetData = new ChangeSetData(1);
@@ -764,8 +695,7 @@ public class LangChainSpecializedAgentReviewClientTest {
         new TestableSpecializedPrompt(config(), changeSetData, change(false));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
-    String fieldDefinitions =
-        extractSection(instructions, "Field Definitions");
+    String fieldDefinitions = extractSection(instructions, "Field Definitions");
 
     assertTrue(fieldDefinitions.contains("# Field Definitions"));
     assertTrue(fieldDefinitions.contains("`concerns`"));
@@ -806,8 +736,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertTrue(patchsetInstructions.contains("mandatory exclusions"));
     assertTrue(patchsetInstructions.contains("TESTABILITY"));
     assertTrue(commitMessageInstructions.contains(memory.getGenericFeedback()));
-    assertTrue(
-        commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
+    assertTrue(commitMessageInstructions.contains(memory.getConcernFeedback().get("concern-1")));
   }
 
   @Test
@@ -952,7 +881,8 @@ public class LangChainSpecializedAgentReviewClientTest {
   @Test
   public void verificationInputIncludesPatchsetAndConflictResolvedFindings() {
     RecordingSpecializedClient client = new RecordingSpecializedClient(config());
-    String verificationInput = client.buildVerificationInput("Patch body", finding("Correctness", "Issue"));
+    String verificationInput =
+        client.buildVerificationInput("Patch body", finding("Correctness", "Issue"));
 
     JsonObject input = JsonParser.parseString(verificationInput).getAsJsonObject();
     assertEquals("Patch body", input.get("patchset").getAsString());
@@ -968,8 +898,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     return triage;
   }
 
-  private static SpecializedReviewTriage.AgentPlan plan(
-      String agent, boolean enabled) {
+  private static SpecializedReviewTriage.AgentPlan plan(String agent, boolean enabled) {
     SpecializedReviewTriage.AgentPlan plan = new SpecializedReviewTriage.AgentPlan();
     plan.setAgent(agent);
     plan.setEnabled(enabled);
@@ -1017,15 +946,13 @@ public class LangChainSpecializedAgentReviewClientTest {
   private static ReviewFeedbackMemory readDisabledCommitMessageMemory() throws Exception {
     return getGson()
         .fromJson(
-            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE),
-            ReviewFeedbackMemory.class);
+            readTestResource(DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
   }
 
   private static ReviewFeedbackMemory readDisabledTestabilityMemory() throws Exception {
     return getGson()
         .fromJson(
-            readTestResource(DISABLED_TESTABILITY_MEMORY_RESOURCE),
-            ReviewFeedbackMemory.class);
+            readTestResource(DISABLED_TESTABILITY_MEMORY_RESOURCE), ReviewFeedbackMemory.class);
   }
 
   private static HashMap<String, GerritComment> mapById(List<GerritComment> comments) {
@@ -1158,8 +1085,7 @@ public class LangChainSpecializedAgentReviewClientTest {
       incrementalPatches.add(incrementalPatchSet);
       fullPatches.add(fullPatchSet);
       return rawReviewRequestResult(
-          getGson().toJson(finding(agent, agent + " new concern")),
-          "finder-" + agent);
+          getGson().toJson(finding(agent, agent + " new concern")), "finder-" + agent);
     }
 
     @Override
@@ -1310,8 +1236,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   private static class TestableTriagePrompt extends AiPromptSpecializedReviewTriage {
-    TestableTriagePrompt(
-        Configuration config, ChangeSetData changeSetData, GerritChange change) {
+    TestableTriagePrompt(Configuration config, ChangeSetData changeSetData, GerritChange change) {
       super(config, changeSetData, change, null);
     }
 

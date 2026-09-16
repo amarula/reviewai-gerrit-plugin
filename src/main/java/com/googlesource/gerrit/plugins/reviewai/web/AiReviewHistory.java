@@ -37,11 +37,10 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.settings.Settings;
 import com.googlesource.gerrit.plugins.reviewai.web.model.AiReviewHistoryInfo;
-
-import java.util.ArrayList;
-import java.util.Collection;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,7 +139,8 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
 
   private static GerritComment toComment(CommentInfo commentInfo, String filename) {
     GerritComment comment = new GerritComment();
-    Optional.ofNullable(commentInfo.author).ifPresent(author -> comment.setAuthor(toAuthor(author)));
+    Optional.ofNullable(commentInfo.author)
+        .ifPresent(author -> comment.setAuthor(toAuthor(author)));
     comment.setChangeMessageId(commentInfo.changeMessageId);
     comment.setUnresolved(commentInfo.unresolved);
     comment.setPatchSet(commentInfo.patchSet);
@@ -158,7 +158,8 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
                         .endCharacter(range.endCharacter)
                         .build()));
     comment.setInReplyTo(commentInfo.inReplyTo);
-    Optional.ofNullable(commentInfo.updated).ifPresent(updated -> comment.setUpdated(toDateString(updated)));
+    Optional.ofNullable(commentInfo.updated)
+        .ifPresent(updated -> comment.setUpdated(toDateString(updated)));
     comment.setMessage(commentInfo.message);
     comment.setCommitId(commentInfo.commitId);
     comment.setFilename(filename);
@@ -167,7 +168,8 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
 
   private static GerritComment toComment(ChangeMessageInfo messageInfo) {
     GerritComment comment = new GerritComment();
-    Optional.ofNullable(messageInfo.author).ifPresent(author -> comment.setAuthor(toAuthor(author)));
+    Optional.ofNullable(messageInfo.author)
+        .ifPresent(author -> comment.setAuthor(toAuthor(author)));
     comment.setId(messageInfo.id);
     comment.setTag(messageInfo.tag);
     Optional.ofNullable(messageInfo.date).ifPresent(date -> comment.setUpdated(toDateString(date)));
@@ -178,7 +180,8 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     return comment;
   }
 
-  private static boolean isDuplicatePatchSetMessage(GerritComment existing, GerritComment incoming) {
+  private static boolean isDuplicatePatchSetMessage(
+      GerritComment existing, GerritComment incoming) {
     return Stream.of(existing.getChangeMessageId(), existing.getId())
         .filter(Objects::nonNull)
         .anyMatch(existingId -> existingId.equals(incoming.getId()));

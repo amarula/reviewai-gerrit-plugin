@@ -42,8 +42,7 @@ public class ReviewFeedbackLifecycleTest {
   public void authorizesModeratorActionsAgainstOriginalFeedbackAuthor() {
     ReviewFeedbackPublisher publisher = mock(ReviewFeedbackPublisher.class);
     Configuration config = mock(Configuration.class);
-    IdentifiedUser.GenericFactory identifiedUserFactory =
-        mock(IdentifiedUser.GenericFactory.class);
+    IdentifiedUser.GenericFactory identifiedUserFactory = mock(IdentifiedUser.GenericFactory.class);
     IdentifiedUser feedbackAuthor = mock(IdentifiedUser.class);
     AiRoleResolver roleResolver = mock(AiRoleResolver.class);
     GerritChange change = mock(GerritChange.class);
@@ -56,31 +55,23 @@ public class ReviewFeedbackLifecycleTest {
         .thenReturn(AiRole.MODERATOR);
     when(publisher.claimPending(change))
         .thenReturn(
-            new ReviewFeedbackStore.Claim(
-                "claim",
-                List.of("comment-1"),
-                Map.of("comment-1", 42)));
+            new ReviewFeedbackStore.Claim("claim", List.of("comment-1"), Map.of("comment-1", 42)));
     ChangeSetData changeSetData = new ChangeSetData(1);
     ReviewFeedbackLifecycle lifecycle =
-        new ReviewFeedbackLifecycle(
-            publisher, config, identifiedUserFactory, roleResolver);
+        new ReviewFeedbackLifecycle(publisher, config, identifiedUserFactory, roleResolver);
 
     lifecycle.begin(change, changeSetData);
 
     assertEquals(
-        Set.of("comment-1"),
-        changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
-    assertEquals(
-        Set.of("comment-1"),
-        changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
+        Set.of("comment-1"), changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
+    assertEquals(Set.of("comment-1"), changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
   }
 
   @Test
   public void ordinaryFeedbackAuthorCannotAuthorizeModeratorActions() {
     ReviewFeedbackPublisher publisher = mock(ReviewFeedbackPublisher.class);
     Configuration config = mock(Configuration.class);
-    IdentifiedUser.GenericFactory identifiedUserFactory =
-        mock(IdentifiedUser.GenericFactory.class);
+    IdentifiedUser.GenericFactory identifiedUserFactory = mock(IdentifiedUser.GenericFactory.class);
     IdentifiedUser feedbackAuthor = mock(IdentifiedUser.class);
     AiRoleResolver roleResolver = mock(AiRoleResolver.class);
     GerritChange change = mock(GerritChange.class);
@@ -89,24 +80,17 @@ public class ReviewFeedbackLifecycleTest {
     when(change.getChangeNumber()).thenReturn(Optional.of(7));
     when(change.getProjectNameKey()).thenReturn(project);
     when(identifiedUserFactory.create(Account.id(42))).thenReturn(feedbackAuthor);
-    when(roleResolver.resolve(config, feedbackAuthor, project, changeId))
-        .thenReturn(AiRole.USER);
+    when(roleResolver.resolve(config, feedbackAuthor, project, changeId)).thenReturn(AiRole.USER);
     when(publisher.claimPending(change))
         .thenReturn(
-            new ReviewFeedbackStore.Claim(
-                "claim",
-                List.of("comment-1"),
-                Map.of("comment-1", 42)));
+            new ReviewFeedbackStore.Claim("claim", List.of("comment-1"), Map.of("comment-1", 42)));
     ChangeSetData changeSetData = new ChangeSetData(1);
     ReviewFeedbackLifecycle lifecycle =
-        new ReviewFeedbackLifecycle(
-            publisher, config, identifiedUserFactory, roleResolver);
+        new ReviewFeedbackLifecycle(publisher, config, identifiedUserFactory, roleResolver);
 
     lifecycle.begin(change, changeSetData);
 
-    assertEquals(
-        Set.of(), changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
-    assertEquals(
-        Set.of(), changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
+    assertEquals(Set.of(), changeSetData.getReviewFeedbackDismissalAuthorizedCommentIds());
+    assertEquals(Set.of(), changeSetData.getReviewFeedbackControlAuthorizedCommentIds());
   }
 }

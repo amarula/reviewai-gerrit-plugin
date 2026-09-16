@@ -68,8 +68,7 @@ public class AiRequestStoreTest extends TestBase {
   public void rejectsReviewWhenQueuedRequestOccupiesChange() {
     store.admit(message("message-1", "event-1"));
 
-    AiRequestStore.Admission admission =
-        store.admit(review("review-1", "event-2"));
+    AiRequestStore.Admission admission = store.admit(review("review-1", "event-2"));
 
     assertFalse(admission.duplicate());
     assertEquals(AiRequest.State.REJECTED, admission.request().state());
@@ -79,13 +78,10 @@ public class AiRequestStoreTest extends TestBase {
   @Test
   public void requestsRunningReviewSupersessionAndRejectsIncomingReview() {
     store.admit(review("review-1", "patch-set-1"));
-    assertEquals(
-        "review-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("review-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     AiRequest requested =
-        store
-            .requestSupersession(CHANGE, "Superseded by patch set 2")
-            .orElseThrow();
+        store.requestSupersession(CHANGE, "Superseded by patch set 2").orElseThrow();
     AiRequestStore.Admission incoming = store.admit(review("review-2", "patch-set-2"));
 
     assertEquals(AiRequest.State.SUPERSEDE_REQUESTED, requested.state());
@@ -111,8 +107,7 @@ public class AiRequestStoreTest extends TestBase {
   @Test
   public void staleOwnerCannotCompleteRequest() {
     store.admit(message("request-1", "event-1"));
-    assertEquals(
-        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     assertFalse(store.complete("request-1", "stale-worker", null));
     assertEquals(AiRequest.State.RUNNING, store.get("request-1").orElseThrow().state());
@@ -123,8 +118,7 @@ public class AiRequestStoreTest extends TestBase {
   public void failureStoresReasonAndReleasesChangeLane() {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
-    assertEquals(
-        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
     String failureReason = AiRequest.State.FAILED.name();
 
     assertTrue(store.fail("request-1", OWNER, failureReason));
@@ -139,8 +133,7 @@ public class AiRequestStoreTest extends TestBase {
   public void abandonsExpiredRequestAndMakesNextMessageClaimable() {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
-    assertEquals(
-        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     assertEquals(1, store.abandonExpired(LEASE, "expired"));
     assertEquals(AiRequest.State.ABANDONED, store.get("request-1").orElseThrow().state());
@@ -154,8 +147,7 @@ public class AiRequestStoreTest extends TestBase {
 
     AiRequestStore recreated = new AiRequestStore(getTestReviewAiDb());
 
-    assertEquals(
-        "request-1", recreated.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-1", recreated.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
   }
 
   @Test
@@ -214,8 +206,7 @@ public class AiRequestStoreTest extends TestBase {
   public void doesNotListChangeWhileItsLaneIsActive() {
     store.admit(message("request-1", "event-1"));
     store.admit(message("request-2", "event-2"));
-    assertEquals(
-        "request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
+    assertEquals("request-1", store.claimNext(CHANGE, OWNER, LEASE).orElseThrow().requestId());
 
     assertTrue(store.listQueuedChanges(10).isEmpty());
   }
@@ -266,11 +257,7 @@ public class AiRequestStoreTest extends TestBase {
   private AiRequestSubmission message(
       String requestId, String sourceEventId, GerritChangeRef change) {
     return submission(
-        requestId,
-        sourceEventId,
-        change,
-        AiRequest.Kind.MESSAGE,
-        AiRequest.AdmissionPolicy.QUEUE);
+        requestId, sourceEventId, change, AiRequest.Kind.MESSAGE, AiRequest.AdmissionPolicy.QUEUE);
   }
 
   private AiRequestSubmission review(String requestId, String sourceEventId) {
@@ -289,11 +276,6 @@ public class AiRequestStoreTest extends TestBase {
       AiRequest.Kind kind,
       AiRequest.AdmissionPolicy policy) {
     return new AiRequestSubmission(
-        requestId,
-        change,
-        sourceEventId,
-        kind,
-        policy,
-        GsonUtils.getGson().toJson(Map.of()));
+        requestId, change, sourceEventId, kind, policy, GsonUtils.getGson().toJson(Map.of()));
   }
 }

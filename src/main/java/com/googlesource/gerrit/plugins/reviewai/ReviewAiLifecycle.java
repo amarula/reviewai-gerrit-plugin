@@ -152,8 +152,8 @@ public class ReviewAiLifecycle implements LifecycleListener {
   }
 
   /**
-   * Removes any {@code GerritListener} instances already registered for this plugin from the
-   * {@link DynamicSet}.
+   * Removes any {@code GerritListener} instances already registered for this plugin from the {@link
+   * DynamicSet}.
    *
    * <p>On Gerrit 3.14.2, plugin reload and plugin add call {@code start()} on the new instance
    * before {@code stop()} on the old one, so stale entries may still be present. We match stale
@@ -191,9 +191,7 @@ public class ReviewAiLifecycle implements LifecycleListener {
         listener = extension.get();
       } catch (RuntimeException e) {
         log.warn(
-            "Unable to inspect an event listener for plugin '{}': {}",
-            pluginName,
-            e.getMessage());
+            "Unable to inspect an event listener for plugin '{}': {}", pluginName, e.getMessage());
         continue;
       }
       if (listenerClassName.equals(listener.getClass().getName())) {
@@ -219,12 +217,8 @@ public class ReviewAiLifecycle implements LifecycleListener {
         listener = extension.get();
       } catch (RuntimeException e) {
         log.warn(
-            "Unable to inspect an event listener for plugin '{}': {}",
-            pluginName,
-            e.getMessage());
-        listeners.add(
-            String.format(
-                "%s(unreachable,classLoader@?)", listenerClassName));
+            "Unable to inspect an event listener for plugin '{}': {}", pluginName, e.getMessage());
+        listeners.add(String.format("%s(unreachable,classLoader@?)", listenerClassName));
         continue;
       }
       if (listenerClassName.equals(listener.getClass().getName())) {

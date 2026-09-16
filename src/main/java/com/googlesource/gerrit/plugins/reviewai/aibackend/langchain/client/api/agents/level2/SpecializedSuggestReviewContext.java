@@ -61,7 +61,8 @@ class SpecializedSuggestReviewContext {
   }
 
   private List<ChatMessage> buildPreviousReviewMessages(ChangeSetData changeSetData) {
-    return buildReviewHistoryMessages(changeSetData == null ? null : changeSetData.getAiDataPrompt())
+    return buildReviewHistoryMessages(
+            changeSetData == null ? null : changeSetData.getAiDataPrompt())
         .stream()
         .filter(AiMessage.class::isInstance)
         .toList();

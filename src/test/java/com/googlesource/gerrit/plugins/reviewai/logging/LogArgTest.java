@@ -42,10 +42,7 @@ public class LogArgTest {
     String result = String.valueOf(LogArg.truncated(new ObjectWithLongToString(value)));
 
     assertEquals(
-        "ObjectWithLongToString{value=\""
-            + value.substring(0, CUT_AT)
-            + TRUNCATION_SUFFIX
-            + "\"}",
+        "ObjectWithLongToString{value=\"" + value.substring(0, CUT_AT) + TRUNCATION_SUFFIX + "\"}",
         result);
   }
 

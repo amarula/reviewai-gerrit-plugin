@@ -25,14 +25,14 @@ import static org.mockito.Mockito.when;
 import com.google.gerrit.extensions.client.ChangeKind;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.PatchSetAttribute;
-import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType.PreprocessResult;
-import java.util.Optional;
+import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -54,8 +54,7 @@ public class EventHandlerTypePatchSetReviewTest {
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
     TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
-    AiReviewApplicabilityChecker applicabilityChecker =
-        mock(AiReviewApplicabilityChecker.class);
+    AiReviewApplicabilityChecker applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = changeKind;
 
@@ -87,8 +86,7 @@ public class EventHandlerTypePatchSetReviewTest {
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
     TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
-    AiReviewApplicabilityChecker applicabilityChecker =
-        mock(AiReviewApplicabilityChecker.class);
+    AiReviewApplicabilityChecker applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = changeKind;
 
@@ -121,8 +119,7 @@ public class EventHandlerTypePatchSetReviewTest {
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
     TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
-    AiReviewApplicabilityChecker applicabilityChecker =
-        mock(AiReviewApplicabilityChecker.class);
+    AiReviewApplicabilityChecker applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = changeKind;
     patchSet.author = new AccountAttribute();
@@ -162,8 +159,7 @@ public class EventHandlerTypePatchSetReviewTest {
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
     TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
-    AiReviewApplicabilityChecker applicabilityChecker =
-        mock(AiReviewApplicabilityChecker.class);
+    AiReviewApplicabilityChecker applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = ChangeKind.REWORK;
     patchSet.author = new AccountAttribute();
@@ -205,8 +201,7 @@ public class EventHandlerTypePatchSetReviewTest {
     PatchSetReviewer reviewer = mock(PatchSetReviewer.class);
     GerritClient gerritClient = mock(GerritClient.class);
     TopicPatchSetReviewCoordinator coordinator = mock(TopicPatchSetReviewCoordinator.class);
-    AiReviewApplicabilityChecker applicabilityChecker =
-        mock(AiReviewApplicabilityChecker.class);
+    AiReviewApplicabilityChecker applicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     PatchSetAttribute patchSet = new PatchSetAttribute();
     patchSet.kind = ChangeKind.REWORK;
     patchSet.author = new AccountAttribute();

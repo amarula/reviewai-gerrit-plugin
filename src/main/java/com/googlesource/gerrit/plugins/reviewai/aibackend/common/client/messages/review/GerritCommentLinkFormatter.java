@@ -64,7 +64,8 @@ final class GerritCommentLinkFormatter {
       return COMMIT_MESSAGE_LABEL;
     }
     String filename = firstNonBlank(replyItem.getFilename(), comment.getFilename());
-    Integer line = replyItem.getLineNumber() == null ? comment.getLine() : replyItem.getLineNumber();
+    Integer line =
+        replyItem.getLineNumber() == null ? comment.getLine() : replyItem.getLineNumber();
     if (COMMIT_MESSAGE_FILENAME.equals(filename)) {
       return COMMIT_MESSAGE_LABEL;
     }

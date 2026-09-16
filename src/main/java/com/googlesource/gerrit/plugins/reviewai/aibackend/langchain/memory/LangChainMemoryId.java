@@ -51,9 +51,7 @@ public final class LangChainMemoryId {
 
   public static LangChainMemoryId from(ChangeSetData changeSetData, GerritChange change) {
     return new LangChainMemoryId(
-        change.getFullChangeId(),
-        getPatchSetNumber(change),
-        getMemoryScope(changeSetData, change));
+        change.getFullChangeId(), getPatchSetNumber(change), getMemoryScope(changeSetData, change));
   }
 
   public static int getPatchSetNumber(GerritChange change) {

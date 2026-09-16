@@ -16,11 +16,10 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class ClientMessageBase extends ClientBase {

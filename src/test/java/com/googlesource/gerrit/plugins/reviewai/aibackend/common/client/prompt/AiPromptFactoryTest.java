@@ -120,13 +120,15 @@ public class AiPromptFactoryTest {
   public void routedReviewAgentInstructionsAreLoadedIntoReviewPromptFields() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
-    AiPromptRoutedReviewAgentRequest request = new AiPromptRoutedReviewAgentRequest(
-        mock(Configuration.class),
-        changeSetData,
-        commentEventChange(),
-        mock(ICodeContextPolicy.class));
+    AiPromptRoutedReviewAgentRequest request =
+        new AiPromptRoutedReviewAgentRequest(
+            mock(Configuration.class),
+            changeSetData,
+            commentEventChange(),
+            mock(ICodeContextPolicy.class));
 
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/router/routed-request-prompts");
+    Map<String, Object> prompts =
+        AiPrompt.getJsonPromptValues("agents/level1/router/routed-request-prompts");
 
     assertEquals(
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"),
@@ -198,9 +200,7 @@ public class AiPromptFactoryTest {
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
     changeSetData.setSpecializedAgentInstructions("Review code quality concerns only.");
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
     Configuration config = mock(Configuration.class);
@@ -235,9 +235,7 @@ public class AiPromptFactoryTest {
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
     Configuration config = mock(Configuration.class);
@@ -267,21 +265,15 @@ public class AiPromptFactoryTest {
   public void feedbackClassificationStageUsesDedicatedPrompt() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
-    changeSetData.setReviewAssistantStage(
-        ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
     Configuration config = mock(Configuration.class);
     when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1");
 
     IAiPrompt prompt =
         AiPromptFactory.getAiPrompt(
-            config,
-            changeSetData,
-            commentEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, commentEventChange(), mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptReviewFeedbackClassification);
     String instructions = prompt.getDefaultAiAssistantInstructions();
@@ -296,15 +288,12 @@ public class AiPromptFactoryTest {
   @Test
   public void newIssueFinderStageUsesReviewerAwarePrompt() {
     ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(
-        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
     Configuration config = mock(Configuration.class);
@@ -320,8 +309,7 @@ public class AiPromptFactoryTest {
     assertTrue(
         prompt
             .getDefaultAiAssistantInstructions()
-            .contains(
-                (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
+            .contains((String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains("# Condition Labels"));
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains("- Verified: +1"));
   }
@@ -335,9 +323,7 @@ public class AiPromptFactoryTest {
     changeSetData.setForcedStagedReview(true);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
     Configuration config = mock(Configuration.class);
@@ -379,10 +365,7 @@ public class AiPromptFactoryTest {
     when(config.getAiReviewCommitMessages()).thenReturn(true);
     AiPromptReview prompt =
         new AiPromptReview(
-            config,
-            new ChangeSetData(1),
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, new ChangeSetData(1), patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
@@ -395,8 +378,7 @@ public class AiPromptFactoryTest {
   @Test
   public void reviewPromptIncludesConfiguredApplicabilityExpression() {
     Configuration config = mock(Configuration.class);
-    when(config.getAiReviewApplicableIf())
-        .thenReturn("label:Verified=+1 OR label:Code-Review=+2");
+    when(config.getAiReviewApplicableIf()).thenReturn("label:Verified=+1 OR label:Code-Review=+2");
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setConditionLabels(
         Map.of(
@@ -406,10 +388,7 @@ public class AiPromptFactoryTest {
             new GerritConditionLabel(java.util.List.of(), "Code quality review")));
     AiPromptReview prompt =
         new AiPromptReview(
-            config,
-            changeSetData,
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
@@ -428,13 +407,9 @@ public class AiPromptFactoryTest {
     when(config.getAiReviewApplicableIf()).thenReturn("");
     AiPromptReview prompt =
         new AiPromptReview(
-            config,
-            new ChangeSetData(1),
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, new ChangeSetData(1), patchSetEventChange(), mock(ICodeContextPolicy.class));
 
-    assertFalse(
-        prompt.getDefaultAiAssistantInstructions().contains("Current AI Review Condition"));
+    assertFalse(prompt.getDefaultAiAssistantInstructions().contains("Current AI Review Condition"));
   }
 
   @Test
@@ -445,15 +420,10 @@ public class AiPromptFactoryTest {
     changeSetData.setForcedReview(true);
     changeSetData.setAiReviewConditionMet(false);
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of(), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of(), "CI verification")));
     AiPromptReview prompt =
         new AiPromptReview(
-            config,
-            changeSetData,
-            patchSetEventChange(),
-            mock(ICodeContextPolicy.class));
+            config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
@@ -472,9 +442,7 @@ public class AiPromptFactoryTest {
     changeSetData.setSpecializedAgentName("CORRECTNESS");
     changeSetData.setSpecializedAgentInstructions("Review correctness only.");
     changeSetData.setConditionLabels(
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
 
     for (ReviewAssistantStage stage :
         List.of(
@@ -488,10 +456,7 @@ public class AiPromptFactoryTest {
 
       String instructions =
           AiPromptFactory.getAiPrompt(
-                  config,
-                  changeSetData,
-                  patchSetEventChange(),
-                  mock(ICodeContextPolicy.class))
+                  config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class))
               .getDefaultAiAssistantInstructions();
 
       assertTrue(
@@ -507,10 +472,7 @@ public class AiPromptFactoryTest {
 
     String commitMessageInstructions =
         AiPromptFactory.getAiPrompt(
-                config,
-                changeSetData,
-                patchSetEventChange(),
-                mock(ICodeContextPolicy.class))
+                config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class))
             .getDefaultAiAssistantInstructions();
 
     assertFalse(commitMessageInstructions.contains(applicableIf));
@@ -541,7 +503,8 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("codeSnippet"));
     assertTrue(instructions.contains("/COMMIT_MSG"));
     assertTrue(instructions.contains("including the first line"));
-    assertTrue(prompt.getDefaultAiThreadReviewMessage("patch").contains("every negative review reply"));
+    assertTrue(
+        prompt.getDefaultAiThreadReviewMessage("patch").contains("every negative review reply"));
   }
 
   @Test
@@ -631,7 +594,11 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertTrue(instructions.startsWith("You are ReviewPatchsetAgent."));
-    assertFalse(instructions.contains((String) AiPrompt.getJsonPromptValues("prompts").get("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS")));
+    assertFalse(
+        instructions.contains(
+            (String)
+                AiPrompt.getJsonPromptValues("prompts")
+                    .get("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS")));
   }
 
   @Test
@@ -641,8 +608,7 @@ public class AiPromptFactoryTest {
         new ChangeSetData(1),
         patchSetEventChange(),
         mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts =
-        AiPrompt.getJsonPromptValues("agents/level1/patchset/prompts");
+    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/patchset/prompts");
 
     String reviewTasks = (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS");
     assertFalse(prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS").toString().isEmpty());
@@ -658,8 +624,7 @@ public class AiPromptFactoryTest {
         prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER"),
         routerPrompt.getDefaultAiAssistantInstructions());
     assertEquals(
-        String.format(
-            prompts.get("DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER").toString(), "request"),
+        String.format(prompts.get("DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER").toString(), "request"),
         routerPrompt.getDefaultAiThreadReviewMessage("request"));
   }
 

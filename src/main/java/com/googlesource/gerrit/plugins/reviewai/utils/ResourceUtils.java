@@ -50,10 +50,7 @@ public final class ResourceUtils {
   }
 
   private static void forEachResourceFile(
-      URL resource,
-      String resourceDirectory,
-      String resourceSuffix,
-      ResourceFileConsumer consumer)
+      URL resource, String resourceDirectory, String resourceSuffix, ResourceFileConsumer consumer)
       throws Exception {
     if ("file".equals(resource.getProtocol())) {
       forEachFileResource(resource, resourceSuffix, consumer);
@@ -84,10 +81,7 @@ public final class ResourceUtils {
   }
 
   private static void forEachJarResource(
-      URL resource,
-      String resourceDirectory,
-      String resourceSuffix,
-      ResourceFileConsumer consumer)
+      URL resource, String resourceDirectory, String resourceSuffix, ResourceFileConsumer consumer)
       throws Exception {
     JarURLConnection connection = (JarURLConnection) resource.openConnection();
     connection.setUseCaches(false);

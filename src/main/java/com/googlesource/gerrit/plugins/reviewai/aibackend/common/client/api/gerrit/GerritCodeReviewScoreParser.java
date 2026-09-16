@@ -25,9 +25,7 @@ import java.util.regex.Pattern;
 public final class GerritCodeReviewScoreParser {
   private static final Pattern PATCH_SET_HEADER_PATTERN =
       Pattern.compile(
-          "^(?:"
-              + GERRIT_DEFAULT_MESSAGE_PATCH_SET
-              + "|Uploaded patch set) \\d+:[^\\n]*",
+          "^(?:" + GERRIT_DEFAULT_MESSAGE_PATCH_SET + "|Uploaded patch set) \\d+:[^\\n]*",
           Pattern.CASE_INSENSITIVE);
   private static final Pattern CODE_REVIEW_SCORE_PATTERN =
       Pattern.compile("(?<![-\\w])Code-Review\\s*([+-]\\d+)\\b");

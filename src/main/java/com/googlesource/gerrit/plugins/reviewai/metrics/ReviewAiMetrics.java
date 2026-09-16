@@ -97,9 +97,7 @@ public class ReviewAiMetrics {
     aiEstimatedCostNanoUsd =
         metricMaker.newCounter(
             "reviewai/ai_request/estimated_cost_nanousd",
-            new Description("Estimated ReviewAI provider cost")
-                .setCumulative()
-                .setUnit("nanoUSD"),
+            new Description("Estimated ReviewAI provider cost").setCumulative().setUnit("nanoUSD"),
             providerField,
             modelField);
     aiPricingMissing =
@@ -149,7 +147,8 @@ public class ReviewAiMetrics {
       return;
     }
     aiRequestCount.increment(label(provider), label(stage), label(status));
-    aiRequestLatency.record(label(provider), label(model), label(stage), elapsedNanos, TimeUnit.NANOSECONDS);
+    aiRequestLatency.record(
+        label(provider), label(model), label(stage), elapsedNanos, TimeUnit.NANOSECONDS);
   }
 
   public void recordAiEstimatedCostNanoUsd(String provider, String model, long nanoUsd) {

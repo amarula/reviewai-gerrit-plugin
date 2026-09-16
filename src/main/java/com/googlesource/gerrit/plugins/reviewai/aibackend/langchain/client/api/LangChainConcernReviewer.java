@@ -36,8 +36,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 final class LangChainConcernReviewer {
-  private static final String RESPONSE_SCHEMA_RESOURCE =
-      "config/formatConcernReviewSchema.json";
+  private static final String RESPONSE_SCHEMA_RESOURCE = "config/formatConcernReviewSchema.json";
 
   private final Configuration config;
   private final ResponseFormat responseFormat;

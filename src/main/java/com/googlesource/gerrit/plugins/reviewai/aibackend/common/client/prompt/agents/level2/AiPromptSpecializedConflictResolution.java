@@ -48,7 +48,8 @@ public class AiPromptSpecializedConflictResolution extends AiPromptSpecializedRe
 
   @Override
   protected String getCollectorResponseFormat() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT");
+    return prompt(
+        "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT");
   }
 
   @Override

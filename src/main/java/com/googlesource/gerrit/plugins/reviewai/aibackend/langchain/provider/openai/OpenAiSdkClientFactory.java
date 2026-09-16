@@ -16,12 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai;
 
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.http.HttpResponse;
 import com.openai.errors.OpenAIServiceException;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
@@ -54,8 +53,8 @@ public final class OpenAiSdkClientFactory {
     while (cause != null) {
       if (cause instanceof SocketTimeoutException
           || cause instanceof InterruptedIOException
-          && cause.getMessage() != null
-          && cause.getMessage().toLowerCase(Locale.ROOT).contains("timeout")) {
+              && cause.getMessage() != null
+              && cause.getMessage().toLowerCase(Locale.ROOT).contains("timeout")) {
         return true;
       }
       cause = cause.getCause();

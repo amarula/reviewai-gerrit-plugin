@@ -33,8 +33,7 @@ public record AiRequestIntakeDecision(
   }
 
   public static AiRequestIntakeDecision direct(boolean supersedesActiveReview) {
-    return new AiRequestIntakeDecision(
-        Disposition.DIRECT, null, null, supersedesActiveReview);
+    return new AiRequestIntakeDecision(Disposition.DIRECT, null, null, supersedesActiveReview);
   }
 
   public static AiRequestIntakeDecision persistent(

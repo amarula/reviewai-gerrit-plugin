@@ -19,11 +19,10 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
 
 @Singleton
 @Slf4j

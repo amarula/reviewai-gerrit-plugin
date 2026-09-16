@@ -48,7 +48,8 @@ public class PluginChatMemoryStoreTest {
     String userMessage = readResource(USER_MESSAGE_RESOURCE);
     String aiMessage = readResource(AI_MESSAGE_RESOURCE);
 
-    store.updateMessages(memoryId, List.of(UserMessage.from(userMessage), AiMessage.from(aiMessage)));
+    store.updateMessages(
+        memoryId, List.of(UserMessage.from(userMessage), AiMessage.from(aiMessage)));
 
     List<ChatMessage> restored = store.getMessages(memoryId);
 

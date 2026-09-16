@@ -16,10 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.gerrit.server.git.GitRepositoryManager;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
@@ -31,7 +34,6 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetReviewAi;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
@@ -40,17 +42,14 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 class ReviewAgentResponseService {
   private final GitRepositoryManager repositoryManager;
@@ -76,10 +75,7 @@ class ReviewAgentResponseService {
   }
 
   Optional<AiReviewMessage.Output> getDirectResponse(
-      ChangeResource resource,
-      Configuration config,
-      AiReviewMessage.Input input,
-      String message) {
+      ChangeResource resource, Configuration config, AiReviewMessage.Input input, String message) {
     if (input == null
         || !Boolean.TRUE.equals(input.reviewAgent)
         || !ClientCommandBase.shouldSkipGerritMessage(message)) {
@@ -102,10 +98,7 @@ class ReviewAgentResponseService {
   }
 
   Optional<AiReviewMessage.Output> getPreflightSystemResponse(
-      ChangeResource resource,
-      Configuration config,
-      AiReviewMessage.Input input,
-      String message) {
+      ChangeResource resource, Configuration config, AiReviewMessage.Input input, String message) {
     if (input == null || !Boolean.TRUE.equals(input.reviewAgent)) {
       return Optional.empty();
     }
@@ -128,10 +121,7 @@ class ReviewAgentResponseService {
   }
 
   String getPreamble(
-      ChangeResource resource,
-      Configuration config,
-      AiReviewMessage.Input input,
-      String message) {
+      ChangeResource resource, Configuration config, AiReviewMessage.Input input, String message) {
     if (input == null || !Boolean.TRUE.equals(input.reviewAgent)) {
       return null;
     }
@@ -235,14 +225,13 @@ class ReviewAgentResponseService {
     return resource == null
         ? AiRole.USER
         : roleResolver.resolve(
-            config,
-            resource.getUser(),
-            resource.getProject(),
-            resource.getChange().getId());
+            config, resource.getUser(), resource.getProject(), resource.getChange().getId());
   }
 
   private String getDynamicConfigurationMessage(
-      Configuration config, PluginDataHandlerProvider pluginDataHandlerProvider, Localizer localizer) {
+      Configuration config,
+      PluginDataHandlerProvider pluginDataHandlerProvider,
+      Localizer localizer) {
     return commandExtension
         .getDynamicConfigurationMessage(config, pluginDataHandlerProvider, localizer)
         .orElse(null);

@@ -60,7 +60,9 @@ public class AiReviewMessageStatus
   }
 
   public static class Input {
-    @SerializedName(value = "request_id", alternate = {"requestId"})
+    @SerializedName(
+        value = "request_id",
+        alternate = {"requestId"})
     public String requestId;
   }
 }

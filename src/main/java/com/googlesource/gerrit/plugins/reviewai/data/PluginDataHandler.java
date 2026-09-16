@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -31,8 +33,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 
 @Singleton
 @Slf4j
@@ -72,12 +72,14 @@ public class PluginDataHandler {
   public synchronized void setValue(String key, String value) {
     log.debug("Setting value for key: {} with value: {}", key, value);
     synchronized (fileLock) {
-      String upsertSql = db.getDialect().upsert(
-          "plugin_data",
-          "scope, data_key, data_value, updated_at",
-          "?, ?, ?, CURRENT_TIMESTAMP",
-          "scope, data_key",
-          "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
+      String upsertSql =
+          db.getDialect()
+              .upsert(
+                  "plugin_data",
+                  "scope, data_key, data_value, updated_at",
+                  "?, ?, ?, CURRENT_TIMESTAMP",
+                  "scope, data_key",
+                  "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
       try (Connection c = db.getConnection();
           PreparedStatement ps = c.prepareStatement(upsertSql)) {
         ps.setString(1, scope);
@@ -195,12 +197,14 @@ public class PluginDataHandler {
     if (legacyProperties.isEmpty()) {
       return;
     }
-    String upsertSql = db.getDialect().upsert(
-        "plugin_data",
-        "scope, data_key, data_value, updated_at",
-        "?, ?, ?, CURRENT_TIMESTAMP",
-        "scope, data_key",
-        "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
+    String upsertSql =
+        db.getDialect()
+            .upsert(
+                "plugin_data",
+                "scope, data_key, data_value, updated_at",
+                "?, ?, ?, CURRENT_TIMESTAMP",
+                "scope, data_key",
+                "data_value = EXCLUDED.data_value, updated_at = CURRENT_TIMESTAMP");
     try (Connection c = db.getConnection();
         PreparedStatement ps = c.prepareStatement(upsertSql)) {
       for (String key : legacyProperties.stringPropertyNames()) {

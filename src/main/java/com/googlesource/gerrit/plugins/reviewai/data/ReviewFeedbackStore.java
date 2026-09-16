@@ -195,8 +195,8 @@ public final class ReviewFeedbackStore {
     enqueue(connection, commentId, null);
   }
 
-  private void enqueue(
-      Connection connection, String commentId, Integer authorAccountId) throws SQLException {
+  private void enqueue(Connection connection, String commentId, Integer authorAccountId)
+      throws SQLException {
     try (PreparedStatement existing =
         connection.prepareStatement(
             """
@@ -335,8 +335,7 @@ public final class ReviewFeedbackStore {
 
     public Claim {
       commentIds = List.copyOf(commentIds);
-      authorAccountIds =
-          Collections.unmodifiableMap(new LinkedHashMap<>(authorAccountIds));
+      authorAccountIds = Collections.unmodifiableMap(new LinkedHashMap<>(authorAccountIds));
     }
 
     public boolean isEmpty() {

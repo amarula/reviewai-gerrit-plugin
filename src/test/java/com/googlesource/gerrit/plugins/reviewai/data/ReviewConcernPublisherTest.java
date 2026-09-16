@@ -60,9 +60,7 @@ public class ReviewConcernPublisherTest extends TestBase {
     publisher.persist(response, change);
 
     ReviewConcernLedger restored =
-        new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
-            .load()
-            .orElseThrow();
+        new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId()).load().orElseThrow();
     assertEquals(REVIEWED_COMMIT, restored.getLastReviewedCommit());
     assertEquals(ledger, restored);
   }

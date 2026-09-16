@@ -41,12 +41,10 @@ import java.util.Map;
 import org.junit.Test;
 
 public class LangChainConcernReviewTest {
-  private static final String RESPONSE_RESOURCE =
-      "__files/langchain/concernReviewResponse.json";
+  private static final String RESPONSE_RESOURCE = "__files/langchain/concernReviewResponse.json";
   private static final String INCREMENTAL_PATCH_RESOURCE =
       "__files/langchain/newIssueIncrementalPatch.txt";
-  private static final String FULL_PATCH_RESOURCE =
-      "__files/langchain/newIssueFullPatch.txt";
+  private static final String FULL_PATCH_RESOURCE = "__files/langchain/newIssueFullPatch.txt";
 
   @Test
   public void nonePolicyProvidesSamePatchContextAsNewIssueFinder() throws Exception {
@@ -82,21 +80,18 @@ public class LangChainConcernReviewTest {
     assertSame(reviewerId, result.getReviewer());
     assertEquals(ConcernStatus.FIXED, result.getConcerns().getFirst().getStatus());
     assertEquals(
-        "A null value reaches the dereference.",
-        result.getConcerns().getFirst().getDescription());
+        "A null value reaches the dereference.", result.getConcerns().getFirst().getDescription());
     assertEquals(ConcernStatus.PRESENT, existing.getStatus());
     assertEquals(
         ReviewAssistantStage.REVIEW_CONCERNS,
         capturedRequest.requestData.getReviewAssistantStage());
     assertTrue(capturedRequest.requestData.getForcedStagedReview());
     assertSame(
-        reviewerConcerns,
-        capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
+        reviewerConcerns, capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
     assertEquals(
         incrementalPatch,
         capturedRequest.requestData.getConcernWorkflowInput().getIncrementalPatch());
-    assertEquals(
-        fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals(fullPatch, capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
     assertEquals("", capturedRequest.patchSet);
   }
 
@@ -133,15 +128,12 @@ public class LangChainConcernReviewTest {
     Configuration config = mock(Configuration.class);
     LangChainConcernReviewer concernReviewer = concernReviewer(config);
     ReviewerConcerns concerns = new ReviewerConcerns();
-    concerns.setReviewer(
-        new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET"));
     ReviewConcern concern = new ReviewConcern();
     concern.setId("concern-1");
     concerns.setConcerns(List.of(concern));
     Map<String, GerritConditionLabel> conditionLabels =
-        Map.of(
-            "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification"));
+        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification"));
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setConditionLabels(conditionLabels);
     CapturedRequest capturedRequest = new CapturedRequest();
@@ -157,9 +149,7 @@ public class LangChainConcernReviewTest {
           return readTestResource(RESPONSE_RESOURCE);
         });
 
-    assertEquals(
-        conditionLabels,
-        capturedRequest.requestData.getConditionLabels());
+    assertEquals(conditionLabels, capturedRequest.requestData.getConditionLabels());
   }
 
   private static LangChainConcernReviewer concernReviewer(Configuration config) {
@@ -173,7 +163,8 @@ public class LangChainConcernReviewTest {
   }
 
   private static String readTestResource(String resource) throws IOException {
-    try (var stream = LangChainConcernReviewTest.class.getClassLoader().getResourceAsStream(resource)) {
+    try (var stream =
+        LangChainConcernReviewTest.class.getClassLoader().getResourceAsStream(resource)) {
       if (stream == null) {
         throw new IOException("Missing test resource: " + resource);
       }

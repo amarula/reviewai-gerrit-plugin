@@ -57,8 +57,7 @@ public class GerritClientCommentsTest {
   private static final int AI_ACCOUNT_ID = 1000;
   private static final int REVIEWER_ACCOUNT_ID = 2000;
   private static final long LATEST_COMMENT_TIMESTAMP = 1699271271L;
-  private static final String COMMENTS_RESOURCE =
-      "__files/gerritImplicitReplyComments.json";
+  private static final String COMMENTS_RESOURCE = "__files/gerritImplicitReplyComments.json";
   private static final String RESOLVED_REPLY_RESOURCE =
       "__files/gerritImplicitResolvedReplyComments.json";
   private static final Type COMMENTS_TYPE =
@@ -117,11 +116,8 @@ public class GerritClientCommentsTest {
 
     assertEquals(1, client.getCommentProperties().size());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
-    assertEquals(
-        "latest-review", client.getCommentData().getSourceChangeMessageId());
-    assertEquals(
-        "latest-reply",
-        client.getCommentData().getAddressedComments().getFirst().getId());
+    assertEquals("latest-review", client.getCommentData().getSourceChangeMessageId());
+    assertEquals("latest-reply", client.getCommentData().getAddressedComments().getFirst().getId());
 
     client.retrieveAllComments(change);
 
@@ -134,8 +130,7 @@ public class GerritClientCommentsTest {
 
     assertTrue(client.retrieveComments(change, AiRole.USER, "latest-review"));
 
-    assertEquals(
-        "latest-review", client.getCommentData().getSourceChangeMessageId());
+    assertEquals("latest-review", client.getCommentData().getSourceChangeMessageId());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
   }
 
@@ -154,9 +149,7 @@ public class GerritClientCommentsTest {
     assertFalse(client.retrieveComments(change, AiRole.USER));
 
     assertTrue(client.getCommentProperties().isEmpty());
-    assertEquals(
-        "latest-reply",
-        client.getCommentData().getAddressedComments().getFirst().getId());
+    assertEquals("latest-reply", client.getCommentData().getAddressedComments().getFirst().getId());
   }
 
   @Test
@@ -192,8 +185,7 @@ public class GerritClientCommentsTest {
   }
 
   private static Map<String, List<CommentInfo>> readComments(String resource) throws IOException {
-    String json =
-        Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
+    String json = Files.readString(TestResourceLoader.getTestResourcePath().resolve(resource));
     return OutputFormat.JSON.newGson().fromJson(json, COMMENTS_TYPE);
   }
 

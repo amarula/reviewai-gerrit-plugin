@@ -16,18 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import lombok.extern.slf4j.Slf4j;
-
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiDataPrompt;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiDataPrompt {
@@ -40,8 +39,7 @@ public class AiDataPrompt {
       GerritClientData gerritClientData,
       Localizer localizer) {
     openAiDataPromptHandler =
-        AiPromptFactory.getAiDataPrompt(
-            config, changeSetData, change, gerritClientData, localizer);
+        AiPromptFactory.getAiDataPrompt(config, changeSetData, change, gerritClientData, localizer);
     log.debug("AiDataPrompt initialized for change: {}", change.getFullChangeId());
   }
 

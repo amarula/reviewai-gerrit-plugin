@@ -68,7 +68,6 @@ public class LangChainMemoryIdTest {
 
     LangChainMemoryId memoryId = LangChainMemoryId.from(changeSetData, change);
 
-    assertEquals(
-        "review_specialized_verification.reviewai-topic-change-1", memoryId.getScope());
+    assertEquals("review_specialized_verification.reviewai-topic-change-1", memoryId.getScope());
   }
 }

@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -23,8 +25,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview {
   protected AiPromptSpecializedReviewCollector(
@@ -43,11 +43,13 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
     List<String> sections = new ArrayList<>();
     sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getCollectorRole()));
     sections.addAll(buildConditionLabelSections());
-    sections.add(buildSection(
-        prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getCollectorRules()));
-    sections.add(buildSection(
-        prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-        getCollectorResponseFormat()));
+    sections.add(
+        buildSection(
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getCollectorRules()));
+    sections.add(
+        buildSection(
+            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+            getCollectorResponseFormat()));
     return joinWithDoubleNewLine(sections);
   }
 

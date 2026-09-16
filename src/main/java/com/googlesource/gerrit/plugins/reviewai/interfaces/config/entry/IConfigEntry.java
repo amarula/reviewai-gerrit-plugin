@@ -17,7 +17,6 @@
 package com.googlesource.gerrit.plugins.reviewai.interfaces.config.entry;
 
 import com.google.gerrit.server.config.PluginConfig;
-
 import java.util.Map;
 
 public interface IConfigEntry {

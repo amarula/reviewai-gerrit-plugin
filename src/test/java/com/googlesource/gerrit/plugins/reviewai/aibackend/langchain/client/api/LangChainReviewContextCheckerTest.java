@@ -16,13 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
-import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
@@ -36,7 +35,8 @@ import org.junit.Test;
 
 public class LangChainReviewContextCheckerTest {
   private static final Path REVIEW_HISTORY_RESOURCE =
-      TestResourceLoader.getTestResourcePath().resolve("__files/langchain/routerAiDataPromptWithHistory.json");
+      TestResourceLoader.getTestResourcePath()
+          .resolve("__files/langchain/routerAiDataPromptWithHistory.json");
 
   @Test
   public void detectsExistingOpenAiReviewConversation() {

@@ -46,8 +46,7 @@ public final class PluginBuild {
     Map<String, String> versionInfo = new LinkedHashMap<>();
     versionInfo.put(
         "pluginVersion",
-        valueOrUnknown(
-            pluginPackage == null ? null : pluginPackage.getImplementationVersion()));
+        valueOrUnknown(pluginPackage == null ? null : pluginPackage.getImplementationVersion()));
     versionInfo.put("gerritVersion", valueOrUnknown(Version.getVersion()));
     versionInfo.put("javaVersion", valueOrUnknown(System.getProperty("java.version")));
 

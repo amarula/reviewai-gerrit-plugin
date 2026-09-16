@@ -28,22 +28,22 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistoryMessageFilter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.AiModelRequestLimiter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.AiModelRequestLimiter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.LangChainMemoryId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
@@ -262,8 +262,9 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
               change,
               previousLedger == null
                   ? new ReviewConcernLedger()
-                  : concernLedgerOperations().markDisabledConcernsSkipped(
-                      previousLedger, changeSetData.getReviewFeedbackMemory()));
+                  : concernLedgerOperations()
+                      .markDisabledConcernsSkipped(
+                          previousLedger, changeSetData.getReviewFeedbackMemory()));
       return response;
     }
     List<CompletableFuture<ReviewRequestResult>> reviewRequestFutures = new ArrayList<>();
@@ -272,8 +273,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
           changeSetData
               .getAiRequestCancellation()
               .supplyAsync(
-                  () -> askStage(changeSetData, change, patchSet, assistantStage),
-                  executor));
+                  () -> askStage(changeSetData, change, patchSet, assistantStage), executor));
     }
 
     List<AiResponseContent> aiResponseContents = new ArrayList<>();
@@ -339,8 +339,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     ConcernReviewerId reviewer = scopedReviewer(assistantStage);
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
     if (previousLedger == null) {
-      ReviewRequestResult firstReview =
-          askSingleRequest(stageChangeSetData, change, patchSet);
+      ReviewRequestResult firstReview = askSingleRequest(stageChangeSetData, change, patchSet);
       if (firstReview == null) {
         return null;
       }
@@ -381,7 +380,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
         switch (stage) {
           case REVIEW_CODE -> "PATCHSET";
           case REVIEW_COMMIT_MESSAGE -> "COMMIT_MESSAGE";
-          default -> throw new IllegalArgumentException("Unsupported scoped review stage: " + stage);
+          default ->
+              throw new IllegalArgumentException("Unsupported scoped review stage: " + stage);
         };
     return new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, reviewerName);
   }
@@ -391,24 +391,19 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
     if (previousLedger == null
         || response.getPendingConcernUpdates() == null
-        || response
-            .getPendingConcernUpdates()
-            .get(change.getFullChangeId())
-            .isEmpty()) {
+        || response.getPendingConcernUpdates().get(change.getFullChangeId()).isEmpty()) {
       return;
     }
     ReviewConcernLedger reviewerUpdates =
-        response
-            .getPendingConcernUpdates()
-            .get(change.getFullChangeId())
-            .orElseThrow();
+        response.getPendingConcernUpdates().get(change.getFullChangeId()).orElseThrow();
     concernLedgerOperations()
         .attachPendingLedger(
             response,
             change,
-            concernLedgerOperations().markDisabledConcernsSkipped(
-                concernLedgerOperations().mergeReviewerUpdates(previousLedger, reviewerUpdates),
-                changeSetData.getReviewFeedbackMemory()));
+            concernLedgerOperations()
+                .markDisabledConcernsSkipped(
+                    concernLedgerOperations().mergeReviewerUpdates(previousLedger, reviewerUpdates),
+                    changeSetData.getReviewFeedbackMemory()));
   }
 
   @VisibleForTesting
@@ -471,7 +466,8 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     if (!log.isDebugEnabled()) {
       return;
     }
-    log.debug("LangChain routing agent instructions for {}: {}", routerMemoryId, routerInstructions);
+    log.debug(
+        "LangChain routing agent instructions for {}: {}", routerMemoryId, routerInstructions);
     log.debug("LangChain routing agent user prompt for {}: {}", routerMemoryId, routerUserPrompt);
     log.debug(
         "LangChain routing agent message stack for {} with {} messages:{}",

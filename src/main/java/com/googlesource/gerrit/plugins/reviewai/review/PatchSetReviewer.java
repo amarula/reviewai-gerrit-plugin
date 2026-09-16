@@ -16,18 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import com.google.gerrit.server.config.CanonicalWebUrl;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
-import com.google.gerrit.server.config.CanonicalWebUrl;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
-import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
-import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
-import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
-import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
@@ -43,12 +34,20 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewReplyMapper;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.*;
 import javax.annotation.Nullable;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class PatchSetReviewer {
@@ -104,12 +103,7 @@ public class PatchSetReviewer {
             gerritClient, changeSetData, localizer, canonicalWebUrl);
     this.topicReviewReplyMapper = new TopicReviewReplyMapper();
     this.topicPatchSetReviewer =
-        new TopicPatchSetReviewer(
-            config,
-            gerritClient,
-            changeSetData,
-            localizer,
-            this);
+        new TopicPatchSetReviewer(config, gerritClient, changeSetData, localizer, this);
     debugCodeBlocksReview = new DebugCodeBlocksReview(localizer);
     log.debug("PatchSetReviewer initialized.");
   }
@@ -126,7 +120,8 @@ public class PatchSetReviewer {
     changeSetData.setReviewRepeatedCommentsMessage(null);
     reviewFeedbackLifecycle.reset(changeSetData);
     if (!changeSetData.shouldRequestAiReview()) {
-      log.debug("Skipping patch retrieval and AI request because only a system response is needed.");
+      log.debug(
+          "Skipping patch retrieval and AI request because only a system response is needed.");
       clientReviewProvider.get().setReview(change, reviewBatches, changeSetData, null);
       return;
     }
@@ -135,8 +130,8 @@ public class PatchSetReviewer {
     String patchSet = gerritClient.getPatchSet(change);
     prepareConcernContext(change);
     if (shouldSkipAiReviewForEmptyPatchSet(change)) {
-      changeSetData.setReviewSystemMessage(SystemMessageFormatter.getLocalizedMessage(
-          localizer, "message.review.skipped"));
+      changeSetData.setReviewSystemMessage(
+          SystemMessageFormatter.getLocalizedMessage(localizer, "message.review.skipped"));
       log.debug(
           "Skipping AI review for change {} because no files remain after patch filtering.",
           change.getFullChangeId());
@@ -192,8 +187,7 @@ public class PatchSetReviewer {
               .setReviewAndGetPublishedCommentIds(
                   change, reviewBatches, changeSetData, reviewScore, reviewReply);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
-      reviewFeedbackLifecycle.settle(
-          change, changeSetData, feedbackSession, reviewReply != null);
+      reviewFeedbackLifecycle.settle(change, changeSetData, feedbackSession, reviewReply != null);
       conversationRecorder.record(change, reviewBatches, reviewScore);
     } catch (Exception e) {
       reviewFeedbackLifecycle.release(change, feedbackSession, e);
@@ -249,9 +243,7 @@ public class PatchSetReviewer {
         reviewReply == null
             ? null
             : getReviewScore(
-                change,
-                topicReviewScores == null ? reviewScores : topicReviewScores,
-                reviewReply);
+                change, topicReviewScores == null ? reviewScores : topicReviewScores, reviewReply);
     Map<String, String> publishedCommentIdsByConcern =
         clientReviewProvider
             .get()
@@ -289,7 +281,8 @@ public class PatchSetReviewer {
     }
   }
 
-  private List<ReviewBatch> retrieveReviewBatches(AiResponseContent reviewReply, GerritChange change) {
+  private List<ReviewBatch> retrieveReviewBatches(
+      AiResponseContent reviewReply, GerritChange change) {
     return retrieveReviewBatches(reviewReply, change, null);
   }
 
@@ -329,8 +322,7 @@ public class PatchSetReviewer {
         log.debug("Score added: {}", score);
         reviewScores.add(score);
       }
-      if (reply == null
-          || hiddenByReplyFilter) {
+      if (reply == null || hiddenByReplyFilter) {
         continue;
       }
       if (changeSetData.getDebugReviewMode()) {
@@ -376,8 +368,7 @@ public class PatchSetReviewer {
         .ifPresent(changeSetData::setReviewRepeatedCommentsMessage);
   }
 
-  AiResponseContent getReviewReply(GerritChange change, String patchSet)
-      throws Exception {
+  AiResponseContent getReviewReply(GerritChange change, String patchSet) throws Exception {
     log.debug("Generating review reply for patch set.");
     List<String> patchLines = Arrays.asList(patchSet.split("\n"));
     if (patchLines.size() > config.getMaxReviewLines()) {
@@ -456,7 +447,8 @@ public class PatchSetReviewer {
     if (permittedVotingRange == null) {
       return normalizedScore;
     }
-    return Math.clamp(normalizedScore, permittedVotingRange.getMin(), permittedVotingRange.getMax());
+    return Math.clamp(
+        normalizedScore, permittedVotingRange.getMin(), permittedVotingRange.getMax());
   }
 
   private boolean canVotePositive() {

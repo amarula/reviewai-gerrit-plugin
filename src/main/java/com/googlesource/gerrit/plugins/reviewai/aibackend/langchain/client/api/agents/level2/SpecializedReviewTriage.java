@@ -32,8 +32,10 @@ class SpecializedReviewTriage {
     private String agent;
     private boolean enabled;
     private String reason;
+
     @SerializedName("history_context")
     private String historyContext;
+
     @SerializedName("custom_instructions")
     private String customInstructions;
   }

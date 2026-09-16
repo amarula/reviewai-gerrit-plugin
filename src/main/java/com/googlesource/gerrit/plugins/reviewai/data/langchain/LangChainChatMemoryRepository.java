@@ -59,8 +59,7 @@ public class LangChainChatMemoryRepository {
           existingRecords.stream().map(StoredMessage::messageJson).toList();
       int overlapSize = getExistingOverlapSize(existingMessages, updatedMessages);
       deleteObsoleteMessages(c, existingRecords, existingMessages.size() - overlapSize);
-      List<String> messagesToAppend =
-          updatedMessages.subList(overlapSize, updatedMessages.size());
+      List<String> messagesToAppend = updatedMessages.subList(overlapSize, updatedMessages.size());
       for (String messageJson : messagesToAppend) {
         bindInsertMessage(ps, changeId, patchSet, scope, messageJson);
         ps.addBatch();
@@ -118,8 +117,7 @@ public class LangChainChatMemoryRepository {
   }
 
   private List<StoredMessage> getMessageRecords(
-      Connection c, String changeId, int patchSet, String scope)
-      throws SQLException {
+      Connection c, String changeId, int patchSet, String scope) throws SQLException {
     try (PreparedStatement ps =
         c.prepareStatement(
             """

@@ -32,8 +32,7 @@ final class GerritEventHandlerContextFactory {
 
   Context create(Configuration config, Event event) {
     Injector eventInjector =
-        injector.createChildInjector(
-            new GerritEventContextModule(config, event, buildFeatures));
+        injector.createChildInjector(new GerritEventContextModule(config, event, buildFeatures));
     return new Context(eventInjector, eventInjector.getInstance(EventHandlerTask.class));
   }
 

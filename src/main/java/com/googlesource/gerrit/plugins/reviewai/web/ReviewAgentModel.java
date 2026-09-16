@@ -50,10 +50,7 @@ public class ReviewAgentModel implements RestReadView<ChangeResource> {
     boolean administratorUser =
         AiRolePolicy.isAllowed(
             roleResolver.resolve(
-                config,
-                resource.getUser(),
-                resource.getProject(),
-                resource.getChange().getId()),
+                config, resource.getUser(), resource.getProject(), resource.getChange().getId()),
             AiAction.USE_ADMINISTRATOR_FEATURES);
     List<String> models = config.getAiModels(administratorUser);
     return Response.ok(

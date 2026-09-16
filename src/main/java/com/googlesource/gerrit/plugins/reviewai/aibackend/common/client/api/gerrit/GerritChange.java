@@ -56,8 +56,8 @@ public class GerritChange {
   @Setter private Boolean isCommentEvent = false;
 
   /**
-   * Constructor accepts projectNameKey as Object to avoid type reference in signature.
-   * Works with both older (class) and newer (interface) Project.NameKey implementations.
+   * Constructor accepts projectNameKey as Object to avoid type reference in signature. Works with
+   * both older (class) and newer (interface) Project.NameKey implementations.
    */
   public GerritChange(Object projectNameKey, BranchNameKey branchNameKey, Change.Key changeKey) {
     this.projectName = getProjectName(projectNameKey);
@@ -154,10 +154,10 @@ public class GerritChange {
   }
 
   /**
-   * Returns the Project.NameKey instance created from the stored string.
-   * This method is lazily resolved and works across Gerrit versions because:
-   * 1. Project.nameKey() factory method exists in both 3.2.x (class) and 3.13.x (interface)
-   * 2. The return type is not resolved until this method is called
+   * Returns the Project.NameKey instance created from the stored string. This method is lazily
+   * resolved and works across Gerrit versions because: 1. Project.nameKey() factory method exists
+   * in both 3.2.x (class) and 3.13.x (interface) 2. The return type is not resolved until this
+   * method is called
    */
   public Project.NameKey getProjectNameKey() {
     if (projectName == null && patchSetEvent != null) {

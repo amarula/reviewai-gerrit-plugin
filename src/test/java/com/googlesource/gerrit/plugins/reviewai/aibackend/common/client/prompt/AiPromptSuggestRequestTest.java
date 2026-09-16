@@ -23,7 +23,8 @@ import java.util.Map;
 import org.junit.Test;
 
 public class AiPromptSuggestRequestTest {
-  private static final Map<String, Object> PROMPTS = AiPrompt.getJsonPromptValues("promptsAiSuggest");
+  private static final Map<String, Object> PROMPTS =
+      AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
   @Test
   public void reviewRepliesRequestUsesResourceTemplate() {

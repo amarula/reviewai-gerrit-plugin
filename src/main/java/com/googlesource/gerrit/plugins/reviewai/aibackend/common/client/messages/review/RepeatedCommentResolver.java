@@ -50,7 +50,8 @@ final class RepeatedCommentResolver {
 
   Optional<GerritComment> resolve(AiReplyItem replyItem, GerritChange change) {
     List<GerritComment> comments = getAiComments(change);
-    Optional<GerritComment> commentById = getCommentById(comments, replyItem.getRepetitionReplyId());
+    Optional<GerritComment> commentById =
+        getCommentById(comments, replyItem.getRepetitionReplyId());
     if (commentById.isPresent()) {
       return commentById;
     }
@@ -96,14 +97,17 @@ final class RepeatedCommentResolver {
     }
     Pattern idPattern =
         Pattern.compile(
-            "(^|[^" + idBoundaryCharacters(id) + "])"
+            "(^|[^"
+                + idBoundaryCharacters(id)
+                + "])"
                 + Pattern.quote(id)
                 + "([^"
                 + idBoundaryCharacters(id)
                 + "]|$)");
     return comments.stream()
         .filter(
-            comment -> comment.getMessage() != null && idPattern.matcher(comment.getMessage()).find())
+            comment ->
+                comment.getMessage() != null && idPattern.matcher(comment.getMessage()).find())
         .findFirst();
   }
 

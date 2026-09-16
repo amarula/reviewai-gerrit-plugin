@@ -18,11 +18,10 @@ package com.googlesource.gerrit.plugins.reviewai;
 
 import static org.junit.Assert.*;
 
+import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;

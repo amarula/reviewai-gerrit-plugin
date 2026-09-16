@@ -53,8 +53,7 @@ public class PendingReviewConcernUpdatesTest {
     assertEquals(List.of(concern), concerns);
   }
 
-  private ReviewConcernLedger ledger(
-      ConcernReviewerId reviewer, ReviewConcern... concerns) {
+  private ReviewConcernLedger ledger(ConcernReviewerId reviewer, ReviewConcern... concerns) {
     ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
     reviewerConcerns.setReviewer(reviewer);
     reviewerConcerns.setConcerns(List.of(concerns));

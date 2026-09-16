@@ -42,7 +42,13 @@ final class AiProviderConfiguration {
   static final String DEFAULT_MOONSHOT_ESTIMATOR_MODEL = "moonshot-v1-8k";
   static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = DEFAULT_OLLAMA_AI_MODEL;
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
-      List.of("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra", "gpt-5.5", DEFAULT_OPENAI_AI_MODEL);
+      List.of(
+          "gpt-5.6-luna",
+          "gpt-5.6-terra",
+          "gpt-5.6-sol",
+          "gpt-6-astra",
+          "gpt-5.5",
+          DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =
       List.of("gemini-3.1-pro", "gemini-3.1-flash", "gemini-2.5-pro", DEFAULT_GEMINI_AI_MODEL);
   static final List<String> DEFAULT_DEEPSEEK_AI_MODELS =
@@ -73,8 +79,7 @@ final class AiProviderConfiguration {
   String getAiToken(AiProviderType provider) {
     String token = getAiTokens().get(provider.getConfigName());
     if (token == null || token.isBlank()) {
-      throw new RuntimeException(
-          String.format(ConfigCore.NOT_CONFIGURED_ERROR_MSG, KEY_AI_TOKENS));
+      throw new RuntimeException(String.format(ConfigCore.NOT_CONFIGURED_ERROR_MSG, KEY_AI_TOKENS));
     }
     return token;
   }
@@ -135,18 +140,16 @@ final class AiProviderConfiguration {
     ConfiguredAiModels modelMap = getAiModelMap(configuredModels, providerRoutes);
     List<String> resolvedModels =
         providerRoutes.stream()
-        .flatMap(
-            providerRoute ->
-                modelMap
-                    .getModels(providerRoute)
-                    .orElseGet(() -> getDefaultAiModels(providerRoute.provider()))
-                    .stream()
-                    .map(
-                        model ->
-                            new AiModelRoute(providerRoute.provider(), model)))
-        .map(AiModelRoute::modelRoute)
-        .distinct()
-        .toList();
+            .flatMap(
+                providerRoute ->
+                    modelMap
+                        .getModels(providerRoute)
+                        .orElseGet(() -> getDefaultAiModels(providerRoute.provider()))
+                        .stream()
+                        .map(model -> new AiModelRoute(providerRoute.provider(), model)))
+            .map(AiModelRoute::modelRoute)
+            .distinct()
+            .toList();
     resolvedModels =
         DevMockAiConfigurationBridge.appendMockAiModelRoutes(
             config,
@@ -172,7 +175,8 @@ final class AiProviderConfiguration {
       }
       AiProviderType.fromConfigName(tokenRoute.substring(0, separator))
           .ifPresent(
-              provider -> tokens.put(provider.getConfigName(), tokenRoute.substring(separator + 1)));
+              provider ->
+                  tokens.put(provider.getConfigName(), tokenRoute.substring(separator + 1)));
     }
     return tokens;
   }
@@ -194,8 +198,7 @@ final class AiProviderConfiguration {
       }
     }
     return getDefaultAiModelRoute()
-        .orElse(
-            new AiModelRoute(AiProviderType.OPENAI, DEFAULT_OPENAI_AI_MODEL));
+        .orElse(new AiModelRoute(AiProviderType.OPENAI, DEFAULT_OPENAI_AI_MODEL));
   }
 
   Optional<AiModelRoute> getDefaultRealAiModelRoute() {
@@ -263,7 +266,8 @@ final class AiProviderConfiguration {
             .ifPresent(
                 provider ->
                     routeModelMap
-                        .computeIfAbsent(new AiProviderRoute(provider), ignored -> new ArrayList<>())
+                        .computeIfAbsent(
+                            new AiProviderRoute(provider), ignored -> new ArrayList<>())
                         .add(parts[1]));
         continue;
       }

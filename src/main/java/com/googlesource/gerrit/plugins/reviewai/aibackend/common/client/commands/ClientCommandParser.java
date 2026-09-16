@@ -16,8 +16,13 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
-import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
+
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewFeedbackPublisher;
@@ -25,19 +30,13 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.commands.IPatchSetProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiCommandAccessPolicy;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
 import com.googlesource.gerrit.plugins.reviewai.utils.PluginBuild;
 import com.googlesource.gerrit.plugins.reviewai.utils.TextUtils;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.*;
 import java.util.regex.Matcher;
-
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.distanceCodeDelimiter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class ClientCommandParser extends ClientCommandBase {
@@ -80,11 +79,7 @@ public class ClientCommandParser extends ClientCommandBase {
   private static final List<CommandSet> BASE_OPTIONS_REQUIRED =
       new ArrayList<>(List.of(CommandSet.SHOW));
   private static final List<CommandSet> DEBUG_REQUIRED_COMMANDS =
-      new ArrayList<>(
-          List.of(
-              CommandSet.DIRECTIVES,
-              CommandSet.CONFIGURE,
-              CommandSet.SHOW));
+      new ArrayList<>(List.of(CommandSet.DIRECTIVES, CommandSet.CONFIGURE, CommandSet.SHOW));
 
   private final ChangeSetData changeSetData;
   private final Localizer localizer;
@@ -198,7 +193,10 @@ public class ClientCommandParser extends ClientCommandBase {
     Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
     changeSetData.setHideAiReview(true);
     while (commandMatcher.find()) {
-      log.debug("Parsing command: {} - Parsing args: {}", commandMatcher.group(1), commandMatcher.group(2));
+      log.debug(
+          "Parsing command: {} - Parsing args: {}",
+          commandMatcher.group(1),
+          commandMatcher.group(2));
       CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
       if (command != null) {
         changeSetData.setShowDynamicConfigMessage(
