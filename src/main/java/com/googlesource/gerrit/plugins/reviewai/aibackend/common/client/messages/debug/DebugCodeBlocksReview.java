@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.prettyStringifyObject;
-
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.List;
@@ -30,7 +28,21 @@ public class DebugCodeBlocksReview extends DebugCodeBlocksComposer {
   }
 
   public String getDebugCodeBlock(AiReplyItem replyItem, boolean isHidden) {
+    // Keep fields explicit so new model or subclass fields are not disclosed automatically.
     return super.getDebugCodeBlock(
-        List.of(String.format(HIDDEN_REPLY, isHidden), prettyStringifyObject(replyItem)));
+        List.of(
+            String.format(HIDDEN_REPLY, isHidden),
+            "concernId: " + replyItem.getConcernId(),
+            "reply: " + replyItem.getReply(),
+            "score: " + replyItem.getScore(),
+            "relevance: " + replyItem.getRelevance(),
+            "repeated: " + replyItem.isRepeated(),
+            "duplicated: " + replyItem.isDuplicated(),
+            "conflicting: " + replyItem.isConflicting(),
+            "sourceAgent: " + replyItem.getSourceAgent(),
+            "repetitionReplyId: " + replyItem.getRepetitionReplyId(),
+            "repeatedReason: " + replyItem.getRepeatedReason(),
+            "duplicatedReason: " + replyItem.getDuplicatedReason(),
+            "conflictingReason: " + replyItem.getConflictingReason()));
   }
 }
