@@ -17,9 +17,14 @@
 package com.googlesource.gerrit.plugins.reviewai;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.gerrit.extensions.registration.DynamicSet;
@@ -32,7 +37,9 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewAiDb;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerExecutor;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
+import java.sql.SQLException;
 import org.junit.Test;
+import org.mockito.InOrder;
 
 public class ReviewAiLifecycleTest {
   private static final String PLUGIN_NAME = "reviewai-gerrit-plugin";
@@ -109,10 +116,11 @@ public class ReviewAiLifecycleTest {
   }
 
   @Test
-  public void startsAndStopsDurableRequestExecutor() {
+  public void startsAndStopsDurableRequestExecutor() throws Exception {
     DynamicSet<EventListener> eventListeners = new DynamicSet<>();
     ReviewAiExecutors executors = mock(ReviewAiExecutors.class);
     EventHandlerExecutor eventHandlerExecutor = mock(EventHandlerExecutor.class);
+    ReviewAiDb reviewAiDb = mock(ReviewAiDb.class);
     when(executors.getAgentExecutor()).thenReturn(command -> command.run());
     ReviewAiLifecycle lifecycle =
         new ReviewAiLifecycle(
@@ -120,7 +128,7 @@ public class ReviewAiLifecycleTest {
             eventHandlerExecutor,
             MOCK_LISTENER_PROVIDER,
             eventListeners,
-            mock(ReviewAiDb.class),
+            reviewAiDb,
             mock(ReviewConcernSanitizer.class),
             PLUGIN_NAME,
             TargetEventListener.class.getName());
@@ -128,8 +136,39 @@ public class ReviewAiLifecycleTest {
     lifecycle.start();
     lifecycle.stop();
 
-    verify(eventHandlerExecutor).start();
+    InOrder startup = inOrder(reviewAiDb, eventHandlerExecutor);
+    startup.verify(reviewAiDb).initSchema();
+    startup.verify(eventHandlerExecutor).start();
     verify(eventHandlerExecutor).stop();
+  }
+
+  @Test
+  public void schemaInitializationFailurePreventsStartupAndStopsManagedDatabase() throws Exception {
+    DynamicSet<EventListener> eventListeners = new DynamicSet<>();
+    ReviewAiExecutors executors = mock(ReviewAiExecutors.class);
+    EventHandlerExecutor eventHandlerExecutor = mock(EventHandlerExecutor.class);
+    Provider<GerritListener> listenerProvider = mock(Provider.class);
+    ReviewAiDb reviewAiDb = mock(ReviewAiDb.class);
+    ReviewConcernSanitizer sanitizer = mock(ReviewConcernSanitizer.class);
+    SQLException failure = new SQLException();
+    doThrow(failure).when(reviewAiDb).initSchema();
+    ReviewAiLifecycle lifecycle =
+        new ReviewAiLifecycle(
+            executors,
+            eventHandlerExecutor,
+            listenerProvider,
+            eventListeners,
+            reviewAiDb,
+            sanitizer,
+            PLUGIN_NAME,
+            TargetEventListener.class.getName());
+
+    RuntimeException error = assertThrows(RuntimeException.class, lifecycle::start);
+
+    assertSame(failure, error.getCause());
+    verify(reviewAiDb).stopManagedTcpServerIfOwner();
+    verifyNoInteractions(executors, eventHandlerExecutor, listenerProvider, sanitizer);
+    assertFalse(hasAnyEntry(eventListeners));
   }
 
   @Test

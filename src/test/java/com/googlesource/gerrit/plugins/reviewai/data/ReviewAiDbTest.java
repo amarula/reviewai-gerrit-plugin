@@ -18,10 +18,14 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,17 +33,101 @@ import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.List;
 import org.junit.Test;
 
 public class ReviewAiDbTest extends TestBase {
+  @Test
+  public void recordsVersionOnceAndPreservesTimestampAfterReload() throws Exception {
+    ReviewAiDb db = getTestReviewAiDb();
+    db.initSchema();
+    Timestamp appliedAt;
+    try (Connection c = db.getConnection();
+        Statement s = c.createStatement();
+        ResultSet rows = s.executeQuery(readDbResource("versions.sql"))) {
+      assertTrue(rows.next());
+      assertEquals(1, rows.getInt("version"));
+      appliedAt = rows.getTimestamp("applied_at");
+      assertNotNull(appliedAt);
+      assertFalse(rows.next());
+    }
+
+    ReviewAiDb reloadedDb =
+        new ReviewAiDb(
+            tempFolder.getRoot().toPath(),
+            buildEmbeddedTestJdbcUrl(tempFolder.getRoot().toPath()));
+    reloadedDb.initSchema();
+    try (Connection c = reloadedDb.getConnection();
+        Statement s = c.createStatement();
+        ResultSet rows = s.executeQuery(readDbResource("versions.sql"))) {
+      assertTrue(rows.next());
+      assertEquals(1, rows.getInt("version"));
+      assertEquals(appliedAt, rows.getTimestamp("applied_at"));
+      assertFalse(rows.next());
+    }
+  }
+
+  @Test
+  public void preservesExistingVersionHistory() throws Exception {
+    ReviewAiDb db = getTestReviewAiDb();
+    Timestamp originalAppliedAt;
+    try (Connection c = db.getConnection(); Statement s = c.createStatement()) {
+      s.execute(readDbResource("existingVersions.sql"));
+      try (ResultSet rows = s.executeQuery(readDbResource("versions.sql"))) {
+        assertTrue(rows.next());
+        originalAppliedAt = rows.getTimestamp("applied_at");
+      }
+    }
+
+    db.initSchema();
+
+    try (Connection c = db.getConnection();
+        Statement s = c.createStatement();
+        ResultSet rows = s.executeQuery(readDbResource("versions.sql"))) {
+      assertTrue(rows.next());
+      assertEquals(0, rows.getInt("version"));
+      assertEquals(originalAppliedAt, rows.getTimestamp("applied_at"));
+      assertTrue(rows.next());
+      assertEquals(1, rows.getInt("version"));
+      assertNotNull(rows.getTimestamp("applied_at"));
+      assertFalse(rows.next());
+    }
+  }
+
+  @Test
+  public void doesNotRecordVersionWhenSchemaInitializationFails() throws Exception {
+    ReviewAiDb db = spy(getTestReviewAiDb());
+    doThrow(new SQLException("Schema initialization failed"))
+        .when(db)
+        .initReviewAgentConversationSchema();
+
+    assertThrows(SQLException.class, db::initSchema);
+
+    try (Connection c = db.getConnection();
+        ResultSet tables = c.getMetaData().getTables(null, null, "DB_VERSIONS", null)) {
+      assertFalse(tables.next());
+    }
+  }
+
+  private String readDbResource(String name) throws Exception {
+    try (InputStream input =
+        getClass().getClassLoader().getResourceAsStream("__files/db/" + name)) {
+      assertNotNull(input);
+      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+
   @Test
   public void oldInstanceCannotShutDownDatabaseAfterReloadWithSameUrl() throws Exception {
     Path dataDir = tempFolder.getRoot().toPath();

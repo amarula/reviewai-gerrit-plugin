@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -46,6 +47,7 @@ import org.h2.tools.Server;
 @Slf4j
 @Singleton
 public class ReviewAiDb {
+  private static final int CURRENT_DB_VERSION = 1;
   private static final String DB_FILE_NAME = "reviewai";
   private static final String TCP_HOST = "localhost";
   private static final int TCP_PORT = 9092;
@@ -146,6 +148,35 @@ public class ReviewAiDb {
     try (Connection c = getConnection()) {
       return callback.execute(c);
     }
+  }
+
+  /** Initializes the existing schemas and records their version without directing migrations. */
+  public void initSchema() throws SQLException {
+    initLangChainChatMemorySchema();
+    initPluginDataSchema();
+    initReviewConcernSchema();
+    initReviewFeedbackSchema();
+    initAiRequestSchema();
+    initReviewAgentConversationSchema();
+    executeSchema(
+        "CREATE TABLE IF NOT EXISTS db_versions ("
+            + "version INT PRIMARY KEY"
+            + ", applied_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            + ")");
+    withConnection(
+        c -> {
+          String sql =
+              getDialect() == DbDialect.POSTGRESQL
+                  ? "INSERT INTO db_versions(version) VALUES (?) ON CONFLICT (version) DO NOTHING"
+                  : "MERGE INTO db_versions USING (SELECT CAST(? AS INT) AS version) incoming"
+                      + " ON db_versions.version = incoming.version"
+                      + " WHEN NOT MATCHED THEN INSERT (version) VALUES (incoming.version)";
+          try (PreparedStatement s = c.prepareStatement(sql)) {
+            s.setInt(1, CURRENT_DB_VERSION);
+            s.executeUpdate();
+          }
+          return null;
+        });
   }
 
   public void initLangChainChatMemorySchema() throws SQLException {

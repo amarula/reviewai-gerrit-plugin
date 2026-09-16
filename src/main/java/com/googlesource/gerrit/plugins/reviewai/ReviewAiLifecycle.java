@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventHandlerExecutor;
 import com.googlesource.gerrit.plugins.reviewai.listener.GerritListener;
 import java.lang.reflect.Field;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -98,6 +99,13 @@ public class ReviewAiLifecycle implements LifecycleListener {
   @Override
   public void start() {
     log.info("Starting ReviewAI lifecycle");
+
+    try {
+      reviewAiDb.initSchema();
+    } catch (SQLException e) {
+      reviewAiDb.stopManagedTcpServerIfOwner();
+      throw new RuntimeException("Failed to initialize ReviewAI database", e);
+    }
 
     eventHandlerExecutor.start();
 
