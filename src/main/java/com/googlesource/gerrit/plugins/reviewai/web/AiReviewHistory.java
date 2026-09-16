@@ -201,7 +201,7 @@ public class AiReviewHistory implements RestReadView<ChangeResource> {
     return author;
   }
 
-  private static String toDateString(Timestamp input) {
+  private static synchronized String toDateString(Timestamp input) {
     return DATE_FORMAT.format(input) + "000000";
   }
 

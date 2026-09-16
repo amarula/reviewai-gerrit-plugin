@@ -273,7 +273,7 @@ public class GerritClientDetail {
   }
 
   /** Date format copied from <b>com.google.gerrit.json.SqlTimestampDeserializer</b> */
-  static String toDateString(Timestamp input) {
+  static synchronized String toDateString(Timestamp input) {
     return DATE_FORMAT.format(input) + "000000";
   }
 
