@@ -16,7 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -108,19 +107,6 @@ public class TextUtils extends StringUtils {
 
   public static List<String> getNumberedList(List<String> components) {
     return getNumberedList(components, null, null);
-  }
-
-  public static String prettyStringifyObject(Object object) {
-    List<String> lines = new ArrayList<>();
-    for (Field field : object.getClass().getDeclaredFields()) {
-      field.setAccessible(true);
-      try {
-        lines.add(field.getName() + COLON_SPACE + field.get(object));
-      } catch (IllegalAccessException e) {
-        log.debug("Error while accessing field {} in {}", field.getName(), object, e);
-      }
-    }
-    return joinWithNewLine(lines);
   }
 
   public static String sortTextLines(String value) {
