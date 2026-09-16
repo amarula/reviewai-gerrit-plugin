@@ -1,0 +1,18 @@
+{
+  "concern_id": "resource-1",
+  "reply": "Please close the resource.",
+  "score": 4.0,
+  "relevance": 0.75,
+  "repeated": true,
+  "duplicated": false,
+  "conflicting": true,
+  "source_agent": "CORRECTNESS",
+  "repetition_reply_id": "previous-reply-1",
+  "repeated_reason": "Previously reported.",
+  "duplicated_reason": "No duplicate found.",
+  "conflicting_reason": "Conflicts with an earlier suggestion.",
+  "id": 73,
+  "filename": "internal-details.java",
+  "codeSnippet": "internal source details",
+  "privateDebugData": "not-for-debug-output"
+}
