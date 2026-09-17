@@ -1,0 +1,5 @@
+{
+  "name": "SECURITY",
+  "short_description": "Checks security boundaries and input validation.",
+  "instructions": "Review the patch for security issues and explain each finding."
+}
