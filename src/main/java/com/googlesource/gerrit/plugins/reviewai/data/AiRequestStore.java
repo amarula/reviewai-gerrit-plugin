@@ -30,7 +30,7 @@ import java.util.Optional;
 
 /** Transactional persistence for durable, per-Change AI request queues. */
 @Singleton
-public class AiRequestStore {
+public final class AiRequestStore {
   private final ReviewAiDb db;
 
   @Inject
