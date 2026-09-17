@@ -1119,4 +1119,15 @@
         <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt"/>
         <Method name="&lt;init&gt;" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration" returns="void"/>
     </Match>
+
+    <!-- loadDefinitions builds an unmodifiable list with Stream.toList(). Its
+      SpecializedReviewAgentDefinition elements are immutable Lombok @Value
+      objects containing only strings. Returning the cache cannot expose mutable
+      state; retain shared reads without unnecessary defensive copies. -->
+    <Match>
+        <Bug pattern="MS_EXPOSE_REP"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions"/>
+        <Method name="load" params="" returns="java.util.List"/>
+        <Field name="cachedDefinitions" type="java.util.List"/>
+    </Match>
 </FindBugsFilter>
