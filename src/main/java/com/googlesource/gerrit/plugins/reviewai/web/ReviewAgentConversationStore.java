@@ -52,7 +52,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Singleton
-public class ReviewAgentConversationStore {
+public final class ReviewAgentConversationStore {
   static final long SHARED_USER_ID = 0L;
 
   private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
