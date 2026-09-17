@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
 
 @Data
 @RequiredArgsConstructor
-public class AiResponseContent {
+public final class AiResponseContent {
   private List<AiReplyItem> replies;
   private String changeId;
   private transient PendingReviewConcernUpdates pendingConcernUpdates;
