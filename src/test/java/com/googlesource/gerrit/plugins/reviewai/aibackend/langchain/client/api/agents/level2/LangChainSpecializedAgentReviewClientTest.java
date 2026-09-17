@@ -37,6 +37,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinition;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -76,6 +77,8 @@ public class LangChainSpecializedAgentReviewClientTest {
       "__files/langchain/specializedTriageResponse.json";
   private static final String WRAPPED_TRIAGE_RESPONSE_RESOURCE =
       "__files/langchain/specializedTriageWrappedResponse.json";
+  private static final String AGENT_DEFINITION_RESOURCE =
+      "__files/langchain/specializedAgentDefinition.json";
   private static final String ROUTER_HISTORY_EXPECTED_MESSAGES_RESOURCE =
       "__files/langchain/routerAiDataPromptWithHistoryExpectedMessages.txt";
   private static final String PATCH_SET_FORGET_THREAD_RESOURCE =
@@ -590,6 +593,19 @@ public class LangChainSpecializedAgentReviewClientTest {
     assertEquals("SECURITY", triage.getAgents().get(2).getAgent());
     assertFalse(triage.getAgents().get(2).isEnabled());
     assertEquals("No shared consolidation context.", triage.getConsolidationContext());
+  }
+
+  @Test
+  public void immutableSpecializedAgentDefinitionPreservesJsonFields() throws Exception {
+    JsonObject json =
+        JsonParser.parseString(readTestResource(AGENT_DEFINITION_RESOURCE)).getAsJsonObject();
+    SpecializedReviewAgentDefinition definition =
+        getGson().fromJson(json, SpecializedReviewAgentDefinition.class);
+
+    assertEquals(json.get("name").getAsString(), definition.getName());
+    assertEquals(json.get("short_description").getAsString(), definition.getShortDescription());
+    assertEquals(json.get("instructions").getAsString(), definition.getInstructions());
+    assertEquals(json, getGson().toJsonTree(definition));
   }
 
   @Test
