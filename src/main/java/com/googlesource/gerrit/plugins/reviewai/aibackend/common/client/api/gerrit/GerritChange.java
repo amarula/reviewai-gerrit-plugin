@@ -106,40 +106,41 @@ public class GerritChange {
   }
 
   public Optional<PatchSetAttribute> getPatchSetAttribute() {
-    try {
-      return Optional.ofNullable(patchSetEvent.patchSet.get());
-    } catch (NullPointerException e) {
-      if (patchSetNumber == null) {
-        return Optional.empty();
-      }
-      PatchSetAttribute patchSetAttribute = new PatchSetAttribute();
-      patchSetAttribute.number = patchSetNumber;
-      return Optional.of(patchSetAttribute);
+    PatchSetAttribute patchSet =
+        patchSetEvent == null || patchSetEvent.patchSet == null
+            ? null
+            : patchSetEvent.patchSet.get();
+    if (patchSet != null) {
+      return Optional.of(patchSet);
     }
+    if (patchSetNumber == null) {
+      return Optional.empty();
+    }
+    PatchSetAttribute patchSetAttribute = new PatchSetAttribute();
+    patchSetAttribute.number = patchSetNumber;
+    return Optional.of(patchSetAttribute);
   }
 
   public Optional<Integer> getChangeNumber() {
     if (changeNumber != null) {
       return Optional.of(changeNumber);
     }
-    try {
-      return Optional.ofNullable(patchSetEvent.change.get()).map(change -> change.number);
-    } catch (NullPointerException e) {
+    if (patchSetEvent == null || patchSetEvent.change == null) {
       return Optional.empty();
     }
+    return Optional.ofNullable(patchSetEvent.change.get()).map(change -> change.number);
   }
 
   public Optional<String> getTopic() {
     if (topic != null && !topic.isBlank()) {
       return Optional.of(topic);
     }
-    try {
-      return Optional.ofNullable(patchSetEvent.change.get())
-          .map(change -> change.topic)
-          .filter(topic -> !topic.isBlank());
-    } catch (NullPointerException e) {
+    if (patchSetEvent == null || patchSetEvent.change == null) {
       return Optional.empty();
     }
+    return Optional.ofNullable(patchSetEvent.change.get())
+        .map(change -> change.topic)
+        .filter(topic -> !topic.isBlank());
   }
 
   public String getPatchSetEventKey() {
