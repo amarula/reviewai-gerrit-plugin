@@ -178,7 +178,7 @@ public class AiHistory extends AiComment {
             .filter(Objects::nonNull)
             .max(String::compareTo)
             .orElse(null);
-    log.debug("Last /forget_thread cutoff: {}", cutoff);
+    log.debug("Last /restart cutoff: {}", cutoff);
     return cutoff;
   }
 
@@ -193,12 +193,13 @@ public class AiHistory extends AiComment {
             .getMessage()
             .trim();
     // Avoid the regex scan for the common case where the command name is not present at all.
-    if (!normalizedMessage.contains(ClientCommandBase.commandName(CommandSet.FORGET_THREAD))) {
+    if (!normalizedMessage.contains(ClientCommandBase.commandName(CommandSet.FORGET_THREAD))
+        && !normalizedMessage.contains("forget_thread")) {
       return false;
     }
     Matcher commandMatcher = ClientCommandBase.COMMAND_PATTERN.matcher(normalizedMessage);
     while (commandMatcher.find()) {
-      if (ClientCommandBase.commandName(CommandSet.FORGET_THREAD).equals(commandMatcher.group(1))) {
+      if (ClientCommandBase.resolveCommand(commandMatcher.group(1)) == CommandSet.FORGET_THREAD) {
         return true;
       }
     }
