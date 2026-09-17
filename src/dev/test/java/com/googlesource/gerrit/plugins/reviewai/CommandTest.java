@@ -405,11 +405,11 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewDoesNotPersistDynamicConfigAfterChainedForgetThreadCommand()
+  public void commandReviewDoesNotPersistDynamicConfigAfterChainedRestartCommand()
       throws Exception {
     PluginDataHandler changeHandler = getChangeDataHandler();
     changeHandler.setJsonValue(KEY_DYNAMIC_CONFIG, Map.of("aiModel", "OpenAI/gpt-4.1"));
-    setupCommandComment("/forget_thread /review");
+    setupCommandComment("/restart /review");
     setupMockRequestCreateResponse("openAiResponseRequest.json");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -435,8 +435,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandForgetThreadAllowsAiModerator() throws Exception {
-    setupCommandComment("/forget_thread");
+  public void commandRestartAllowsAiModerator() throws Exception {
+    setupCommandComment("/restart");
     grantSubmitPermission();
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
@@ -444,6 +444,44 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     Assert.assertEquals(
         "Conversation history successfully removed", changeSetData.getReviewSystemMessage());
     Assert.assertTrue(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
+  }
+
+  @Test
+  public void commandForgetThreadAliasEmitsDeprecationWarning() throws Exception {
+    setupCommandComment("/forget_thread");
+    grantSubmitPermission();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertTrue(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
+    Assert.assertTrue(
+        testRequestSent().getValue().message.contains(
+            readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
+  }
+
+  @Test
+  public void commandForgetThreadAliasWarningSurvivesChainedReview() throws Exception {
+    setupCommandComment("/forget_thread /review");
+    grantSubmitPermission();
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertTrue(changeSetData.getForcedReview());
+    Assert.assertTrue(
+        testRequestSent().getValue().message.contains(
+            readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
+  }
+
+  @Test
+  public void commandHelpRestartAndDeprecatedAlias() throws Exception {
+    for (String command : java.util.List.of("/help restart", "/help forget_thread")) {
+      setupCommandComment(command);
+
+      handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+      Assert.assertTrue(changeSetData.getReviewSystemMessage().contains("`/restart`"));
+    }
   }
 
   @Test

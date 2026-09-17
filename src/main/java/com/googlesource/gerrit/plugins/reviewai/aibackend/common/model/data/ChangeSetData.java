@@ -102,7 +102,8 @@ public final class ChangeSetData {
   }
 
   public Boolean hasParsedCommand(CommandSet command) {
-    return hasParsedCommand(ClientCommandBase.commandName(command));
+    return parsedCommands.stream()
+        .anyMatch(name -> ClientCommandBase.resolveCommand(name) == command);
   }
 
   public Boolean hasParsedCommandOption(String command, String option, String value) {
