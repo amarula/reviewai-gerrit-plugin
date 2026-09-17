@@ -120,6 +120,25 @@ class ReviewAgentResponseService {
             false));
   }
 
+  static boolean isStandaloneRestartCommand(String message) {
+    return "/restart".equals(message) || "/forget_thread".equals(message);
+  }
+
+  AiReviewMessage.Output restart(ChangeResource resource, Configuration config, String message) {
+    ReviewAgentCommandContext commandContext =
+        parseReviewAgentCommand(resource, config, message, true);
+    return new AiReviewMessage.Output(
+        true,
+        getDirectResponseText(
+            config,
+            commandContext.changeSetData(),
+            commandContext.pluginDataHandlerProvider(),
+            commandContext.localizer(),
+            commandContext.administratorUser(),
+            true),
+        false);
+  }
+
   String getPreamble(
       ChangeResource resource, Configuration config, AiReviewMessage.Input input, String message) {
     if (input == null || !Boolean.TRUE.equals(input.reviewAgent)) {
