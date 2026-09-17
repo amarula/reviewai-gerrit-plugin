@@ -23,7 +23,7 @@ ReviewAI assigns each user one of three roles for the current Change:
 | Role | Assignment | Additional capabilities |
 | --- | --- | --- |
 | User | The default role. | Standard messages, reviews, and suggestions. |
-| AI Moderator | The user can apply `Code-Review +2` or submit the Change. | Dismiss tracked concerns, control future review scopes and specialized agents, and use `/forget_thread`. |
+| AI Moderator | The user can apply `Code-Review +2` or submit the Change. | Dismiss tracked concerns, control future review scopes and specialized agents, and use `/restart`. |
 | ReviewAI Administrator | In the development build, the user belongs to `aiAdministratorsGroup`; if that group is not configured or cannot be found, Gerrit administrators are used. | All AI Moderator capabilities plus development and debugging features. |
 
 AI Moderator permissions are evaluated per Change. Moderator actions can be requested using ordinary messages; no
@@ -156,11 +156,11 @@ The index in the response to `/directives` query can be used to remove single dy
 /directives --reset
 ```
 
-## Forgetting Conversation History
+## Restarting Conversation History
 
 For the OpenAI Responses backend, the plugin stores the OpenAI conversation ID for each Change Set so that forced or
 reiterated reviews continue on the same durable conversation object. For the other LangChain providers, the plugin
-stores chat memory locally by Change, Patch Set, and review scope. This history can be removed with the `/forget_thread`
+stores chat memory locally by Change, Patch Set, and review scope. This history can be removed with the `/restart`
 command.
 This functionality is crucial for preventing AI from merely recycling old responses, particularly following
 modifications to configuration parameters.
@@ -168,8 +168,10 @@ modifications to configuration parameters.
 ### Basic Syntax
 
 ```
-/forget_thread
+/restart
 ```
+
+`/forget_thread` remains available as a deprecated alias and emits a warning to use `/restart`.
 
 **NOTE**: This command is reserved to users who can apply Code-Review +2 or submit the change.
 ReviewAI Administrators inherit moderator permissions.
