@@ -83,9 +83,10 @@ public record AiRequestDescriptor(
       if (eventApprovals != null) {
         approvals = Arrays.stream(eventApprovals).map(ApprovalData::from).toList();
       }
-    } else {
-      PatchSetCreatedEvent patchSetCreatedEvent = (PatchSetCreatedEvent) event;
+    } else if (event instanceof PatchSetCreatedEvent patchSetCreatedEvent) {
       actor = patchSetCreatedEvent.uploader == null ? null : patchSetCreatedEvent.uploader.get();
+    } else {
+      throw new IllegalArgumentException("Unsupported Gerrit event: " + event.getClass().getName());
     }
     return new AiRequestDescriptor(
         CURRENT_SCHEMA_VERSION,

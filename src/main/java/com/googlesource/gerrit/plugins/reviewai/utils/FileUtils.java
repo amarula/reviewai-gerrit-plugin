@@ -17,12 +17,12 @@
 package com.googlesource.gerrit.plugins.reviewai.utils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -30,18 +30,15 @@ public class FileUtils {
   private static final String ALL_FILE_EXTENSIONS = "ALL";
 
   public static InputStreamReader getInputStreamReader(String filename) {
-    try {
-      InputStreamReader reader =
-          new InputStreamReader(
-              Objects.requireNonNull(
-                  FileUtils.class.getClassLoader().getResourceAsStream(filename)),
-              StandardCharsets.UTF_8);
-      log.debug("Input stream reader created for file: {}", filename);
-      return reader;
-    } catch (NullPointerException e) {
-      log.error("File not found or error reading the file: {}", filename, e);
-      throw new RuntimeException("File not found or error reading the file: " + filename, e);
+    InputStream inputStream = FileUtils.class.getClassLoader().getResourceAsStream(filename);
+    if (inputStream == null) {
+      String message = "File not found or error reading the file: " + filename;
+      log.error(message);
+      throw new RuntimeException(message);
     }
+    InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+    log.debug("Input stream reader created for file: {}", filename);
+    return reader;
   }
 
   public static Path createTempFileWithContent(String prefix, String suffix, String content) {

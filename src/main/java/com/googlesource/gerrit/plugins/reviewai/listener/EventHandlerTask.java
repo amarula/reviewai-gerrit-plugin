@@ -25,6 +25,7 @@ import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
+import com.google.gerrit.server.events.PatchSetEvent;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -307,12 +308,21 @@ public class EventHandlerTask implements Runnable {
   }
 
   private Optional<AccountAttribute> getEventAccount() {
+    PatchSetEvent patchSetEvent = change.getPatchSetEvent();
     try {
       return switch (processing_event_type) {
         case COMMENT_ADDED ->
-            Optional.ofNullable(((CommentAddedEvent) change.getPatchSetEvent()).author.get());
+            patchSetEvent instanceof CommentAddedEvent commentAddedEvent
+                ? Optional.ofNullable(
+                    commentAddedEvent.author == null ? null : commentAddedEvent.author.get())
+                : Optional.empty();
         case PATCH_SET_CREATED ->
-            Optional.ofNullable(((PatchSetCreatedEvent) change.getPatchSetEvent()).uploader.get());
+            patchSetEvent instanceof PatchSetCreatedEvent patchSetCreatedEvent
+                ? Optional.ofNullable(
+                    patchSetCreatedEvent.uploader == null
+                        ? null
+                        : patchSetCreatedEvent.uploader.get())
+                : Optional.empty();
       };
     } catch (RuntimeException e) {
       log.debug("Failed to retrieve event account for change {}", change.getFullChangeId(), e);

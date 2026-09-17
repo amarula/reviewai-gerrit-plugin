@@ -22,6 +22,7 @@ import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -62,7 +63,7 @@ class LangChainStructuredResponseFactory {
       if (schemaDefinition.isJsonObject()) {
         try {
           rootElement = LangChainJsonSchemaParser.parse(schemaDefinition.getAsJsonObject());
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
           log.warn(
               "Failed to convert structured output schema {} into LangChain schema classes",
               schemaResourcePath,
@@ -85,7 +86,7 @@ class LangChainStructuredResponseFactory {
 
       log.debug("Loaded structured output schema '{}' from {}", schemaName, schemaResourcePath);
       return responseFormat;
-    } catch (Exception e) {
+    } catch (IOException | RuntimeException e) {
       log.warn(
           "Failed to load structured output schema from {}. Falling back to free-form responses",
           schemaResourcePath,
