@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 
 @Data
 @RequiredArgsConstructor
-public class ReviewBatch {
+public final class ReviewBatch {
   private String id;
   private String concernId;
   @NonNull private String content;

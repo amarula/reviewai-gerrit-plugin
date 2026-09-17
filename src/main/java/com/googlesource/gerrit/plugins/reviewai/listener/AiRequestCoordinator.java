@@ -42,7 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 /** Runs durable AI requests sequentially within each Change while allowing parallel Changes. */
 @Singleton
 @Slf4j
-public class AiRequestCoordinator {
+public final class AiRequestCoordinator {
   public static final String STATE_CHANGE_SUPERSESSION_REASON =
       "Superseded by a conversation reset command";
   private static final int DEFAULT_EXECUTOR_POOL_SIZE = 2;
