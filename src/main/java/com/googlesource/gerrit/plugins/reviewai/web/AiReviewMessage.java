@@ -141,7 +141,10 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     ReviewAgentRequestStatusStore statusStore = getStatusStore(resource);
     aiReviewPermission.checkCanAiReview(resource);
     storeSelectedModel(resource, input, config);
-    supersedeActiveReviewForDirectStateChange(resource, config, statusStore, reviewAgent, message);
+    if (ClientCommandBase.shouldSkipGerritMessage(message)) {
+      supersedeActiveReviewForDirectStateChange(
+          resource, config, statusStore, reviewAgent, message);
+    }
     Optional<Output> directResponse =
         reviewAgentResponseService.getDirectResponse(resource, config, input, message);
     if (directResponse.isPresent()) {
@@ -153,6 +156,21 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         reviewAgentResponseService.getPreflightSystemResponse(resource, config, input, message);
     if (preflightSystemResponse.isPresent()) {
       Output output = preflightSystemResponse.get().withRequestId(requestId);
+      completeStatus(statusStore, requestId, output.responseText);
+      return Response.ok(output);
+    }
+    if (reviewAgent && ReviewAgentResponseService.isStandaloneRestartCommand(message)) {
+      supersedeActiveReviewForDirectStateChange(resource, config, statusStore, true, message);
+      // Keep the history cutoff in Gerrit without addressing the bot and executing twice.
+      gerritApi
+          .changes()
+          .id(
+              GerritChange.getProjectName(resource.getProject()),
+              resource.getChange().getChangeId())
+          .current()
+          .review(ReviewInput.create().patchSetLevelComment(message));
+      Output output =
+          reviewAgentResponseService.restart(resource, config, message).withRequestId(requestId);
       completeStatus(statusStore, requestId, output.responseText);
       return Response.ok(output);
     }
@@ -265,9 +283,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
       ReviewAgentRequestStatusStore statusStore,
       boolean reviewAgent,
       String message) {
-    if (!reviewAgent
-        || !ClientCommandBase.shouldSkipGerritMessage(message)
-        || !ClientCommandBase.containsReviewInvalidatingCommand(message)) {
+    if (!reviewAgent || !ClientCommandBase.containsReviewInvalidatingCommand(message)) {
       return;
     }
     GerritChange change =
