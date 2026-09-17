@@ -17,8 +17,12 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands;
 
 import com.google.common.collect.ImmutableBiMap;
+import com.google.common.collect.ImmutableMap;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,9 +70,11 @@ public abstract class ClientCommandBase extends ClientBase {
           "review", CommandSet.REVIEW,
           "suggest", CommandSet.SUGGEST,
           "directives", CommandSet.DIRECTIVES,
-          "forget_thread", CommandSet.FORGET_THREAD,
+          "restart", CommandSet.FORGET_THREAD,
           "configure", CommandSet.CONFIGURE,
           "show", CommandSet.SHOW);
+  private static final ImmutableMap<String, String> COMMAND_ALIASES =
+      ImmutableMap.of("forget_thread", "restart");
   private static final ImmutableBiMap<CommandSet, String> COMMAND_MAP_INVERSE =
       COMMAND_MAP.inverse();
   public static final Set<CommandSet> GERRIT_MESSAGE_SKIPPED_COMMANDS =
@@ -116,6 +122,17 @@ public abstract class ClientCommandBase extends ClientBase {
     return COMMAND_MAP_INVERSE.get(command);
   }
 
+  public static CommandSet resolveCommand(String name) {
+    return COMMAND_MAP.get(COMMAND_ALIASES.getOrDefault(name, name));
+  }
+
+  public static String getDeprecationWarning(ChangeSetData changeSetData, Localizer localizer) {
+    return changeSetData.hasParsedCommand("forget_thread")
+        ? SystemMessageFormatter.getLocalizedWarningMessage(
+            localizer, "message.command.forget_thread.deprecated")
+        : null;
+  }
+
   public static boolean shouldSkipGerritMessage(String message) {
     return message != null && GERRIT_MESSAGE_SKIPPED_COMMAND_PATTERN.matcher(message).matches();
   }
@@ -126,7 +143,7 @@ public abstract class ClientCommandBase extends ClientBase {
     }
     Matcher commandMatcher = COMMAND_PATTERN.matcher(message);
     while (commandMatcher.find()) {
-      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
+      CommandSet command = resolveCommand(commandMatcher.group(1));
       if (REVIEW_INVALIDATING_COMMANDS.contains(command)) {
         return true;
       }

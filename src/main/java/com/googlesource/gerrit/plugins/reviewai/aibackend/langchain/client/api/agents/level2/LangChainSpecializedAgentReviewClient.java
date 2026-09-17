@@ -26,7 +26,6 @@ import com.googlesource.gerrit.plugins.reviewai.ReviewAiExecutors;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
@@ -862,9 +861,7 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
 
   protected boolean isForgetThreadRequested(ChangeSetData changeSetData) {
     return changeSetData != null
-        && Boolean.TRUE.equals(
-            changeSetData.hasParsedCommand(
-                ClientCommandBase.commandName(CommandSet.FORGET_THREAD)));
+        && Boolean.TRUE.equals(changeSetData.hasParsedCommand(CommandSet.FORGET_THREAD));
   }
 
   private boolean isSpecializedAgentStage(ReviewAssistantStage stage) {
