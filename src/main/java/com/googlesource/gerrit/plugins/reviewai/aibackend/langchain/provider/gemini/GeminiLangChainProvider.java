@@ -59,6 +59,10 @@ public class GeminiLangChainProvider implements ILangChainProvider {
 
   @Override
   public Optional<TokenCountEstimator> createTokenEstimator(Configuration config) {
+    return createTokenEstimatorInternal(config);
+  }
+
+  private static Optional<TokenCountEstimator> createTokenEstimatorInternal(Configuration config) {
     if (Boolean.FALSE.equals(estimatorAvailable)) {
       return Optional.empty();
     }
