@@ -146,7 +146,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
                 localizer.getText("message.command.help.review"),
                 localizer.getText("message.command.help.suggest"),
                 localizer.getText("message.command.help.directives"),
-                localizer.getText("message.command.help.forget_thread"),
+                localizer.getText("message.command.help.restart"),
                 localizer.getText("message.command.help.configure"),
                 localizer.getText("message.command.help.show"),
                 "",
@@ -163,7 +163,7 @@ public class ClientCommandExecutor extends ClientCommandBase {
     if (commandName.isEmpty()) {
       return null;
     }
-    return COMMAND_MAP.get(commandName.toLowerCase(Locale.ROOT));
+    return resolveCommand(commandName.toLowerCase(Locale.ROOT));
   }
 
   private String getSingleCommandHelpMessage(CommandSet command) {
@@ -215,10 +215,10 @@ public class ClientCommandExecutor extends ClientCommandBase {
           joinWithNewLine(
               List.of(
                   String.format(
-                      localizer.getText("message.command.help.command.title"), "/forget_thread"),
+                      localizer.getText("message.command.help.command.title"), "/restart"),
                   "",
-                  localizer.getText("message.command.help.command.forget_thread.syntax"),
-                  localizer.getText("message.command.help.command.forget_thread.description")));
+                  localizer.getText("message.command.help.command.restart.syntax"),
+                  localizer.getText("message.command.help.command.restart.description")));
       case CONFIGURE ->
           joinWithNewLine(
               List.of(

@@ -382,17 +382,8 @@ public final class AiRequestStore {
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        Optional<AiRequest> existing = get(connection, requestId);
-        if (existing.isEmpty()) {
-          connection.commit();
-          return false;
-        }
-        ensureAndLockLane(connection, existing.get().change());
-        Optional<AiRequest> request = getForUpdate(connection, requestId);
-        if (request.isEmpty()
-            || (request.get().state() != AiRequest.State.RUNNING
-                && request.get().state() != AiRequest.State.SUPERSEDE_REQUESTED)
-            || !ownerId.equals(request.get().ownerId())) {
+        Optional<AiRequest> request = getActiveRequestForUpdate(connection, requestId);
+        if (request.isEmpty() || !ownerId.equals(request.get().ownerId())) {
           connection.commit();
           return false;
         }
@@ -419,16 +410,8 @@ public final class AiRequestStore {
     try (Connection connection = db.getConnection()) {
       connection.setAutoCommit(false);
       try {
-        Optional<AiRequest> existing = get(connection, requestId);
-        if (existing.isEmpty()) {
-          connection.commit();
-          return false;
-        }
-        ensureAndLockLane(connection, existing.get().change());
-        Optional<AiRequest> request = getForUpdate(connection, requestId);
+        Optional<AiRequest> request = getActiveRequestForUpdate(connection, requestId);
         if (request.isEmpty()
-            || (request.get().state() != AiRequest.State.RUNNING
-                && request.get().state() != AiRequest.State.SUPERSEDE_REQUESTED)
             || request.get().leaseExpiresAtMillis() == null
             || request.get().leaseExpiresAtMillis() > expiredBeforeMillis) {
           connection.commit();
@@ -449,6 +432,20 @@ public final class AiRequestStore {
     } catch (SQLException e) {
       throw new RuntimeException("Failed to abandon expired AI request " + requestId, e);
     }
+  }
+
+  private Optional<AiRequest> getActiveRequestForUpdate(Connection connection, String requestId)
+      throws SQLException {
+    Optional<AiRequest> existing = get(connection, requestId);
+    if (existing.isEmpty()) {
+      return Optional.empty();
+    }
+    ensureAndLockLane(connection, existing.get().change());
+    return getForUpdate(connection, requestId)
+        .filter(
+            request ->
+                request.state() == AiRequest.State.RUNNING
+                    || request.state() == AiRequest.State.SUPERSEDE_REQUESTED);
   }
 
   private String ensureAndLockLane(Connection connection, GerritChangeRef change)
