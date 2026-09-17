@@ -34,7 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 
 @Slf4j
-public class FileDiffProcessed {
+public final class FileDiffProcessed {
   private static final int MIN_RANDOM_PLACEHOLDER_VARIABLE_LENGTH = 1;
 
   private final Configuration config;
