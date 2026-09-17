@@ -197,7 +197,7 @@ public class ClientCommandParser extends ClientCommandBase {
           "Parsing command: {} - Parsing args: {}",
           commandMatcher.group(1),
           commandMatcher.group(2));
-      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
+      CommandSet command = resolveCommand(commandMatcher.group(1));
       if (command != null) {
         changeSetData.setShowDynamicConfigMessage(
             DYNAMIC_CONFIG_MESSAGE_COMMANDS.contains(command));
@@ -224,7 +224,7 @@ public class ClientCommandParser extends ClientCommandBase {
   private boolean rejectDeniedCommandChain(String comment) {
     Matcher commandMatcher = COMMAND_PATTERN.matcher(comment);
     while (commandMatcher.find()) {
-      CommandSet command = COMMAND_MAP.get(commandMatcher.group(1));
+      CommandSet command = resolveCommand(commandMatcher.group(1));
       if (command == null) {
         return false;
       }
