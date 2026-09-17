@@ -6,7 +6,7 @@ lifecycle, and the persistence rules that connect reviews of successive Patch Se
 
 For durable event intake, per-Change request serialization, and cancellation, see
 [AI Request Coordination](request-coordination.md). For configuration values, see
-[Configuration](../configuration.md). For commands such as `/review` and `/forget_thread`, see the
+[Configuration](../configuration.md). For commands such as `/review` and `/restart`, see the
 [Command Reference](../commands.md).
 
 ## Core Concepts
@@ -581,7 +581,7 @@ path on the next eligible review.
 
 ### Forgetting a thread
 
-`/forget_thread` clears the conversation context, concern ledger, and review feedback memory for the Change. It also
+`/restart` clears the conversation context, concern ledger, and review feedback memory for the Change. It also
 marks any pending or in-progress feedback rows processed while preserving comment-ID tombstones. The next eligible
 review therefore behaves like an initial ledger-backed review and can rebuild the ledger from its result.
 
