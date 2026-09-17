@@ -234,16 +234,14 @@ public abstract class ConfigCore {
     if (items.isEmpty()) {
       return defaultValue;
     }
-    try {
-      items.replaceAll(StringUtils::backslashDoubleQuotes);
-    } catch (NullPointerException e) {
+    if (items.stream().anyMatch(Objects::isNull)) {
       log.warn(
           "Unable to retrieve Global and/or Project configuration items (possible issue with unescaped "
               + "double quotes): {}",
-          key,
-          e);
+          key);
       return defaultValue;
     }
+    items.replaceAll(StringUtils::backslashDoubleQuotes);
     log.debug("Sanitized configuration split items: {}", items);
 
     if (isDumpingConfig) {

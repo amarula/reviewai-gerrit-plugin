@@ -22,6 +22,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -71,7 +72,7 @@ class LangChainToolSpecificationFactory {
       JsonObjectSchema parametersSchema;
       try {
         parametersSchema = LangChainJsonSchemaParser.parseObjectSchema(parametersObject);
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         log.warn(
             "Failed to convert tool schema {} into LangChain schema classes; skipping",
             schemaResourcePath,
@@ -90,7 +91,7 @@ class LangChainToolSpecificationFactory {
       ToolSpecification toolSpecification = builder.build();
       log.debug("Loaded tool specification '{}' from {}", name, schemaResourcePath);
       return toolSpecification;
-    } catch (Exception e) {
+    } catch (IOException | RuntimeException e) {
       log.warn(
           "Failed to load tool specification from {}. Tool execution disabled for this schema",
           schemaResourcePath,
