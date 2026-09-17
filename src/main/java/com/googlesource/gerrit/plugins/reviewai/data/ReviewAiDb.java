@@ -46,7 +46,7 @@ import org.h2.tools.Server;
 
 @Slf4j
 @Singleton
-public class ReviewAiDb {
+public final class ReviewAiDb {
   private static final int CURRENT_DB_VERSION = 1;
   private static final String DB_FILE_NAME = "reviewai";
   private static final String TCP_HOST = "localhost";

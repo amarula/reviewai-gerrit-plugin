@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Singleton
-public class LangChainChatMemoryRepository {
+public final class LangChainChatMemoryRepository {
   private final ReviewAiDb db;
 
   @Inject
