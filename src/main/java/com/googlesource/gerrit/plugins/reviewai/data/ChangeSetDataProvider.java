@@ -26,7 +26,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class ChangeSetDataProvider implements Provider<ChangeSetData> {
+public final class ChangeSetDataProvider implements Provider<ChangeSetData> {
   private final int aiAccountId;
 
   @Inject
