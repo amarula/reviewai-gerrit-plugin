@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Singleton
 @Slf4j
-public class PluginDataHandler {
+public final class PluginDataHandler {
   private static final Map<Path, Object> FILE_LOCKS = new ConcurrentHashMap<>();
   private static final String PATH_SUFFIX = ".data";
   private static final String KEY_REVIEW_AGENT_CONVERSATIONS = "reviewAgentConversations";
