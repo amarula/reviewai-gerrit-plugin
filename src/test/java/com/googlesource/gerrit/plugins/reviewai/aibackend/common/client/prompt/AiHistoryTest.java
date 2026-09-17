@@ -48,8 +48,22 @@ public class AiHistoryTest {
 
   @Test
   public void patchSetHistoryStartsAfterLatestForgetThreadCommand() throws Exception {
+    assertPatchSetHistoryStartsAfterRestart(false);
+  }
+
+  @Test
+  public void patchSetHistoryStartsAfterLatestRestartCommand() throws Exception {
+    assertPatchSetHistoryStartsAfterRestart(true);
+  }
+
+  private void assertPatchSetHistoryStartsAfterRestart(boolean useRestart) throws Exception {
     AiHistoryFixture fixture =
         readFixture("patchSetHistoryStartsAfterLatestForgetThreadCommand.json");
+    if (useRestart) {
+      fixture.patchSetComments.forEach(
+          comment ->
+              comment.setMessage(comment.getMessage().replace("/forget_thread", "/restart")));
+    }
     HashMap<String, GerritComment> patchSetCommentMap = mapById(fixture.patchSetComments);
 
     AiHistory aiHistory =
@@ -73,8 +87,23 @@ public class AiHistoryTest {
 
   @Test
   public void inlineThreadHistoryDropsMessagesBeforeForgetThreadCutoff() throws Exception {
+    assertInlineThreadHistoryDropsMessagesBeforeRestart(false);
+  }
+
+  @Test
+  public void inlineThreadHistoryDropsMessagesBeforeRestartCutoff() throws Exception {
+    assertInlineThreadHistoryDropsMessagesBeforeRestart(true);
+  }
+
+  private void assertInlineThreadHistoryDropsMessagesBeforeRestart(boolean useRestart)
+      throws Exception {
     AiHistoryFixture fixture =
         readFixture("inlineThreadHistoryDropsMessagesBeforeForgetThreadCutoff.json");
+    if (useRestart) {
+      fixture.patchSetComments.forEach(
+          comment ->
+              comment.setMessage(comment.getMessage().replace("/forget_thread", "/restart")));
+    }
     HashMap<String, GerritComment> commentMap = mapById(fixture.inlineComments);
     HashMap<String, GerritComment> patchSetCommentMap = mapById(fixture.patchSetComments);
     GerritComment currentComment = commentMap.get(fixture.currentCommentId);
