@@ -56,13 +56,28 @@ public class AiHistoryTest {
     assertPatchSetHistoryStartsAfterRestart(true);
   }
 
+  @Test
+  public void patchSetHistoryStartsAfterSidebarRestartMarker() throws Exception {
+    assertPatchSetHistoryStartsAfterRestart(true, true);
+  }
+
   private void assertPatchSetHistoryStartsAfterRestart(boolean useRestart) throws Exception {
+    assertPatchSetHistoryStartsAfterRestart(useRestart, false);
+  }
+
+  private void assertPatchSetHistoryStartsAfterRestart(boolean useRestart, boolean sidebarMarker)
+      throws Exception {
     AiHistoryFixture fixture =
         readFixture("patchSetHistoryStartsAfterLatestForgetThreadCommand.json");
     if (useRestart) {
       fixture.patchSetComments.forEach(
           comment ->
               comment.setMessage(comment.getMessage().replace("/forget_thread", "/restart")));
+    }
+    if (sidebarMarker) {
+      fixture.patchSetComments.stream()
+          .filter(comment -> comment.getMessage().contains("/restart"))
+          .forEach(comment -> comment.setMessage("/restart"));
     }
     HashMap<String, GerritComment> patchSetCommentMap = mapById(fixture.patchSetComments);
 
