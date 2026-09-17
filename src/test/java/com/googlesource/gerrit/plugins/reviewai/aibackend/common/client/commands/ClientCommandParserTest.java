@@ -124,6 +124,8 @@ public class ClientCommandParserTest {
       pluginBuild.when(PluginBuild::isProductionBuild).thenReturn(false);
       for (DeniedCommandChain testCase :
           List.of(
+              new DeniedCommandChain(AiRole.USER, "/restart /review"),
+              new DeniedCommandChain(AiRole.USER, "/review /restart"),
               new DeniedCommandChain(AiRole.USER, "/forget_thread /review"),
               new DeniedCommandChain(AiRole.USER, "/review /forget_thread"),
               new DeniedCommandChain(AiRole.MODERATOR, "/show --config /review"),
@@ -217,6 +219,19 @@ public class ClientCommandParserTest {
     assertTrue(parser.parseCommands("/forget_thread", false));
 
     assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+  }
+
+  @Test
+  public void restartIsParsedForModeratorWithoutDeprecationWarning() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser = parserForRole(changeSetData, AiRole.MODERATOR);
+
+    assertTrue(parser.parseCommands("/restart", false));
+
+    assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
+    assertNull(ClientCommandBase.getDeprecationWarning(changeSetData, localizer()));
+    assertTrue(ClientCommandBase.containsReviewInvalidatingCommand("/restart /review"));
+    assertTrue(ClientCommandBase.containsReviewInvalidatingCommand("/forget_thread /review"));
   }
 
   private static ClientCommandParser parserForRole(ChangeSetData changeSetData, AiRole role) {
