@@ -240,14 +240,17 @@ public final class LangChainChatMessages {
     try {
       Method from = type.getMethod("from", String.class);
       return type.cast(from.invoke(null, text));
-    } catch (Exception ignore) {
+    } catch (NoSuchMethodException e) {
       try {
         Constructor<T> constructor = type.getConstructor(String.class);
         return constructor.newInstance(text);
-      } catch (Exception e) {
+      } catch (ReflectiveOperationException constructorFailure) {
         throw new RuntimeException(
-            "Failed to instantiate message of type " + type.getSimpleName(), e);
+            "Failed to instantiate message of type " + type.getSimpleName(), constructorFailure);
       }
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(
+          "Failed to instantiate message of type " + type.getSimpleName(), e);
     }
   }
 }

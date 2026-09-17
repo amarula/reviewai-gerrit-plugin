@@ -179,7 +179,9 @@ public class EventHandlerTypeCommentAdded implements IEventHandlerType {
   }
 
   private boolean hasConditionLabelTransition(String applicableIf) {
-    CommentAddedEvent commentEvent = (CommentAddedEvent) change.getPatchSetEvent();
+    if (!(change.getPatchSetEvent() instanceof CommentAddedEvent commentEvent)) {
+      return false;
+    }
     try {
       ApprovalAttribute[] approvals =
           commentEvent.approvals == null ? null : commentEvent.approvals.get();
