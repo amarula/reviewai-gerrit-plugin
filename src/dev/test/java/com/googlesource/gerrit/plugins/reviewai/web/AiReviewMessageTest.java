@@ -365,6 +365,27 @@ public class AiReviewMessageTest extends TestBase {
 
     assertEquals(true, output.ok);
     assertTrue(output.waitForAssistantReply);
+    assertTrue(
+        output.responseText.contains(
+            readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
+    verify(revisionApi).review(any());
+  }
+
+  @Test
+  public void reviewAgentRestartPostsRequestForAiModerator() throws Exception {
+    when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/restart";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertTrue(output.waitForAssistantReply);
+    assertFalse(
+        output.responseText != null
+            && output.responseText.contains(
+                readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
     verify(revisionApi).review(any());
   }
 
@@ -382,6 +403,9 @@ public class AiReviewMessageTest extends TestBase {
 
     assertEquals(true, output.ok);
     assertTrue(output.waitForAssistantReply);
+    assertTrue(
+        output.responseText.contains(
+            readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
     assertTrue(output.responseText.contains("DYNAMIC CONFIGURATION SETTINGS"));
     assertTrue(output.responseText.contains("OpenAI/gpt-4.1"));
     verify(revisionApi).review(any());
