@@ -248,7 +248,7 @@ public class ReviewAgentConversationStore {
       for (ReviewAgentConversationInfo conversation : conversations.values()) {
         upsertConversation(c, changeId, SHARED_USER_ID, conversation);
       }
-    } catch (Exception e) {
+    } catch (IOException | SQLException | RuntimeException e) {
       log.warn("Failed to migrate review-agent conversations for change {}", changeId, e);
     }
   }
