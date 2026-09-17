@@ -1135,4 +1135,32 @@
         <Method name="load" params="" returns="java.util.List"/>
         <Field name="cachedDefinitions" type="java.util.List"/>
     </Match>
+
+    <!-- getDefaultAiMessageReview has no current overrides and reads prompt
+      values loaded before this call. Preserve its extension contract; future
+      overrides must not depend on subclass state during construction. -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage"/>
+        <Method name="&lt;init&gt;" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration,com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData,com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange,com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy" returns="void"/>
+    </Match>
+
+    <!-- Collector dispatch is intentional: all four current getCollectorMessage
+      implementations read only prompt values loaded before this call. Future
+      overrides must not depend on subclass state during construction. -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewCollector"/>
+        <Method name="&lt;init&gt;" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration,com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData,com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange,com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy,java.lang.String" returns="void"/>
+    </Match>
+
+    <!-- concernLedgerOperations has no current overrides and returns a final
+      field initialized by the completed superclass constructor. Preserve its
+      extension contract; future overrides must not depend on subclass state
+      during construction. -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level2.LangChainSpecializedAgentReviewClient"/>
+        <Method name="&lt;init&gt;" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration,com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy,com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient,com.googlesource.gerrit.plugins.reviewai.localization.Localizer,com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider,com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore,com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore,java.util.concurrent.Executor,com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles,com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics" returns="void"/>
+    </Match>
 </FindBugsFilter>
