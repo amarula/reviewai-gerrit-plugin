@@ -18,9 +18,9 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 
 import com.google.gson.annotations.SerializedName;
 import java.util.Locale;
-import lombok.Data;
+import lombok.Value;
 
-@Data
+@Value
 public class SpecializedReviewAgentDefinition {
   private String name;
 
