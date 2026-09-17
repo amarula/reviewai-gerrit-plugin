@@ -55,10 +55,9 @@ class ReviewAgentEventRequestStatusUpdater {
   }
 
   PendingRequest getPendingRequest(String sourceEventId) {
-    if (!(change.getPatchSetEvent() instanceof CommentAddedEvent)) {
+    if (!(change.getPatchSetEvent() instanceof CommentAddedEvent event)) {
       return PendingRequest.empty();
     }
-    CommentAddedEvent event = (CommentAddedEvent) change.getPatchSetEvent();
     if (ReviewAiUser.matches(
         event.author == null ? null : event.author.get(),
         config.getUserId(),
