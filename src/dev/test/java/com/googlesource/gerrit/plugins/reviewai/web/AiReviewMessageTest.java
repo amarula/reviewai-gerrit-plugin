@@ -46,6 +46,8 @@ import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
@@ -81,6 +83,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -113,6 +116,7 @@ public class AiReviewMessageTest extends TestBase {
   @Mock private ChangeApi.CommentsRequest commentsRequest;
   @Mock private RevisionApi revisionApi;
   @Mock private FileApi fileApi;
+  @Mock private PluginChatMemoryStore chatMemoryStore;
 
   private AiReviewMessage view;
   private Path realChangeDataPath;
@@ -157,7 +161,7 @@ public class AiReviewMessageTest extends TestBase {
             supersededReviewNotifier,
             repositoryManager,
             mockPluginDataPath,
-            null,
+            chatMemoryStore,
             getTestReviewAiDb(),
             new DevAiRoleResolver(
                 new ConfiguredAiGroupMembership(groupCache),
@@ -355,7 +359,7 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
-  public void reviewAgentForgetThreadPostsRequestForAiModerator() throws Exception {
+  public void reviewAgentForgetThreadReturnsImmediateResponseForAiModerator() throws Exception {
     when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/forget_thread";
@@ -364,29 +368,80 @@ public class AiReviewMessageTest extends TestBase {
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
     assertEquals(true, output.ok);
-    assertTrue(output.waitForAssistantReply);
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(
+        output.responseText.contains(
+            readTestFile("__files/commands/restartSuccess.txt").stripTrailing()));
     assertTrue(
         output.responseText.contains(
             readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
-    verify(revisionApi).review(any());
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(captor.capture());
+    assertEquals(input.message, captor.getValue().comments.get("/PATCHSET_LEVEL").get(0).message);
   }
 
   @Test
-  public void reviewAgentRestartPostsRequestForAiModerator() throws Exception {
+  public void reviewAgentRestartClearsHistoryAndReturnsImmediateResponse() throws Exception {
     when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
+    PluginDataHandler changeHandler =
+        new PluginDataHandler(realChangeDataPath, getTestReviewAiDb());
+    changeHandler.setValue(OpenAiConversation.KEY_CONVERSATION_ID, "old-conversation");
+    changeHandler.setValue(OpenAiConversation.getMessagesConversationKey(), "old-messages");
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/restart";
+    input.reviewAgent = true;
+    input.requestId = "restart-request";
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertEquals(
+        readTestFile("__files/commands/restartSuccess.txt").stripTrailing(), output.responseText);
+    assertEquals(input.requestId, output.requestId);
+    assertEquals(null, changeHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID));
+    assertEquals(null, changeHandler.getValue(OpenAiConversation.getMessagesConversationKey()));
+    verify(chatMemoryStore).deleteMessagesForChangeSet(any(), anyInt());
+    assertFalse(
+        output.responseText != null
+            && output.responseText.contains(
+                readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(captor.capture());
+    assertEquals(input.message, captor.getValue().comments.get("/PATCHSET_LEVEL").get(0).message);
+    verify(requestCoordinator)
+        .requestReviewSupersession(
+            new GerritChangeRef("gerrit-instance", 1),
+            AiRequestCoordinator.STATE_CHANGE_SUPERSESSION_REASON);
+  }
+
+  @Test
+  public void reviewAgentRestartRequiresAiModeratorPrivileges() throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/restart";
     input.reviewAgent = true;
 
     AiReviewMessage.Output output = view.apply(changeResource, input).value();
 
-    assertEquals(true, output.ok);
+    assertFalse(output.waitForAssistantReply);
+    assertTrue(output.responseText.contains("Moderator privileges are required"));
+    verify(revisionApi, never()).review(any());
+    verify(chatMemoryStore, never()).deleteMessagesForChangeSet(any(), anyInt());
+    verify(requestCoordinator, never()).requestReviewSupersession(any(), any());
+  }
+
+  @Test
+  public void reviewAgentRestartChainedWithReviewStillWaitsForAssistantReply() throws Exception {
+    when(permissionsForChange.testOrFalse(ChangePermission.SUBMIT)).thenReturn(true);
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/restart /review";
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
     assertTrue(output.waitForAssistantReply);
-    assertFalse(
-        output.responseText != null
-            && output.responseText.contains(
-                readTestFile("__files/commands/forgetThreadDeprecationWarning.txt").stripTrailing()));
     verify(revisionApi).review(any());
+    verify(chatMemoryStore, never()).deleteMessagesForChangeSet(any(), anyInt());
   }
 
   @Test
