@@ -128,6 +128,10 @@ class ReviewAgentResponseService {
     ReviewAgentCommandContext commandContext =
         parseReviewAgentCommand(resource, config, message, false);
     List<String> messages = new ArrayList<>();
+    Optional.ofNullable(
+            ClientCommandBase.getDeprecationWarning(
+                commandContext.changeSetData(), commandContext.localizer()))
+        .ifPresent(messages::add);
     Optional.ofNullable(getPartialReviewPositiveScoreMessage(commandContext))
         .ifPresent(messages::add);
     if (!commandContext.administratorUser()
@@ -157,6 +161,8 @@ class ReviewAgentResponseService {
               getDynamicConfigurationMessage(config, pluginDataHandlerProvider, localizer))
           .ifPresent(messages::add);
     }
+    Optional.ofNullable(ClientCommandBase.getDeprecationWarning(changeSetData, localizer))
+        .ifPresent(messages::add);
     if (changeSetData.getReviewSystemMessage() != null) {
       messages.add(
           prefixSystemMessage

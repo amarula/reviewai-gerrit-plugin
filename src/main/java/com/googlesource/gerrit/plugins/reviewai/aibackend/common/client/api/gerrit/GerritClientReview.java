@@ -31,6 +31,7 @@ import com.google.gerrit.extensions.client.Comment;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
@@ -244,6 +245,8 @@ public class GerritClientReview extends GerritClientAccount {
       boolean emptyComments,
       String systemMessage) {
     List<String> messages = new ArrayList<>();
+    Optional.ofNullable(ClientCommandBase.getDeprecationWarning(changeSetData, localizer))
+        .ifPresent(messages::add);
     if (changeSetData.getReviewNoticeMessage() != null) {
       messages.add(
           SystemMessageFormatter.getPrefixedSystemMessage(
@@ -268,7 +271,8 @@ public class GerritClientReview extends GerritClientAccount {
   private boolean shouldSuppressSystemMessage(ChangeSetData changeSetData, Integer reviewScore) {
     if (reviewScore == null
         || changeSetData.getReviewSystemMessage() != null
-        || changeSetData.getReviewRepeatedCommentsMessage() != null) {
+        || changeSetData.getReviewRepeatedCommentsMessage() != null
+        || changeSetData.hasParsedCommand("forget_thread")) {
       return false;
     }
     Integer existingReviewScore = getCurrentCodeReviewValue(changeSetData);

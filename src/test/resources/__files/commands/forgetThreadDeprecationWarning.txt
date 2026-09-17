@@ -1,0 +1,1 @@
+ReviewAI **WARNING**: `/forget_thread` is deprecated. Use `/restart` instead.
