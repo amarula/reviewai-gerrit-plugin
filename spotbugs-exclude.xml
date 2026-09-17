@@ -1115,4 +1115,13 @@
         <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksComposer"/>
         <Field name="localizer" type="com.googlesource.gerrit.plugins.reviewai.localization.Localizer"/>
     </Match>
+    <!-- AiPrompt must remain extensible for plugin prompt subclasses. Preserve
+      constructor failure when prompt resources cannot be loaded. Accept the
+      theoretical finalizer risk for this constructor's trusted plugin usage;
+      this exclusion does not prevent untrusted subclasses or finalizer attacks. -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+        <Class name="com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt"/>
+        <Method name="&lt;init&gt;" params="com.googlesource.gerrit.plugins.reviewai.config.Configuration" returns="void"/>
+    </Match>
 </FindBugsFilter>

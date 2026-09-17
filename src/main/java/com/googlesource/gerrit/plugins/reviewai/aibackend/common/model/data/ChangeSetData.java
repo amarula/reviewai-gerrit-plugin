@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Data
 @Slf4j
-public class ChangeSetData {
+public final class ChangeSetData {
   @NonNull private Integer aiAccountId;
   private String aiDataPrompt;
   private Integer commentPropertiesSize;
