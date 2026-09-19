@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.hasColumn;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JdbcUtils.metadataIdentifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gerrit.extensions.annotations.PluginData;
 import com.google.gerrit.extensions.annotations.PluginName;
 import com.google.gerrit.server.config.PluginConfig;
@@ -26,8 +27,6 @@ import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -52,6 +51,10 @@ public class ReviewAiDb {
   private static final String TCP_HOST = "localhost";
   private static final int TCP_PORT = 9092;
   private static final String TCP_URL_PREFIX = "jdbc:h2:tcp://" + TCP_HOST + ":" + TCP_PORT + "/";
+  // A leftover server can hold the port briefly after we decide it is not serving. Bounded, because
+  // a failure to start after this many attempts is a real failure and should be reported as one.
+  private static final int TCP_SERVER_START_ATTEMPTS = 5;
+  private static final long TCP_SERVER_START_RETRY_MILLIS = 200;
   // Plugin reloads use separate classloaders, so ownership and its lock must be JVM-wide.
   private static final String TCP_SERVER_OWNER_KEY = ReviewAiDb.class.getName() + ".tcpServerOwner";
   private static final Object TCP_SERVER_LOCK = TCP_SERVER_OWNER_KEY.intern();
@@ -439,7 +442,18 @@ public class ReviewAiDb {
         });
   }
 
-  private void ensureTcpServerStarted() {
+  /**
+   * Claims JVM-wide ownership of the managed database, so a previous plugin instance will not shut
+   * it down underneath this one.
+   *
+   * <p>Called at the start of the plugin lifecycle rather than deferred to the first query.
+   * Ownership is what {@link #stopManagedTcpServerIfOwner()} checks before tearing the database
+   * down, so claiming it late lets an old instance legitimately shut the database down while the
+   * new one is still starting. That surfaces as a connection landing inside H2's exclusive
+   * open/close window — reported as "the database is open in exclusive mode" — which names nothing
+   * about the real cause.
+   */
+  public void claimTcpServerOwnership() {
     if (!usesManagedTcpServer() || !dialect.needsTcpServer()) {
       return;
     }
@@ -448,7 +462,40 @@ public class ReviewAiDb {
         System.setProperty(TCP_SERVER_OWNER_KEY, tcpServerOwner);
         registeredTcpServerOwner = true;
       }
-      if ((tcpServer != null && tcpServer.isRunning(false)) || isTcpServerAvailable()) {
+    }
+  }
+
+  private void ensureTcpServerStarted() {
+    if (!usesManagedTcpServer() || !dialect.needsTcpServer()) {
+      return;
+    }
+    claimTcpServerOwnership();
+    synchronized (TCP_SERVER_LOCK) {
+      if (tcpServer != null && tcpServer.isRunning(false)) {
+        return;
+      }
+      startTcpServerUnlessDatabaseIsUsable();
+    }
+  }
+
+  /**
+   * Starts this instance's TCP server, unless the database is already usable through one.
+   *
+   * <p>The decision is made by <em>connecting</em>, not by probing the port. A socket that accepts
+   * proves only that something is bound: a server left behind by the previous plugin instance can
+   * still hold the port while its database is closed or closing, and treating that as healthy means
+   * skipping our own server and then talking to a database in H2's exclusive open/close window —
+   * which fails with "the database is open in exclusive mode" and says nothing about the real
+   * cause.
+   *
+   * <p>Retries because that same leftover server can hold the port for a moment after we decide it
+   * is not serving: the wait is bounded, and each attempt re-checks reachability first, so a
+   * database that recovers on its own is used rather than duplicated.
+   */
+  private void startTcpServerUnlessDatabaseIsUsable() {
+    RuntimeException lastFailure = null;
+    for (int attempt = 1; attempt <= TCP_SERVER_START_ATTEMPTS; attempt++) {
+      if (isDatabaseReachable()) {
         return;
       }
       try {
@@ -456,9 +503,26 @@ public class ReviewAiDb {
             Server.createTcpServer(
                     "-tcpPort", Integer.toString(TCP_PORT), "-tcpDaemon", "-ifNotExists")
                 .start();
+        return;
       } catch (SQLException e) {
-        throw new RuntimeException("Failed to start H2 TCP server for ReviewAI DB", e);
+        lastFailure = new RuntimeException("Failed to start H2 TCP server for ReviewAI DB", e);
+        log.debug(
+            "Attempt {} of {} to start the ReviewAI H2 TCP server failed",
+            attempt,
+            TCP_SERVER_START_ATTEMPTS,
+            e);
+        pauseBeforeTcpServerRetry();
       }
+    }
+    throw lastFailure;
+  }
+
+  private static void pauseBeforeTcpServerRetry() {
+    try {
+      Thread.sleep(TCP_SERVER_START_RETRY_MILLIS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting to start the H2 TCP server", e);
     }
   }
 
@@ -494,11 +558,20 @@ public class ReviewAiDb {
     return jdbcUrl.startsWith(TCP_URL_PREFIX);
   }
 
-  private static boolean isTcpServerAvailable() {
-    try (Socket socket = new Socket()) {
-      socket.connect(new InetSocketAddress(TCP_HOST, TCP_PORT), 200);
-      return true;
-    } catch (IOException e) {
+  /**
+   * Whether the database can actually be queried at the configured URL.
+   *
+   * <p>Deliberately a connection rather than a port check: the question this answers is "is there a
+   * working database behind that port", and only a query answers it.
+   */
+  @VisibleForTesting
+  boolean isDatabaseReachable() {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, connectionProperties);
+        Statement statement = connection.createStatement();
+        ResultSet results = statement.executeQuery("SELECT 1")) {
+      return results.next();
+    } catch (SQLException e) {
+      log.debug("ReviewAI database is not reachable at {}", jdbcUrl, e);
       return false;
     }
   }
