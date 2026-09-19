@@ -51,6 +51,12 @@
                 <version>${checkstyle.version}</version>
                 <configuration>
                     <configLocation>google_checks.xml</configLocation>
+                    <!--
+                      Google's checks, with one deliberate exception: javadoc is required on the SPI
+                      and the plugin entry points rather than on every public member of every internal
+                      class. See config/checkstyle/suppressions.xml for the reasoning.
+                    -->
+                    <suppressionsLocation>config/checkstyle/suppressions.xml</suppressionsLocation>
                     <consoleOutput>false</consoleOutput>
                     <failsOnError>true</failsOnError>
                     <linkXRef>false</linkXRef>
