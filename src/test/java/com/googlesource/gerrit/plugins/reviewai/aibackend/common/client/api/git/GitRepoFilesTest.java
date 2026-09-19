@@ -17,7 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,6 +36,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -158,6 +166,86 @@ public class GitRepoFilesTest extends TestBase {
           new GitRepoFiles(repositoryManager)
               .grepPatchSet(config, change, "specialized", Set.of(changedPath)));
     }
+  }
+
+  @Test
+  public void concurrentCallsDoNotShareFileExtensionFilters() throws Exception {
+    // One GitRepoFiles instance serves every agent stage running against a change, so its calls
+    // overlap. If the extension filters are held on the instance rather than per call, one call's
+    // filters decide another call's results - silently, and only under concurrency.
+    try (Git git = createRepository()) {
+      Path workTree = git.getRepository().getWorkTree().toPath();
+      Files.writeString(workTree.resolve("wanted.py"), "shared marker\n");
+      Files.writeString(workTree.resolve("other.txt"), "shared marker\n");
+      git.add().addFilepattern(".").call();
+      RevCommit patchSetCommit =
+          git.commit().setMessage("Two file types").setAuthor("Test", "test@example.com").call();
+
+      RefUpdate patchSetRef = git.getRepository().updateRef(PATCH_SET_REF);
+      patchSetRef.setNewObjectId(patchSetCommit);
+      assertEquals(RefUpdate.Result.NEW, patchSetRef.update());
+
+      GerritChange change = getGerritChange();
+      change.setChangeNumber(CHANGE_NUMBER);
+      change.setPatchSetNumber(PATCH_SET_NUMBER);
+
+      CountDownLatch firstCallAtRepository = new CountDownLatch(1);
+      CountDownLatch secondCallFinished = new CountDownLatch(1);
+      AtomicBoolean firstCall = new AtomicBoolean(true);
+
+      GitRepositoryManager repositoryManager = mock(GitRepositoryManager.class);
+      when(repositoryManager.openRepository(any(Project.NameKey.class)))
+          .thenAnswer(
+              invocation -> {
+                if (firstCall.compareAndSet(true, false)) {
+                  // Reached only after this call has taken its configuration, and before it walks
+                  // the tree. Holding it here lets the other call run start to finish in between,
+                  // which makes the interleaving deterministic instead of a race the test hopes to
+                  // hit.
+                  firstCallAtRepository.countDown();
+                  secondCallFinished.await(5, TimeUnit.SECONDS);
+                }
+                return git.getRepository();
+              });
+
+      GitRepoFiles files = new GitRepoFiles(repositoryManager);
+      ExecutorService pool = Executors.newFixedThreadPool(2);
+      try {
+        Future<List<String>> pythonMatches =
+            pool.submit(
+                () ->
+                    files.grepPatchSet(configWithExtensions("py"), change, "shared marker", null));
+        assertTrue(firstCallAtRepository.await(5, TimeUnit.SECONDS));
+
+        Future<List<String>> textMatches =
+            pool.submit(
+                () ->
+                    files.grepPatchSet(configWithExtensions("txt"), change, "shared marker", null));
+        List<String> texts = textMatches.get(5, TimeUnit.SECONDS);
+        secondCallFinished.countDown();
+        List<String> pythons = pythonMatches.get(5, TimeUnit.SECONDS);
+
+        assertFalse("the .py call should have matched something", pythons.isEmpty());
+        assertFalse("the .txt call should have matched something", texts.isEmpty());
+        assertTrue(
+            "a .py-only call returned .txt files: " + pythons, allStartWith(pythons, "wanted.py"));
+        assertTrue(
+            "a .txt-only call returned .py files: " + texts, allStartWith(texts, "other.txt"));
+      } finally {
+        pool.shutdownNow();
+      }
+    }
+  }
+
+  private static boolean allStartWith(List<String> matches, String path) {
+    return matches.stream().allMatch(match -> match.startsWith(path + ":"));
+  }
+
+  private static Configuration configWithExtensions(String extension) {
+    Configuration config = mock(Configuration.class);
+    when(config.getEnabledFileExtensions()).thenReturn(List.of(extension));
+    when(config.getDisabledFileExtensions()).thenReturn(List.of());
+    return config;
   }
 
   private Git createRepository() throws Exception {
