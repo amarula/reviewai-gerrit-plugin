@@ -46,10 +46,6 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 @Slf4j
 public class GitRepoFiles {
   private final GitRepositoryManager repositoryManager;
-  private GitFileChunkBuilder gitFileChunkBuilder;
-  private List<String> enabledFileExtensions;
-  private List<String> disabledFileExtensions;
-  private long fileSize;
 
   @Inject
   public GitRepoFiles(GitRepositoryManager repositoryManager) {
@@ -63,12 +59,14 @@ public class GitRepoFiles {
 
   public List<String> getGitRepoFilesAsJson(Configuration config, GerritChange change) {
     log.debug("Getting Repository files as JSON");
-    gitFileChunkBuilder = new GitFileChunkBuilder(config);
-    enabledFileExtensions = config.getEnabledFileExtensions();
-    disabledFileExtensions = config.getDisabledFileExtensions();
+    GitFileChunkBuilder chunkBuilder = new GitFileChunkBuilder(config);
+    FileSelection selection = FileSelection.from(config);
     try {
       List<Map<String, String>> chunkedFileContent =
-          withRepositoryTree(change, this::listFilesWithContent);
+          withRepositoryTree(
+              change,
+              (repository, tree) ->
+                  listFilesWithContent(repository, tree, chunkBuilder, selection));
       return chunkedFileContent.stream()
           .map(chunk -> getGson().toJson(chunk))
           .collect(Collectors.toList());
@@ -107,14 +105,13 @@ public class GitRepoFiles {
   public List<String> getPatchSetFileTree(
       Configuration config, GerritChange change, String subdir) {
     log.debug("Getting repository file tree from subdir: {}", subdir);
-    enabledFileExtensions = config.getEnabledFileExtensions();
-    disabledFileExtensions = config.getDisabledFileExtensions();
+    FileSelection selection = FileSelection.from(config);
     String normalizedSubdir = normalizePath(subdir);
     try {
       return withRepositoryTree(
           change,
           this::getPatchSetRevTree,
-          (repository, tree) -> listMatchingPaths(repository, tree, normalizedSubdir));
+          (repository, tree) -> listMatchingPaths(repository, tree, normalizedSubdir, selection));
     } catch (IOException e) {
       throw new RuntimeException("Failed to retrieve file tree from " + normalizedSubdir, e);
     }
@@ -123,8 +120,7 @@ public class GitRepoFiles {
   public List<String> grepPatchSet(
       Configuration config, GerritChange change, String searchString, Set<String> includedPaths) {
     log.debug("Searching repository for string: {}", searchString);
-    enabledFileExtensions = config.getEnabledFileExtensions();
-    disabledFileExtensions = config.getDisabledFileExtensions();
+    FileSelection selection = FileSelection.from(config);
     if (searchString == null || searchString.isEmpty()) {
       return Collections.emptyList();
     }
@@ -133,33 +129,39 @@ public class GitRepoFiles {
           change,
           this::getPatchSetRevTree,
           (repository, tree, reader) ->
-              grepTree(repository, tree, reader, searchString, includedPaths));
+              grepTree(repository, tree, reader, searchString, includedPaths, selection));
     } catch (IOException e) {
       throw new RuntimeException("Failed to search repository", e);
     }
   }
 
-  private List<Map<String, String>> listFilesWithContent(Repository repository, RevTree tree)
+  private List<Map<String, String>> listFilesWithContent(
+      Repository repository,
+      RevTree tree,
+      GitFileChunkBuilder chunkBuilder,
+      FileSelection selection)
       throws IOException {
     Map<String, List<FileEntry>> dirFilesMap =
-        getDirFilesMap(repository, tree, TreeFilter.ANY_DIFF);
+        getDirFilesMap(repository, tree, TreeFilter.ANY_DIFF, selection);
     for (Map.Entry<String, List<FileEntry>> entry : dirFilesMap.entrySet()) {
       String dirPath = entry.getKey();
       log.debug("File from dirFilesMap processed: {}", dirPath);
       List<FileEntry> fileEntries = entry.getValue();
-      gitFileChunkBuilder.addFiles(fileEntries);
+      chunkBuilder.addFiles(fileEntries);
     }
 
-    return gitFileChunkBuilder.getChunks();
+    return chunkBuilder.getChunks();
   }
 
   private List<String> listMatchingPaths(
-      Repository repository, RevTree tree, String normalizedSubdir) throws IOException {
+      Repository repository, RevTree tree, String normalizedSubdir, FileSelection selection)
+      throws IOException {
     return collectMatchingFiles(
         repository,
         tree,
         path -> isUnderSubdir(path, normalizedSubdir),
-        (paths, path, treeWalk) -> paths.add(path));
+        (paths, path, treeWalk) -> paths.add(path),
+        selection);
   }
 
   private List<String> grepTree(
@@ -167,27 +169,33 @@ public class GitRepoFiles {
       RevTree tree,
       ObjectReader reader,
       String searchString,
-      Set<String> includedPaths)
+      Set<String> includedPaths,
+      FileSelection selection)
       throws IOException {
     return collectMatchingFiles(
         repository,
         tree,
         path -> includedPaths == null || includedPaths.contains(path),
         (matches, path, treeWalk) -> {
-          String content = getContent(reader, treeWalk);
+          String content = readFile(reader, treeWalk).text();
           addGrepMatches(matches, path, content, searchString);
-        });
+        },
+        selection);
   }
 
   private List<String> collectMatchingFiles(
-      Repository repository, RevTree tree, PathMatcher pathMatcher, MatchingFileCollector collector)
+      Repository repository,
+      RevTree tree,
+      PathMatcher pathMatcher,
+      MatchingFileCollector collector,
+      FileSelection selection)
       throws IOException {
     List<String> results = new ArrayList<>();
     try (TreeWalk treeWalk = newRecursiveTreeWalk(repository, tree)) {
       while (treeWalk.next()) {
         String path = treeWalk.getPathString();
         if (!pathMatcher.matches(path)) continue;
-        if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions)) continue;
+        if (!selection.accepts(path)) continue;
         collector.collect(results, path, treeWalk);
       }
     }
@@ -195,7 +203,8 @@ public class GitRepoFiles {
   }
 
   private Map<String, List<FileEntry>> getDirFilesMap(
-      Repository repository, RevTree tree, TreeFilter filter) throws IOException {
+      Repository repository, RevTree tree, TreeFilter filter, FileSelection selection)
+      throws IOException {
     Map<String, List<FileEntry>> dirFilesMap = new LinkedHashMap<>();
 
     try (ObjectReader reader = repository.newObjectReader()) {
@@ -204,15 +213,14 @@ public class GitRepoFiles {
 
         while (treeWalk.next()) {
           String path = treeWalk.getPathString();
-          if (!isFileExtensionEnabled(path, enabledFileExtensions, disabledFileExtensions))
-            continue;
+          if (!selection.accepts(path)) continue;
           int lastSlashIndex = path.lastIndexOf('/');
           String dirPath = (lastSlashIndex != -1) ? path.substring(0, lastSlashIndex) : "";
-          String content = getContent(reader, treeWalk);
+          FileContent content = readFile(reader, treeWalk);
 
           dirFilesMap
               .computeIfAbsent(dirPath, k -> new ArrayList<>())
-              .add(new FileEntry(path, content, fileSize));
+              .add(new FileEntry(path, content.text(), content.size()));
           log.debug("Repo File loaded: {}", path);
         }
       }
@@ -328,18 +336,24 @@ public class GitRepoFiles {
       throws IOException {
     try (TreeWalk treeWalk = TreeWalk.forPath(reader, path, tree)) {
       if (treeWalk != null) {
-        return getContent(reader, treeWalk);
+        return readFile(reader, treeWalk).text();
       }
       return null;
     }
   }
 
-  private String getContent(ObjectReader reader, TreeWalk treeWalk) throws IOException {
+  /**
+   * Reads an entry, returning its text and byte length together.
+   *
+   * <p>The length used to be left on the instance for the caller to pick up. That made this a
+   * hidden out-parameter, so a second call on the same instance would silently overwrite the first
+   * call's value before the first had read it.
+   */
+  private FileContent readFile(ObjectReader reader, TreeWalk treeWalk) throws IOException {
     ObjectId objectId = treeWalk.getObjectId(0);
     byte[] bytes = reader.open(objectId).getBytes();
-    fileSize = bytes.length;
 
-    return new String(bytes, StandardCharsets.UTF_8);
+    return new FileContent(new String(bytes, StandardCharsets.UTF_8), bytes.length);
   }
 
   private static String normalizePath(String path) {
@@ -385,4 +399,26 @@ public class GitRepoFiles {
   private interface MatchingFileCollector {
     void collect(List<String> results, String path, TreeWalk treeWalk) throws IOException;
   }
+
+  /**
+   * The file filters for one call.
+   *
+   * <p>Held per call rather than on the instance: one {@code GitRepoFiles} serves every agent stage
+   * running against a change, so instance state here decides one call's results using another
+   * call's configuration.
+   */
+  private record FileSelection(List<String> enabled, List<String> disabled) {
+
+    static FileSelection from(Configuration config) {
+      return new FileSelection(
+          config.getEnabledFileExtensions(), config.getDisabledFileExtensions());
+    }
+
+    boolean accepts(String path) {
+      return isFileExtensionEnabled(path, enabled, disabled);
+    }
+  }
+
+  /** An entry's text and byte length, read together so neither can be overwritten in between. */
+  private record FileContent(String text, long size) {}
 }
