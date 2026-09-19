@@ -18,8 +18,10 @@ package com.googlesource.gerrit.plugins.reviewai.data;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
@@ -33,7 +35,10 @@ import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +50,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
+import org.h2.tools.Server;
 import org.junit.Test;
 
 public class ReviewAiDbTest extends TestBase {
@@ -292,5 +298,128 @@ public class ReviewAiDbTest extends TestBase {
         .thenReturn(columns.get(0), columns.subList(1, columns.size()).toArray(String[]::new));
     when(result.getString("PK_NAME")).thenReturn(name);
     return result;
+  }
+
+  @Test
+  public void claimingOwnershipRecordsItJvmWide() throws Exception {
+    withOwnershipTokenCleared(
+        () -> {
+          assertNull(System.getProperty(OWNERSHIP_KEY));
+          tcpRoutedDb("first").claimTcpServerOwnership();
+          assertNotNull(
+              "a plugin instance must be able to claim the database without connecting to it",
+              System.getProperty(OWNERSHIP_KEY));
+        });
+  }
+
+  @Test
+  public void aLaterInstanceTakesOwnershipAwayFromAnEarlierOne() throws Exception {
+    // The reload sequence: Gerrit starts the new plugin instance before stopping the old one. Once
+    // the new instance has claimed the database, the old instance's stop must not tear it down -
+    // otherwise the new instance's connections land inside H2's exclusive open/close window and
+    // fail
+    // with "the database is open in exclusive mode", which names nothing about the real cause.
+    withOwnershipTokenCleared(
+        () -> {
+          ReviewAiDb oldInstance = tcpRoutedDb("old");
+          oldInstance.claimTcpServerOwnership();
+          String oldOwner = System.getProperty(OWNERSHIP_KEY);
+
+          ReviewAiDb newInstance = tcpRoutedDb("new");
+          newInstance.claimTcpServerOwnership();
+          String newOwner = System.getProperty(OWNERSHIP_KEY);
+          assertNotEquals("a later instance must take ownership", oldOwner, newOwner);
+
+          // A non-owner returns before opening a connection or clearing the token, so the token
+          // still being the new owner's is what shows the old instance left the database alone.
+          oldInstance.stopManagedTcpServerIfOwner();
+          assertEquals(
+              "the previous instance must not release a database the new one owns",
+              newOwner,
+              System.getProperty(OWNERSHIP_KEY));
+        });
+  }
+
+  private static final String OWNERSHIP_KEY = ReviewAiDb.class.getName() + ".tcpServerOwner";
+
+  @Test
+  public void reachabilityTracksARealServer() throws Exception {
+    Path dir = tempFolder.newFolder("reachable").toPath();
+    Server server = Server.createTcpServer("-tcpPort", "0", "-tcpDaemon", "-ifNotExists").start();
+    ReviewAiDb db = new ReviewAiDb(dir, tcpUrl(server.getPort(), dir));
+    try {
+      assertTrue("a running server should be reachable", db.isDatabaseReachable());
+    } finally {
+      server.stop();
+    }
+    assertFalse("a stopped server should not be reachable", db.isDatabaseReachable());
+  }
+
+  @Test
+  public void aBoundPortIsNotProofThatTheDatabaseIsUsable() throws Exception {
+    // The reload case this guards: a server left behind by the previous plugin instance can still
+    // hold the port while its database is closed or closing. Deciding by port rather than by query
+    // means skipping our own server, and then connecting to a database inside H2's exclusive
+    // open/close window - reported as "the database is open in exclusive mode", which names nothing
+    // about the real cause.
+    try (ServerSocket impostor = new ServerSocket(0)) {
+      Thread rejecter =
+          new Thread(
+              () -> {
+                try (Socket accepted = impostor.accept()) {
+                  // Closing straight away gives the client EOF, so it fails fast rather than
+                  // waiting
+                  // for a handshake that will never arrive.
+                  assertNotNull(accepted);
+                } catch (IOException e) {
+                  // The test finished and closed the socket; nothing to report.
+                }
+              });
+      rejecter.setDaemon(true);
+      rejecter.start();
+
+      ReviewAiDb db =
+          new ReviewAiDb(
+              tempFolder.newFolder("impostor").toPath(),
+              tcpUrl(impostor.getLocalPort(), tempFolder.getRoot().toPath()));
+
+      assertFalse(
+          "a port that accepts connections must not be taken for a usable database",
+          db.isDatabaseReachable());
+    }
+  }
+
+  private static String tcpUrl(int port, Path dir) {
+    return "jdbc:h2:tcp://localhost:" + port + "/" + dir + "/reviewai";
+  }
+
+  /**
+   * A database routed through the managed TCP server, without starting one.
+   *
+   * <p>Claiming ownership only decides who may later shut the database down; it does not connect.
+   * So the ownership rules can be exercised without binding port 9092 or touching a running Gerrit.
+   */
+  private ReviewAiDb tcpRoutedDb(String name) throws Exception {
+    Path dir = tempFolder.newFolder(name).toPath();
+    return new ReviewAiDb(dir, "jdbc:h2:tcp://localhost:9092/" + dir + "/reviewai");
+  }
+
+  private static void withOwnershipTokenCleared(ThrowingRunnable body) throws Exception {
+    String previous = System.getProperty(OWNERSHIP_KEY);
+    System.clearProperty(OWNERSHIP_KEY);
+    try {
+      body.run();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(OWNERSHIP_KEY);
+      } else {
+        System.setProperty(OWNERSHIP_KEY, previous);
+      }
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 }

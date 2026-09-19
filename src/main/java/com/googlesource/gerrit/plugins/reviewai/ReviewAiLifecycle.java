@@ -100,6 +100,12 @@ public class ReviewAiLifecycle implements LifecycleListener {
   public void start() {
     log.info("Starting ReviewAI lifecycle");
 
+    // Take ownership before the first query. Gerrit starts the new plugin instance before stopping
+    // the old one, and ownership is what stops the old instance tearing this database down
+    // underneath us, so taking it here makes the database's survival independent of when the first
+    // query happens to run. See claimTcpServerOwnership().
+    reviewAiDb.claimTcpServerOwnership();
+
     try {
       reviewAiDb.initSchema();
     } catch (SQLException e) {
