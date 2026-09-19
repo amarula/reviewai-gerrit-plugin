@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!--
+  Suppressions on top of google_checks.xml.
+
+  Only one rule here, and it is deliberate: google_checks requires javadoc on every public type and
+  every public method of two lines or more, which across this codebase means 646 findings in 246
+  files. Most of those are internal classes where the honest comment is "Gets the file name" — costs
+  to write, costs to read, and documents nothing a signature did not already.
+
+  Javadoc is instead required where it is a contract rather than a restatement: the SPI in
+  interfaces/, which the rest of the plugin implements against, and the two classes the plugin
+  manifest names as entry points. Those are the surfaces where a reader needs to know what the method
+  is for, and where changing the contract breaks something outside the file.
+
+  Everything else is left to the reader of the code. If a class grows into a contract, move it into
+  interfaces/ or name it here and the requirement follows it.
+-->
+<suppressions>
+  <suppress
+      checks="MissingJavadoc.*"
+      files="^(?!.*[\\/]interfaces[\\/])(?!.*[\\/](?:Module|HttpModule)\.java$).*\.java$"/>
+</suppressions>
