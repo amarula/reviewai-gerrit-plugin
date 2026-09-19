@@ -46,11 +46,13 @@ public class AiRequestCoordinator {
   public static final String STATE_CHANGE_SUPERSESSION_REASON =
       "Superseded by a conversation reset command";
   private static final int DEFAULT_EXECUTOR_POOL_SIZE = 2;
+  private static final int DEFAULT_INTAKE_POOL_SIZE = 2;
   private static final long DEFAULT_LEASE_MILLIS = TimeUnit.MINUTES.toMillis(15);
   private static final long DEFAULT_RECOVERY_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(1);
 
   private final AiRequestStore store;
   private final ScheduledExecutorService requestExecutor;
+  private final ScheduledExecutorService intakeExecutor;
   private final ScheduledExecutorService leaseExecutor;
   private final long leaseMillis;
   private final long recoveryIntervalMillis;
@@ -79,6 +81,11 @@ public class AiRequestCoordinator {
                 .getFromGerritConfig(pluginName)
                 .getInt("maximumPoolSize", DEFAULT_EXECUTOR_POOL_SIZE),
             "AI request executor"),
+        workQueue.createQueue(
+            pluginConfigFactory
+                .getFromGerritConfig(pluginName)
+                .getInt("intakePoolSize", DEFAULT_INTAKE_POOL_SIZE),
+            "AI intake executor"),
         workQueue.createQueue(1, "AI request lease executor"),
         DEFAULT_LEASE_MILLIS,
         DEFAULT_RECOVERY_INTERVAL_MILLIS);
@@ -88,11 +95,13 @@ public class AiRequestCoordinator {
   AiRequestCoordinator(
       AiRequestStore store,
       ScheduledExecutorService requestExecutor,
+      ScheduledExecutorService intakeExecutor,
       ScheduledExecutorService leaseExecutor,
       long leaseMillis,
       long recoveryIntervalMillis) {
     this.store = Objects.requireNonNull(store, "store");
     this.requestExecutor = Objects.requireNonNull(requestExecutor, "requestExecutor");
+    this.intakeExecutor = Objects.requireNonNull(intakeExecutor, "intakeExecutor");
     this.leaseExecutor = Objects.requireNonNull(leaseExecutor, "leaseExecutor");
     if (leaseMillis <= 0 || recoveryIntervalMillis <= 0) {
       throw new IllegalArgumentException("Lease and recovery intervals must be positive");
@@ -122,8 +131,16 @@ public class AiRequestCoordinator {
             TimeUnit.MILLISECONDS);
   }
 
+  /**
+   * Classifies an event, on a pool of its own.
+   *
+   * <p>Deliberately not the pool that runs reviews. A review holds a thread for minutes, and intake
+   * is milliseconds of work whose cost is paid by whoever sent the event - so sharing a bounded
+   * pool between them means a couple of concurrent reviews stop the plugin reacting to Gerrit
+   * entirely, with no error and no log line to explain it.
+   */
   public void submitIntake(Runnable intake) {
-    requestExecutor.execute(intake);
+    intakeExecutor.execute(intake);
   }
 
   public AiRequestStore.Admission admit(
@@ -194,8 +211,10 @@ public class AiRequestCoordinator {
       recoveryTask = null;
     }
     requestExecutor.shutdownNow();
+    intakeExecutor.shutdownNow();
     leaseExecutor.shutdownNow();
     awaitTermination(requestExecutor, "request");
+    awaitTermination(intakeExecutor, "intake");
     awaitTermination(leaseExecutor, "lease");
     preparedProcessors.clear();
     activeRequests.clear();

@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestStore;
 import com.googlesource.gerrit.plugins.reviewai.data.AiRequestSubmission;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.ProcessingOutcome;
+import com.googlesource.gerrit.plugins.reviewai.listener.AiRequestCoordinator.RequestProcessor;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ public class AiRequestCoordinatorTest extends TestBase {
 
   private AiRequestStore store;
   private ScheduledExecutorService requestExecutor;
+  private ScheduledExecutorService intakeExecutor;
   private ScheduledExecutorService leaseExecutor;
   private AiRequestCoordinator coordinator;
 
@@ -56,10 +58,16 @@ public class AiRequestCoordinatorTest extends TestBase {
   public void setUp() {
     store = new AiRequestStore(getTestReviewAiDb());
     requestExecutor = Executors.newScheduledThreadPool(2);
+    intakeExecutor = Executors.newSingleThreadScheduledExecutor();
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
+            store,
+            requestExecutor,
+            intakeExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
     coordinator.start(request -> ProcessingOutcome.COMPLETED);
   }
 
@@ -107,15 +115,54 @@ public class AiRequestCoordinatorTest extends TestBase {
   }
 
   @Test
+  public void intakeIsNotBlockedByRunningReviews() throws Exception {
+    // A review takes minutes; classifying a Gerrit event takes milliseconds. If both run on the
+    // same
+    // bounded pool, a couple of concurrent reviews stop the plugin reacting to Gerrit at all - and
+    // "a couple" is the production default of two threads.
+    GerritChangeRef firstChange = new GerritChangeRef("gerrit", 1);
+    GerritChangeRef secondChange = new GerritChangeRef("gerrit", 2);
+    CountDownLatch reviewsRunning = new CountDownLatch(2);
+    CountDownLatch releaseReviews = new CountDownLatch(1);
+
+    RequestProcessor blockingReview =
+        request -> {
+          reviewsRunning.countDown();
+          releaseReviews.await();
+          return ProcessingOutcome.COMPLETED;
+        };
+
+    coordinator.admit(submission(firstChange, "request-1", "event-1"), blockingReview);
+    coordinator.admit(submission(secondChange, "request-2", "event-2"), blockingReview);
+    assertTrue("both reviews should be running", reviewsRunning.await(5, TimeUnit.SECONDS));
+
+    CountDownLatch intakeRan = new CountDownLatch(1);
+    try {
+      coordinator.submitIntake(intakeRan::countDown);
+      assertTrue(
+          "event intake must not queue behind a running review",
+          intakeRan.await(2, TimeUnit.SECONDS));
+    } finally {
+      releaseReviews.countDown();
+    }
+  }
+
+  @Test
   public void processesQueuedRequestAfterCoordinatorRecreation() throws Exception {
     coordinator.stop();
     store.admit(message("request-1", "event-1"));
     CountDownLatch processed = new CountDownLatch(1);
     requestExecutor = Executors.newScheduledThreadPool(2);
+    intakeExecutor = Executors.newSingleThreadScheduledExecutor();
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
+            store,
+            requestExecutor,
+            intakeExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
 
     coordinator.start(
         request -> {
@@ -137,10 +184,16 @@ public class AiRequestCoordinatorTest extends TestBase {
     CountDownLatch recovered = new CountDownLatch(1);
     AtomicReference<String> recoveredRequestId = new AtomicReference<>();
     requestExecutor = Executors.newScheduledThreadPool(2);
+    intakeExecutor = Executors.newSingleThreadScheduledExecutor();
     leaseExecutor = Executors.newSingleThreadScheduledExecutor();
     coordinator =
         new AiRequestCoordinator(
-            store, requestExecutor, leaseExecutor, LEASE_MILLIS, RECOVERY_INTERVAL_MILLIS);
+            store,
+            requestExecutor,
+            intakeExecutor,
+            leaseExecutor,
+            LEASE_MILLIS,
+            RECOVERY_INTERVAL_MILLIS);
 
     coordinator.start(
         request -> {
@@ -288,23 +341,33 @@ public class AiRequestCoordinatorTest extends TestBase {
   }
 
   private AiRequestSubmission review(String requestId, String sourceEventId) {
-    return new AiRequestSubmission(
-        requestId,
+    return submission(
         CHANGE,
+        requestId,
         sourceEventId,
         AiRequest.Kind.REVIEW,
-        AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED,
-        GsonUtils.getGson().toJson(Map.of()));
+        AiRequest.AdmissionPolicy.REJECT_IF_OCCUPIED);
   }
 
   private AiRequestSubmission message(String requestId, String sourceEventId) {
+    return submission(
+        CHANGE, requestId, sourceEventId, AiRequest.Kind.MESSAGE, AiRequest.AdmissionPolicy.QUEUE);
+  }
+
+  private AiRequestSubmission submission(
+      GerritChangeRef change, String requestId, String sourceEventId) {
+    return submission(
+        change, requestId, sourceEventId, AiRequest.Kind.MESSAGE, AiRequest.AdmissionPolicy.QUEUE);
+  }
+
+  private AiRequestSubmission submission(
+      GerritChangeRef change,
+      String requestId,
+      String sourceEventId,
+      AiRequest.Kind kind,
+      AiRequest.AdmissionPolicy policy) {
     return new AiRequestSubmission(
-        requestId,
-        CHANGE,
-        sourceEventId,
-        AiRequest.Kind.MESSAGE,
-        AiRequest.AdmissionPolicy.QUEUE,
-        GsonUtils.getGson().toJson(Map.of()));
+        requestId, change, sourceEventId, kind, policy, GsonUtils.getGson().toJson(Map.of()));
   }
 
   private static void enter(
