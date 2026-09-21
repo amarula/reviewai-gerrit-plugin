@@ -40,6 +40,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.h2.tools.Server;
 
@@ -55,6 +56,9 @@ public class ReviewAiDb {
   // a failure to start after this many attempts is a real failure and should be reported as one.
   private static final int TCP_SERVER_START_ATTEMPTS = 5;
   private static final long TCP_SERVER_START_RETRY_MILLIS = 200;
+  private static final int TCP_DATABASE_REACHABILITY_TIMEOUT_MILLIS = 2_000;
+  private static final Pattern NETWORK_TIMEOUT_SETTING =
+      Pattern.compile("(?i);NETWORK_TIMEOUT=[^;]*");
   // Plugin reloads use separate classloaders, so ownership and its lock must be JVM-wide.
   private static final String TCP_SERVER_OWNER_KEY = ReviewAiDb.class.getName() + ".tcpServerOwner";
   private static final Object TCP_SERVER_LOCK = TCP_SERVER_OWNER_KEY.intern();
@@ -566,7 +570,13 @@ public class ReviewAiDb {
    */
   @VisibleForTesting
   boolean isDatabaseReachable() {
-    try (Connection connection = DriverManager.getConnection(jdbcUrl, connectionProperties);
+    String reachabilityUrl = NETWORK_TIMEOUT_SETTING.matcher(jdbcUrl).replaceAll("");
+    Properties reachabilityProperties = new Properties();
+    reachabilityProperties.putAll(connectionProperties);
+    reachabilityProperties.setProperty(
+        "NETWORK_TIMEOUT", Integer.toString(TCP_DATABASE_REACHABILITY_TIMEOUT_MILLIS));
+    try (Connection connection =
+            DriverManager.getConnection(reachabilityUrl, reachabilityProperties);
         Statement statement = connection.createStatement();
         ResultSet results = statement.executeQuery("SELECT 1")) {
       return results.next();

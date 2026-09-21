@@ -50,6 +50,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.h2.tools.Server;
 import org.junit.Test;
 
@@ -386,6 +391,46 @@ public class ReviewAiDbTest extends TestBase {
       assertFalse(
           "a port that accepts connections must not be taken for a usable database",
           db.isDatabaseReachable());
+    }
+  }
+
+  @Test
+  public void reachabilityTimesOutWhenServerStopsResponding() throws Exception {
+    try (ServerSocket impostor = new ServerSocket(0)) {
+      CountDownLatch acceptedConnection = new CountDownLatch(1);
+      CountDownLatch releaseConnection = new CountDownLatch(1);
+      Thread staller =
+          new Thread(
+              () -> {
+                try (Socket ignored = impostor.accept()) {
+                  acceptedConnection.countDown();
+                  releaseConnection.await();
+                } catch (IOException e) {
+                  // The test finished and closed the socket; nothing to report.
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                }
+              });
+      staller.setDaemon(true);
+      staller.start();
+
+      ReviewAiDb db =
+          new ReviewAiDb(
+              tempFolder.newFolder("stalled-impostor").toPath(),
+              tcpUrl(impostor.getLocalPort(), tempFolder.getRoot().toPath())
+                  + ";NETWORK_TIMEOUT=0");
+      ExecutorService probeExecutor = Executors.newSingleThreadExecutor();
+      try {
+        Future<Boolean> reachable = probeExecutor.submit(db::isDatabaseReachable);
+        assertTrue(
+            "the impostor did not accept the probe", acceptedConnection.await(5, TimeUnit.SECONDS));
+        assertFalse(
+            "a server that stops responding must not block the reachability probe",
+            reachable.get(5, TimeUnit.SECONDS));
+      } finally {
+        releaseConnection.countDown();
+        probeExecutor.shutdownNow();
+      }
     }
   }
 
