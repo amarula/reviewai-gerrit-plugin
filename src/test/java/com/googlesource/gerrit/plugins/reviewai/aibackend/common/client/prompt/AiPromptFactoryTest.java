@@ -77,11 +77,16 @@ public class AiPromptFactoryTest {
         (String)
             AiPrompt.getJsonPromptValues("promptsAiRequests")
                 .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+    String moderatorInstruction =
+        (String)
+            AiPrompt.getJsonPromptValues("promptsAiRequests")
+                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_GRANTED");
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
+    assertFalse(prompt.getDefaultAiAssistantInstructions().contains(moderatorInstruction));
   }
 
   @Test
-  public void moderatorRequestPromptKeepsExistingInstructions() {
+  public void moderatorRequestPromptOverridesPriorPermissionDenials() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setCommentPropertiesSize(1);
     changeSetData.setModeratorFeaturesAllowed(true);
@@ -97,7 +102,12 @@ public class AiPromptFactoryTest {
         (String)
             AiPrompt.getJsonPromptValues("promptsAiRequests")
                 .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+    String moderatorInstruction =
+        (String)
+            AiPrompt.getJsonPromptValues("promptsAiRequests")
+                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_GRANTED");
     assertFalse(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
+    assertTrue(prompt.getDefaultAiAssistantInstructions().contains(moderatorInstruction));
   }
 
   @Test
