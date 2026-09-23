@@ -28,6 +28,8 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
+import dev.langchain4j.model.chat.request.ResponseFormat;
+import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
@@ -50,6 +52,10 @@ public class OpenAiLangChainProviderTest {
       "__files/langchain/openAiResponsesUsageWithoutDetails.json";
   private static final String OPENAI_RESPONSES_TOOL_CALL_WITH_REASONING_RESOURCE =
       "__files/langchain/openAiResponsesToolCallWithReasoning.json";
+  private static final String OPENAI_RESPONSES_STRUCTURED_CONTENT_BLOCKS_RESOURCE =
+      "__files/langchain/openAiResponsesStructuredContentBlocks.json";
+  private static final String OPENAI_RESPONSES_MULTIPLE_STRUCTURED_MESSAGES_RESOURCE =
+      "__files/langchain/openAiResponsesMultipleStructuredMessages.json";
 
   @Rule public WireMockRule wireMockRule = new WireMockRule(0);
 
@@ -123,6 +129,44 @@ public class OpenAiLangChainProviderTest {
     assertEquals(Integer.valueOf(4), tokenUsage.inputTokenCount());
     assertNull(tokenUsage.cachedInputTokenCount());
     assertNull(tokenUsage.cacheWriteTokenCount());
+  }
+
+  @Test
+  public void concatenatesStructuredOutputContentBlocksWithoutAddingText() {
+    Configuration config = responsesApiConfig();
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(responseBody(OPENAI_RESPONSES_STRUCTURED_CONTENT_BLOCKS_RESOURCE))));
+
+    ChatResponse response =
+        provider.buildChatModel(config, 0.0).getModel().chat(structuredRequest());
+
+    assertEquals("{\"status_reason\":\"still present\"}", response.aiMessage().text());
+  }
+
+  @Test
+  public void rejectsMultipleStructuredResponseMessages() {
+    Configuration config = responsesApiConfig();
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        responseBody(OPENAI_RESPONSES_MULTIPLE_STRUCTURED_MESSAGES_RESOURCE))));
+
+    RuntimeException failure =
+        assertThrows(
+            RuntimeException.class,
+            () -> provider.buildChatModel(config, 0.0).getModel().chat(structuredRequest()));
+
+    assertTrue(
+        failure
+            .getMessage()
+            .contains("Expected at most one structured response message but received 2"));
   }
 
   @Test
@@ -361,6 +405,23 @@ public class OpenAiLangChainProviderTest {
 
   private static String successfulResponseBody() {
     return responseBody(OPENAI_RESPONSES_SUCCESS_RESOURCE);
+  }
+
+  private Configuration responsesApiConfig() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
+    when(config.getAiToken()).thenReturn("dummy-token");
+    when(config.getAiModel()).thenReturn("gpt-4.1");
+    when(config.getAiConnectionTimeout()).thenReturn(5);
+    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    return config;
+  }
+
+  private static ChatRequest structuredRequest() {
+    return ChatRequest.builder()
+        .messages(UserMessage.from("Return JSON"))
+        .responseFormat(ResponseFormat.builder().type(ResponseFormatType.JSON).build())
+        .build();
   }
 
   private static String responseBody(String resource) {
