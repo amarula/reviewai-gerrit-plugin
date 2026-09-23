@@ -116,7 +116,7 @@ public class OpenAiResponsesChatModel implements ChatModel {
     try {
       try (HttpResponseFor<Response> rawResponse =
           client.responses().withRawResponse().create(request)) {
-        return toChatResponse(rawResponse.parse());
+        return toChatResponse(rawResponse.parse(), isStructuredResponse(chatRequest));
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -361,13 +361,21 @@ public class OpenAiResponsesChatModel implements ChatModel {
     return values;
   }
 
-  private ChatResponse toChatResponse(Response response) {
+  private boolean isStructuredResponse(ChatRequest chatRequest) {
+    ResponseFormat responseFormat = chatRequest.responseFormat();
+    return responseFormat != null && responseFormat.type() != ResponseFormatType.TEXT;
+  }
+
+  private ChatResponse toChatResponse(Response response, boolean structuredResponse) {
     List<ToolExecutionRequest> toolRequests = new ArrayList<>();
-    StringBuilder responseText = new StringBuilder();
+    List<String> messageTexts = new ArrayList<>();
 
     for (ResponseOutputItem outputItem : response.output()) {
       if (outputItem.isMessage()) {
-        appendMessageText(responseText, outputItem.asMessage());
+        String messageText = messageText(outputItem.asMessage());
+        if (!messageText.isEmpty()) {
+          messageTexts.add(messageText);
+        }
       } else if (outputItem.isFunctionCall()) {
         ResponseFunctionToolCall functionCall = outputItem.asFunctionCall();
         toolRequests.add(
@@ -378,10 +386,17 @@ public class OpenAiResponsesChatModel implements ChatModel {
                 .build());
       }
     }
+    if (structuredResponse && messageTexts.size() > 1) {
+      throw new IllegalStateException(
+          String.format(
+              "Expected at most one structured response message but received %d for response %s",
+              messageTexts.size(), response.id()));
+    }
+    String responseText = String.join("\n", messageTexts);
 
     AiMessage.Builder aiMessageBuilder =
         AiMessage.builder()
-            .text(responseText.isEmpty() ? null : responseText.toString())
+            .text(responseText.isEmpty() ? null : responseText)
             .toolExecutionRequests(toolRequests.isEmpty() ? null : toolRequests);
     if (stateless) {
       aiMessageBuilder.attributes(
@@ -412,15 +427,14 @@ public class OpenAiResponsesChatModel implements ChatModel {
     }
   }
 
-  private void appendMessageText(StringBuilder responseText, ResponseOutputMessage message) {
+  private String messageText(ResponseOutputMessage message) {
+    StringBuilder messageText = new StringBuilder();
     for (ResponseOutputMessage.Content content : message.content()) {
       if (content.isOutputText()) {
-        if (!responseText.isEmpty()) {
-          responseText.append("\n");
-        }
-        responseText.append(content.asOutputText().text());
+        messageText.append(content.asOutputText().text());
       }
     }
+    return messageText.toString();
   }
 
   private TokenUsage toTokenUsage(ResponseUsage usage) {
