@@ -43,10 +43,12 @@ final class AiProviderConfiguration {
   static final String DEFAULT_OLLAMA_ESTIMATOR_MODEL = DEFAULT_OLLAMA_AI_MODEL;
   static final List<String> DEFAULT_OPENAI_AI_MODELS =
       List.of(
+          "gpt-6-luna",
+          "gpt-6-sol",
+          "gpt-6-astra",
           "gpt-5.6-luna",
           "gpt-5.6-terra",
           "gpt-5.6-sol",
-          "gpt-6-astra",
           "gpt-5.5",
           DEFAULT_OPENAI_AI_MODEL);
   static final List<String> DEFAULT_GEMINI_AI_MODELS =
