@@ -4,12 +4,17 @@
 - **Date:** 2026-08-29, revised 2026-09-19
 - **Goal:** maintainability and reuse — a product-neutral review engine that scales independently
 
-> **Revision note (2026-09-19).** The original version of this document proposed a neutral contract with
-> a **stateless** engine, the Gerrit adapter owning all state, and "no I/O mid-review". Two requirements
-> have since been adopted that invert those assumptions: the engine becomes a **Spring Boot service that
-> scales across instances**, and it must **serve future GitHub and GitLab plugins**. Sections 4, 5, 7,
-> 8 and 13 are substantially new; §6 is entirely new. Several claims in the original are now **wrong**
-> rather than merely superseded — those are called out inline rather than quietly dropped.
+> **Revision note (2026-09-19).** This document supersedes the 2026-08-29 proposal. That proposal
+> already called for a product-neutral engine reusable by Gerrit, GitHub, GitLab, or an IDE, with an
+> incremental path from an in-process interface to a service. It proposed a **stateless** engine, with
+> the Gerrit adapter owning all review state, and pre-fetched code context with no I/O mid-review. It
+> left transport, asynchronous execution, persistence ownership, deployment topology, and configuration
+> ownership open.
+>
+> This revision retains product neutrality, reuse, and incremental delivery, while resolving those open
+> choices differently: the remote engine is a horizontally scalable Spring Boot service, owns review
+> state, and obtains on-demand code context through adapter callbacks. References below to the "prior
+> proposal" mean this baseline; no earlier document is required to understand the current design.
 >
 > A further decision shapes the packaging: the engine service is developed as a **separate,
 > proprietary repository** (`reviewai-backend`), while this repository stays Apache-2.0 and **keeps its
@@ -61,13 +66,14 @@ follow from the same boundary.
   final comment text is composed and is expected to carry a comment-quality risk until measured.
 - No multi-tenancy. Per-install deployment (§4.1) makes it unnecessary.
 
-> **Overturned from the original.** The original listed "Not (yet) a multi-tenant or high-throughput
+> **Changed from the prior proposal.** It listed "Not (yet) a multi-tenant or high-throughput
 > service design" as a non-goal. Scale-out is now a requirement, not a non-goal. Multi-tenancy remains
 > out of scope, but now for a stated reason rather than as a deferral: each install gets its own
 > engine deployment.
 >
-> The original also listed "No re-platforming of persistence or config in the first iteration". That is
-> now **false**: persistence moves to the engine's own database (§13) and config is split between
+> The prior proposal also listed "No re-platforming of persistence or config in the first iteration".
+> That no longer applies: persistence moves to the engine's own database (§13), and configuration is
+> split between
 > adapter-resolved and engine-owned (§5.4).
 
 ## 3. Current architecture and coupling points
@@ -104,15 +110,20 @@ The engine is coupled to Gerrit in these concrete ways:
 6. **Listener and web layers are inherently Gerrit.** `GerritListener`, the `EventHandlerType*`
    classes, and `ChangeResource` / `ChangeApi` cannot be shared with another product.
 
-The original document claimed that "only `previousCommentId` leaks into the otherwise-neutral concern
-models". Four further couplings were missed and belong in this inventory:
+The prior proposal treated `ReviewConcern`, `ConcernStatus`, `ReviewerConcerns`, `ConcernLedger`, and
+`ReviewFeedbackMemory` as already product-agnostic except for `ReviewConcern.previousCommentId`, which
+it identified as the only Gerrit leak. It proposed renaming that field to `threadId`, but did not
+account for the following additional couplings and consequences:
 
 7. **Cancellation is in-process.** `AiRequestCancellation` carries request-scoped cancellation through
    a `ThreadLocal`, and the durable `SUPERSEDE_REQUESTED` state is polled by the *same* worker that
    holds the lease. Correctness depends on worker and lease owner being one process.
-8. **The persisted concern ledger itself stores a Gerrit comment id.** `previousCommentId` is
-   serialized inside `concern_json` under the Gson names `past_comment_id` / `previous_comment_id`
-   (`aibackend/common/model/review/ReviewConcern.java:55-56`). This is **not** cosmetic — see §5.1.
+8. **Historical concern correlation is persisted, so changing it requires data migration.**
+   `ReviewConcern.previousCommentId` is serialized inside `concern_json` under the Gson names
+   `past_comment_id` / `previous_comment_id`
+   (`aibackend/common/model/review/ReviewConcern.java:55-56`). Existing values may identify either
+   a Gerrit comment or a prior concern, as explained in §5.1. Renaming or redefining the field is
+   therefore not cosmetic and requires a migration strategy.
 9. **Feedback comment state stores Gerrit comment ids.**
    `review_feedback_comments.comment_id` (`data/ReviewAiDb.java:263-271`) is a Gerrit comment id in a
    table the engine would otherwise own.
@@ -173,7 +184,7 @@ Key properties:
 - **The adapter keeps its durable intake queue.** It absorbs host events before the network call, so an
   engine outage does not lose work. There are therefore **two durable queues in series** (§8).
 
-> **Overturned from the original.** The original stated: *"The engine is stateless. The adapter owns the
+> **Changed from the prior proposal.** It stated: *"The engine is stateless. The adapter owns the
 > concern ledger, feedback memory, and conversation id, and passes them per request."* This is now
 > **reversed** — the engine owns them (§9). The reason is not preference: two writers to one ledger
 > reintroduce exactly the split-brain the concern ledger exists to prevent, and a stale request could
@@ -221,8 +232,15 @@ puts whatever it needs to resolve the change back into a host object, and gets i
 tool-RPC call. This is what lets Gerrit carry `project~branch~Change-Id`, GitHub carry
 `owner/repo#number`, and GitLab carry `group/project!iid` through one field.
 
-**The comment-id question is a data migration, not a rename.** The original said
-`ReviewConcern.previousCommentId` → `threadId` was "the one Gerrit leak to rename". That is **wrong**:
+**Historical concern correlation is a data migration, not a field rename.** The current implementation
+uses `ReviewConcern.previousCommentId` as a historical correlation reference. Despite its name, the
+value has two meanings:
+
+- a host comment id when the concern was matched against `past_comments`;
+- a prior concern id when the match came from conversation history.
+
+The prior proposal mapped `ReviewConcern.previousCommentId` to a neutral `threadId` and treated that as
+the only required change. That is incomplete because:
 
 - it is persisted inside `concern_json` (`ReviewConcern.java:55-56`);
 - it is a **required** field in two LLM output schemas
@@ -230,14 +248,14 @@ tool-RPC call. This is what lets Gerrit carry `project~branch~Change-Id`, GitHub
   `config/formatSpecializedConflictResolutionSchema.json:34,58`);
 - it is the join key from review feedback back to concerns
   (`aibackend/langchain/client/api/LangChainReviewFeedbackClassifier.java:145-146`);
-- it is **polymorphic** — the model sets it to a host comment id when the match came from
-  `past_comments`, but to a prior *concern id* when it came from conversation history
+- consumers cannot interpret it as a thread id without first knowing which of the two meanings applies
   (`agents/level2/SpecializedReviewRepetitionMerger.java:198`).
 
-Resolution: the value leaves the engine's **persisted** state, but still flows **through** the engine
-on each request, because the schemas require it and changing them would change concern-workflow
-behaviour. Here the "no semantic change" non-goal holds — unlike §6.3, where it is deliberately
-relaxed. The adapter supplies `priorPublications` and owns the mapping; the engine returns `concernId`s.
+Resolution: the historical correlation reference leaves the engine's **persisted** state, but still
+flows **through** the engine on each request because the schemas require it and changing them would
+change concern-workflow behaviour. Here the "no semantic change" non-goal holds — unlike §6.3, where
+it is deliberately relaxed. The adapter supplies `priorPublications` and owns the mapping; the engine
+returns `concernId`s.
 
 ### 5.2 Request
 
@@ -286,13 +304,13 @@ public record ReviewIntent(
 ```
 
 **`priorConcerns` and `feedback` are gone from the steady-state request.** The engine is the single
-writer and loads them from its own store. Carrying them per request is what the original proposed, and
-it is the split-brain the ledger exists to prevent. The one exception is `StateBootstrap`, which is
+writer and loads them from its own store. The prior proposal carried them on every request; doing so
+would let stale requests compete with newer engine state. The one exception is `StateBootstrap`, which is
 explicit and nullable rather than implicit — see §13.1 for why "no ledger row means first review" is an
 unsafe default.
 
-> **Overturned from the original.** The original's `ReviewContext` carried `priorConcerns`, `feedback`
-> and `incrementalPatch` on every request, and `ModelConfig` carried a `conversationId` described as
+> **Changed from the prior proposal.** Its `ReviewContext` carried `priorConcerns`, `feedback`, and
+> `incrementalPatch` on every request, while `ModelConfig` carried a `conversationId` described as
 > *"optional, frontend-owned, for stateful conversations"*. Both are reversed: the engine owns that
 > state. `conversationId` leaves the contract entirely and moves to an engine table keyed by change and
 > scope.
@@ -484,7 +502,7 @@ left holding requests whose caller is gone.
 
 ## 8. Idempotency and the at-least-once contract
 
-This is the deepest consequence of the split and the original document does not mention it.
+This is the deepest consequence of the split and was not addressed by the prior proposal.
 
 Today a review runs once; a crash loses the work. After the split, a re-dispatch — adapter restart,
 engine replica restart, lease expiry, a retryable model outage — **re-runs the review**. Nothing in the
@@ -527,13 +545,15 @@ The adapter's own `requestId` — a fresh `UUID.randomUUID()` per admission
 key. `attempt` increments only when the adapter re-dispatches after observing a terminal
 non-`COMPLETED` job. Engine job TTL must be **≤** the adapter's, or the staleness collision returns.
 
-### A precondition the original missed
+### A deployment precondition not covered by the prior proposal
 
-The original's implicit claim — that the adapter's durable queue makes the handoff safe — is
-**conditional**. `ReviewAiDb` defaults to an embedded H2 file over a TCP server pinned to
-`localhost:9092` with `AUTO_SERVER=FALSE` (`data/ReviewAiDb.java:52-54, 126-129`); external PostgreSQL
-is opt-in via `storeUrl`. If Gerrit runs more than one replica, there are two independent queues, the
-unique index dedupes nothing, and the same event can be admitted twice.
+The prior proposal did not define a durable handoff. This revised design implicitly relies on the
+adapter's durable queue to retain accepted work until the engine accepts it. That guarantee is
+**conditional**: every adapter replica must use the same queue.
+`ReviewAiDb` defaults to an embedded H2 file over a TCP server pinned to `localhost:9092` with
+`AUTO_SERVER=FALSE` (`data/ReviewAiDb.java:52-54, 126-129`); external PostgreSQL is opt-in via
+`storeUrl`. If Gerrit runs more than one replica, there are two independent queues, the unique index
+dedupes nothing, and the same event can be admitted twice.
 
 **Shared PostgreSQL for the adapter's queue is a documented precondition of the handoff**, and should
 be a startup check: refuse to enable the engine handoff when the dialect is H2.
@@ -752,12 +772,13 @@ aggregator would force `<parent>`/`<modules>` into a pom that deliberately has n
 `createDependencyReducedPom`, the `Gerrit-ApiVersion` manifest entries, and the `build-helper` dev
 wiring variables in a build nobody wants to debug mid-split.
 
-> **Corrected from an earlier revision of this document.** That revision claimed the contract *must*
-> live here, under Apache-2.0, as a published artifact both sides compile against. The licence
-> reasoning behind it was sound but the conclusion did not follow. What is true is that this plugin
-> must never require a *closed artifact* to build. It does not follow that the shared types must live
-> here — the plugin already has its own types, and the format can be agreed on without a shared jar.
-> The original claim is recorded here rather than deleted because the reasoning is easy to repeat.
+> **Historical note about an intermediate revision.** A revision between the 2026-08-29 proposal
+> and this document required the contract to live in this Apache-2.0 repository as a published
+> Java artifact compiled by both sides. Its underlying constraint remains valid: the public plugin
+> must never depend on a proprietary artifact to build. The shared-artifact conclusion, however,
+> is unnecessary. The plugin and engine can define their Java types independently while agreeing
+> on a public JSON Schema and conformance vectors. This history is retained because the valid
+> licensing constraint can otherwise lead future reviews back to the same unnecessary conclusion.
 
 Consequences to accept:
 
@@ -782,9 +803,9 @@ published from this repository under Apache-2.0 because they are specification r
 
 The vectors cover what the format promises rather than how either side is built:
 
-- every request field round-trips without loss, including the nullable and polymorphic cases
-  (`StateBootstrap`; the correlation value that §5.1 describes, which may legitimately hold either a
-  host comment id or a concern id);
+- every request field round-trips without loss, including `StateBootstrap` and the historical
+  correlation reference defined in §5.1, whose value may identify either a host comment or a prior
+  concern;
 - the job state machine's legal transitions and terminal-state semantics (§7.2);
 - `POST` on an existing idempotency key returns the existing job rather than a conflict (§7.1);
 - cancellation reaches a terminal state and never publishes afterwards (§10);
@@ -918,8 +939,10 @@ and the schema validates payloads produced by each.
 migration (§13.1) and rollback window (§13.3). The in-process path is retained, so rollback is a
 configuration change rather than a code change. Engine-side retention and metrics follow §16.
 
-Note what is **not** in this sequence any more: there is no step that deletes the in-process engine.
-It is a supported deployment mode, not a migration waypoint.
+> **Changed from the prior proposal.** The prior migration plan treated the in-process contract
+> as an intermediate step before service extraction, although it did not explicitly require its
+> removal. This revision makes the decision explicit: the in-process engine remains a permanently
+> supported deployment mode after remote mode is introduced.
 
 **Ordering constraints.** Step 0 must precede Step 4 — idempotent publication is a precondition for the
 split. Step 2 must precede Step 4. Steps 1 and 2 are independent of each other. The schema and vectors
@@ -928,16 +951,19 @@ written sides together.
 
 ## 16. Risks and trade-offs
 
-Carried from the original:
+Baseline risks retained or refined from the prior proposal:
 
 - **Payload size.** The patch in the job payload can be megabytes. A `context.fetchPatch()` fallback
   and a request-size limit may be needed in v1.
 - **Contract versioning.** Once two processes deploy independently, the contract must be versioned and
   evolved carefully. `GET /v1/meta` lets an adapter fail fast against an incompatible engine rather
   than erroring on every review.
+- **Metric continuity.** The prior proposal already required metrics and cost tracking to move into the
+  service or be returned with the result. In this design, `reviewai/*` metrics currently registered on
+  Gerrit's `MetricMaker` need an explicit replacement or reporting path.
 - **Effort.** Multi-week when done properly, but landable incrementally.
 
-New with this revision:
+Risks introduced or made material by the revised design:
 
 - **At-least-once execution** (§8). Mitigated by deterministic `findingKey` and a publication ledger —
   but only if Step 0 lands first.
@@ -950,9 +976,6 @@ New with this revision:
 - **Comment-quality risk** from moving rendering to the adapter (§6.3). Measure, do not assume.
 - **Tool-RPC amplification** (§12.3) — a new denial-of-service surface with no in-process equivalent.
 - **Config is no longer centrally validated**, since the adapter resolves it.
-- **Metric continuity.** `reviewai/*` metrics are registered on Gerrit's `MetricMaker`. Moving to
-  Micrometer silently drops those series from Gerrit. Decide whether to report metrics back in
-  `ReviewResult` or accept the change and document it.
 - **`AiReviewThreads` reads the concern ledger directly** (`web/AiReviewThreads.java:136,288`); once
   the engine owns the ledger, that sidebar endpoint needs a read-through or it renders stale data.
 
