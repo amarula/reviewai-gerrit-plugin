@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -42,20 +43,30 @@ public final class AiPromptConditionLabelFormatter {
   private static String formatLabel(
       Map.Entry<String, GerritConditionLabel> entry, Function<String, String> localize) {
     GerritConditionLabel label = entry.getValue();
-    String values =
-        label.values().isEmpty()
-            ? "no vote"
-            : label.values().stream()
-                .map(value -> (value >= 0 ? "+" : "") + value)
-                .collect(Collectors.joining(", "));
+    String currentValues = formatValues(label.currentValues(), "no vote");
+    String possibleValues = formatValues(label.possibleValues(), "unknown");
     String description =
         label.description() == null || label.description().isBlank()
             ? getDefaultDescription(entry.getKey(), localize)
             : label.description();
+    String formattedLabel =
+        entry.getKey()
+            + ":\n  Current value: "
+            + currentValues
+            + "\n  Possible values: "
+            + possibleValues;
     if (description.isBlank()) {
-      return "- " + entry.getKey() + ": " + values;
+      return formattedLabel;
     }
-    return "- " + entry.getKey() + ": " + values + "\n  Description: " + description;
+    return formattedLabel + "\n  Description: " + description;
+  }
+
+  private static String formatValues(List<Short> values, String emptyValue) {
+    return values.isEmpty()
+        ? emptyValue
+        : values.stream()
+            .map(value -> (value >= 0 ? "+" : "") + value)
+            .collect(Collectors.joining(", "));
   }
 
   private static String getDefaultDescription(String labelName, Function<String, String> localize) {

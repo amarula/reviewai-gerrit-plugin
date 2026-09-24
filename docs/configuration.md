@@ -233,11 +233,11 @@ expressions and evaluation failures are logged and fail closed, so they do not s
 
 ### Condition Labels and CI Awareness
 
-When `aiReviewApplicableIf` references labels, ReviewAI supplies the current value and configured description of each
-Condition Label to the review workflow. Agents treat a label as evidence only when its description is directly
-relevant to the concern being assessed. A positive vote or a label name alone is not blanket proof that an unrelated
-concern has been resolved. For example, `Verified+1` supports marking a compilation concern as fixed only when the
-`Verified` label description conclusively establishes that the relevant code was compiled successfully.
+When `aiReviewApplicableIf` references labels, ReviewAI supplies the current value, possible values, and configured
+description of each Condition Label to the review workflow. Agents treat a label as evidence only when its description
+is directly relevant to the concern being assessed. A positive vote or a label name alone is not blanket proof that an
+unrelated concern has been resolved. For example, `Verified+1` supports marking a compilation concern as fixed only
+when the `Verified` label description conclusively establishes that the relevant code was compiled successfully.
 
 During a follow-up review, conclusive label evidence can mark a tracked concern as fixed. At specialization level 2,
 the feedback classifier can also exclude a specialized agent for the current review, but only when a positive label's

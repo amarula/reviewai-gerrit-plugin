@@ -39,13 +39,25 @@ public class AiPromptConditionLabelFormatterTest {
     Localizer localizer = localizer();
 
     assertEquals(
-        "- Code-Review: no vote\n- Verified: -1, +1\n  Description: CI verification",
+        "Code-Review:\n"
+            + "  Current value: no vote\n"
+            + "  Possible values: -2, -1, +0, +1, +2\n"
+            + "Verified:\n"
+            + "  Current value: -1, +1\n"
+            + "  Possible values: +0, +1\n"
+            + "  Description: CI verification",
         AiPromptConditionLabelFormatter.format(
             Map.of(
                 "Verified",
-                new GerritConditionLabel(List.of((short) -1, (short) 1), "CI verification"),
+                new GerritConditionLabel(
+                    List.of((short) -1, (short) 1),
+                    List.of((short) 0, (short) 1),
+                    "CI verification"),
                 "Code-Review",
-                new GerritConditionLabel(List.of(), null)),
+                new GerritConditionLabel(
+                    List.of(),
+                    List.of((short) -2, (short) -1, (short) 0, (short) 1, (short) 2),
+                    null)),
             localizer::getText));
   }
 
@@ -61,12 +73,16 @@ public class AiPromptConditionLabelFormatterTest {
     assertEquals(
         expected,
         AiPromptConditionLabelFormatter.format(
-            Map.of("Verified", new GerritConditionLabel(List.of((short) 0, (short) 1), null)),
+            Map.of(
+                "Verified",
+                new GerritConditionLabel(List.of((short) 1), List.of((short) 0, (short) 1), null)),
             localizer::getText));
     assertEquals(
         expected,
         AiPromptConditionLabelFormatter.format(
-            Map.of("Verified", new GerritConditionLabel(List.of((short) 0, (short) 1), "  ")),
+            Map.of(
+                "Verified",
+                new GerritConditionLabel(List.of((short) 1), List.of((short) 0, (short) 1), "  ")),
             localizer::getText));
   }
 

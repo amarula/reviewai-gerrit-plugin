@@ -1,2 +1,4 @@
-- Verified: +0, +1
+Verified:
+  Current value: +1
+  Possible values: +0, +1
   Description: Verified label usually means that automated tests have run and the code compiles and passes basic checks

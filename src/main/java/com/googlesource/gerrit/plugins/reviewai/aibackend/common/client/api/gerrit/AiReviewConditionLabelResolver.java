@@ -64,7 +64,7 @@ public final class AiReviewConditionLabelResolver {
           if (currentLabel.isPresent()) {
             result.put(currentLabel.get().getKey(), currentLabel.get().getValue());
           } else {
-            result.put(label, new GerritConditionLabel(List.of(), null));
+            result.put(label, new GerritConditionLabel(List.of(), List.of(), null));
           }
         });
     return result;
@@ -120,6 +120,7 @@ public final class AiReviewConditionLabelResolver {
     labels.forEach(
         (labelName, labelInfo) -> {
           Set<Short> distinctValues = new TreeSet<>();
+          Set<Short> possibleValues = new TreeSet<>();
           if (labelInfo != null && labelInfo.all != null) {
             labelInfo.all.stream()
                 .map(approval -> approval.value)
@@ -127,10 +128,18 @@ public final class AiReviewConditionLabelResolver {
                 .map(Integer::shortValue)
                 .forEach(distinctValues::add);
           }
+          if (labelInfo != null && labelInfo.values != null) {
+            labelInfo.values.keySet().stream()
+                .map(String::trim)
+                .map(Short::valueOf)
+                .forEach(possibleValues::add);
+          }
           conditionLabels.put(
               labelName,
               new GerritConditionLabel(
-                  List.copyOf(distinctValues), labelInfo == null ? null : labelInfo.description));
+                  List.copyOf(distinctValues),
+                  List.copyOf(possibleValues),
+                  labelInfo == null ? null : labelInfo.description));
         });
     return conditionLabels;
   }

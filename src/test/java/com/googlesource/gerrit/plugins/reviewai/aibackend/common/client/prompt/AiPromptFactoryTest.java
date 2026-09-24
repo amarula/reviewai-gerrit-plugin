@@ -210,7 +210,10 @@ public class AiPromptFactoryTest {
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_CONCERNS);
     changeSetData.setSpecializedAgentInstructions("Review code quality concerns only.");
     changeSetData.setConditionLabels(
-        Map.of("Verified", new GerritConditionLabel(List.of((short) 1), "CI verification")));
+        Map.of(
+            "Verified",
+            new GerritConditionLabel(
+                List.of((short) 1), List.of((short) 0, (short) 1), "CI verification")));
     changeSetData.setConcernWorkflowInput(
         new ConcernWorkflowInput(concerns, "incremental patch", null));
     Configuration config = mock(Configuration.class);
@@ -229,7 +232,8 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("# Current AI Review Condition"));
     assertTrue(instructions.contains("label:Verified=+1"));
     assertTrue(instructions.contains("# Condition Labels"));
-    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Verified:\n  Current value: +1"));
+    assertTrue(instructions.contains("Possible values: +0, +1"));
     assertTrue(instructions.contains("Description: CI verification"));
     assertFalse(instructions.contains("candidate issues that may deserve"));
     String request = prompt.getDefaultAiThreadReviewMessage("");
@@ -268,7 +272,7 @@ public class AiPromptFactoryTest {
     assertFalse(instructions.contains("candidate issues that may deserve"));
     assertFalse(instructions.contains("# Current AI Review Condition"));
     assertFalse(instructions.contains("# Condition Labels"));
-    assertFalse(instructions.contains("- Verified: +1"));
+    assertFalse(instructions.contains("Verified:\n  Current value: +1"));
   }
 
   @Test
@@ -290,7 +294,7 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("# Current AI Review Condition"));
     assertTrue(instructions.contains("label:Verified=+1"));
     assertTrue(instructions.contains("# Condition Labels"));
-    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Verified:\n  Current value: +1"));
     assertTrue(instructions.contains("Description: CI verification"));
     assertTrue(instructions.contains("conclusive current Condition Labels evidence"));
   }
@@ -321,7 +325,8 @@ public class AiPromptFactoryTest {
             .getDefaultAiAssistantInstructions()
             .contains((String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains("# Condition Labels"));
-    assertTrue(prompt.getDefaultAiAssistantInstructions().contains("- Verified: +1"));
+    assertTrue(
+        prompt.getDefaultAiAssistantInstructions().contains("Verified:\n  Current value: +1"));
   }
 
   @Test
@@ -346,7 +351,7 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertFalse(instructions.contains("# Current AI Review Condition"));
     assertFalse(instructions.contains("# Condition Labels"));
-    assertFalse(instructions.contains("- Verified: +1"));
+    assertFalse(instructions.contains("Verified:\n  Current value: +1"));
   }
 
   @Test
@@ -393,7 +398,10 @@ public class AiPromptFactoryTest {
     changeSetData.setConditionLabels(
         Map.of(
             "Verified",
-            new GerritConditionLabel(java.util.List.of((short) 1), "CI verification"),
+            new GerritConditionLabel(
+                java.util.List.of((short) 1),
+                java.util.List.of((short) 0, (short) 1),
+                "CI verification"),
             "Code-Review",
             new GerritConditionLabel(java.util.List.of(), "Code quality review")));
     AiPromptReview prompt =
@@ -405,9 +413,10 @@ public class AiPromptFactoryTest {
     assertTrue(instructions.contains("Current AI Review Condition"));
     assertTrue(instructions.contains("label:Verified=+1 OR label:Code-Review=+2"));
     assertTrue(instructions.contains("Condition Labels"));
-    assertTrue(instructions.contains("- Verified: +1"));
+    assertTrue(instructions.contains("Verified:\n  Current value: +1"));
+    assertTrue(instructions.contains("Possible values: +0, +1"));
     assertTrue(instructions.contains("Description: CI verification"));
-    assertTrue(instructions.contains("- Code-Review: no vote"));
+    assertTrue(instructions.contains("Code-Review:\n  Current value: no vote"));
     assertTrue(instructions.contains("Description: Code quality review"));
   }
 
@@ -473,7 +482,8 @@ public class AiPromptFactoryTest {
           stage + " should include the applicability expression",
           instructions.contains(applicableIf));
       assertTrue(
-          stage + " should include condition labels", instructions.contains("- Verified: +1"));
+          stage + " should include condition labels",
+          instructions.contains("Verified:\n  Current value: +1"));
     }
 
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
