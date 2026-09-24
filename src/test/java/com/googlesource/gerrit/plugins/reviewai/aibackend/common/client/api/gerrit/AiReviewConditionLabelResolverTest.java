@@ -42,11 +42,15 @@ public class AiReviewConditionLabelResolverTest {
     assertEquals(
         Map.of(
             "Verified",
-            new GerritConditionLabel(List.of((short) 1), "CI verification"),
+            new GerritConditionLabel(
+                List.of((short) 1), List.of((short) 0, (short) 1), "CI verification"),
             "Code-Review",
-            new GerritConditionLabel(List.of((short) 2), "Code quality"),
+            new GerritConditionLabel(
+                List.of((short) 2),
+                List.of((short) -2, (short) -1, (short) 0, (short) 1, (short) 2),
+                "Code quality"),
             "Build-Check",
-            new GerritConditionLabel(List.of(), null)),
+            new GerritConditionLabel(List.of(), List.of(), null)),
         resolver.resolve(
             CHANGE_ID, "label:Verified=+1 OR (label:\"Code-Review>=2\" AND -label:Build-Check-1)"));
   }
@@ -63,7 +67,8 @@ public class AiReviewConditionLabelResolverTest {
     assertEquals(
         Map.of(
             "Verified",
-            new GerritConditionLabel(List.of((short) -1, (short) 1), "CI verification")),
+            new GerritConditionLabel(
+                List.of((short) -1, (short) 1), List.of((short) 0, (short) 1), "CI verification")),
         resolver.resolve(CHANGE_ID, "label:Verified=+1"));
   }
 
@@ -74,6 +79,18 @@ public class AiReviewConditionLabelResolverTest {
   private static LabelInfo label(String description, ApprovalInfo... approvals) {
     LabelInfo label = new LabelInfo();
     label.all = List.of(approvals);
+    int maxValue = label.all.stream().mapToInt(approval -> approval.value).max().orElse(1);
+    if (maxValue > 1) {
+      label.values =
+          Map.of(
+              "-2", "Do not submit",
+              "-1", "Needs work",
+              "0", "No score",
+              "+1", "Looks good",
+              "+2", "Approved");
+    } else {
+      label.values = Map.of(" 0", "Failed", "+1", "Passed");
+    }
     label.description = description;
     return label;
   }

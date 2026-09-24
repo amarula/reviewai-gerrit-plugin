@@ -63,8 +63,9 @@ variable names and voting step depend on the Gerrit trigger/integration in use.
 
 ## How the `Verified` description affects AI findings
 
-ReviewAI includes the current value and configured description of labels referenced by `aiReviewApplicableIf` in its
-review context. The description communicates what a successful CI vote proves; the label name alone does not.
+ReviewAI includes the current value, possible values, and configured description of labels referenced by
+`aiReviewApplicableIf` in its review context. The description communicates what a successful CI vote proves; the
+label name alone does not.
 
 When `Verified` has no configured description, ReviewAI uses this default meaning:
 

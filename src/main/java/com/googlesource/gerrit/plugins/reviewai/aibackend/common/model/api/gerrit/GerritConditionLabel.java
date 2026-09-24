@@ -18,9 +18,15 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerr
 
 import java.util.List;
 
-/** Current values and configured description for a Gerrit label used by the review condition. */
-public record GerritConditionLabel(List<Short> values, String description) {
+/** Current and possible values plus the description of a Gerrit review-condition label. */
+public record GerritConditionLabel(
+    List<Short> currentValues, List<Short> possibleValues, String description) {
   public GerritConditionLabel {
-    values = List.copyOf(values);
+    currentValues = List.copyOf(currentValues);
+    possibleValues = List.copyOf(possibleValues);
+  }
+
+  public GerritConditionLabel(List<Short> currentValues, String description) {
+    this(currentValues, List.of(), description);
   }
 }

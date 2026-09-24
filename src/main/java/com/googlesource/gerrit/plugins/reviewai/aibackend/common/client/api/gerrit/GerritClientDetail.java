@@ -119,7 +119,7 @@ public class GerritClientDetail {
     return null;
   }
 
-  /** Returns current distinct values and descriptions for labels referenced by the condition. */
+  /** Returns current values, possible values, and descriptions for condition labels. */
   public Map<String, GerritConditionLabel> getConditionLabels(
       GerritChange change, String expression) {
     if (!conditionLabelResolver.hasConditionLabels(expression)) {
