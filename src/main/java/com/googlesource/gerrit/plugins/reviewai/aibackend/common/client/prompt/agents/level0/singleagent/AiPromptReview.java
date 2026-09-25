@@ -233,15 +233,6 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
-    return getAiAssistantInstructionsReview(true, ruleFilter);
-  }
-
-  protected String getAiAssistantInstructionsReviewWithoutDirectives(boolean... ruleFilter) {
-    return getAiAssistantInstructionsReview(false, ruleFilter);
-  }
-
-  private String getAiAssistantInstructionsReview(
-      boolean includeConfiguredDirectives, boolean... ruleFilter) {
     // Built-in rules are applied by default unless the corresponding ruleFilter value is set to
     // false. Each ruleFilter position refers to a fixed built-in rule slot (code context policy
     // rule, history rule, focus rule), even when the current code context policy adds no rule.
@@ -259,7 +250,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
         rules.addAll(builtInRuleSlots.get(i));
       }
     }
-    if (includeConfiguredDirectives && config.getDirective() != null) {
+    if (config.getDirective() != null) {
       rules.addAll(config.getDirective());
     }
     log.debug("Rules used in the assistant: {}", rules);
