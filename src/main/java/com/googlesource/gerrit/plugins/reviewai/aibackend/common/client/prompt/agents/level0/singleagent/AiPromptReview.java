@@ -33,8 +33,6 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -244,24 +242,27 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   private String getAiAssistantInstructionsReview(
       boolean includeConfiguredDirectives, boolean... ruleFilter) {
-    // Rules are applied by default unless the corresponding ruleFilter values is set to false
-    List<String> rules = new ArrayList<>();
-    codeContextPolicy.addCodeContextPolicyAwareAssistantRule(rules);
-    rules.addAll(
+    // Built-in rules are applied by default unless the corresponding ruleFilter value is set to
+    // false. Each ruleFilter position refers to a fixed built-in rule slot (code context policy
+    // rule, history rule, focus rule), even when the current code context policy adds no rule.
+    // Configured directives are never filtered.
+    List<String> codeContextPolicyRules = new ArrayList<>();
+    codeContextPolicy.addCodeContextPolicyAwareAssistantRule(codeContextPolicyRules);
+    List<List<String>> builtInRuleSlots =
         List.of(
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
+            codeContextPolicyRules,
+            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")),
+            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
+    List<String> rules = new ArrayList<>();
+    for (int i = 0; i < builtInRuleSlots.size(); i++) {
+      if (i >= ruleFilter.length || ruleFilter[i]) {
+        rules.addAll(builtInRuleSlots.get(i));
+      }
+    }
     if (includeConfiguredDirectives && config.getDirective() != null) {
       rules.addAll(config.getDirective());
     }
     log.debug("Rules used in the assistant: {}", rules);
-    return joinWithNewLine(
-        getNumberedList(
-            IntStream.range(0, rules.size())
-                .filter(i -> i >= ruleFilter.length || ruleFilter[i])
-                .mapToObj(rules::get)
-                .collect(Collectors.toList()),
-            RULE_NUMBER_PREFIX,
-            COLON_SPACE));
+    return joinWithNewLine(getNumberedList(rules, RULE_NUMBER_PREFIX, COLON_SPACE));
   }
 }

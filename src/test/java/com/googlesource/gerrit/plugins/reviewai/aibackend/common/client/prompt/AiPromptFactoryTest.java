@@ -24,6 +24,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyOnDemand;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
@@ -487,6 +489,48 @@ public class AiPromptFactoryTest {
 
     assertFalse(commitMessageInstructions.contains(applicableIf));
     assertFalse(commitMessageInstructions.contains("Condition Labels"));
+  }
+
+  @Test
+  public void commitMessageRuleFilterKeepsDirectivesWithoutCodeContextRule() {
+    Configuration config = mock(Configuration.class);
+    when(config.getDirective()).thenReturn(List.of("First directive", "Second directive"));
+    AiPromptReviewCommitMessage prompt =
+        new AiPromptReviewCommitMessage(
+            config, new ChangeSetData(1), patchSetEventChange(), new CodeContextPolicyNone(config));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertTrue(
+        instructions.contains(
+            "RULE #1: " + prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")));
+    assertFalse(
+        instructions.contains(prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
+    assertTrue(instructions.contains("RULE #2: First directive"));
+    assertTrue(instructions.contains("RULE #3: Second directive"));
+  }
+
+  @Test
+  public void commitMessageRuleFilterKeepsDirectivesWithOnDemandCodeContextRule() {
+    Configuration config = mock(Configuration.class);
+    when(config.getDirective()).thenReturn(List.of("First directive", "Second directive"));
+    AiPromptReviewCommitMessage prompt =
+        new AiPromptReviewCommitMessage(
+            config,
+            new ChangeSetData(1),
+            patchSetEventChange(),
+            new CodeContextPolicyOnDemand(config));
+
+    String instructions = prompt.getDefaultAiAssistantInstructions();
+
+    assertFalse(
+        instructions.contains(
+            AiPromptReview.staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST")));
+    assertTrue(
+        instructions.contains(
+            "RULE #1: " + prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")));
+    assertTrue(instructions.contains("RULE #2: First directive"));
+    assertTrue(instructions.contains("RULE #3: Second directive"));
   }
 
   @Test
