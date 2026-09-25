@@ -534,6 +534,36 @@ public class AiPromptFactoryTest {
   }
 
   @Test
+  public void specializedAgentPromptsIncludeConfiguredDirectives() {
+    Configuration config = mock(Configuration.class);
+    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getDirective()).thenReturn(List.of("First directive", "Second directive"));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setForcedStagedReview(true);
+    changeSetData.setSpecializedAgentReview(true);
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    changeSetData.setSpecializedAgentName("CORRECTNESS");
+    changeSetData.setSpecializedAgentInstructions("Review correctness only.");
+
+    String patchSetInstructions =
+        AiPromptFactory.getAiPrompt(
+                config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class))
+            .getDefaultAiAssistantInstructions();
+
+    changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
+    changeSetData.setSpecializedAgentName(null);
+    String commitMessageInstructions =
+        AiPromptFactory.getAiPrompt(
+                config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class))
+            .getDefaultAiAssistantInstructions();
+
+    assertTrue(patchSetInstructions.contains("RULE #3: First directive"));
+    assertTrue(patchSetInstructions.contains("RULE #4: Second directive"));
+    assertTrue(commitMessageInstructions.contains("RULE #2: First directive"));
+    assertTrue(commitMessageInstructions.contains("RULE #3: Second directive"));
+  }
+
+  @Test
   public void suggestPromptsAreLoadedFromResources() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setForcedReview(true);

@@ -57,7 +57,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReviewWithoutDirectives()));
+            getAiAssistantInstructionsReview()));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
       sections.add(buildSection("Triage-Selected Instructions", customInstructions));
@@ -97,7 +97,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReviewWithoutDirectives(false, true, false)));
+            getAiAssistantInstructionsReview(false, true, false)));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
       sections.add(buildSection("Triage-Selected Instructions", customInstructions));
