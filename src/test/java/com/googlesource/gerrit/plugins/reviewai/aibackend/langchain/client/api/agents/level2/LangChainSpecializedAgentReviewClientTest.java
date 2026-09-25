@@ -1279,7 +1279,7 @@ public class LangChainSpecializedAgentReviewClientTest {
     }
 
     @Override
-    protected String getAiAssistantInstructionsReviewWithoutDirectives(boolean... ruleFilter) {
+    protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
       return "";
     }
   }
