@@ -30,18 +30,18 @@ import org.junit.Test;
 public class AiCostCalculatorTest {
   @Test
   public void calculatesOpenAiCachedInputAndOutputInNanoUsd() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-5.6-sol");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-sol");
     TokenUsage usage = new DetailedTokenUsage(12000, 500, 12500, 8000, null);
 
-    assertEquals(29_200_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
+    assertEquals(13_800_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
   }
 
   @Test
   public void calculatesOpenAiCacheWritesOnlyWhenReported() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-5.6-sol");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-sol");
     TokenUsage usage = new DetailedTokenUsage(12000, 500, 12500, 8000, 1000);
 
-    assertEquals(30_200_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
+    assertEquals(14_300_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
   }
 
   @Test
@@ -61,13 +61,13 @@ public class AiCostCalculatorTest {
 
   @Test
   public void switchesToLongContextPricingAboveThreshold() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-5.6-sol");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-sol");
 
     assertEquals(
-        1_088_000_000L,
+        544_000_000L,
         AiCostCalculator.calculateNanoUsd(pricing, new TokenUsage(272000, 0)).orElseThrow());
     assertEquals(
-        2_176_008_000L,
+        1_088_004_000L,
         AiCostCalculator.calculateNanoUsd(pricing, new TokenUsage(272001, 0)).orElseThrow());
   }
 
@@ -119,6 +119,9 @@ public class AiCostCalculatorTest {
             route(AiProviderType.OPENAI, "gpt-5.4"),
             route(AiProviderType.OPENAI, "gpt-5.5"),
             route(AiProviderType.OPENAI, "gpt-6-astra"),
+            route(AiProviderType.OPENAI, "gpt-6.1-sol"),
+            route(AiProviderType.OPENAI, "gpt-6-sol"),
+            route(AiProviderType.OPENAI, "gpt-6-luna"),
             route(AiProviderType.OPENAI, "gpt-5.6-sol"),
             route(AiProviderType.OPENAI, "gpt-5.6-terra"),
             route(AiProviderType.OPENAI, "gpt-5.6-luna"),

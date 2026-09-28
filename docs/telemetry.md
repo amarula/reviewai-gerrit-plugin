@@ -227,7 +227,7 @@ Additional behavior:
 
 ### Built-in pricing
 
-The built-in prices are USD per one million tokens and were verified on 2026-09-08 against the official
+The built-in prices are USD per one million tokens and were verified on 2026-09-30 against the official
 [OpenAI](https://developers.openai.com/api/docs/pricing),
 [Gemini](https://ai.google.dev/gemini-api/docs/pricing),
 [DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/), and
@@ -237,6 +237,9 @@ plugin, as described below.
 | Provider/model                                         | Input | Cached input | Cache write | Output | Long-context input / cached / write / output |
 |--------------------------------------------------------|------:|-------------:|------------:|-------:|----------------------------------------------|
 | `OpenAI/gpt-6-astra`                                   | 10.00 |         1.00 |       12.50 |  50.00 | 20.00 / 2.00 / 25.00 / 75.00 above 272K      |
+| `OpenAI/gpt-6.1-sol`                                   |  2.00 |         0.10 |        2.50 |  10.00 | 4.00 / 0.20 / 5.00 / 15.00 above 272K        |
+| `OpenAI/gpt-6-sol`                                     |  2.00 |         0.20 |        2.50 |  10.00 | 4.00 / 0.40 / 5.00 / 15.00 above 272K        |
+| `OpenAI/gpt-6-luna`                                    |  0.10 |         0.01 |       0.125 |   0.50 | 0.20 / 0.02 / 0.25 / 0.75 above 272K         |
 | `OpenAI/gpt-5.6-sol`                                   |  4.00 |         0.40 |        5.00 |  20.00 | 8.00 / 0.80 / 10.00 / 30.00 above 272K       |
 | `OpenAI/gpt-5.6-terra`                                 |  2.00 |         0.20 |        2.50 |  12.00 | 4.00 / 0.40 / 5.00 / 18.00 above 272K        |
 | `OpenAI/gpt-5.6-luna`                                  |  0.20 |         0.02 |        0.25 |   1.20 | 0.40 / 0.04 / 0.50 / 1.80 above 272K         |
@@ -303,11 +306,11 @@ Add pricing for an explicitly configured snapshot:
     aiPricing = OpenAI/gpt-5.4-2026-06-15,input=2.50,cachedInput=0.25,output=15.00,longThreshold=272000,longInput=5.00,longCachedInput=0.50,longOutput=22.50
 ```
 
-Define GPT-5.6 cache-write rates:
+Define GPT-6 cache-write rates:
 
 ```ini
 [plugin "reviewai-gerrit-plugin"]
-    aiPricing = OpenAI/gpt-5.6-sol,input=4,cachedInput=.4,cacheWrite=5,output=20,longThreshold=272000,longInput=8,longCachedInput=.8,longCacheWrite=10,longOutput=30
+    aiPricing = OpenAI/gpt-6.1-sol,input=2,cachedInput=.1,cacheWrite=2.5,output=10,longThreshold=272000,longInput=4,longCachedInput=.2,longCacheWrite=5,longOutput=15
 ```
 
 Multiple entries can be repeated in the same configuration section:
