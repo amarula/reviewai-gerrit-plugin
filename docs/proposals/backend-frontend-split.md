@@ -145,34 +145,47 @@ keeps the open plugin self-contained while allowing a scaled deployment.
 The diagram below shows **remote mode**. In-process mode is the current architecture with the
 `ReviewEngine` contract introduced as an internal seam (migration Steps 1–3, §15).
 
-```
-┌──────────────── host plugin = adapter (one per product install) ───────────────┐
-│  Gerrit / GitHub / GitLab                                                      │
-│                                                                               │
-│   UI ──► host-facing REST ──► intake queue (durable) ──► job client            │
-│             (host-specific)     (existing design)         │                    │
-│                                                           │                    │
-│   tool server  ◄──────────────────────────────────────────┼──────┐            │
-│   (per-host impl of tree / read / grep)                    │      │            │
-└────────────────────────────────────────────────────────────┼──────┼────────────┘
-                                                             │      │
-                                    ReviewRequest (neutral)  │      │  tool-RPC
-                                                             ▼      │  (neutral)
-┌──────────────── review engine (Spring Boot, N replicas) ──────────┼────────────┐
-│                                                                   │            │
-│   POST /v1/reviews ──► job store (lanes, leases) ──► worker ──────┘            │
-│                            │                          │                        │
-│                            ▼                          ▼                        │
-│                    review_job_events          prompt / concern workflow / LLM  │
-│                    (progress log)                      │                        │
-│                            │                          ▼                        │
-│                            └───────────────►    ReviewResult                   │
-└────────────────────────────────────┬───────────────────────────────────────────┘
-                                     │  pull (GET /v1/reviews/{id})
-                                     ▼
-┌──────────────── host plugin = adapter ─────────────────────────────────────────┐
-│  render comments in host syntax, post, map concernId → thread id, vote          │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  subgraph Engine["review engine (Spring Boot, N replicas)"]
+    direction TB
+    Submit["POST /v1/reviews"]
+    Jobs["job store (lanes, leases)"]
+    Worker["worker"]
+    Events["review_job_events<br/>(progress log)"]
+    Workflow["prompt / concern workflow / LLM"]
+    Result["ReviewResult"]
+
+    Submit --> Jobs
+    Jobs --> Worker
+    Jobs --> Events
+    Worker --> Workflow
+    Events --> Result
+    Workflow --> Result
+  end
+
+  subgraph AdapterIn["host plugin = adapter (one per product install)"]
+    direction TB
+    Products["Gerrit / GitHub / GitLab"]
+    UI["UI"]
+    Rest["host-facing REST<br/>(host-specific)"]
+    Intake["intake queue (durable)<br/>(existing design)"]
+    Client["job client"]
+    Tools["tool server<br/>(per-host impl of tree / read / grep)"]
+
+    Products ~~~ UI
+    UI --> Rest
+    Rest --> Intake
+    Intake --> Client
+  end
+
+  subgraph AdapterOut["host plugin = adapter"]
+    Publish["render comments in host syntax, post,<br/>map concernId → thread id, vote"]
+  end
+
+  Worker -->|"tool-RPC (neutral)"| Tools
+  Client -->|"ReviewRequest (neutral)"| Submit
+  Result -->|"pull (GET /v1/reviews/{id})"| Publish
 ```
 
 Key properties:
