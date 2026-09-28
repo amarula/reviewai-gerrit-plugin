@@ -146,47 +146,67 @@ The diagram below shows **remote mode**. In-process mode is the current architec
 `ReviewEngine` contract introduced as an internal seam (migration Steps 1–3, §15).
 
 ```mermaid
+---
+config:
+  flowchart:
+    subGraphTitleMargin:
+      bottom: 30
+---
 flowchart TB
   subgraph Engine["review engine (Spring Boot, N replicas)"]
     direction TB
-    Submit["POST /v1/reviews"]
-    Jobs["job store (lanes, leases)"]
+    API["job API"]
+    Jobs[("durable job store<br/>shared PostgreSQL<br/>jobs, lanes, leases, results")]
     Worker["worker"]
-    Events["review_job_events<br/>(progress log)"]
+    Events[("review_job_events<br/>(progress log)")]
     Workflow["prompt / concern workflow / LLM"]
     Result["ReviewResult"]
 
-    Submit --> Jobs
-    Jobs --> Worker
-    Jobs --> Events
+    API --> Jobs
+    Jobs -->|"claim with lease"| Worker
+    Jobs -->|"persisted progress"| Events
     Worker --> Workflow
-    Events --> Result
     Workflow --> Result
+    Result -->|"store terminal result"| Jobs
   end
 
-  subgraph AdapterIn["host plugin = adapter (one per product install)"]
+  subgraph Adapter["host plugin = adapter (one per product install)"]
     direction TB
-    Products["Gerrit / GitHub / GitLab"]
-    UI["UI"]
     Rest["host-facing REST<br/>(host-specific)"]
-    Intake["intake queue (durable)<br/>(existing design)"]
+    Intake[("durable intake queue<br/>(adapter database)")]
     Client["job client"]
+    Poller["result poller<br/>(EngineJobPoller)"]
+    Publish["render comments in host syntax, post,<br/>map concernId → thread id, vote"]
     Tools["tool server<br/>(per-host impl of tree / read / grep)"]
 
-    Products ~~~ UI
-    UI --> Rest
     Rest --> Intake
     Intake --> Client
+    Intake -->|"requests awaiting result"| Poller
+    Poller --> Publish
+
+    %% Stagger the right-hand nodes to clear the engine-facing arrows.
+    Rest ~~~ Poller
+    Poller ~~~ Intake
+    Client ~~~ Tools
   end
 
-  subgraph AdapterOut["host plugin = adapter"]
-    Publish["render comments in host syntax, post,<br/>map concernId → thread id, vote"]
+  subgraph Host["host product surface<br/>(one of: Gerrit / GitHub / GitLab)"]
+    direction TB
+    UI["UI / webhook"]
+    Reviews["comments / votes"]
   end
 
+  UI --> Rest
+  Client -->|"POST /v1/reviews<br/>ReviewRequest (neutral)"| API
+  Poller -->|"GET /v1/reviews/{jobId}"| API
+  %% Keep the adapter and engine side by side without a response arrow.
+  API ~~~ Poller
   Worker -->|"tool-RPC (neutral)"| Tools
-  Client -->|"ReviewRequest (neutral)"| Submit
-  Result -->|"pull (GET /v1/reviews/{id})"| Publish
+  Publish --> Reviews
 ```
+
+The host-product box shows where reviews originate and are published; it does not imply a separate
+process from the adapter.
 
 Key properties:
 
@@ -194,8 +214,9 @@ Key properties:
   same engine code and contract. Isolation comes from the deployment.
 - **N engine replicas over one shared PostgreSQL.** Any replica can accept a submission, run a job, or
   report a result.
-- **The adapter keeps its durable intake queue.** It absorbs host events before the network call, so an
-  engine outage does not lose work. There are therefore **two durable queues in series** (§8).
+- **Two durable queues are in series.** The adapter intake queue absorbs host events before the
+  network call, so an engine outage does not lose work. The engine job store then coordinates
+  execution across replicas (§8).
 
 > **Changed from the prior proposal.** It stated: *"The engine is stateless. The adapter owns the
 > concern ledger, feedback memory, and conversation id, and passes them per request."* This is now
