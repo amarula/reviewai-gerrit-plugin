@@ -227,7 +227,7 @@ Key properties:
 ### 4.2 The three REST surfaces
 
 "The API is the same for Gerrit, GitHub and GitLab" is true of exactly two of three surfaces. Being
-precise about which is which is what keeps the engine host-agnostic.
+precise about which-is-which is what keeps the engine host-agnostic.
 
 | Surface | Shared? |
 |---|---|
@@ -337,11 +337,17 @@ public record ReviewIntent(
     List<String> dataPrompt) {}
 ```
 
-**`priorConcerns` and `feedback` are gone from the steady-state request.** The engine is the single
-writer and loads them from its own store. The prior proposal carried them on every request; doing so
-would let stale requests compete with newer engine state. The one exception is `StateBootstrap`, which is
-explicit and nullable rather than implicit — see §13.1 for why "no ledger row means first review" is an
-unsafe default.
+**`priorConcerns` and `feedback` are absent from normal steady-state requests.** Once a change is in
+remote mode, the engine reads that history from its own store and is its only writer. Sending a copy with
+every review, as the prior proposal did, would let a delayed or retried request bring back older history.
+For example, it could supply a concern as `PRESENT` after a newer review marked it `FIXED`.
+
+The one-time exception is migration: before the first remote review of a change, the engine needs a
+verified `StateBootstrap` snapshot of its legacy history. An empty snapshot is valid only after the
+adapter confirms there is no prior state; if the old state cannot be read, the job must fail and retry
+instead of starting with an empty history (§13.1–13.2). The record above shows `StateBootstrap` as an
+optional request field, while §13.1 describes fetching it through a callback. Those two descriptions
+need one agreed transport before implementation.
 
 > **Changed from the prior proposal.** Its `ReviewContext` carried `priorConcerns`, `feedback`, and
 > `incrementalPatch` on every request, while `ModelConfig` carried a `conversationId` described as
@@ -377,7 +383,8 @@ public record Finding(
 
 `ReviewResult.updatedConcerns` is **removed** — the engine already persisted them. `Finding.id` becomes
 `findingKey` and is now a deterministic content hash rather than an opaque id; §8 explains why that is
-required rather than merely convenient.
+required rather than merely convenient. `ReviewResult.state` describes the terminal review outcome,
+not every internal job state; §7.2 defines the mapping for an expired worker lease.
 
 ### 5.4 Config: resolved by the adapter, shipped flat
 
@@ -455,18 +462,27 @@ prompt assets. **Decision: findings stay structured and the adapter renders them
   GitLab's equivalent.
 - The engine never names a host syntax.
 
+The model still writes the finding's explanation in `Finding.message`. It returns any proposed
+replacement separately in `Finding.suggestion`, without a suggestion fence. The adapter combines
+those fields into the comment it publishes: on Gerrit it wraps the replacement in Gerrit's ```suggestion
+syntax; another host uses its own format. Rendering does not mean that the adapter
+rewrites the model's explanation.
+
 Consequences to be honest about:
 
-- **The model stops composing the final comment prose.** This is a deliberate relaxation of the "no
-  review-semantics change" non-goal and carries a probable comment-quality risk. It should be measured
-  against current output rather than assumed, and revisited only if the regression is real.
+- **The model no longer composes the complete published comment.** The adapter now assembles the
+  model's explanation, optional replacement text, and host formatting. This is the deliberate
+  exception to the concern-workflow non-goal (§2): the final comment's wording or presentation may
+  differ even when the finding is the same. Compare rendered comments with current output to measure
+  the quality risk, and revisit the decision if there is a real regression.
 - **Prompt neutralisation becomes a required workstream, not a tidy-up.** There are 17 `Gerrit`
   references across 6 files under `src/main/resources/config/`, and they split into two classes:
   - *Essential host mechanics* — Suggested Edits syntax and the `/COMMIT_MSG` pseudo-file. Both leave
     the engine entirely: syntax to the adapter's renderer, `/COMMIT_MSG` to the adapter resolving it
     into the neutral `commitMessage` field.
   - *Vocabulary* — "Gerrit patch", "Gerrit review comment", "Gerrit comments". Cheap to neutralise.
-- Product-specific instruction fragments that remain have a home in `ResolvedConfig.instructions`.
+- Product-specific instructions that affect review behaviour can remain in
+  `ResolvedConfig.instructions`; comment-format instructions belong in the adapter's renderer.
 
 ## 7. The service
 
@@ -486,14 +502,45 @@ force the adapter either to retry blindly or to treat an unknown outcome as fail
 
 ### 7.2 Job state machine
 
-The engine's job store reuses the state machine the adapter already has in `data/AiRequest.java`:
-`QUEUED, RUNNING, SUPERSEDE_REQUESTED, COMPLETED, FAILED, REJECTED, SUPERSEDED, ABANDONED`, with
-`isTerminal()`.
+The names below come from the adapter's `data/AiRequest.java`. They describe the lifecycle of an
+**AI request**, not a review concern. A concern has a separate `ConcernStatus` (`PRESENT`, `FIXED`,
+`UNCERTAIN`, `SKIPPED`, `DISMISSED`). The engine reuses the adapter's queue, lease, and cancellation
+design, but its job states are not a verbatim copy of the adapter's enum.
+
+| State | Meaning | Used as an engine job state? |
+|---|---|---|
+| `QUEUED` | Accepted, waiting for a worker. | Yes. |
+| `RUNNING` | Claimed by a worker with a lease. | Yes. |
+| `SUPERSEDE_REQUESTED` | Stop requested because the work is stale or explicitly cancelled; the worker has not finished stopping. | Yes, pending a `SUPERSEDED` or `CANCELLED` outcome according to the reason. |
+| `COMPLETED` | Review finished successfully. | Yes, terminal. |
+| `FAILED` | Review execution failed. | Yes, terminal. |
+| `REJECTED` | Adapter refused admission because the change was already occupied (`REJECT_IF_OCCUPIED`). | No. An engine `POST` refusal creates no job and returns an error response. |
+| `SUPERSEDED` | An outdated request stopped without producing a publishable review. | Yes, terminal. |
+| `ABANDONED` | A running worker's lease expired before completion; this does **not** mean the host change was abandoned. | Yes, terminal; exposed as a failed `ReviewResult` with a lease-expiry `failureReason`. |
+| `CANCELLED` | An explicit cancellation finished after the worker stopped. | Yes, terminal; this state is new to the engine contract. |
+
+The engine job's `isTerminal()` covers `COMPLETED`, `FAILED`, `SUPERSEDED`, `ABANDONED`, and
+`CANCELLED`. `GET /v1/reviews/{jobId}` exposes the job state; its terminal `ReviewResult.state` uses
+the narrower outcome list in §5.3 (`ABANDONED` maps to `FAILED`). A duplicate idempotency key still
+returns the existing job as described in §7.1; it is not an admission rejection.
 
 ### 7.3 Replica coordination
 
-The multi-instance machinery largely **already exists and is already correct** in the adapter. The
-engine reuses the *design*, not the tables (§14.7):
+The proposed remote topology puts N engine replicas behind a load balancer over one shared PostgreSQL
+(§2, §4.1). The adapter sends job API calls to that deployment; the load balancer selects the replica
+that handles each HTTP call. Its routing policy, including whether it considers workload, is not
+specified here. HTTP routing is separate from job assignment: the receiving replica persists the job,
+then a worker on any replica may claim it from the shared store.
+
+For example, the load balancer could send `POST /v1/reviews` to replica A, which stores job 42 as
+`QUEUED` and returns its ID. A worker on replica B could then claim job 42 from PostgreSQL and change
+it to `RUNNING` with a lease; A does not forward the job to B. If A's worker also tries to claim it,
+the database transaction prevents a second claim. A later `GET /v1/reviews/42` could go to either
+replica, since both read the shared job store. This illustrates the proposed design, not an existing
+engine implementation.
+
+The adapter already uses a lane, claim, and lease design to coordinate its own request workers. The
+engine would implement that *design* in its own job tables, not share the adapter's tables (§14.7):
 
 - `data/AiRequestStore.claimNext` (`data/AiRequestStore.java:75-136`) locks the lane, then flips
   `QUEUED → RUNNING` with owner and lease and sets the lane's active request **in one transaction**,
@@ -509,13 +556,23 @@ or a long review can block event intake. This applies to the adapter as well (§
 
 ### 7.4 Progress delivery
 
-Events are persisted to `review_job_events` **in the same transaction as the state change that produced
-them**. The row is authoritative; the stream is a projection. The SSE handler reads `seq > Last-Event-ID`
-on connect and then polls for new rows.
+The engine sends progress to the adapter over SSE (Server-Sent Events). It saves progress events in
+`review_job_events`. The database is the durable record. When a job state changes, the engine updates
+the job row and inserts the corresponding `review_job_events` row **in the same transaction**. Either
+both changes commit or neither does. The SSE endpoint only reads stored event rows and sends them over
+HTTP; it does not own a second copy of job state.
+
+For example, job 42 moves from `QUEUED` to `RUNNING`, and event `seq = 7` records that transition.
+The adapter receives event 7, then its SSE connection drops while event 8 is stored. On reconnect,
+the adapter sends `Last-Event-ID: 7`; the SSE handler reads rows with `seq > 7` and sends event 8.
+It then polls for new rows to keep the stream current. The dropped connection did not lose the event,
+and `GET /v1/reviews/42` can still report the job's current state. Exact stream termination and
+replica-restart edge cases remain open in §17.7.
 
 No broker is required. Postgres `LISTEN/NOTIFY` is an optional latency optimisation only, and should be
 treated as such: it is fire-and-forget, non-durable, needs a dedicated non-pooled connection, and has a
-payload cap.
+payload cap. It could wake the SSE handler sooner than the next poll, but the handler still reads the
+event rows from PostgreSQL.
 
 **The stream's consumer is the adapter, not the browser.** Exposing engine SSE to the browser would
 need CORS, leak the engine URL and its auth model, and be broken by any reverse proxy that buffers
@@ -553,9 +610,10 @@ The mechanism:
 - The adapter keeps `published_findings(change_id, revision, finding_key, comment_id, published_at)`
   with a unique index, and skips findings already recorded, reusing the recorded `comment_id` for the
   thread.
-- This table also provides decision 6's storage: `concern_comment_ids(change_id, concern_id, comment_id)`
-  replaces the `previousCommentId` currently written into the engine's ledger
-  (`data/ReviewConcernPublisher.java:70-83`).
+- A companion adapter-owned table, `concern_comment_ids(change_id, concern_id, comment_id)`, stores
+  the mapping from a change's `concern_id` to its published host `comment_id`. This is the
+  **concern-to-host-comment map** referenced below. It replaces the `previousCommentId` currently
+  written into the engine's ledger (`data/ReviewConcernPublisher.java:70-83`; see also §5.1).
 
 ### Boundary idempotency key
 
@@ -614,10 +672,16 @@ Ownership is **mode-dependent**, which matters because in-process mode (§4.1) i
 Two rules follow:
 
 1. **The adapter must never delete engine state**, and the engine must never delete adapter state.
-2. **Cleanup ordering** carries over from the existing design: deletion must run *after* scheduled work
-   for the change is idle, so an in-flight model call cannot recreate memory after deletion
-   (`docs/architecture/request-coordination.md:180-182`). The engine's equivalent is: delete only when
-   the lane is unowned.
+2. **Cleanup must wait for in-flight work.** Cleanup ordering carries over from the existing design:
+   deletion must run *after* scheduled work for the change is idle, so an in-flight model call cannot
+   recreate memory after deletion (`docs/architecture/request-coordination.md:180-182`). Suppose a change
+   is merged while its review is waiting for a model response. If the engine deletes the concern ledger
+   and chat memory immediately, the worker could receive the response and write new state after cleanup.
+   Today the in-process coordinator waits until scheduled work for the change is idle before clearing that
+   state (`docs/architecture/request-coordination.md:180-182`). In remote mode, the adapter requests
+   cancellation, and the engine clears its own state only after the worker has stopped or can no
+   longer write. An unowned lane alone is insufficient after a lease expires: the former worker may
+   still finish an in-flight call.
 
 A consequence worth stating plainly: because both modes exist, a site that runs in-process pays none of
 the migration cost in §13, and a site that switches to remote mode pays it once, per change, on first
@@ -656,7 +720,7 @@ Reasons, in order of weight:
    `GerritCommentRange` to map replies onto existing threads
    (`review/PatchSetReviewer.java:128-129, 236-237`). Moving that would mean moving Gerrit back into
    the engine.
-2. Decision 6 requires the adapter to own the comment-id map, which it cannot do if the engine posts.
+2. The adapter owns the concern-to-host-comment map (§5.1, §8), so it must also own publication.
 3. A push would add a second callback surface with *write* privileges, widening the tool-RPC auth
    problem (§12.2) for no gain.
 
@@ -677,12 +741,14 @@ exception propagation across the RPC boundary would violate it.
 
 ### 12.2 Authentication
 
-The six sidebar endpoints are `RestModifyView<ChangeResource, …>`, which require a user. Tool-RPC has
-no user. Use a dedicated servlet — the pattern already exists in `HttpModule` — authenticated by a
-shared secret (HMAC over method, path, timestamp, and nonce; constant-time comparison; bounded replay
-window), executing the repository work under `OneOffRequestContext.openAs(config.getUserId())`. The RPC
-surface is read-only and scoped to the change in the request, so the engine can read only code it is
-already reviewing.
+Tool-RPC calls come from the remote engine back to the adapter to read code context; they do not
+carry an end-user Gerrit session. The six sidebar endpoints are Gerrit `ChangeResource` REST views
+(three `RestReadView`, three `RestModifyView`) that run in Gerrit's request context, so they are not
+the engine's callback endpoint. Instead, the adapter exposes a dedicated servlet (following the
+pattern in `HttpModule`) and authenticates the engine with a shared secret (HMAC over method, path,
+timestamp, and nonce; constant-time comparison; bounded replay window). It executes repository work
+under `OneOffRequestContext.openAs(config.getUserId())`. The RPC surface is read-only and scoped to
+the change in the request, so the engine can read only code it is already reviewing.
 
 ### 12.3 Timeouts and backpressure
 
@@ -712,18 +778,30 @@ conversation ids (in plugin data). All are keyed by `change_id` today
 
 ### 13.1 Strategy: lazy per-change bootstrap, engine-authoritative from first contact
 
+Here **bootstrap** means initializing the engine's state for one change from the adapter's legacy
+state before that change's first remote review. `StateBootstrap` (§5.2) is the snapshot used for this
+one-time transfer. A successful snapshot may contain no prior concerns; that is different from being
+unable to obtain or save a reliable snapshot.
+
 Do **not** bulk-migrate. Changes are long-lived and a bulk copy needs a freeze that is not available.
 Instead:
 
 1. **Ask once per change.** On a job where the engine has no ledger row for the `ChangeRef`, it calls
    the adapter's authenticated callback for a `StateBootstrap`, inserts it, and proceeds.
-2. **No dual-write window.** The engine writes only after the bootstrap read, inside the claimed job.
-   Both lanes serialize per change, so there is no interleaving to get wrong.
-3. **Bootstrap failure must fail the job as retryable — never proceed with an empty ledger.** This is
-   the single most important safety rule in the migration. An empty ledger is *not* a safe default:
-   `preexisting` and `repeated` are computed from the prior ledger
-   (`review/PatchSetReviewer.java:190-200`), so the model would re-report every previously-raised
-   concern as new.
+2. **No dual-write window for migrated review state.** When a site switches to remote mode, the
+   adapter's intake lane must finish any in-process job for a change before dispatching its first
+   remote job. The adapter then freezes its legacy concern, feedback, and chat-memory state, keeping
+   that copy for bootstrap and rollback (§13.3). The engine reads the snapshot from the adapter,
+   saves it inside the claimed job, and alone updates that review state thereafter. For example,
+   suppose concern C is `PRESENT` in the adapter's ledger when the engine copies it. If an old
+   in-process job later marks C `FIXED` in that ledger, the engine keeps its stale `PRESENT` copy:
+   it reads legacy state only once. Finishing adapter work before bootstrap prevents this. The
+   engine's per-change lane separately prevents two remote jobs from updating C at the same time.
+3. **Bootstrap failure must fail the job as retryable.** If the engine cannot obtain, validate, or
+   save `StateBootstrap`, it must stop the review so the adapter can retry it later. It must not treat
+   that failure as a successful empty ledger. The previous ledger is loaded into the review context
+   (`review/PatchSetReviewer.java:199-206`); losing it could make previously reported concerns appear
+   new and lead to duplicate comments or lost thread linkage.
 4. **Write-back is forbidden.** After bootstrap the engine is authoritative.
 5. **Back-fill the adapter's concern → comment map from the legacy ledger *during* the migration step**,
    not only going forward. Skip this and every pre-existing concern loses its thread linkage the first
@@ -731,20 +809,33 @@ Instead:
 6. **Engine-side strip.** The engine has no `previousCommentId` field. This is lossless *only* because
    step 5 retains the mapping.
 
-### 13.2 A hazard to not rely on
+### 13.2 Distinguish missing history from unreadable history
 
-`ReviewConcernStore.load()` returns `Optional.empty()` on a `CURRENT_SCHEMA_VERSION` mismatch, logging
-only a warning (`data/ReviewConcernStore.java:62-68`). A naive migration would therefore **drop concern
-history without failing**. Dual-read must be explicit; this fallback must not be treated as safety.
+`ReviewConcernStore.load()` returns `Optional.empty()` when no ledger row exists. It also returns
+`Optional.empty()` after logging a warning when a row exists but its schema version is unsupported or
+its data is invalid (`data/ReviewConcernStore.java:56-77`). The return value alone cannot tell these
+cases apart.
+
+For example, suppose change 42 has stored concern C, but the migration reader cannot decode that
+ledger version. If bootstrap treats the empty result as "no previous concerns", the engine starts
+without C and may report it again as a new finding. The migration reader must check whether a legacy
+row exists and explicitly decode or convert each supported version. If an existing row cannot be
+read, bootstrap fails as described in §13.1; an empty snapshot is valid only when the reader confirms
+there is no prior ledger. Do not rely on `load()`'s fallback to make that decision.
 
 ### 13.3 Rollback
 
-Rollback points the adapter back at the in-process engine, so it is a **copy-back**:
+Here **rollback** means reversing a site's switch from in-process to remote mode and returning it to
+the in-process engine if the remote rollout must be undone. This is an operational fallback, not a
+normal review step. While remote mode runs, the engine updates its state and the adapter's old copy
+stays frozen. Switching the mode back without restoring those updates would resume from stale review
+history, so rollback requires a **copy-back**:
 
-1. **Do not drop the adapter's tables at cut-over.** The migration step's job is "stop writing, keep
-   the data", with a per-change `legacy_state_frozen_at` watermark.
-2. On rollback, export engine state for every change whose `lastReviewedCommit` is newer than the
-   watermark, and restore `previousCommentId` from the adapter's `concern_comment_ids`.
+1. **Do not drop the adapter's tables at cut-over.** Keep the legacy review state for rollback, but
+   stop updating it once the engine owns that state.
+2. Before switching back, pause new remote dispatch and let in-flight remote jobs reach a terminal
+   state. Export engine state for every change handled in remote mode, and restore `previousCommentId`
+   from the adapter's `concern_comment_ids` before importing that state into the adapter's tables.
 3. The engine's schema must round-trip everything the plugin's schema holds **except**
    `previousCommentId`, which comes back from the adapter's map. That asymmetry is deliberate.
 4. Engine-created conversations are host-side objects keyed by an id the engine holds; export them too.
@@ -752,9 +843,9 @@ Rollback points the adapter back at the in-process engine, so it is a **copy-bac
 **Dropping the legacy tables is the point of no return** and belongs last, after the rollback window
 closes.
 
-Crucially, because the in-process engine is retained (§14.1), rollback is simply **configuring the
-adapter back to in-process mode**. That is what makes this migration far safer than a one-way
-extraction: the fallback is the current, well-tested code path, not a reconstruction of it.
+After copy-back, configure the adapter to use the in-process engine again. Retaining that engine
+(§14.1) means the fallback uses the existing code path, but the configuration switch alone is not a
+complete rollback.
 
 ### 13.4 The two modes do not share review state
 
@@ -764,9 +855,9 @@ path in §13.1 exactly once — the engine asks the adapter for the legacy ledge
 
 Two consequences follow:
 
-1. **Switching is per-site, not per-change, and it is one-way per change.** Once a change has been
-   bootstrapped into the engine, that change's subsequent reviews are engine-owned. Flipping the site
-   back to in-process returns to the adapter's copy, which has been frozen since the watermark.
+1. **Switching is per-site, not per-change.** Once a change has been bootstrapped into the engine,
+   subsequent remote reviews use engine-owned state. Returning the site to in-process mode requires
+   the copy-back in §13.3; pointing it at the adapter's frozen copy would lose newer state.
 2. **A mixed fleet is normal during rollout.** Different sites on different modes is the expected
    intermediate state, not an error. Nothing in the contract assumes the other side's mode, which is
    why the in-process engine must also run the conformance suite (§14.2) — a divergence between the
@@ -858,37 +949,51 @@ directories are excluded by construction and the Bazel build is genuinely untouc
 Spring Boot repackaging, `application.yml` layout, and Flyway resource scanning under Bazel is not
 worth it, and the release pipeline only ships the plugin.
 
-### 14.4 Keeping Gerrit off the engine classpath — enforced, not intended
+### 14.4 Keep Gerrit libraries out of the remote engine
 
-Layering alone will not hold; someone will add a convenience import. Enforce it:
+The engine's classpath is the set of Java libraries available to it at build and run time. The remote
+engine must work without Gerrit classes so the same service can be used by other host adapters. For
+example, the engine handles a neutral `ChangeRef`; the Gerrit adapter resolves it using Gerrit APIs.
+If engine code imported Gerrit's `ChangeResource` directly, that boundary would be broken.
 
-1. `reviewai-contract` has zero dependencies, so it cannot leak Gerrit by construction.
-2. `reviewai-engine` depends on the contract, LangChain4j, and Spring — **never** `gerrit-plugin-api`.
-   That artifact is a 65 MB self-contained fat jar embedding Gerrit server classes, Guice, and Guava.
-3. `maven-enforcer-plugin` `bannedDependencies` in the engine pom banning `com.google.gerrit:*`
-   (and `com.google.guava:*`, `com.google.gson:*`, which the fat jar supplies).
-4. An ArchUnit rule asserting nothing under the engine package references `com.google.gerrit`. This is
-   the rule that actually catches regressions.
+Enforce the boundary in the separate engine repository at both levels:
 
-### 14.5 The Jackson relocation trap
+1. **Dependencies:** `reviewai-contract` has no third-party dependencies. `reviewai-engine` may depend
+   on the contract, LangChain4j, and Spring, but not `gerrit-plugin-api`. Add a
+   `maven-enforcer-plugin` `bannedDependencies` rule for `com.google.gerrit:*` so a direct or transitive
+   Gerrit artifact fails the build. The plugin API is a fat jar containing Gerrit server classes,
+   Guice, and Guava; it must not become the engine's source of dependencies.
+2. **Code references:** Add an ArchUnit rule that fails if a class under the engine package references
+   `com.google.gerrit`. This prevents someone from importing and using a Gerrit type as a convenience
+   while moving code from `aibackend/` or changing the engine later.
 
-The shade plugin relocates `com.fasterxml.jackson` to
-`com.googlesource.gerrit.plugins.aireview.jackson` (`pom.xml:238-241`) — note `aireview`, not
-`reviewai`; a pre-existing inconsistency worth fixing separately.
+The earlier draft also proposed banning Guava and Gson artifacts because it treated them as part of
+the fat-jar problem. That would also block legitimate standalone dependencies: existing `aibackend/`
+code imports both. Keep the Gerrit artifact out of the engine, but declare Guava and Gson independently
+if the extracted code needs them.
 
-The plugin's adapter-side wire types are not in the shade `artifactSet` allowlist, so they would keep
-literal `com.fasterxml.jackson.*` references while the plugin's own classes reference the relocated
-package. At runtime inside Gerrit, the unrelocated references resolve against **Gerrit's own Jackson**
-— a silent version-skew bug with no compile error.
+### 14.5 Jackson relocation and the wire contract
 
-Hence the hard rule: **zero Jackson *and* zero Gson annotations or types on either side of the
-contract.** Field names are the wire names; the engine configures `SNAKE_CASE`, the adapter configures
-`LOWER_CASE_WITH_UNDERSCORES`. No hand-written field mapping, and no annotation on either side.
+The plugin bundles Jackson and relocates `com.fasterxml.jackson` to
+`com.googlesource.gerrit.plugins.aireview.jackson` (`pom.xml:233,245-247`) so its packaged classes use
+a private Jackson namespace. The `aireview` prefix differs from `reviewai`; that naming inconsistency
+can be fixed separately.
 
-A consequence to budget for: the wire format is **not** byte-compatible with today's `concern_json`,
-which is acceptable because the engine gets fresh tables — the plugin's existing rows are read once,
-during bootstrap. Four or more existing test classes use Lombok setters on the concern models and will
-need mechanical rewriting. Wide but shallow.
+The shade `artifactSet` selects dependency JARs, while Maven Shade includes this plugin's own JAR
+automatically and rewrites references in its classes. Therefore an adapter-side wire type does not
+retain unrelocated Jackson references merely because it is absent from the `artifactSet` list. The
+earlier claim of an inevitable runtime version-skew bug from that list was incorrect
+([Maven Shade's artifact selection](https://maven.apache.org/plugins/maven-shade-plugin/xref/org/apache/maven/plugins/shade/mojo/ArtifactSelector.html)).
+
+Keep the contract types serializer-neutral anyway: **no Jackson or Gson annotations** or library-specific
+field types on either side. The engine configures `SNAKE_CASE`, the adapter configures
+`LOWER_CASE_WITH_UNDERSCORES`, and both validate the resulting JSON against the schema and conformance
+vectors (§14.2). This lets the two sides use different serializers without making either one's
+annotations part of the wire contract.
+
+The existing `concern_json` is a persisted plugin format, not the wire format. Bootstrap reads those
+legacy rows and constructs the neutral snapshot; byte-for-byte compatibility is not required. Tests
+that use Lombok setters on concern models will need updating when those models become records.
 
 ### 14.6 Credentials
 
@@ -921,9 +1026,13 @@ entirely**. It must be promoted to a runtime dependency before any Postgres-back
 `data/DbDialect.java:21` already anticipates this — its own documentation reads "H2 (default,
 single-node) and PostgreSQL (multi-site)".
 
-## 15. Migration sequence
+## 15. Implementation and rollout sequence
 
-Each step is independently landable and reversible. Steps 0–3 are valuable even if the split never
+The AI review logic already exists in this plugin under `aibackend/` and runs inside Gerrit today;
+that is the **in-process engine**. Steps 0–3 refactor this existing code without introducing a remote
+service. Step 4 builds the separate Spring Boot engine and connects the adapter to it. Step 5 enables
+remote mode for sites that choose it. The in-process engine remains supported throughout. Each step
+is independently landable and reversible, and Steps 0–3 are valuable even if the remote split never
 happens.
 
 **Step 0 — Make re-execution safe.** No new process, no behaviour change.
@@ -932,14 +1041,18 @@ happens.
   must release the lane so queued work proceeds (`listener/AiRequestCoordinator.java:291-301`).
 - Fix the `GitRepoFiles` mutable-instance-field race
   (`aibackend/common/client/api/git/GitRepoFiles.java:49-52`): `enabledFileExtensions`,
-  `disabledFileExtensions` and `fileSize` are shared across concurrently running agent stages.
+  `disabledFileExtensions` and `fileSize` are shared across. Multiple agent stages can call the same
+  instance concurrently even while the engine runs inside Gerrit. If one stage selects `.java` files
+  and another selects `.py` files, mutable instance fields could let one stage use the other's filters;
+  a shared `fileSize` could similarly apply the wrong size to a file. Per-call values keep their
+  results separate.
 - De-static `AiModelRequestLimiter.REQUEST_GATE` behind an injected gate
   (`aibackend/langchain/client/api/AiModelRequestLimiter.java:26,30`).
 - Split intake, worker, and lease pools.
 
 *Proves it worked:* a fault-injection test fails a review after the model call and re-runs it,
 asserting exactly one set of comments. A concurrency test asserts no cross-contamination of
-file-extension filters — it fails on today's code.
+file-extension filters between simultaneous calls with different configurations.
 
 **Step 1 — Extract the contract and the code-context port.** Move the concern and feedback models to
 annotation-free records. Define `CodeContextPort` and implement it in the plugin over `GitRepoFiles`.
@@ -958,20 +1071,33 @@ lease and cancel semantics are now exercised through the new interface while sti
 *Proves it worked:* a second service instance over the same database; a job survives a simulated
 restart.
 
-**Step 4 — Add the remote transport; publish the wire format.** The adapter gains an engine-transport
-selection (§4.1): in-process remains the default, and remote is opt-in per site. Concurrently, the
-proprietary repository stands up the Spring Boot service against its own implementation of the format,
-and the JSON Schema and conformance vectors land here (§14.2) so both sides are held to one
-specification.
-*Proves it worked:* (a) `SIGKILL` the remote engine mid-review → the review retries and completes,
-comments appear exactly once; (b) `SIGKILL` the adapter mid-review → the engine finishes and
-`EngineJobPoller` publishes on restart, exactly once; (c) all six sidebar endpoints keep working with
-the remote engine down; (d) the bootstrap drill from §13; (e) both sides pass the conformance vectors,
-and the schema validates payloads produced by each.
+**Step 4 — Implement remote mode and publish the wire format.** This step spans both
+repositories; it does not replace the plugin's in-process engine:
+
+- **In this repository:** add a configurable remote client that submits `ReviewRequest` jobs, checks
+  their status and results, handles cancellation, and publishes completed findings in Gerrit. Expose
+  the authenticated code-context callback that the remote engine uses during a review (§12). The
+  in-process path remains the default (§4.1).
+- **In `reviewai-backend`:** build the separate Spring Boot service with its own job API, workers, and
+  PostgreSQL state. It runs the review workflow using its own types for the neutral JSON contract;
+  it does not depend on the plugin's Java classes (§14.1).
+- **Shared specification:** publish the JSON Schema and conformance vectors in this repository.
+  Both repositories validate and test their own implementations against them (§14.2). No shared Java
+  artifact is introduced.
+
+*Proves it worked:*
+
+- Kill the remote engine mid-review: the job retries, completes, and publishes one set of comments.
+- Kill the adapter mid-review: the engine finishes, then `EngineJobPoller` publishes the result once
+  after the adapter restarts.
+- With the remote engine down, the six existing sidebar endpoints still work.
+- The first remote review of a change passes the bootstrap drill in §13.
+- Both sides pass the conformance vectors, and their payloads validate against the schema.
 
 **Step 5 — Enable remote mode site by site.** Flip sites one at a time, each with its own bootstrap
-migration (§13.1) and rollback window (§13.3). The in-process path is retained, so rollback is a
-configuration change rather than a code change. Engine-side retention and metrics follow §16.
+migration (§13.1) and rollback window (§13.3). The in-process path is retained, so rollback uses the
+existing code after state is copied back; switching configuration alone is insufficient (§13.3).
+Engine-side retention and metrics follow §16.
 
 > **Changed from the prior proposal.** The prior migration plan treated the in-process contract
 > as an intermediate step before service extraction, although it did not explicitly require its
@@ -1003,12 +1129,20 @@ Risks introduced or made material by the revised design:
   but only if Step 0 lands first.
 - **Two queues in series** add latency and a second place for work to stall. The `EngineJobPoller`
   makes a stalled handoff recoverable rather than lost.
-- **`aiMaxConcurrentRequests` silently multiplies by N.** It is a JVM-static semaphore
-  (`aibackend/langchain/client/api/AiModelRequestLimiter.java:26`), so N replicas mean N× the load
-  against a metered quota. Split the knob, or document the multiplication if the global gate is
-  deferred.
+- **`aiMaxConcurrentRequests` applies separately to each replica.** The current limit is held in a
+  JVM-static `RequestGate` (`aibackend/langchain/client/api/AiModelRequestLimiter.java:30`), which
+  replicas do not share. For example, a limit of 4 with 3 remote engine replicas allows up to 4
+  simultaneous model calls on each replica, or 12 across the deployment. Thus N replicas can put
+  up to N times the configured concurrent load against a metered provider quota. If the intended
+  limit is 4 calls across the whole deployment, the remote engine needs a gate shared across replicas.
+  Otherwise, document and configure the limit as per-replica; question 4 in §17 leaves that choice open.
 - **Comment-quality risk** from moving rendering to the adapter (§6.3). Measure, do not assume.
-- **Tool-RPC amplification** (§12.3) — a new denial-of-service surface with no in-process equivalent.
+- **Tool-RPC amplification** (§12.3). A single remote review can run multiple agents, each making
+  code-context calls over several tool rounds. Calls from concurrent reviews and engine replicas can
+  then pile up at the adapter, where each may trigger repository work in Gerrit. Without a separate
+  bound on these callbacks, they could exhaust adapter threads or slow the host. The in-process agent
+  executor previously bounded this work locally; remote mode needs the bounded executor and
+  per-change cap in §12.3, with excess calls returning `CONTEXT NOT PROVIDED`.
 - **Config is no longer centrally validated**, since the adapter resolves it.
 - **`AiReviewThreads` reads the concern ledger directly** (`web/AiReviewThreads.java:136,288`); once
   the engine owns the ledger, that sidebar endpoint needs a read-through or it renders stale data.
@@ -1025,16 +1159,22 @@ Still open:
    (`data/ReviewAiDb.java:263-271`) is a Gerrit comment id in a table the engine would own, and the
    same applies to the three comment-id sets the engine currently reads off `ChangeSetData` —
    `pendingReviewFeedbackCommentIds`, `reviewFeedbackDismissalAuthorizedCommentIds`, and
-   `reviewFeedbackControlAuthorizedCommentIds` (`ChangeSetData.java:63-65`). Decision 6 covers the
-   *concern* map but not these. Either extend the adapter-owned mapping to feedback handles, or keep
-   feedback classification adapter-side. **This is decision-6-sized and should be settled before
-   Step 4.**
+   `reviewFeedbackControlAuthorizedCommentIds` (`ChangeSetData.java:63-65`). The adapter-owned
+   concern-to-host-comment map (§8) does not cover these feedback handles. Either extend the
+   adapter-owned mapping to feedback handles, or keep feedback classification adapter-side. **Settle
+   this ownership question before Step 4.**
 2. **Where per-project LLM credentials live** post-split, given `credentialRef` (§14.6). Requires an
    operator-facing decision about who holds secrets.
 3. **Is shared PostgreSQL a hard requirement** for the adapter's queue, and if so is H2 support
    dropped from the plugin entirely?
 4. **`aiMaxConcurrentRequests`**: per-replica, or a globally enforced gate?
-5. **Does a `context.fetchPatch()` fallback land in v1**, or is a request-size limit sufficient?
+5. **How should v1 handle large patches?** `ReviewRequest.target.patch` (§5.2) currently carries
+   the entire diff, so `POST /v1/reviews` can become very large. One option is to cap the request
+   size and return a clear error for reviews above the cap; those reviews could not run remotely.
+   The other is to add `context.fetchPatch()` to the adapter callback API (§12), so the engine can
+   fetch an oversized patch separately. That would require changing the request contract to allow
+   the patch to be omitted and defining limits and timeouts for the fetch. Does v1 need this fallback,
+   or is the simpler request-size limit sufficient?
 6. **Metric-name continuity** (§16).
 7. **SSE termination and `Last-Event-ID` semantics** across replica restarts.
 8. **Does the engine's schema need a downgrade path**, or is the §13.3 export sufficient?
