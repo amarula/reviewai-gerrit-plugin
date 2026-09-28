@@ -1,7 +1,7 @@
 {
   "currency": "USD",
   "unit": "perMillionTokens",
-  "verifiedOn": "2026-09-08",
+  "verifiedOn": "2026-09-28",
   "sources": {
     "OpenAI": "https://developers.openai.com/api/docs/pricing",
     "Gemini": "https://ai.google.dev/gemini-api/docs/pricing",
@@ -21,6 +21,32 @@
       "longCachedInput": 2,
       "longCacheWrite": 25,
       "longOutput": 75
+    },
+    {
+      "provider": "OpenAI",
+      "model": "gpt-6-sol",
+      "input": 2,
+      "cachedInput": 0.2,
+      "cacheWrite": 2.5,
+      "output": 10,
+      "longThreshold": 272000,
+      "longInput": 4,
+      "longCachedInput": 0.4,
+      "longCacheWrite": 5,
+      "longOutput": 15
+    },
+    {
+      "provider": "OpenAI",
+      "model": "gpt-6-luna",
+      "input": 0.1,
+      "cachedInput": 0.01,
+      "cacheWrite": 0.125,
+      "output": 0.5,
+      "longThreshold": 272000,
+      "longInput": 0.2,
+      "longCachedInput": 0.02,
+      "longCacheWrite": 0.25,
+      "longOutput": 0.75
     },
     {
       "provider": "OpenAI",
