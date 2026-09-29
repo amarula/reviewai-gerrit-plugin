@@ -21,33 +21,33 @@
 > in-process engine**. The split is therefore **optional** — a site may run the engine in-process as it
 > does today, or point the adapter at a remote engine. Nothing is shared as a Java artifact: the two
 > sides agree on the wire format, which this repository publishes as a JSON Schema with conformance
-> vectors. §14.1 and §14.2 record that.
+> vectors. [§14.1](#141-two-repositories-and-what-actually-crosses-between-them) and [§14.2](#142-how-two-independently-written-sides-stay-in-agreement) record that.
 
 ## Glossary
 
 | Term | Meaning in this proposal |
 |---|---|
-| **Host installation** | One independently operated Gerrit site, GitHub org, or GitLab group using ReviewAI. This is the isolation boundary (§4.1). |
-| **Adapter** | The host-specific integration for an installation: the ReviewAI plugin in Gerrit. It accepts host events, supplies code context, and publishes results. Several running copies may serve one installation (§4.1). |
-| **Engine** | The product-neutral review workflow: agents, prompts, model calls, and concern handling. It runs inside the host in in-process mode or as a separate service in remote mode (§4.1). |
-| **Engine deployment** | The remote engine service assigned to one host installation, including its shared review-state database. It may run multiple replicas (§4.1). |
-| **Replica** | One running copy of an engine deployment. Replicas share its job store and can serve or claim work independently (§7.3). |
-| **Multi-tenancy** | One engine deployment serving several unrelated host installations while isolating their jobs and state within that service. It is out of scope here (§2). |
-| **In-process mode** | The engine runs in the host process and uses the plugin's existing state store (§4.1). |
-| **Remote mode** | The adapter submits reviews to a separate engine deployment, which owns its review state (§4.1, §9). |
-| **Contract / wire format** | The JSON request, result, and callback formats agreed by adapter and remote engine; the two repositories do not share Java classes (§5, §14.1). |
-| **Review job** | A durable unit of review work admitted by the remote engine. Its lifecycle state is separate from a concern's status (§7.1–7.2). |
-| **Lane** | The per-change scheduling boundary that prevents two reviews of the same change from updating state at once (§7.3). |
-| **Lease** | A time-limited worker claim on a job; expiry lets recovery handle a stalled worker (§7.3). |
-| **Concern** | A code-review issue tracked across reviews. Its `ConcernStatus` is separate from a review job's state (§7.2). |
-| **Concern ledger** | The stored history of concerns for a change; its owner depends on the deployment mode (§9). |
-| **Finding** | An item in `ReviewResult` that the adapter can render and publish as a host comment, possibly linked to a concern (§5.3, §6.3). |
-| **Publication** | The adapter's act of posting findings, messages, or votes to the host; it must be idempotent across review retries (§8, §11). |
-| **Concern-to-host-comment map** | The adapter-owned mapping from a concern id to its published host comment id, used to keep later updates on the right thread (§8). |
-| **Tool-RPC** | Authenticated remote procedure calls from the engine to the adapter for on-demand code context during a review (§12). |
-| **SSE** | Server-Sent Events: the engine's HTTP progress stream to the adapter, backed by stored event rows (§7.4). |
-| **Bootstrap / `StateBootstrap`** | The one-time initialization of a change's engine state from legacy adapter state, and the snapshot used for that transfer (§13.1). |
-| **Rollback** | Returning a site from remote to in-process mode after copying newer engine state back to the adapter (§13.3). |
+| **Host installation** | One independently operated Gerrit site, GitHub org, or GitLab group using ReviewAI. This is the isolation boundary ([§4.1](#41-topology)). |
+| **Adapter** | The host-specific integration for an installation: the ReviewAI plugin in Gerrit. It accepts host events, supplies code context, and publishes results. Several running copies may serve one installation ([§4.1](#41-topology)). |
+| **Engine** | The product-neutral review workflow: agents, prompts, model calls, and concern handling. It runs inside the host in in-process mode or as a separate service in remote mode ([§4.1](#41-topology)). |
+| **Engine deployment** | The remote engine service assigned to one host installation, including its shared review-state database. It may run multiple replicas ([§4.1](#41-topology)). |
+| **Replica** | One running copy of an engine deployment. Replicas share its job store and can serve or claim work independently ([§7.3](#73-replica-coordination)). |
+| **Multi-tenancy** | One engine deployment serving several unrelated host installations while isolating their jobs and state within that service. It is out of scope here ([§2](#2-goals-and-non-goals)). |
+| **In-process mode** | The engine runs in the host process and uses the plugin's existing state store ([§4.1](#41-topology)). |
+| **Remote mode** | The adapter submits reviews to a separate engine deployment, which owns its review state ([§4.1](#41-topology), [§9](#9-ownership-matrix)). |
+| **Contract / wire format** | The JSON request, result, and callback formats agreed by adapter and remote engine; the two repositories do not share Java classes ([§5](#5-the-contract), [§14.1](#141-two-repositories-and-what-actually-crosses-between-them)). |
+| **Review job** | A durable unit of review work admitted by the remote engine. Its lifecycle state is separate from a concern's status ([§7.1](#71-job-api)–[§7.2](#72-job-state-machine)). |
+| **Lane** | The per-change scheduling boundary that prevents two reviews of the same change from updating state at once ([§7.3](#73-replica-coordination)). |
+| **Lease** | A time-limited worker claim on a job; expiry lets recovery handle a stalled worker ([§7.3](#73-replica-coordination)). |
+| **Concern** | A code-review issue tracked across reviews. Its `ConcernStatus` is separate from a review job's state ([§7.2](#72-job-state-machine)). |
+| **Concern ledger** | The stored history of concerns for a change; its owner depends on the deployment mode ([§9](#9-ownership-matrix)). |
+| **Finding** | An item in `ReviewResult` that the adapter can render and publish as a host comment, possibly linked to a concern ([§5.3](#53-response), [§6.3](#63-comment-rendering-moves-to-the-adapter)). |
+| **Publication** | The adapter's act of posting findings, messages, or votes to the host; it must be idempotent across review retries ([§8](#8-idempotency-and-the-at-least-once-contract), [§11](#11-publication-is-a-pull)). |
+| **Concern-to-host-comment map** | The adapter-owned mapping from a concern id to its published host comment id, used to keep later updates on the right thread ([§8](#8-idempotency-and-the-at-least-once-contract)). |
+| **Tool-RPC** | Authenticated remote procedure calls from the engine to the adapter for on-demand code context during a review ([§12](#12-code-context-the-tool-rpc-contract)). |
+| **SSE** | Server-Sent Events: the engine's HTTP progress stream to the adapter, backed by stored event rows ([§7.4](#74-progress-delivery)). |
+| **Bootstrap / `StateBootstrap`** | The one-time initialization of a change's engine state from legacy adapter state, and the snapshot used for that transfer ([§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact)). |
+| **Rollback** | Returning a site from remote to in-process mode after copying newer engine state back to the adapter ([§13.3](#133-rollback)). |
 
 ## 1. Context and motivation
 
@@ -81,17 +81,17 @@ follow from the same boundary.
 - Allow the engine to be reused by other products via new adapters.
 - **Keep this repository self-contained.** The plugin must remain buildable, releasable, and fully
   functional from public sources alone, with the in-process engine as a supported mode. The remote
-  engine is additive, never a build requirement of the open plugin (§14.1).
+  engine is additive, never a build requirement of the open plugin ([§14.1](#141-two-repositories-and-what-actually-crosses-between-them)).
 - Land the change incrementally, without a big-bang rewrite.
 
 ### Non-goals
 
-- No change to the browser sidebar UX. The sidebar's polling contract is preserved (see §12.4).
+- No change to the browser sidebar UX. The sidebar's polling contract is preserved (see [§12.4](#124-degradation-must-be-observable)).
 - No change to the *concern workflow* semantics (concerns, voting, feedback memory).
-  **Deliberate exception:** host comment *rendering* moves to the adapter (§6.3). This changes how the
+  **Deliberate exception:** host comment *rendering* moves to the adapter ([§6.3](#63-comment-rendering-moves-to-the-adapter)). This changes how the
   final comment text is composed and is expected to carry a comment-quality risk until measured.
 - **No multi-tenancy across host installations.** In remote mode, each installation gets its own engine
-  deployment and review state (§4.1). Multiple replicas of that deployment still serve the same
+  deployment and review state ([§4.1](#41-topology)). Multiple replicas of that deployment still serve the same
   installation.
 
 > **Changed from the prior proposal.** It listed "Not (yet) a multi-tenant or high-throughput
@@ -100,9 +100,9 @@ follow from the same boundary.
 > engine deployment.
 >
 > The prior proposal also listed "No re-platforming of persistence or config in the first iteration".
-> That no longer applies: persistence moves to the engine's own database (§13), and configuration is
+> That no longer applies: persistence moves to the engine's own database ([§13](#13-state-migration)), and configuration is
 > split between
-> adapter-resolved and engine-owned (§5.4).
+> adapter-resolved and engine-owned ([§5.4](#54-config-resolved-by-the-adapter-shipped-flat)).
 
 ## 3. Current architecture and coupling points
 
@@ -150,7 +150,7 @@ account for the following additional couplings and consequences:
    `ReviewConcern.previousCommentId` is serialized inside `concern_json` under the Gson names
    `past_comment_id` / `previous_comment_id`
    (`aibackend/common/model/review/ReviewConcern.java:55-56`). Existing values may identify either
-   a Gerrit comment or a prior concern, as explained in §5.1. Renaming or redefining the field is
+   a Gerrit comment or a prior concern, as explained in [§5.1](#51-what-the-contract-must-carry-and-why-changeref-is-not-what-youd-guess). Renaming or redefining the field is
    therefore not cosmetic and requires a migration strategy.
 9. **Feedback comment state stores Gerrit comment ids.**
    `review_feedback_comments.comment_id` (`data/ReviewAiDb.java:263-271`) is a Gerrit comment id in a
@@ -167,16 +167,16 @@ keeps the open plugin self-contained while allowing a scaled deployment.
 
 For Gerrit, the adapter is the ReviewAI plugin running on the site's Gerrit nodes. Several nodes may
 run copies of the plugin, but they belong to the same installation and must share the adapter's intake
-queue in remote mode (§8). That adapter submits reviews to its installation's engine deployment, which
+queue in remote mode ([§8](#8-idempotency-and-the-at-least-once-contract)). That adapter submits reviews to its installation's engine deployment, which
 may itself have multiple replicas.
 
 | Mode | Engine | Review state lives in | Available to |
 |---|---|---|---|
 | **In-process** (default) | `aibackend/`, in the host JVM — today's behaviour | The plugin's own database | Anyone building this repository |
-| **Remote** | The Spring Boot service, N replicas over one PostgreSQL | The engine's database (§9) | Deployments that want independent scaling |
+| **Remote** | The Spring Boot service, N replicas over one PostgreSQL | The engine's database ([§9](#9-ownership-matrix)) | Deployments that want independent scaling |
 
 The diagram below shows **remote mode**. In-process mode is the current architecture with the
-`ReviewEngine` contract introduced as an internal seam (migration Steps 1–3, §15).
+`ReviewEngine` contract introduced as an internal seam (migration Steps 1–3, [§15](#15-implementation-and-rollout-sequence)).
 
 ```mermaid
 ---
@@ -249,11 +249,11 @@ Key properties:
   report a result.
 - **Two durable queues are in series.** The adapter intake queue absorbs host events before the
   network call, so an engine outage does not lose work. The engine job store then coordinates
-  execution across replicas (§8).
+  execution across replicas ([§8](#8-idempotency-and-the-at-least-once-contract)).
 
 > **Changed from the prior proposal.** It stated: *"The engine is stateless. The adapter owns the
 > concern ledger, feedback memory, and conversation id, and passes them per request."* This is now
-> **reversed** — the engine owns them (§9). The reason is not preference: two writers to one ledger
+> **reversed** — the engine owns them ([§9](#9-ownership-matrix)). The reason is not preference: two writers to one ledger
 > reintroduce exactly the split-brain the concern ledger exists to prevent, and a stale request could
 > overwrite newer engine state.
 
@@ -273,8 +273,8 @@ The engine never learns which host it is serving. That is the test of whether th
 ## 5. The contract
 
 The contract is the **wire format**, not a shared Java artifact: two independently-written types, one
-per side, agreeing on JSON (§14.1). It names no host product, and — for a non-obvious reason — the
-types on both sides carry no Jackson or Gson annotations (§14.5).
+per side, agreeing on JSON ([§14.1](#141-two-repositories-and-what-actually-crosses-between-them)). It names no host product, and — for a non-obvious reason — the
+types on both sides carry no Jackson or Gson annotations ([§14.5](#145-jackson-relocation-and-the-wire-contract)).
 
 ### 5.1 What the contract must carry, and why `ChangeRef` is not what you'd guess
 
@@ -320,7 +320,7 @@ the only required change. That is incomplete because:
 
 Resolution: the historical correlation reference leaves the engine's **persisted** state, but still
 flows **through** the engine on each request because the schemas require it and changing them would
-change concern-workflow behaviour. Here the "no semantic change" non-goal holds — unlike §6.3, where
+change concern-workflow behaviour. Here the "no semantic change" non-goal holds — unlike [§6.3](#63-comment-rendering-moves-to-the-adapter), where
 it is deliberately relaxed. The adapter supplies `priorPublications` and owns the mapping; the engine
 returns `concernId`s.
 
@@ -337,7 +337,7 @@ public record ReviewRequest(
     ReviewTarget target,
     ReviewIntent intent,
     ResolvedConfig config,
-    StateBootstrap bootstrap,   // nullable; migration only (§13)
+    StateBootstrap bootstrap,   // nullable; migration only
     Instant requestedAt,
     String traceId) {}
 
@@ -347,7 +347,7 @@ public record ReviewTarget(
     String commitMessage,            // nullable; adapter resolves any host pseudo-file into this
     List<String> commitMessageLines) {}
 
-public record StateBootstrap(        // nullable; present only while migrating a change (§13)
+public record StateBootstrap(        // nullable; one-time migration snapshot
     LedgerSnapshot priorConcerns,
     FeedbackSnapshot feedback,
     String incrementalPatch,
@@ -365,10 +365,12 @@ public record ReviewIntent(
     AgentSpecialization agent,          // SINGLE_AGENT | SCOPED_AGENTS | SPECIALIZED_AGENTS
     SpecializedAgent specializedAgent,  // nullable
     String conversationSuffix,          // nullable; feeds the memory scope
-    ScoreRange permittedScoreRange,     // NEUTRAL form of the host's voting model (§6.2)
+    ScoreRange permittedScoreRange,     // NEUTRAL form of the host's voting model
     Map<String, ConditionLabel> conditionLabels,
     List<String> dataPrompt) {}
 ```
+
+`permittedScoreRange` uses the neutral score semantics described in [§6.2](#62-score-semantics).
 
 **`priorConcerns` and `feedback` are absent from normal steady-state requests.** Once a change is in
 remote mode, the engine reads that history from its own store and is its only writer. Sending a copy with
@@ -378,8 +380,8 @@ For example, it could supply a concern as `PRESENT` after a newer review marked 
 The one-time exception is migration: before the first remote review of a change, the engine needs a
 verified `StateBootstrap` snapshot of its legacy history. An empty snapshot is valid only after the
 adapter confirms there is no prior state; if the old state cannot be read, the job must fail and retry
-instead of starting with an empty history (§13.1–13.2). The record above shows `StateBootstrap` as an
-optional request field, while §13.1 describes fetching it through a callback. Those two descriptions
+instead of starting with an empty history ([§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact)–[§13.2](#132-distinguish-missing-history-from-unreadable-history)). The record above shows `StateBootstrap` as an
+optional request field, while [§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact) describes fetching it through a callback. Those two descriptions
 need one agreed transport before implementation.
 
 > **Changed from the prior proposal.** Its `ReviewContext` carried `priorConcerns`, `feedback`, and
@@ -402,11 +404,11 @@ public record ReviewResult(
     String failureReason) {}         // nullable
 
 public record Finding(
-    String findingKey,   // deterministic identity — see §8; load-bearing, not opaque
+    String findingKey,   // deterministic identity; load-bearing, not opaque
     String filename,
     Integer lineNumber,
     String codeSnippet,
-    String message,      // prose; contains no host syntax (§6.3)
+    String message,      // prose; contains no host syntax
     String suggestion,   // nullable; structured replacement text, rendered by the adapter
     String concernId,    // the adapter maps this to a host thread
     Double score, Double relevance,
@@ -415,9 +417,11 @@ public record Finding(
 ```
 
 `ReviewResult.updatedConcerns` is **removed** — the engine already persisted them. `Finding.id` becomes
-`findingKey` and is now a deterministic content hash rather than an opaque id; §8 explains why that is
+`findingKey` and is now a deterministic content hash rather than an opaque id; [§8](#8-idempotency-and-the-at-least-once-contract) explains why that is
 required rather than merely convenient. `ReviewResult.state` describes the terminal review outcome,
-not every internal job state; §7.2 defines the mapping for an expired worker lease.
+not every internal job state; [§7.2](#72-job-state-machine) defines the mapping for an expired worker lease.
+The adapter renders `Finding.message` and `Finding.suggestion` as described in
+[§6.3](#63-comment-rendering-moves-to-the-adapter).
 
 ### 5.4 Config: resolved by the adapter, shipped flat
 
@@ -447,10 +451,12 @@ public record ResolvedConfig(
     CodeContextPolicy codeContextPolicy,
     List<String> enabledFileExtensions, List<String> disabledFileExtensions,
     List<PricingEntry> pricing,      // resolved effective list; engine computes cost
-    String credentialRef,            // OPAQUE. Never a token — see §14.6.
+    String credentialRef,            // OPAQUE. Never a token.
     List<AiModelRoute> modelRoutes,
     Map<String, String> hints) {}    // forward-compat escape hatch; unknown keys ignored
 ```
+
+`credentialRef` is opaque so the request never contains a token; see [§14.6](#146-credentials).
 
 Two config planes, stated explicitly:
 
@@ -470,10 +476,10 @@ rather than a startup error. The adapter already has `unknownEnumSettings`
 Neutral names on the wire are not enough. Three things make the sameness real, and the first was a
 defect in the design review's own proposal:
 
-1. **The state key** — `ChangeRef` must be a neutral core plus opaque locator (§5.1), not Gerrit's
+1. **The state key** — `ChangeRef` must be a neutral core plus opaque locator ([§5.1](#51-what-the-contract-must-carry-and-why-changeref-is-not-what-youd-guess)), not Gerrit's
    project/branch/patch-set vocabulary.
-2. **Score semantics** — see §6.2.
-3. **Comment syntax** — see §6.3.
+2. **Score semantics** — see [§6.2](#62-score-semantics).
+3. **Comment syntax** — see [§6.3](#63-comment-rendering-moves-to-the-adapter).
 
 ### 6.2 Score semantics
 
@@ -505,7 +511,7 @@ Consequences to be honest about:
 
 - **The model no longer composes the complete published comment.** The adapter now assembles the
   model's explanation, optional replacement text, and host formatting. This is the deliberate
-  exception to the concern-workflow non-goal (§2): the final comment's wording or presentation may
+  exception to the concern-workflow non-goal ([§2](#2-goals-and-non-goals)): the final comment's wording or presentation may
   differ even when the finding is the same. Compare rendered comments with current output to measure
   the quality risk, and revisit the decision if there is a real regression.
 - **Prompt neutralisation becomes a required workstream, not a tidy-up.** There are 17 `Gerrit`
@@ -525,8 +531,8 @@ Consequences to be honest about:
 |---|---|---|
 | `POST` | `/v1/reviews` | Validate, admit, return `202 {jobId, state: QUEUED}`. **On an existing idempotency key, return `200` with the existing job — never 409.** |
 | `GET` | `/v1/reviews/{jobId}` | Current state and, when terminal, the `ReviewResult`. |
-| `GET` | `/v1/reviews/{jobId}/events` | SSE progress stream (§7.4). |
-| `POST` | `/v1/reviews/{jobId}/cancel` | Cooperative cancellation (§10). |
+| `GET` | `/v1/reviews/{jobId}/events` | SSE progress stream ([§7.4](#74-progress-delivery)). |
+| `POST` | `/v1/reviews/{jobId}/cancel` | Cooperative cancellation ([§10](#10-cancellation-across-the-boundary)). |
 | `GET` | `/v1/meta` | Supported contract versions, for adapter startup checks. |
 
 `POST` must return `200` rather than `409` on a duplicate key because the adapter cannot distinguish
@@ -554,13 +560,13 @@ design, but its job states are not a verbatim copy of the adapter's enum.
 
 The engine job's `isTerminal()` covers `COMPLETED`, `FAILED`, `SUPERSEDED`, `ABANDONED`, and
 `CANCELLED`. `GET /v1/reviews/{jobId}` exposes the job state; its terminal `ReviewResult.state` uses
-the narrower outcome list in §5.3 (`ABANDONED` maps to `FAILED`). A duplicate idempotency key still
-returns the existing job as described in §7.1; it is not an admission rejection.
+the narrower outcome list in [§5.3](#53-response) (`ABANDONED` maps to `FAILED`). A duplicate idempotency key still
+returns the existing job as described in [§7.1](#71-job-api); it is not an admission rejection.
 
 ### 7.3 Replica coordination
 
 The proposed remote topology puts N engine replicas behind a load balancer over one shared PostgreSQL
-(§2, §4.1). The adapter sends job API calls to that deployment; the load balancer selects the replica
+([§2](#2-goals-and-non-goals), [§4.1](#41-topology)). The adapter sends job API calls to that deployment; the load balancer selects the replica
 that handles each HTTP call. Its routing policy, including whether it considers workload, is not
 specified here. HTTP routing is separate from job assignment: the receiving replica persists the job,
 then a worker on any replica may claim it from the shared store.
@@ -573,7 +579,7 @@ replica, since both read the shared job store. This illustrates the proposed des
 engine implementation.
 
 The adapter already uses a lane, claim, and lease design to coordinate its own request workers. The
-engine would implement that *design* in its own job tables, not share the adapter's tables (§14.7):
+engine would implement that *design* in its own job tables, not share the adapter's tables ([§14.7](#147-reuse-the-design-not-the-tables)):
 
 - `data/AiRequestStore.claimNext` (`data/AiRequestStore.java:75-136`) locks the lane, then flips
   `QUEUED → RUNNING` with owner and lease and sets the lane's active request **in one transaction**,
@@ -585,7 +591,7 @@ engine would implement that *design* in its own job tables, not share the adapte
   unchanged.
 
 The engine must also split its pools: intake, worker, and lease/recovery must not share a bounded pool,
-or a long review can block event intake. This applies to the adapter as well (§15, Step 0).
+or a long review can block event intake. This applies to the adapter as well ([§15](#15-implementation-and-rollout-sequence), Step 0).
 
 ### 7.4 Progress delivery
 
@@ -600,7 +606,7 @@ The adapter receives event 7, then its SSE connection drops while event 8 is sto
 the adapter sends `Last-Event-ID: 7`; the SSE handler reads rows with `seq > 7` and sends event 8.
 It then polls for new rows to keep the stream current. The dropped connection did not lose the event,
 and `GET /v1/reviews/42` can still report the job's current state. Exact stream termination and
-replica-restart edge cases remain open in §17.7.
+replica-restart edge cases remain open in question 7 of [§17](#17-open-questions).
 
 No broker is required. Postgres `LISTEN/NOTIFY` is an optional latency optimisation only, and should be
 treated as such: it is fire-and-forget, non-durable, needs a dedicated non-pooled connection, and has a
@@ -620,7 +626,7 @@ then: stop claiming, stop renewing leases, and let in-flight jobs either finish 
 or be reclaimed by another replica's recovery pass.
 
 A mid-LLM-call worker cannot be interrupted, so reclaiming a job **re-runs the review from scratch**.
-That is only safe because publication is idempotent (§8) — an ordering constraint, not a nicety. On
+That is only safe because publication is idempotent ([§8](#8-idempotency-and-the-at-least-once-contract)) — an ordering constraint, not a nicety. On
 `SIGTERM` the engine must also abort in-flight tool-RPCs so the adapter's bounded tool executor is not
 left holding requests whose caller is gone.
 
@@ -646,7 +652,7 @@ The mechanism:
 - The adapter stores the **concern-to-host-comment map** in
   `concern_comment_ids(change_id, concern_id, comment_id)`. It uses the map to attach later findings
   for the same concern to the existing host thread. The map replaces `previousCommentId` currently
-  written into the engine's ledger (`data/ReviewConcernPublisher.java:70-83`; see also §5.1).
+  written into the engine's ledger (`data/ReviewConcernPublisher.java:70-83`; see also [§5.1](#51-what-the-contract-must-carry-and-why-changeref-is-not-what-youd-guess)).
 
 ### Boundary idempotency key
 
@@ -685,7 +691,7 @@ be a startup check: refuse to enable the engine handoff when the dialect is H2.
 
 ## 9. Ownership matrix
 
-Ownership is **mode-dependent**, which matters because in-process mode (§4.1) is still supported:
+Ownership is **mode-dependent**, which matters because in-process mode ([§4.1](#41-topology)) is still supported:
 
 - **In-process mode** — adapter and engine are one process over one database. The matrix below
   collapses: everything is owned where it is owned today, and nothing in this section applies.
@@ -699,7 +705,7 @@ Ownership is **mode-dependent**, which matters because in-process mode (§4.1) i
 | Feedback memory | Engine | Engine | Engine, on adapter request |
 | Chat memory, conversation id | Engine | Engine | Engine |
 | Concern → thread id map | Adapter | Adapter | Adapter |
-| Feedback comment handles | **Undecided** — see §17.1 | | |
+| Feedback comment handles | **Undecided** — see question 1 in [§17](#17-open-questions) | | |
 | Sidebar conversation history | Adapter | Adapter | Adapter (unchanged) |
 
 Two rules follow:
@@ -717,8 +723,8 @@ Two rules follow:
    still finish an in-flight call.
 
 A consequence worth stating plainly: because both modes exist, a site that runs in-process pays none of
-the migration cost in §13, and a site that switches to remote mode pays it once, per change, on first
-contact. The two modes do not share review state — see §13.4.
+the migration cost in [§13](#13-state-migration), and a site that switches to remote mode pays it once, per change, on first
+contact. The two modes do not share review state — see [§13.4](#134-the-two-modes-do-not-share-review-state).
 
 ## 10. Cancellation across the boundary
 
@@ -753,9 +759,9 @@ Reasons, in order of weight:
    `GerritCommentRange` to map replies onto existing threads
    (`review/PatchSetReviewer.java:128-129, 236-237`). Moving that would mean moving Gerrit back into
    the engine.
-2. The adapter owns the concern-to-host-comment map (§5.1, §8), so it must also own publication.
+2. The adapter owns the concern-to-host-comment map ([§5.1](#51-what-the-contract-must-carry-and-why-changeref-is-not-what-youd-guess), [§8](#8-idempotency-and-the-at-least-once-contract)), so it must also own publication.
 3. A push would add a second callback surface with *write* privileges, widening the tool-RPC auth
-   problem (§12.2) for no gain.
+   problem ([§12.2](#122-authentication)) for no gain.
 
 A new adapter component, `EngineJobPoller`, reuses the existing recovery cadence
 (`AiRequestCoordinator`, `recoveryIntervalMillis` default 60 s) to pick up engine-terminal jobs whose
@@ -812,7 +818,7 @@ conversation ids (in plugin data). All are keyed by `change_id` today
 ### 13.1 Strategy: lazy per-change bootstrap, engine-authoritative from first contact
 
 Here **bootstrap** means initializing the engine's state for one change from the adapter's legacy
-state before that change's first remote review. `StateBootstrap` (§5.2) is the snapshot used for this
+state before that change's first remote review. `StateBootstrap` ([§5.2](#52-request)) is the snapshot used for this
 one-time transfer. A successful snapshot may contain no prior concerns; that is different from being
 unable to obtain or save a reliable snapshot.
 
@@ -824,7 +830,7 @@ Instead:
 2. **No dual-write window for migrated review state.** When a site switches to remote mode, the
    adapter's intake lane must finish any in-process job for a change before dispatching its first
    remote job. The adapter then freezes its legacy concern, feedback, and chat-memory state, keeping
-   that copy for bootstrap and rollback (§13.3). The engine reads the snapshot from the adapter,
+   that copy for bootstrap and rollback ([§13.3](#133-rollback)). The engine reads the snapshot from the adapter,
    saves it inside the claimed job, and alone updates that review state thereafter. For example,
    suppose concern C is `PRESENT` in the adapter's ledger when the engine copies it. If an old
    in-process job later marks C `FIXED` in that ledger, the engine keeps its stale `PRESENT` copy:
@@ -853,7 +859,7 @@ For example, suppose change 42 has stored concern C, but the migration reader ca
 ledger version. If bootstrap treats the empty result as "no previous concerns", the engine starts
 without C and may report it again as a new finding. The migration reader must check whether a legacy
 row exists and explicitly decode or convert each supported version. If an existing row cannot be
-read, bootstrap fails as described in §13.1; an empty snapshot is valid only when the reader confirms
+read, bootstrap fails as described in [§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact); an empty snapshot is valid only when the reader confirms
 there is no prior ledger. Do not rely on `load()`'s fallback to make that decision.
 
 ### 13.3 Rollback
@@ -877,23 +883,23 @@ history, so rollback requires a **copy-back**:
 closes.
 
 After copy-back, configure the adapter to use the in-process engine again. Retaining that engine
-(§14.1) means the fallback uses the existing code path, but the configuration switch alone is not a
+([§14.1](#141-two-repositories-and-what-actually-crosses-between-them)) means the fallback uses the existing code path, but the configuration switch alone is not a
 complete rollback.
 
 ### 13.4 The two modes do not share review state
 
-A site runs either in-process or remote, and the two keep review state in different places (§9). A
+A site runs either in-process or remote, and the two keep review state in different places ([§9](#9-ownership-matrix)). A
 change reviewed in-process, then reviewed again after the site switches to remote, hits the bootstrap
-path in §13.1 exactly once — the engine asks the adapter for the legacy ledger and adopts it.
+path in [§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact) exactly once — the engine asks the adapter for the legacy ledger and adopts it.
 
 Two consequences follow:
 
 1. **Switching is per-site, not per-change.** Once a change has been bootstrapped into the engine,
    subsequent remote reviews use engine-owned state. Returning the site to in-process mode requires
-   the copy-back in §13.3; pointing it at the adapter's frozen copy would lose newer state.
+   the copy-back in [§13.3](#133-rollback); pointing it at the adapter's frozen copy would lose newer state.
 2. **A mixed fleet is normal during rollout.** Different sites on different modes is the expected
    intermediate state, not an error. Nothing in the contract assumes the other side's mode, which is
-   why the in-process engine must also run the conformance suite (§14.2) — a divergence between the
+   why the in-process engine must also run the conformance suite ([§14.2](#142-how-two-independently-written-sides-stay-in-agreement)) — a divergence between the
    two engines is otherwise invisible until someone switches.
 
 ## 14. Module layout
@@ -941,7 +947,7 @@ wiring variables in a build nobody wants to debug mid-split.
 Consequences to accept:
 
 - Adapter-side and engine-side types are written twice. That duplication is the price of not sharing
-  an artifact, and §14.2 is what makes it safe.
+  an artifact, and [§14.2](#142-how-two-independently-written-sides-stay-in-agreement) is what makes it safe.
 - **Code moved from `aibackend/` into the proprietary repository remains Apache-2.0** for the portions
   already published here, with attribution retained; only genuinely new work is proprietary. This is
   standard permissive-licence behaviour, but it is easy to overlook when starting a "closed" project
@@ -962,14 +968,14 @@ published from this repository under Apache-2.0 because they are specification r
 The vectors cover what the format promises rather than how either side is built:
 
 - every request field round-trips without loss, including `StateBootstrap` and the historical
-  correlation reference defined in §5.1, whose value may identify either a host comment or a prior
+  correlation reference defined in [§5.1](#51-what-the-contract-must-carry-and-why-changeref-is-not-what-youd-guess), whose value may identify either a host comment or a prior
   concern;
-- the job state machine's legal transitions and terminal-state semantics (§7.2);
-- `POST` on an existing idempotency key returns the existing job rather than a conflict (§7.1);
-- cancellation reaches a terminal state and never publishes afterwards (§10);
+- the job state machine's legal transitions and terminal-state semantics ([§7.2](#72-job-state-machine));
+- `POST` on an existing idempotency key returns the existing job rather than a conflict ([§7.1](#71-job-api));
+- cancellation reaches a terminal state and never publishes afterwards ([§10](#10-cancellation-across-the-boundary));
 - `CONTEXT NOT PROVIDED` is returned — not an exception thrown — when code context is unavailable
-  (§12.1);
-- an unrecognised contract version is refused explicitly rather than silently accepted (§16).
+  ([§12.1](#121-the-good-news));
+- an unrecognised contract version is refused explicitly rather than silently accepted ([§16](#16-risks-and-trade-offs)).
 
 Note that the third and fourth of those describe behaviour, not format, so they are tested by the
 engine against its own implementation rather than by schema validation. Keeping the distinction clear
@@ -1021,7 +1027,7 @@ earlier claim of an inevitable runtime version-skew bug from that list was incor
 Keep the contract types serializer-neutral anyway: **no Jackson or Gson annotations** or library-specific
 field types on either side. The engine configures `SNAKE_CASE`, the adapter configures
 `LOWER_CASE_WITH_UNDERSCORES`, and both validate the resulting JSON against the schema and conformance
-vectors (§14.2). This lets the two sides use different serializers without making either one's
+vectors ([§14.2](#142-how-two-independently-written-sides-stay-in-agreement)). This lets the two sides use different serializers without making either one's
 annotations part of the wire contract.
 
 The existing `concern_json` is a persisted plugin format, not the wire format. Bootstrap reads those
@@ -1033,7 +1039,7 @@ that use Lombok setters on concern models will need updating when those models b
 `aiTokens` is an additive global+project list, so a project token overrides the global one
 (`config/AiProviderConfiguration.java:169-181`). The job payload is persisted in clear, so **a token
 must never appear in it**. The contract carries an opaque `credentialRef`; the engine resolves the
-secret from its own store. Where project credentials live post-split is unresolved (§17.2).
+secret from its own store. Where project credentials live post-split is unresolved (question 2 in [§17](#17-open-questions)).
 
 ### 14.7 Reuse the design, not the tables
 
@@ -1069,7 +1075,7 @@ is independently landable and reversible, and Steps 0–3 are valuable even if t
 happens.
 
 **Step 0 — Make re-execution safe.** No new process, no behaviour change.
-- Idempotent publication (`findingKey` + `published_findings`) — §8.
+- Idempotent publication (`findingKey` + `published_findings`) — [§8](#8-idempotency-and-the-at-least-once-contract).
 - Retryable disposition: `attempt_count`, `next_attempt_at_millis`, `releaseForRetry(backoff)`, which
   must release the lane so queued work proceeds (`listener/AiRequestCoordinator.java:291-301`).
 - Fix the `GitRepoFiles` mutable-instance-field race
@@ -1109,13 +1115,13 @@ repositories; it does not replace the plugin's in-process engine:
 
 - **In this repository:** add a configurable remote client that submits `ReviewRequest` jobs, checks
   their status and results, handles cancellation, and publishes completed findings in Gerrit. Expose
-  the authenticated code-context callback that the remote engine uses during a review (§12). The
-  in-process path remains the default (§4.1).
+  the authenticated code-context callback that the remote engine uses during a review ([§12](#12-code-context-the-tool-rpc-contract)). The
+  in-process path remains the default ([§4.1](#41-topology)).
 - **In `reviewai-backend`:** build the separate Spring Boot service with its own job API, workers, and
   PostgreSQL state. It runs the review workflow using its own types for the neutral JSON contract;
-  it does not depend on the plugin's Java classes (§14.1).
+  it does not depend on the plugin's Java classes ([§14.1](#141-two-repositories-and-what-actually-crosses-between-them)).
 - **Shared specification:** publish the JSON Schema and conformance vectors in this repository.
-  Both repositories validate and test their own implementations against them (§14.2). No shared Java
+  Both repositories validate and test their own implementations against them ([§14.2](#142-how-two-independently-written-sides-stay-in-agreement)). No shared Java
   artifact is introduced.
 
 *Proves it worked:*
@@ -1124,13 +1130,13 @@ repositories; it does not replace the plugin's in-process engine:
 - Kill the adapter mid-review: the engine finishes, then `EngineJobPoller` publishes the result once
   after the adapter restarts.
 - With the remote engine down, the six existing sidebar endpoints still work.
-- The first remote review of a change passes the bootstrap drill in §13.
+- The first remote review of a change passes the bootstrap drill in [§13](#13-state-migration).
 - Both sides pass the conformance vectors, and their payloads validate against the schema.
 
 **Step 5 — Enable remote mode site by site.** Flip sites one at a time, each with its own bootstrap
-migration (§13.1) and rollback window (§13.3). The in-process path is retained, so rollback uses the
-existing code after state is copied back; switching configuration alone is insufficient (§13.3).
-Engine-side retention and metrics follow §16.
+migration ([§13.1](#131-strategy-lazy-per-change-bootstrap-engine-authoritative-from-first-contact)) and rollback window ([§13.3](#133-rollback)). The in-process path is retained, so rollback uses the
+existing code after state is copied back; switching configuration alone is insufficient ([§13.3](#133-rollback)).
+Engine-side retention and metrics follow [§16](#16-risks-and-trade-offs).
 
 > **Changed from the prior proposal.** The prior migration plan treated the in-process contract
 > as an intermediate step before service extraction, although it did not explicitly require its
@@ -1139,7 +1145,7 @@ Engine-side retention and metrics follow §16.
 
 **Ordering constraints.** Step 0 must precede Step 4 — idempotent publication is a precondition for the
 split. Step 2 must precede Step 4. Steps 1 and 2 are independent of each other. The schema and vectors
-(§14.2) must exist before Step 5 begins, since they are the only thing holding the two independently
+([§14.2](#142-how-two-independently-written-sides-stay-in-agreement)) must exist before Step 5 begins, since they are the only thing holding the two independently
 written sides together.
 
 ## 16. Risks and trade-offs
@@ -1158,7 +1164,7 @@ Baseline risks retained or refined from the prior proposal:
 
 Risks introduced or made material by the revised design:
 
-- **At-least-once execution** (§8). Mitigated by deterministic `findingKey` and a publication ledger —
+- **At-least-once execution** ([§8](#8-idempotency-and-the-at-least-once-contract)). Mitigated by deterministic `findingKey` and a publication ledger —
   but only if Step 0 lands first.
 - **Two queues in series** add latency and a second place for work to stall. The `EngineJobPoller`
   makes a stalled handoff recoverable rather than lost.
@@ -1168,14 +1174,14 @@ Risks introduced or made material by the revised design:
   simultaneous model calls on each replica, or 12 across the deployment. Thus N replicas can put
   up to N times the configured concurrent load against a metered provider quota. If the intended
   limit is 4 calls across the whole deployment, the remote engine needs a gate shared across replicas.
-  Otherwise, document and configure the limit as per-replica; question 4 in §17 leaves that choice open.
-- **Comment-quality risk** from moving rendering to the adapter (§6.3). Measure, do not assume.
-- **Tool-RPC amplification** (§12.3). A single remote review can run multiple agents, each making
+  Otherwise, document and configure the limit as per-replica; question 4 in [§17](#17-open-questions) leaves that choice open.
+- **Comment-quality risk** from moving rendering to the adapter ([§6.3](#63-comment-rendering-moves-to-the-adapter)). Measure, do not assume.
+- **Tool-RPC amplification** ([§12.3](#123-timeouts-and-backpressure)). A single remote review can run multiple agents, each making
   code-context calls over several tool rounds. Calls from concurrent reviews and engine replicas can
   then pile up at the adapter, where each may trigger repository work in Gerrit. Without a separate
   bound on these callbacks, they could exhaust adapter threads or slow the host. The in-process agent
   executor previously bounded this work locally; remote mode needs the bounded executor and
-  per-change cap in §12.3, with excess calls returning `CONTEXT NOT PROVIDED`.
+  per-change cap in [§12.3](#123-timeouts-and-backpressure), with excess calls returning `CONTEXT NOT PROVIDED`.
 - **Config is no longer centrally validated**, since the adapter resolves it.
 - **`AiReviewThreads` reads the concern ledger directly** (`web/AiReviewThreads.java:136,288`); once
   the engine owns the ledger, that sidebar endpoint needs a read-through or it renders stale data.
@@ -1193,30 +1199,30 @@ Still open:
    same applies to the three comment-id sets the engine currently reads off `ChangeSetData` —
    `pendingReviewFeedbackCommentIds`, `reviewFeedbackDismissalAuthorizedCommentIds`, and
    `reviewFeedbackControlAuthorizedCommentIds` (`ChangeSetData.java:63-65`). The adapter-owned
-   concern-to-host-comment map (§8) does not cover these feedback handles. Either extend the
+   concern-to-host-comment map ([§8](#8-idempotency-and-the-at-least-once-contract)) does not cover these feedback handles. Either extend the
    adapter-owned mapping to feedback handles, or keep feedback classification adapter-side. **Settle
    this ownership question before Step 4.**
-2. **Where per-project LLM credentials live** post-split, given `credentialRef` (§14.6). Requires an
+2. **Where per-project LLM credentials live** post-split, given `credentialRef` ([§14.6](#146-credentials)). Requires an
    operator-facing decision about who holds secrets.
 3. **Is shared PostgreSQL a hard requirement** for the adapter's queue, and if so is H2 support
    dropped from the plugin entirely?
 4. **`aiMaxConcurrentRequests`**: per-replica, or a globally enforced gate?
-5. **How should v1 handle large patches?** `ReviewRequest.target.patch` (§5.2) currently carries
+5. **How should v1 handle large patches?** `ReviewRequest.target.patch` ([§5.2](#52-request)) currently carries
    the entire diff, so `POST /v1/reviews` can become very large. One option is to cap the request
    size and return a clear error for reviews above the cap; those reviews could not run remotely.
-   The other is to add `context.fetchPatch()` to the adapter callback API (§12), so the engine can
+   The other is to add `context.fetchPatch()` to the adapter callback API ([§12](#12-code-context-the-tool-rpc-contract)), so the engine can
    fetch an oversized patch separately. That would require changing the request contract to allow
    the patch to be omitted and defining limits and timeouts for the fetch. Does v1 need this fallback,
    or is the simpler request-size limit sufficient?
-6. **Metric-name continuity** (§16).
+6. **Metric-name continuity** ([§16](#16-risks-and-trade-offs)).
 7. **SSE termination and `Last-Event-ID` semantics** across replica restarts.
-8. **Does the engine's schema need a downgrade path**, or is the §13.3 export sufficient?
+8. **Does the engine's schema need a downgrade path**, or is the [§13.3](#133-rollback) export sufficient?
 
 ## 18. Alternatives considered
 
 - **A. In-process interface only (no service).** Add the contract but keep it in the host JVM.
   Cheapest; achieves decoupling and testability but not reuse or independent scaling. *This remains a
-  valid interim state and is literally Steps 1–3 of §15.*
+  valid interim state and is literally Steps 1–3 of [§15](#15-implementation-and-rollout-sequence).*
 - **B. Extract as a library (JAR), not a service.** Reusable by embedding, but couples versioning and
   deployment and gives no independent scaling.
 - **C. Do nothing; keep improving in place.** Short-term easier, but the coupling grows and the engine
