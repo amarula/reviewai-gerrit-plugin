@@ -23,11 +23,37 @@
 > sides agree on the wire format, which this repository publishes as a JSON Schema with conformance
 > vectors. §14.1 and §14.2 record that.
 
+## Glossary
+
+| Term | Meaning in this proposal |
+|---|---|
+| **Host installation** | One independently operated Gerrit site, GitHub org, or GitLab group using ReviewAI. This is the isolation boundary (§4.1). |
+| **Adapter** | The host-specific integration for an installation: the ReviewAI plugin in Gerrit. It accepts host events, supplies code context, and publishes results. Several running copies may serve one installation (§4.1). |
+| **Engine** | The product-neutral review workflow: agents, prompts, model calls, and concern handling. It runs inside the host in in-process mode or as a separate service in remote mode (§4.1). |
+| **Engine deployment** | The remote engine service assigned to one host installation, including its shared review-state database. It may run multiple replicas (§4.1). |
+| **Replica** | One running copy of an engine deployment. Replicas share its job store and can serve or claim work independently (§7.3). |
+| **Multi-tenancy** | One engine deployment serving several unrelated host installations while isolating their jobs and state within that service. It is out of scope here (§2). |
+| **In-process mode** | The engine runs in the host process and uses the plugin's existing state store (§4.1). |
+| **Remote mode** | The adapter submits reviews to a separate engine deployment, which owns its review state (§4.1, §9). |
+| **Contract / wire format** | The JSON request, result, and callback formats agreed by adapter and remote engine; the two repositories do not share Java classes (§5, §14.1). |
+| **Review job** | A durable unit of review work admitted by the remote engine. Its lifecycle state is separate from a concern's status (§7.1–7.2). |
+| **Lane** | The per-change scheduling boundary that prevents two reviews of the same change from updating state at once (§7.3). |
+| **Lease** | A time-limited worker claim on a job; expiry lets recovery handle a stalled worker (§7.3). |
+| **Concern** | A code-review issue tracked across reviews. Its `ConcernStatus` is separate from a review job's state (§7.2). |
+| **Concern ledger** | The stored history of concerns for a change; its owner depends on the deployment mode (§9). |
+| **Finding** | An item in `ReviewResult` that the adapter can render and publish as a host comment, possibly linked to a concern (§5.3, §6.3). |
+| **Publication** | The adapter's act of posting findings, messages, or votes to the host; it must be idempotent across review retries (§8, §11). |
+| **Concern-to-host-comment map** | The adapter-owned mapping from a concern id to its published host comment id, used to keep later updates on the right thread (§8). |
+| **Tool-RPC** | Authenticated remote procedure calls from the engine to the adapter for on-demand code context during a review (§12). |
+| **SSE** | Server-Sent Events: the engine's HTTP progress stream to the adapter, backed by stored event rows (§7.4). |
+| **Bootstrap / `StateBootstrap`** | The one-time initialization of a change's engine state from legacy adapter state, and the snapshot used for that transfer (§13.1). |
+| **Rollback** | Returning a site from remote to in-process mode after copying newer engine state back to the adapter (§13.3). |
+
 ## 1. Context and motivation
 
-Today the plugin is a single Gerrit process. The AI review engine (LangChain4j integration, prompt
-building, concern workflow, agents) is intertwined with the Gerrit-specific integration (event
-listeners, Gerrit API clients, web endpoints, plugin data storage).
+Today each plugin instance runs inside a Gerrit process. The AI review engine (LangChain4j
+integration, prompt building, concern workflow, agents) is intertwined with the Gerrit-specific
+integration (event listeners, Gerrit API clients, web endpoints, plugin data storage).
 
 Three forces make this painful:
 
@@ -64,10 +90,9 @@ follow from the same boundary.
 - No change to the *concern workflow* semantics (concerns, voting, feedback memory).
   **Deliberate exception:** host comment *rendering* moves to the adapter (§6.3). This changes how the
   final comment text is composed and is expected to carry a comment-quality risk until measured.
-- **No multi-tenancy across host installations.** Multi-tenancy here would mean one remote engine
-  deployment serving unrelated installations while separating their jobs and review state within the
-  service. This proposal gives each installation its own engine deployment and review state (§4.1).
-  Multiple replicas of that deployment still serve the same installation.
+- **No multi-tenancy across host installations.** In remote mode, each installation gets its own engine
+  deployment and review state (§4.1). Multiple replicas of that deployment still serve the same
+  installation.
 
 > **Changed from the prior proposal.** It listed "Not (yet) a multi-tenant or high-throughput
 > service design" as a non-goal. Scale-out is now a requirement, not a non-goal. Multi-tenancy remains
@@ -139,6 +164,11 @@ account for the following additional couplings and consequences:
 
 There are **two supported modes**, and the adapter chooses between them by configuration. This is what
 keeps the open plugin self-contained while allowing a scaled deployment.
+
+For Gerrit, the adapter is the ReviewAI plugin running on the site's Gerrit nodes. Several nodes may
+run copies of the plugin, but they belong to the same installation and must share the adapter's intake
+queue in remote mode (§8). That adapter submits reviews to its installation's engine deployment, which
+may itself have multiple replicas.
 
 | Mode | Engine | Review state lives in | Available to |
 |---|---|---|---|
@@ -559,11 +589,11 @@ or a long review can block event intake. This applies to the adapter as well (§
 
 ### 7.4 Progress delivery
 
-The engine sends progress to the adapter over SSE (Server-Sent Events). It saves progress events in
-`review_job_events`. The database is the durable record. When a job state changes, the engine updates
-the job row and inserts the corresponding `review_job_events` row **in the same transaction**. Either
-both changes commit or neither does. The SSE endpoint only reads stored event rows and sends them over
-HTTP; it does not own a second copy of job state.
+The engine sends progress to the adapter over SSE. It saves progress events in `review_job_events`.
+The database is the durable record. When a job state changes, the engine updates the job row and
+inserts the corresponding `review_job_events` row **in the same transaction**. Either both changes
+commit or neither does. The SSE endpoint only reads stored event rows and sends them over HTTP; it
+does not own a second copy of job state.
 
 For example, job 42 moves from `QUEUED` to `RUNNING`, and event `seq = 7` records that transition.
 The adapter receives event 7, then its SSE connection drops while event 8 is stored. On reconnect,
@@ -613,9 +643,9 @@ The mechanism:
 - The adapter keeps `published_findings(change_id, revision, finding_key, comment_id, published_at)`
   with a unique index, and skips findings already recorded, reusing the recorded `comment_id` for the
   thread.
-- A companion adapter-owned table, `concern_comment_ids(change_id, concern_id, comment_id)`, stores
-  the mapping from a change's `concern_id` to its published host `comment_id`. This is the
-  **concern-to-host-comment map** referenced below. It replaces the `previousCommentId` currently
+- The adapter stores the **concern-to-host-comment map** in
+  `concern_comment_ids(change_id, concern_id, comment_id)`. It uses the map to attach later findings
+  for the same concern to the existing host thread. The map replaces `previousCommentId` currently
   written into the engine's ledger (`data/ReviewConcernPublisher.java:70-83`; see also §5.1).
 
 ### Boundary idempotency key
