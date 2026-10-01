@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.reflect.TypeToken;
@@ -34,10 +35,15 @@ import com.google.gerrit.extensions.api.changes.ChangeApi.CommentsRequest;
 import com.google.gerrit.extensions.api.changes.Changes;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gerrit.server.account.AccountCache;
+import com.google.gerrit.server.account.AccountState;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
+import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.permissions.RefPermission;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ProjectUserMentionResolver;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
@@ -50,6 +56,7 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -67,6 +74,9 @@ public class GerritClientCommentsTest {
   private GerritChange change;
   private Map<String, List<CommentInfo>> comments;
   private CommentsRequest commentsRequest;
+  private AccountCache accountCache;
+  private PermissionBackend permissionBackend;
+  private PermissionBackend.ForRef mentionRefPermissions;
 
   @Before
   public void setUp() throws Exception {
@@ -100,6 +110,20 @@ public class GerritClientCommentsTest {
     when(change.getChangeKey()).thenReturn(Change.key("change-id"));
     when(change.getFullChangeId()).thenReturn("project~main~change-id");
 
+    accountCache = mock(AccountCache.class);
+    AccountState alice = mock(AccountState.class);
+    Account aliceAccount = mock(Account.class);
+    when(alice.account()).thenReturn(aliceAccount);
+    when(aliceAccount.id()).thenReturn(Account.id(3000));
+    when(aliceAccount.isActive()).thenReturn(true);
+    when(accountCache.getByUsername("alice")).thenReturn(Optional.of(alice));
+    permissionBackend = mock(PermissionBackend.class);
+    PermissionBackend.WithUser mentionPermissions = mock(PermissionBackend.WithUser.class);
+    mentionRefPermissions = mock(PermissionBackend.ForRef.class);
+    when(permissionBackend.absentUser(Account.id(3000))).thenReturn(mentionPermissions);
+    when(mentionPermissions.ref(change.getBranchNameKey())).thenReturn(mentionRefPermissions);
+    when(mentionRefPermissions.testOrFalse(RefPermission.READ)).thenReturn(true);
+
     client =
         new GerritClientComments(
             config,
@@ -107,12 +131,14 @@ public class GerritClientCommentsTest {
             mock(ICodeContextPolicy.class),
             mock(IGerritClientPatchSet.class),
             mock(PluginDataHandlerProvider.class),
-            mock(Localizer.class));
+            mock(Localizer.class),
+            new ProjectUserMentionResolver(accountCache, permissionBackend));
   }
 
   @Test
   public void addressedCommentsRemainEventLocal() {
     assertTrue(client.retrieveComments(change, AiRole.USER));
+    verifyNoInteractions(accountCache);
 
     assertEquals(1, client.getCommentProperties().size());
     assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
@@ -158,6 +184,67 @@ public class GerritClientCommentsTest {
     when(commentsRequest.get()).thenReturn(comments);
 
     assertFalse(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void nestedReplyInAssistantThreadWithUnknownMentionIsProcessed() {
+    comments.get("src/Test.java").get(1).inReplyTo = "ai-parent";
+    latestComment().inReplyTo = "human-parent";
+    latestComment().message = "@fdfgsdfg Is it true?";
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+    assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
+  }
+
+  @Test
+  public void nestedReplyInAssistantThreadAddressedToProjectUserIsIgnored() {
+    comments.get("src/Test.java").get(1).inReplyTo = "ai-parent";
+    latestComment().inReplyTo = "human-parent";
+    latestComment().message = "@alice Is it true?";
+
+    assertFalse(client.retrieveComments(change, AiRole.USER));
+    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+  }
+
+  @Test
+  public void failedMentionLookupDoesNotSuppressReplyToAssistant() {
+    latestComment().message = "@fdfgsdfg Can you check this?";
+    when(accountCache.getByUsername("fdfgsdfg"))
+        .thenThrow(new IllegalStateException("Account lookup unavailable"));
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void checksEveryMentionUntilAnAccessibleUserIsFound() {
+    latestComment().message = "@unknown @alice Can you check this?";
+
+    assertFalse(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void userWithoutBranchAccessDoesNotSuppressReplyToAssistant() {
+    latestComment().message = "@alice Can you check this?";
+    when(mentionRefPermissions.testOrFalse(RefPermission.READ)).thenReturn(false);
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void explicitBotMentionInReplyToAssistantIsProcessed() {
+    latestComment().message = "@reviewai @alice Can you both check this?";
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+    assertEquals("latest-reply", client.getCommentProperties().getFirst().getId());
+    verifyNoInteractions(accountCache);
+  }
+
+  @Test
+  public void emailAddressInReplyToAssistantDoesNotCountAsUserMention() {
+    latestComment().message = "Please send the details to alice@example.com.";
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+    verifyNoInteractions(accountCache);
   }
 
   @Test
