@@ -54,6 +54,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ProjectUserMentionResolver;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;
@@ -416,7 +417,8 @@ public class ReviewTestBase extends TestBase {
                     null,
                     new ReviewConcernPublisher(getTestReviewAiDb()),
                     reviewFeedbackPublisher,
-                    getClientCommandExtension()),
+                    getClientCommandExtension(),
+                    new ProjectUserMentionResolver(accountCacheMock, permissionBackend)),
                 gerritClientPatchSet));
     aiReviewApplicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     when(aiReviewApplicabilityChecker.isApplicable(any(), anyString())).thenReturn(true);

@@ -27,6 +27,7 @@ import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ProjectUserMentionResolver;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DisabledClientCommandExtension;
@@ -65,6 +66,7 @@ public class GerritClientComments extends GerritClientAccount {
   private final ReviewConcernPublisher reviewConcernPublisher;
   private final ReviewFeedbackPublisher reviewFeedbackPublisher;
   private final ClientCommandExtension commandExtension;
+  private final ProjectUserMentionResolver projectUserMentionResolver;
 
   private String authorUsername;
   private GerritCommentThreadIndex commentThreadIndex;
@@ -79,7 +81,8 @@ public class GerritClientComments extends GerritClientAccount {
       ICodeContextPolicy codeContextPolicy,
       IGerritClientPatchSet gerritClientPatchSet,
       PluginDataHandlerProvider pluginDataHandlerProvider,
-      Localizer localizer) {
+      Localizer localizer,
+      ProjectUserMentionResolver projectUserMentionResolver) {
     this(
         config,
         changeSetData,
@@ -90,7 +93,8 @@ public class GerritClientComments extends GerritClientAccount {
         null,
         null,
         null,
-        new DisabledClientCommandExtension());
+        new DisabledClientCommandExtension(),
+        projectUserMentionResolver);
   }
 
   @Inject
@@ -104,7 +108,8 @@ public class GerritClientComments extends GerritClientAccount {
       PluginChatMemoryStore chatMemoryStore,
       ReviewConcernPublisher reviewConcernPublisher,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
-      EventBuildFeatures buildFeatures) {
+      EventBuildFeatures buildFeatures,
+      ProjectUserMentionResolver projectUserMentionResolver) {
     this(
         config,
         changeSetData,
@@ -115,7 +120,8 @@ public class GerritClientComments extends GerritClientAccount {
         chatMemoryStore,
         reviewConcernPublisher,
         reviewFeedbackPublisher,
-        buildFeatures.clientCommandExtension());
+        buildFeatures.clientCommandExtension(),
+        projectUserMentionResolver);
   }
 
   public GerritClientComments(
@@ -128,7 +134,8 @@ public class GerritClientComments extends GerritClientAccount {
       PluginChatMemoryStore chatMemoryStore,
       ReviewConcernPublisher reviewConcernPublisher,
       ReviewFeedbackPublisher reviewFeedbackPublisher,
-      ClientCommandExtension commandExtension) {
+      ClientCommandExtension commandExtension,
+      ProjectUserMentionResolver projectUserMentionResolver) {
     super(config);
     this.changeSetData = changeSetData;
     this.codeContextPolicy = codeContextPolicy;
@@ -139,6 +146,7 @@ public class GerritClientComments extends GerritClientAccount {
     this.reviewConcernPublisher = reviewConcernPublisher;
     this.reviewFeedbackPublisher = reviewFeedbackPublisher;
     this.commandExtension = commandExtension;
+    this.projectUserMentionResolver = projectUserMentionResolver;
     commentProperties = new ArrayList<>();
     addressedComments = new ArrayList<>();
     commentMap = new HashMap<>();
@@ -198,11 +206,11 @@ public class GerritClientComments extends GerritClientAccount {
     commentThreadIndex = new GerritCommentThreadIndex(List.of());
   }
 
-  private boolean isReplyToAssistant(GerritComment comment) {
+  private boolean isReplyInAssistantThread(GerritComment comment) {
     return commentThreadIndex
-        .parentOf(comment)
-        .map(parent -> ReviewAiUser.matches(parent, changeSetData.getAiAccountId()))
-        .orElse(false);
+        .nearestAncestor(
+            comment, ancestor -> ReviewAiUser.matches(ancestor, changeSetData.getAiAccountId()))
+        .isPresent();
   }
 
   private List<GerritComment> fetchComments(GerritChange change, String requestedChangeMessageId)
@@ -268,6 +276,12 @@ public class GerritClientComments extends GerritClientAccount {
               ? eventChangeMessageId
               : requestedChangeMessageId;
       List<GerritComment> targetComments = latestComments.get(targetChangeMessageId);
+      log.debug(
+          "Comment selection: eventMessageId={}, requestedMessageId={}, targetMessageId={}, count={}",
+          eventChangeMessageId,
+          requestedChangeMessageId,
+          targetChangeMessageId,
+          targetComments == null ? 0 : targetComments.size());
       if (targetComments != null) {
         sourceChangeMessageId = targetChangeMessageId;
       }
@@ -294,17 +308,40 @@ public class GerritClientComments extends GerritClientAccount {
     try {
       List<GerritComment> latestComments = fetchComments(change, requestedChangeMessageId);
       if (latestComments == null) {
+        log.debug("No comments selected for change {}", change.getFullChangeId());
         return;
       }
       for (GerritComment latestComment : latestComments) {
         String commentMessage = latestComment.getMessage();
         log.debug("Processing comment: {}", commentMessage);
+        boolean isAddressedToBot = messageParser.isBotAddressed(commentMessage);
+        boolean isReplyInAssistantThread = isReplyInAssistantThread(latestComment);
+        boolean isResolved = latestComment.isResolved();
+        boolean addressesProjectUser =
+            !isAddressedToBot
+                && isReplyInAssistantThread
+                && !isResolved
+                && projectUserMentionResolver.addressesProjectUser(
+                    commentMessage,
+                    authorUsername,
+                    config.getGerritUserName(),
+                    change.getBranchNameKey());
         boolean isAddressed =
-            messageParser.isBotAddressed(commentMessage)
-                || (isReplyToAssistant(latestComment) && !latestComment.isResolved());
+            isAddressedToBot || (isReplyInAssistantThread && !isResolved && !addressesProjectUser);
+        log.debug(
+            "Comment routing: id={}, parentId={}, botMention={}, aiAncestor={}, resolved={}, "
+                + "projectUserMention={}, addressed={}",
+            latestComment.getId(),
+            latestComment.getInReplyTo(),
+            isAddressedToBot,
+            isReplyInAssistantThread,
+            isResolved,
+            addressesProjectUser,
+            isAddressed);
         if (isAddressed) {
           addressedComments.add(latestComment);
           if (messageParser.parseCommands(commentMessage)) {
+            log.debug("Comment {} was handled as a command", latestComment.getId());
             commentProperties.clear();
             return;
           }
