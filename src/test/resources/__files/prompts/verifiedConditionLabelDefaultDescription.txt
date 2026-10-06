@@ -2,3 +2,6 @@ Verified:
   Current value: +1
   Possible values: +0, +1
   Description: Verified label usually means that automated tests have run and the code compiles and passes basic checks
+  Covers: compilation, automated tests
+
+A passing result is stronger evidence than anything the review tools can infer. For the scopes listed under Covers, do not report a finding that rests on missing or inconclusive evidence (a search that returned no match, a declaration you could not see, an import you could not verify), even when your own search appears to contradict the label. Direct evidence in the patch itself (a syntax error in the added lines, a removed declaration, an incompatible signature) may still be reported. Unrelated scopes are unaffected, and labels without a Covers entry are not conclusive for any scope.

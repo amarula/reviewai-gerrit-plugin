@@ -45,7 +45,9 @@ public class AiPromptConditionLabelFormatterTest {
             + "Verified:\n"
             + "  Current value: -1, +1\n"
             + "  Possible values: +0, +1\n"
-            + "  Description: CI verification",
+            + "  Description: CI verification\n"
+            + "\n"
+            + AiPromptConditionLabelFormatter.EVIDENCE_RULE,
         AiPromptConditionLabelFormatter.format(
             Map.of(
                 "Verified",

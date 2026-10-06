@@ -234,10 +234,13 @@ expressions and evaluation failures are logged and fail closed, so they do not s
 ### Condition Labels and CI Awareness
 
 When `aiReviewApplicableIf` references labels, ReviewAI supplies the current value, possible values, and configured
-description of each Condition Label to the review workflow. Agents treat a label as evidence only when its description
-is directly relevant to the concern being assessed. A positive vote or a label name alone is not blanket proof that an
-unrelated concern has been resolved. For example, `Verified+1` supports marking a compilation concern as fixed only
-when the `Verified` label description conclusively establishes that the relevant code was compiled successfully.
+description of each Condition Label to the review workflow. ReviewAI derives the review scopes a passing vote proves
+from the wording of that description and states them in the prompt as a `Covers` entry (compilation, automated tests,
+static analysis, security scanning, documentation). A covered scope is conclusive: agents do not report findings there
+that rest on missing or inconclusive evidence, such as a search that returned no match or a declaration they could not
+see. Direct evidence in the patch — a syntax error, a removed declaration, an incompatible signature — may still be
+reported, a label whose votes conflict covers nothing, and a label name alone is never treated as proof for an
+unrelated concern.
 
 During a follow-up review, conclusive label evidence can mark a tracked concern as fixed. At specialization level 2,
 the feedback classifier can also exclude a specialized agent for the current review, but only when a positive label's

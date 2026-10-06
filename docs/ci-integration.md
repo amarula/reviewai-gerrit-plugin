@@ -67,13 +67,31 @@ ReviewAI includes the current value, possible values, and configured description
 `aiReviewApplicableIf` in its review context. The description communicates what a successful CI vote proves; the
 label name alone does not.
 
+ReviewAI derives what a passing vote covers from the wording of that description and states it in the prompt as a
+`Covers` entry, for example:
+
+```
+Verified:
+  Current value: +1
+  Possible values: +0, +1
+  Description: Verified label usually means that automated tests have run and the code compiles and passes basic checks
+  Covers: compilation, automated tests
+```
+
+A covered scope makes the label conclusive for that scope: ReviewAI does not report a finding that rests on missing or
+inconclusive evidence — a search that returned no match, a declaration it could not see, an import it could not verify
+— even when its own inspection appears to contradict the label. Direct evidence in the patch itself still counts: a
+syntax error in the added lines, a removed declaration, or an incompatible signature may be reported regardless of the
+label, and unrelated scopes are unaffected. A label whose votes conflict (for example a human `-1` against a CI `+1`)
+covers nothing, so a stale CI vote cannot suppress a finding once someone has voted the label down.
+
 When `Verified` has no configured description, ReviewAI uses this default meaning:
 
 > Verified label usually means that automated tests have run and the code compiles and passes basic checks
 
-This is deliberately limited evidence. It filters out doubtful concerns that are plausibly already covered by the build
-and basic automated checks, while still allowing strong concerns to be raised. For example, a clear syntax error or a
-parameter mismatch can still be reported when the changed code provides direct evidence of the problem.
+The wording matters: it is matched against the review scopes ReviewAI knows (compilation, automated tests, static
+analysis, security scanning, documentation). A description that names none of them leaves the label non-conclusive, and
+ReviewAI keeps reporting issues there as before.
 
 If your Jenkins and SonarQube pipeline validates the code more comprehensively, configure a more assertive description
 on the Gerrit `Verified` label, for example in `project.config`:
@@ -83,6 +101,7 @@ on the Gerrit `Verified` label, for example in `project.config`:
     description = The code is correct: automated tests have run successfully, and the code compiles and passes all checks.
 ```
 
-With that stronger statement, ReviewAI has a basis to exclude the corresponding validation concerns much more
-aggressively. Use it only when the positive vote genuinely covers all the checks claimed by the description; otherwise,
-retain a narrower description so that ReviewAI can continue to flag evidence-backed issues outside CI's coverage.
+With that stronger statement, ReviewAI covers compilation, automated tests, static analysis, and documentation for the
+listed scopes. Use it only when the positive vote genuinely covers all the checks claimed by the description;
+otherwise, retain a narrower description so that ReviewAI can continue to flag evidence-backed issues outside CI's
+coverage.
