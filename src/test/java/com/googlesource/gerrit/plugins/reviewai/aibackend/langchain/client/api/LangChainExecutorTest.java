@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand.OnDemandCodeContextTools;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
@@ -66,7 +67,11 @@ public class LangChainExecutorTest {
     when(change.getFullChangeId()).thenReturn("project~branch~change");
 
     List<String> largeTree = readTestResource(LARGE_TREE_RESOURCE).lines().toList();
-    String compressedTreeOutput = readTestResource(COMPRESSED_TREE_OUTPUT_RESOURCE).stripTrailing();
+    // The change cannot be resolved here, so the tree result is marked as spanning the repository.
+    String compressedTreeOutput =
+        OnDemandCodeContextTools.PROJECT_SCOPE_HEADER
+            + "\n"
+            + readTestResource(COMPRESSED_TREE_OUTPUT_RESOURCE).stripTrailing();
     GitRepoFiles gitRepoFiles = Mockito.mock(GitRepoFiles.class);
     when(gitRepoFiles.getPatchSetFileTree(config, change, null)).thenReturn(largeTree, largeTree);
     when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(null);

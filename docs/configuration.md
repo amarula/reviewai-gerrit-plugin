@@ -331,10 +331,16 @@ directive = End each reply with \"Hope this helps!\"
 - `patchContextLines`: The default value is 3. This sets how many unchanged context lines are included around each
   changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.
 - `codeContextPolicy`: Defines the code context policy used when AI needs repository context outside the formatted
-  patch. The default value is `NONE`.
+  patch. The default value is `ON_DEMAND`.
   The currently supported policies are:
     - **ON_DEMAND**: Lets the model request repository context during review through tool calls for listing the file
-      tree, searching references, and reading file content.
+      tree (`tree`), searching references (`grep`), and reading file content (`get_content`). `tree` and `grep` accept
+      an optional `scope`: `change` (the default) covers only the files changed by the Patch Set, while `project` covers
+      the whole repository at that Patch Set. A miss in the default scope is not evidence that a symbol does not exist,
+      so the model is instructed to repeat the search with `scope: "project"` before reporting a declaration, import,
+      or route as missing; only a project-scoped miss supports such a finding. Searches honor `enabledFileExtensions`
+      and `disabledFileExtensions`, and oversized `grep` results are truncated with an explicit notice. A project-wide
+      lookup consumes an extra tool-response round, so leave room in `aiMaxToolResponseRounds` for it.
     - **NONE**: Does not expose repository context tools. Reviews and interactions rely on the formatted patch and
       Gerrit discussion history only.
 - `aiMaxConcurrentRequests`: Maximum number of concurrent requests sent to AI models across review workflows. The

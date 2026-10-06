@@ -17,7 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,7 +67,10 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
     String output = tools.execute("tree", "{\"subdir\":\"src\"}");
 
-    assertEquals(String.join("\n", paths), output);
+    // Without a resolved change the tree spans the repository, so it is marked as project-scoped
+    // context.
+    assertEquals(
+        OnDemandCodeContextTools.PROJECT_SCOPE_HEADER + "\n" + String.join("\n", paths), output);
   }
 
   @Test
@@ -74,8 +81,13 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
     String output = tools.execute("tree", "{}");
 
-    assertEquals("docs/README.md\nsrc/...", output);
-    assertTrue(output.length() <= TreeOutputCompressor.DEFAULT_MAX_LENGTH);
+    assertEquals(
+        OnDemandCodeContextTools.PROJECT_SCOPE_HEADER + "\ndocs/README.md\nsrc/...", output);
+    assertTrue(
+        output.length()
+            <= TreeOutputCompressor.DEFAULT_MAX_LENGTH
+                + OnDemandCodeContextTools.PROJECT_SCOPE_HEADER.length()
+                + 1);
   }
 
   @Test
@@ -121,7 +133,9 @@ public class OnDemandCodeContextToolsTest extends TestBase {
 
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 
-    assertEquals(match, output);
+    // Without a resolved change the search spans the repository, so it is marked as project-scoped
+    // context.
+    assertEquals(OnDemandCodeContextTools.PROJECT_SCOPE_HEADER + "\n" + match, output);
   }
 
   @Test
@@ -156,6 +170,122 @@ public class OnDemandCodeContextToolsTest extends TestBase {
     String output = tools.execute("grep", "{\"string\":\"typing\"}");
 
     assertEquals("changed.py:1: match", output);
+  }
+
+  @Test
+  public void grepWithExplicitChangeScopeFiltersToChangedFiles() throws Exception {
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", Set.of("changed.py")))
+        .thenReturn(List.of("changed.py:1: match"));
+
+    String output = tools.execute("grep", "{\"string\":\"typing\",\"scope\":\"change\"}");
+
+    assertEquals("changed.py:1: match", output);
+  }
+
+  @Test
+  public void grepWithProjectScopeSearchesWholeProject() throws Exception {
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", null))
+        .thenReturn(List.of("pre_existing.py:7: match"));
+
+    String output = tools.execute("grep", "{\"string\":\"typing\",\"scope\":\"project\"}");
+
+    assertEquals(
+        OnDemandCodeContextTools.PROJECT_SCOPE_HEADER + "\npre_existing.py:7: match", output);
+    verify(gitRepoFiles, never()).getPatchSetChangedFiles(change);
+  }
+
+  @Test
+  public void grepWithUnknownScopeFallsBackToChangedFiles() throws Exception {
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "typing", Set.of("changed.py")))
+        .thenReturn(List.of("changed.py:1: match"));
+
+    String output = tools.execute("grep", "{\"string\":\"typing\",\"scope\":\"repository\"}");
+
+    assertEquals("changed.py:1: match", output);
+  }
+
+  @Test
+  public void grepWithoutMatchesInChangeScopeSuggestsProjectScope() throws Exception {
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "missing", Set.of("changed.py")))
+        .thenReturn(List.of());
+
+    String output = tools.execute("grep", "{\"string\":\"missing\"}");
+
+    assertTrue(output.contains("NO MATCH IN CHANGED FILES"));
+    assertTrue(output.contains("scope=\"project\""));
+    assertFalse(output.contains("CONTEXT NOT PROVIDED"));
+  }
+
+  @Test
+  public void grepWithoutMatchesInProjectScopeReportsAbsence() throws Exception {
+    when(gitRepoFiles.grepPatchSet(config, change, "missing", null)).thenReturn(List.of());
+
+    String output = tools.execute("grep", "{\"string\":\"missing\",\"scope\":\"project\"}");
+
+    assertEquals(
+        "NO MATCH IN PROJECT: \"missing\" does not occur in the repository at this patch set.",
+        output);
+  }
+
+  @Test
+  public void grepTruncatesLongResults() throws Exception {
+    List<String> matches =
+        IntStream.range(0, OnDemandCodeContextTools.MAX_GREP_MATCHES + 50)
+            .mapToObj(index -> "changed.py:" + index + ": match")
+            .toList();
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "match", Set.of("changed.py")))
+        .thenReturn(matches);
+
+    String output = tools.execute("grep", "{\"string\":\"match\"}");
+
+    String[] lines = output.split("\n");
+    assertEquals(OnDemandCodeContextTools.MAX_GREP_MATCHES + 1, lines.length);
+    assertEquals("changed.py:0: match", lines[0]);
+    assertEquals("changed.py:199: match", lines[OnDemandCodeContextTools.MAX_GREP_MATCHES - 1]);
+    assertTrue(lines[OnDemandCodeContextTools.MAX_GREP_MATCHES].contains("showing 200 of 250"));
+  }
+
+  @Test
+  public void grepDoesNotTruncateAtCapBoundary() throws Exception {
+    List<String> matches =
+        IntStream.range(0, OnDemandCodeContextTools.MAX_GREP_MATCHES)
+            .mapToObj(index -> "changed.py:" + index + ": match")
+            .toList();
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+    when(gitRepoFiles.grepPatchSet(config, change, "match", Set.of("changed.py")))
+        .thenReturn(matches);
+
+    String output = tools.execute("grep", "{\"string\":\"match\"}");
+
+    assertEquals(OnDemandCodeContextTools.MAX_GREP_MATCHES, output.split("\n").length);
+    assertFalse(output.contains("truncated"));
+  }
+
+  @Test
+  public void treeWithProjectScopeSkipsChangedFileFilter() throws Exception {
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null))
+        .thenReturn(List.of("changed.py", "pre_existing.py"));
+
+    String output = tools.execute("tree", "{\"scope\":\"project\"}");
+
+    assertEquals(
+        OnDemandCodeContextTools.PROJECT_SCOPE_HEADER + "\nchanged.py\npre_existing.py", output);
+  }
+
+  @Test
+  public void treeWithoutMatchingChangedFilesSuggestsProjectScope() throws Exception {
+    when(gitRepoFiles.getPatchSetFileTree(config, change, null))
+        .thenReturn(List.of("pre_existing.py"));
+    when(gitRepoFiles.getPatchSetChangedFiles(change)).thenReturn(Set.of("changed.py"));
+
+    String output = tools.execute("tree", "{}");
+
+    assertTrue(output.contains("NO CHANGED FILES IN SCOPE"));
+    assertTrue(output.contains("scope=\"project\""));
   }
 
   @Test

@@ -1,7 +1,7 @@
 {
   "type": "function",
   "name": "grep",
-  "description": "Search the git project for a literal string and return matching file paths, line numbers, and lines.",
+  "description": "Search the git project for a literal string and return matching file paths, line numbers, and lines. By default the search is limited to the files changed by the current patch set; pass scope=\"project\" to search the whole repository at this patch set. A miss in the default scope is not evidence that a symbol does not exist: repeat the search with scope=\"project\" before concluding that a declaration, import or route is missing.",
   "strict": false,
   "parameters": {
     "type": "object",
@@ -9,6 +9,14 @@
       "string": {
         "type": "string",
         "description": "Literal string to search for in the git project."
+      },
+      "scope": {
+        "type": "string",
+        "enum": [
+          "change",
+          "project"
+        ],
+        "description": "Search space. \"change\" (default) searches only the files changed by the current patch set; \"project\" searches the whole repository at this patch set."
       }
     },
     "required": [

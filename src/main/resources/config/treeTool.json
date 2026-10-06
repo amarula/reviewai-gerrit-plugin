@@ -1,7 +1,7 @@
 {
   "type": "function",
   "name": "tree",
-  "description": "Return the repository file tree starting from the provided subdirectory, or from the git project root when no subdirectory is provided. Large results are shortened by replacing expanded directories with path/... entries; request that path as subdir to inspect it.",
+  "description": "Return the repository file tree starting from the provided subdirectory, or from the git project root when no subdirectory is provided. By default the tree is limited to the files changed by the current patch set; pass scope=\"project\" to list the whole repository at this patch set. Large results are shortened by replacing expanded directories with path/... entries; request that path as subdir to inspect it.",
   "strict": false,
   "parameters": {
     "type": "object",
@@ -9,6 +9,14 @@
       "subdir": {
         "type": "string",
         "description": "Optional subdirectory path relative to the git project root."
+      },
+      "scope": {
+        "type": "string",
+        "enum": [
+          "change",
+          "project"
+        ],
+        "description": "Search space. \"change\" (default) lists only the files changed by the current patch set; \"project\" lists the whole repository tree at this patch set."
       }
     },
     "required": []

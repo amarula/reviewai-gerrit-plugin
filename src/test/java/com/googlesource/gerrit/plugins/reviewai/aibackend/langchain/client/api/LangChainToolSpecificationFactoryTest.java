@@ -17,10 +17,14 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
+import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 
@@ -44,6 +48,23 @@ public class LangChainToolSpecificationFactoryTest {
       assertEquals(toolResource.getValue(), specification.name());
       assertNotNull(specification.parameters());
       assertEquals(JsonObjectSchema.class, specification.parameters().getClass());
+    }
+  }
+
+  @Test
+  public void searchToolsExposeOptionalScopeEnum() {
+    for (String toolResource : List.of("config/treeTool.json", "config/grepTool.json")) {
+      ToolSpecification specification =
+          new LangChainToolSpecificationFactory(toolResource).loadToolSpecification();
+      JsonObjectSchema parameters = (JsonObjectSchema) specification.parameters();
+
+      JsonSchemaElement scope = parameters.properties().get("scope");
+
+      assertNotNull(toolResource + " should expose a scope parameter", scope);
+      assertEquals(toolResource, JsonEnumSchema.class, scope.getClass());
+      assertEquals(List.of("change", "project"), ((JsonEnumSchema) scope).enumValues());
+      assertFalse(
+          toolResource + " must not require scope", parameters.required().contains("scope"));
     }
   }
 }

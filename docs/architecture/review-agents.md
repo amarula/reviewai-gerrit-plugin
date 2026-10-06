@@ -409,7 +409,7 @@ Patch selection is centralized so the stages cannot diverge:
 | `codeContextPolicy` | `incremental_patch` | `full_patch` | Additional repository context |
 | --- | --- | --- | --- |
 | `NONE` | Included | Included | No context tools |
-| `ON_DEMAND` | Included | Omitted | Model can list, search, and read repository files through tools |
+| `ON_DEMAND` | Included | Omitted | Model can list, search, and read repository files through tools; `tree` and `grep` default to the changed files and widen to the whole repository with `scope: "project"` |
 
 The full patch does not change the New Issue Finder's scope. It provides context for interpreting changes in the
 incremental patch. `review_feedback` supplies generic guidance and exact per-concern context; it does not broaden the

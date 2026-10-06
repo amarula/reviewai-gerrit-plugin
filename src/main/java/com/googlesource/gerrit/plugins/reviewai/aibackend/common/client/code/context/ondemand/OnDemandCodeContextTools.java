@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getNonBlankString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.cutString;
 
@@ -44,6 +45,29 @@ public class OnDemandCodeContextTools extends ClientBase {
   private static final Pattern COMMIT_MESSAGE_PATH_PATTERN =
       Pattern.compile("^(?:reviewai-topic-change-.*)?/?COMMIT_MSG$");
   private static final int LOG_MAX_CONTENT_SIZE = 256;
+  static final String SCOPE_CHANGE = "change";
+  static final String SCOPE_PROJECT = "project";
+  static final int MAX_GREP_MATCHES = 200;
+
+  private static final String SCOPE = "scope";
+  // Results that reach beyond the change carry their search space with them, so repository
+  // context cannot be mistaken for code introduced by the patch set.
+  public static final String PROJECT_SCOPE_HEADER =
+      "SCOPE: project (includes files not part of this change)";
+  private static final String CHANGE_SCOPE_MISS_FORMAT =
+      "NO MATCH IN CHANGED FILES: \"%s\" does not occur in the files changed by this patch set. The rest of the "
+          + "repository was not searched; repeat the search with scope=\""
+          + SCOPE_PROJECT
+          + "\" before concluding that a symbol, declaration or import is missing.";
+  private static final String PROJECT_SCOPE_MISS_FORMAT =
+      "NO MATCH IN PROJECT: \"%s\" does not occur in the repository at this patch set.";
+  private static final String TREE_CHANGE_SCOPE_MISS =
+      "NO CHANGED FILES IN SCOPE: the tree is limited to the files changed by this patch set and none match this "
+          + "request; repeat with scope=\""
+          + SCOPE_PROJECT
+          + "\" to inspect the repository tree.";
+  private static final String GREP_TRUNCATION_FORMAT =
+      "[truncated: showing %d of %d matches; narrow the search string]";
 
   private final GerritChange change;
   private final GitRepoFiles gitRepoFiles;
@@ -91,9 +115,9 @@ public class OnDemandCodeContextTools extends ClientBase {
       JsonObject argumentObject = parseArguments(arguments);
       response =
           switch (toolName) {
-            case TREE -> tree(getString(argumentObject, "subdir"));
+            case TREE -> tree(getString(argumentObject, "subdir"), isProjectScope(argumentObject));
             case GET_CONTENT -> getContent(getString(argumentObject, "file_path"));
-            case GREP -> grep(getString(argumentObject, "string"));
+            case GREP -> grep(getString(argumentObject, "string"), isProjectScope(argumentObject));
             default -> "";
           };
     } catch (FileNotFoundException e) {
@@ -111,19 +135,21 @@ public class OnDemandCodeContextTools extends ClientBase {
     return response;
   }
 
-  private String tree(String subdir) {
+  private String tree(String subdir, boolean projectScope) {
     List<String> paths = gitRepoFiles.getPatchSetFileTree(config, change, subdir);
     if (paths == null || paths.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    Set<String> changed = changedFiles();
+    Set<String> changed = projectScope ? null : changedFiles();
     if (changed != null) {
       paths = paths.stream().filter(changed::contains).toList();
       if (paths.isEmpty()) {
-        return CONTEXT_NOT_PROVIDED;
+        return TREE_CHANGE_SCOPE_MISS;
       }
     }
-    return treeOutputCompressor.format(paths, subdir);
+    String formatted = treeOutputCompressor.format(paths, subdir);
+    // Without a resolved change, the tree spans the repository even in change scope.
+    return projectScope || changed == null ? PROJECT_SCOPE_HEADER + "\n" + formatted : formatted;
   }
 
   private String getContent(String filePath) throws FileNotFoundException {
@@ -142,16 +168,45 @@ public class OnDemandCodeContextTools extends ClientBase {
     return COMMIT_MESSAGE_PATH_PATTERN.matcher(filePath).matches();
   }
 
-  private String grep(String string) {
+  private String grep(String string, boolean projectScope) {
     if (string == null || string.isEmpty()) {
       return CONTEXT_NOT_PROVIDED;
     }
-    Set<String> changed = changedFiles();
+    Set<String> changed = projectScope ? null : changedFiles();
+    // Without a resolved change, the search spans the repository even in change scope.
+    boolean repositoryWide = projectScope || changed == null;
     List<String> matches = gitRepoFiles.grepPatchSet(config, change, string, changed);
     if (matches == null || matches.isEmpty()) {
-      return CONTEXT_NOT_PROVIDED;
+      return String.format(
+          repositoryWide ? PROJECT_SCOPE_MISS_FORMAT : CHANGE_SCOPE_MISS_FORMAT, string);
     }
-    return String.join("\n", matches);
+    return formatGrepMatches(matches, repositoryWide);
+  }
+
+  private static String formatGrepMatches(List<String> matches, boolean repositoryWide) {
+    StringBuilder output = new StringBuilder();
+    if (repositoryWide) {
+      output.append(PROJECT_SCOPE_HEADER).append('\n');
+    }
+    output.append(
+        String.join("\n", matches.subList(0, Math.min(matches.size(), MAX_GREP_MATCHES))));
+    if (matches.size() > MAX_GREP_MATCHES) {
+      output
+          .append('\n')
+          .append(String.format(GREP_TRUNCATION_FORMAT, MAX_GREP_MATCHES, matches.size()));
+    }
+    return output.toString();
+  }
+
+  private static boolean isProjectScope(JsonObject arguments) {
+    String scope = getNonBlankString(arguments, SCOPE);
+    if (SCOPE_PROJECT.equalsIgnoreCase(scope)) {
+      return true;
+    }
+    if (scope != null && !SCOPE_CHANGE.equalsIgnoreCase(scope)) {
+      log.debug("Unknown on-demand code context scope `{}`; using `{}`", scope, SCOPE_CHANGE);
+    }
+    return false;
   }
 
   private static JsonObject parseArguments(String arguments) {
