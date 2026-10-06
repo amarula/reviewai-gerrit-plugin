@@ -180,6 +180,22 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commentWithFilePathIsTreatedAsMessage() throws RestApiException {
+    String message =
+        "Defined in "
+            + "common/src/commonMain/kotlin/com/amarula/travelsmart/common/ui/screens/"
+            + "ViewExpenseScreen.kt";
+    setupCommandComment(message);
+    setupMockRequestCreateResponse("openAiResponseRequest.json");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    testRequestSent();
+    Assert.assertTrue(getUserPrompt().contains(message));
+    Assert.assertNull(changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
   public void commandReview() throws RestApiException {
     when(globalConfig.getBoolean(Mockito.eq("enabledVoting"), Mockito.anyBoolean()))
         .thenReturn(true);

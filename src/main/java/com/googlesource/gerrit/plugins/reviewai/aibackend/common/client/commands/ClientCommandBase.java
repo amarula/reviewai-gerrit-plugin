@@ -88,14 +88,34 @@ public abstract class ClientCommandBase extends ClientBase {
   // Option values can be either a sequence of chars enclosed in double quotes or a sequence of
   // non-space chars.
   private static final String OPTION_VALUES = "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\"|\\S+";
+  // A command keyword is only recognized as a standalone token: it cannot be embedded in a word or
+  // a path (`common/src`, `and/or`), nor be followed by a path separator (`/usr/lib`).
+  private static final String COMMAND_TOKEN_START = "(?<![\\w/])";
+  private static final String COMMAND_TOKEN_END = "\\b(?![/\\w])";
 
   protected static final Pattern MESSAGE_COMMAND_PATTERN =
       Pattern.compile(
-          "\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.MESSAGE) + "\\b(.*)$", Pattern.DOTALL);
+          COMMAND_TOKEN_START
+              + "\\s*/"
+              + COMMAND_MAP_INVERSE.get(CommandSet.MESSAGE)
+              + COMMAND_TOKEN_END
+              + "(.*)$",
+          Pattern.DOTALL);
   protected static final Pattern DIRECTIVE_COMMAND_PATTERN =
-      Pattern.compile("\\s*/" + COMMAND_MAP_INVERSE.get(CommandSet.DIRECTIVES) + "\\b.*$");
+      Pattern.compile(
+          COMMAND_TOKEN_START
+              + "\\s*/"
+              + COMMAND_MAP_INVERSE.get(CommandSet.DIRECTIVES)
+              + COMMAND_TOKEN_END
+              + ".*$");
   public static final Pattern COMMAND_PATTERN =
-      Pattern.compile("/(\\w+)\\b((?:\\s+--\\w+(?:=(?:" + OPTION_VALUES + "))?)+)?");
+      Pattern.compile(
+          COMMAND_TOKEN_START
+              + "/(\\w+)"
+              + COMMAND_TOKEN_END
+              + "((?:\\s+--\\w+(?:=(?:"
+              + OPTION_VALUES
+              + "))?)+)?");
   private static final Pattern GERRIT_MESSAGE_SKIPPED_COMMAND_PATTERN =
       Pattern.compile(
           "\\s*/(?:"

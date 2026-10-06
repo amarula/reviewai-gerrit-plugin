@@ -342,3 +342,6 @@ selectiveLogLevelOverride:
 The same messages and commands can also be sent through regular Gerrit comments instead of the Review Agent sidebar. In
 that mode, the message must still be addressed to the AI user, for example `@gpt /review`, where `gpt` is the configured
 `gerritUserName`.
+
+A command is recognized only as a standalone token: a slash embedded in a word or a path, as in
+`common/src/main/ViewExpenseScreen.kt` or `and/or`, is treated as plain text.

@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.command
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -219,6 +220,32 @@ public class ClientCommandParserTest {
     assertTrue(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.FORGET_THREAD));
   }
 
+  @Test
+  public void filePathInCommentIsNotParsedAsCommand() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser = parserForRole(changeSetData, AiRole.USER);
+
+    assertFalse(
+        parser.parseCommands(
+            "Defined in common/src/commonMain/kotlin/com/amarula/travelsmart/common/ui/screens/"
+                + "ViewExpenseScreen.kt",
+            false));
+
+    assertNull(changeSetData.getReviewSystemMessage());
+    assertFalse(changeSetData.hasParsedCommand(ClientCommandBase.CommandSet.REVIEW));
+  }
+
+  @Test
+  public void unknownCommandIsStillReported() {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    ClientCommandParser parser = parserForRole(changeSetData, AiRole.USER);
+
+    parser.parseCommands("@gpt /UNKNOWN", false);
+
+    assertNotNull(changeSetData.getReviewSystemMessage());
+    assertTrue(changeSetData.getReviewSystemMessage().contains("/UNKNOWN"));
+  }
+
   private static ClientCommandParser parserForRole(ChangeSetData changeSetData, AiRole role) {
     return new ClientCommandParser(
         mock(Configuration.class),
@@ -245,6 +272,8 @@ public class ClientCommandParserTest {
         .thenReturn("Unable to execute command: the -dev build is required");
     when(localizer.getText("message.command.option.unknown"))
         .thenReturn("Unknown command option: %s %s");
+    when(localizer.getText("message.command.unknown"))
+        .thenReturn("Unknown command in comment `%s`");
     when(localizer.getText("message.command.moderator.required"))
         .thenReturn("Unable to execute command: Moderator privileges are required");
     return localizer;
