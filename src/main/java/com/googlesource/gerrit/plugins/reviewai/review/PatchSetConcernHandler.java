@@ -16,8 +16,6 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
-
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.filename.FilenameSanitizer;
@@ -32,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
+import com.googlesource.gerrit.plugins.reviewai.utils.GerritUtils;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
@@ -63,12 +62,7 @@ final class PatchSetConcernHandler {
     updates.put(change.getFullChangeId(), previousLedger);
     AiResponseContent response = new AiResponseContent("");
     response.setPendingConcernUpdates(updates);
-    detachConcernsWithoutFiles(
-        response,
-        change,
-        filename ->
-            GERRIT_PATCH_SET_FILENAME.equals(filename)
-                || (filename != null && filename.endsWith("/COMMIT_MSG")));
+    detachConcernsWithoutFiles(response, change, GerritUtils::isGerritNonFilePath);
     setDetachedConcernsMessage(response, change, null);
     if (updates.get(change.getFullChangeId()).orElseThrow() != previousLedger) {
       reviewConcernPublisher.persist(response, change);

@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.ondemand;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GerritUtils.isCommitMessagePath;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getNonBlankString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.getString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.StringUtils.cutString;
@@ -29,7 +30,6 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -42,8 +42,6 @@ public class OnDemandCodeContextTools extends ClientBase {
   private static final String CONTEXT_NOT_PROVIDED = "CONTEXT NOT PROVIDED";
   private static final String PREEXISTING_CONTEXT_MARKER =
       "NOTE: This file is pre-existing repository context and is NOT part of the current change.\n\n";
-  private static final Pattern COMMIT_MESSAGE_PATH_PATTERN =
-      Pattern.compile("^(?:reviewai-topic-change-.*)?/?COMMIT_MSG$");
   private static final int LOG_MAX_CONTENT_SIZE = 256;
   static final String SCOPE_CHANGE = "change";
   static final String SCOPE_PROJECT = "project";
@@ -162,10 +160,6 @@ public class OnDemandCodeContextTools extends ClientBase {
       return PREEXISTING_CONTEXT_MARKER + content;
     }
     return content;
-  }
-
-  private static boolean isCommitMessagePath(String filePath) {
-    return COMMIT_MESSAGE_PATH_PATTERN.matcher(filePath).matches();
   }
 
   private String grep(String string, boolean projectScope) {

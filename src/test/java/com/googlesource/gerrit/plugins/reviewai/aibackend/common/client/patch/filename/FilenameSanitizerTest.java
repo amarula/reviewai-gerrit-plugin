@@ -85,12 +85,29 @@ public class FilenameSanitizerTest {
   }
 
   @Test
+  public void commitMessageIsAlwaysPartOfTheRevision() {
+    // The commit message is not a file of the revision and the patch set only lists it in suggest
+    // mode, so a commit-message concern looks stale to anything that trusts the file list. Treating
+    // it as stale dismissed every commit-message concern the moment it was raised.
+    FilenameSanitizer sanitizer = sanitizer(List.of("src/A.java"));
+
+    assertTrue(sanitizer.isPartOfPatchSet("/COMMIT_MSG"));
+    assertTrue(sanitizer.sanitizeFilename(reply("/COMMIT_MSG")));
+    assertTrue(
+        "a topic review prefixes filenames with the change they came from",
+        sanitizer.isPartOfPatchSet("reviewai-topic-change-1/COMMIT_MSG"));
+    assertTrue(sanitizer.sanitizeFilename(reply("reviewai-topic-change-1/COMMIT_MSG")));
+  }
+
+  @Test
   public void aMissingNameIsNotPartOfTheRevision() {
     FilenameSanitizer sanitizer = sanitizer(List.of("src/A.java"));
 
     assertFalse(sanitizer.isPartOfPatchSet(null));
     assertFalse(sanitizer.isPartOfPatchSet(""));
     assertFalse(sanitizer.isPartOfPatchSet("src/Gone.java"));
+    assertFalse(sanitizer.isPartOfPatchSet("COMMIT_MSG"));
+    assertFalse(sanitizer.isPartOfPatchSet("docs/COMMIT_MSG"));
     assertTrue(sanitizer.isPartOfPatchSet("src/A.java"));
   }
 

@@ -16,7 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.filename;
 
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GerritUtils.isGerritNonFilePath;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
@@ -51,9 +51,9 @@ public class FilenameSanitizer {
     if (filename == null || filename.isEmpty()) {
       return false;
     }
-    if (GERRIT_PATCH_SET_FILENAME.equals(filename)) {
-      // Not a path at all: Gerrit's own key for a comment that belongs to the change rather than to
-      // a file. It is always valid, whatever revision the files list describes.
+    if (isGerritNonFilePath(filename)) {
+      // Not a file of the revision: Gerrit's own key for the change or its commit message. Always
+      // valid, whatever the file list describes.
       return true;
     }
     if (patchSetFiles == null || patchSetFiles.isEmpty()) {
@@ -82,10 +82,10 @@ public class FilenameSanitizer {
       // The model answered without anchoring to a file, which is allowed.
       return true;
     }
-    if (GERRIT_PATCH_SET_FILENAME.equals(filename)) {
-      // Gerrit's key for a change-level comment. It is accepted as-is, and it is not a path that
-      // could be missing from the file list - reporting it as unanchored would tell the author a
-      // finding was lost when it was not.
+    if (isGerritNonFilePath(filename)) {
+      // Gerrit's keys for the change and its commit message. They are accepted as-is, and they are
+      // not paths that could be missing from the file list - reporting them as unanchored would
+      // tell the author a finding was lost when it was not.
       return true;
     }
     if (patchSetFiles == null || patchSetFiles.isEmpty()) {

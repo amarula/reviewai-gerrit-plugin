@@ -85,6 +85,30 @@ public class ReviewConcernDetachmentTest {
   }
 
   @Test
+  public void keepsCommitMessageConcernsWhenNoFilesRemain() {
+    ReviewConcernLedger ledger =
+        ledger(
+            concern("c1", ConcernStatus.PRESENT, "/COMMIT_MSG"),
+            concern("c2", ConcernStatus.PRESENT, "reviewai-topic-change-1/COMMIT_MSG"));
+
+    assertSame(
+        ledger,
+        ReviewConcernDetachment.detachConcernsWithoutFiles(ledger, filename -> false, REASON));
+  }
+
+  @Test
+  public void detachesAnOrdinaryFileNamedCommitMsg() {
+    ReviewConcernLedger ledger = ledger(concern("c1", ConcernStatus.PRESENT, "docs/COMMIT_MSG"));
+
+    assertEquals(
+        ConcernStatus.DETACHED,
+        firstConcern(
+                ReviewConcernDetachment.detachConcernsWithoutFiles(
+                    ledger, filename -> false, REASON))
+            .getStatus());
+  }
+
+  @Test
   public void leavesAUserDismissalAlone() {
     ReviewConcern concern = concern("c1", ConcernStatus.DISMISSED, "Gone.java");
     concern.setStatusReason("accepted risk");
