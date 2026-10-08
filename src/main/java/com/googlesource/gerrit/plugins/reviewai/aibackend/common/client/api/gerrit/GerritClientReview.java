@@ -292,6 +292,11 @@ public class GerritClientReview extends GerritClientAccount {
       boolean emptyComments,
       String systemMessage) {
     List<String> messages = new ArrayList<>();
+    if (changeSetData.getReviewDetachedConcernsMessage() != null) {
+      messages.add(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewDetachedConcernsMessage()));
+    }
     Optional.ofNullable(ClientCommandBase.getDeprecationWarning(changeSetData, localizer))
         .ifPresent(messages::add);
     if (changeSetData.getReviewNoticeMessage() != null) {
@@ -319,6 +324,7 @@ public class GerritClientReview extends GerritClientAccount {
     if (reviewScore == null
         || changeSetData.getReviewSystemMessage() != null
         || changeSetData.getReviewRepeatedCommentsMessage() != null
+        || changeSetData.getReviewDetachedConcernsMessage() != null
         || changeSetData.hasParsedCommand("forget_thread")) {
       return false;
     }

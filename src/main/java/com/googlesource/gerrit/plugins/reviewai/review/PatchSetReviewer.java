@@ -125,6 +125,7 @@ public class PatchSetReviewer {
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    changeSetData.setReviewDetachedConcernsMessage(null);
     reviewFeedbackLifecycle.reset(changeSetData);
     if (!changeSetData.shouldRequestAiReview()) {
       log.debug(
@@ -243,6 +244,7 @@ public class PatchSetReviewer {
     reviewScores = new ArrayList<>();
     changeSetData.setReviewNoticeMessage(null);
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    changeSetData.setReviewDetachedConcernsMessage(null);
     gerritClient.retrievePatchSetInfo(change);
     gerritClient.getPatchSet(change);
     commentProperties = gerritClient.getClientData(change).getCommentProperties();
@@ -284,6 +286,7 @@ public class PatchSetReviewer {
   private List<ReviewBatch> retrieveReviewBatches(
       AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix) {
     List<ReviewBatch> batches = new ArrayList<>();
+    concernHandler.setDetachedConcernsMessage(reviewReply, change, topicFilenamePrefix);
     ReviewCommentAnchoring commentAnchoring =
         new ReviewCommentAnchoring(gerritClient, change, commentProperties, gerritCommentRange);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();

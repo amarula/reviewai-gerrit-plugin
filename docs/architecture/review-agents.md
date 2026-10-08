@@ -39,6 +39,9 @@ ledger but are omitted from New Issue Finder inputs and do not suppress neutral-
 is assigned deterministically by the client, not by the Concern Reviewer. When its scope is enabled again, the Concern
 Reviewer reassesses it and returns an evidence-based state.
 
+The review message lists files associated with detached historical findings separately from any new comments.
+New findings published without their original file anchors do not trigger the skipped-findings notice.
+
 #### `DISMISSED` versus `SKIPPED`
 
 Both states suppress a concern from normal repeated-comment publication, but they record different decisions:
