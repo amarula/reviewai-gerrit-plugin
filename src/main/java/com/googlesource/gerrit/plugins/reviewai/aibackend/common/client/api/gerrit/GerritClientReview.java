@@ -314,9 +314,15 @@ public class GerritClientReview extends GerritClientAccount {
           SystemMessageFormatter.getPrefixedSystemMessage(
               localizer, changeSetData.getReviewDismissedConcernsMessage()));
     }
+    if (changeSetData.getReviewAppliedFixesMessage() != null) {
+      messages.add(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewAppliedFixesMessage()));
+    }
     if (emptyComments
         && changeSetData.getReviewRepeatedCommentsMessage() == null
-        && changeSetData.getReviewDismissedConcernsMessage() == null) {
+        && changeSetData.getReviewDismissedConcernsMessage() == null
+        && changeSetData.getReviewAppliedFixesMessage() == null) {
       messages.add(SystemMessageFormatter.getPrefixedSystemMessage(localizer, systemMessage));
     }
     SystemMessageFormatter.appendConfigurationWarningMessages(config, localizer, messages);
@@ -333,6 +339,7 @@ public class GerritClientReview extends GerritClientAccount {
         || changeSetData.getReviewRepeatedCommentsMessage() != null
         || changeSetData.getReviewUnanchoredCommentsMessage() != null
         || changeSetData.getReviewDismissedConcernsMessage() != null
+        || changeSetData.getReviewAppliedFixesMessage() != null
         || changeSetData.hasParsedCommand("forget_thread")) {
       return false;
     }

@@ -38,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Co
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDismissal;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernFixClosure;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
@@ -48,6 +49,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityCh
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewReplyMapper;
+import com.googlesource.gerrit.plugins.reviewai.utils.AddedCode;
 import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.util.*;
 import javax.annotation.Nullable;
@@ -182,6 +184,7 @@ public class PatchSetReviewer {
     }
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change);
+      closeConcernsWithAppliedFixes(reviewReply, change);
       dismissConcernsWithoutFiles(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change, reviewReply);
@@ -243,6 +246,7 @@ public class PatchSetReviewer {
     ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change, topicFilenamePrefix);
+      closeConcernsWithAppliedFixes(reviewReply, change);
       dismissConcernsWithoutFiles(reviewReply, change);
     }
     Integer reviewScore =
@@ -345,6 +349,61 @@ public class PatchSetReviewer {
             localizer,
             "message.review.concerns.dismissed",
             String.join(", ", new TreeSet<>(dismissedFilenames))));
+  }
+
+  /**
+   * Closes the concerns whose suggested fix the author has applied.
+   *
+   * <p>Runs before the score and before publication, for the same reasons as the dismissal step,
+   * and <em>before</em> it: an applied fix is direct evidence about a concern, while a vanished
+   * file is only the absence of evidence, so the stronger reading gets first say.
+   *
+   * <p>The check is deterministic and looks for the proposed code in the revision the review is
+   * working from, so it cannot be talked out of by a reviewer holding the fix to a stricter
+   * standard the second time round. Anything still wrong after an applied fix is a new concern, and
+   * the reviewer is free to raise one; what it cannot do is re-raise this one.
+   */
+  void closeConcernsWithAppliedFixes(AiResponseContent reviewReply, GerritChange change)
+      throws Exception {
+    PendingReviewConcernUpdates pendingUpdates = reviewReply.getPendingConcernUpdates();
+    if (pendingUpdates == null) {
+      return;
+    }
+    // What this review is actually reasoning about: the delta on a re-review, the patch otherwise.
+    String measuredPatch = changeSetData.getIncrementalPatchSet();
+    if (measuredPatch == null || measuredPatch.isBlank()) {
+      measuredPatch = gerritClient.getPatchSet(change);
+    }
+    String patch = measuredPatch;
+    String reason = localizer.getText("message.review.concern.resolution.fix.applied");
+    pendingUpdates
+        .get(change.getFullChangeId())
+        .map(
+            ledger ->
+                ReviewConcernFixClosure.closeConcernsWithAppliedFixes(
+                    ledger,
+                    fix -> AddedCode.appearsIn(patch, fix.getFilename(), fix.getCode()),
+                    reason))
+        .filter(result -> !result.closedFilenames().isEmpty())
+        .ifPresent(
+            result -> {
+              pendingUpdates.replace(change.getFullChangeId(), result.ledger());
+              setAppliedFixesMessage(result.closedFilenames());
+            });
+  }
+
+  /**
+   * Tells the author which concerns were closed because the fix they applied resolved them.
+   *
+   * <p>The thread is resolved with the same news, but a resolved thread is easy to miss and this is
+   * the moment the loop they were stuck in ends.
+   */
+  private void setAppliedFixesMessage(List<String> filenames) {
+    changeSetData.setReviewAppliedFixesMessage(
+        SystemMessageFormatter.getLocalizedMessage(
+            localizer,
+            "message.review.concerns.fix.applied",
+            String.join(", ", new TreeSet<>(filenames))));
   }
 
   /**

@@ -38,6 +38,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Pe
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.SuggestedFix;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
@@ -337,6 +338,73 @@ public class PatchSetReviewerTest {
     assertEquals("Closed: Gone.java", changeSetData.getReviewDismissedConcernsMessage());
   }
 
+  @Test
+  public void closesAConcernWhoseSuggestedFixWasApplied() throws Exception {
+    // The reported loop: the author applied exactly what ReviewAI proposed, and the next review
+    // raised
+    // the same concern again. The fix is in the revision, so the concern is over.
+    GerritChange change = change();
+    AiResponseContent response = responseWithFix(change, ConcernStatus.PRESENT);
+    ChangeSetData changeSetData = changeSetDataWithDelta(APPLIED_FIX);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(List.of("A.kt"), changeSetData, APPLIED_FIX);
+
+    reviewer.closeConcernsWithAppliedFixes(response, change);
+
+    ReviewConcern concern = firstConcern(response, change);
+    assertEquals(ConcernStatus.FIXED, concern.getStatus());
+    assertEquals(
+        "not DISMISSED: dismissal suppresses the positive vote, and an accepted fix is the opposite",
+        Boolean.FALSE,
+        Boolean.TRUE.equals(concern.getAutomaticDismissal()));
+  }
+
+  @Test
+  public void overridesAReviewerThatStillCallsTheConcernPresent() throws Exception {
+    // The guarantee. The reviewer held the applied fix to a stricter standard the second time
+    // round,
+    // and that is exactly the judgement this step must not defer to: the author did what they were
+    // told.
+    GerritChange change = change();
+    AiResponseContent response = responseWithFix(change, ConcernStatus.PRESENT);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(
+            List.of("A.kt"), changeSetDataWithDelta(APPLIED_FIX), APPLIED_FIX);
+
+    reviewer.closeConcernsWithAppliedFixes(response, change);
+
+    assertEquals(ConcernStatus.FIXED, firstConcern(response, change).getStatus());
+  }
+
+  @Test
+  public void keepsAConcernWhoseSuggestedFixWasNotApplied() throws Exception {
+    GerritChange change = change();
+    AiResponseContent response = responseWithFix(change, ConcernStatus.PRESENT);
+    ChangeSetData changeSetData = changeSetDataWithDelta(UNRELATED_DELTA);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(List.of("A.kt"), changeSetData, UNRELATED_DELTA);
+
+    reviewer.closeConcernsWithAppliedFixes(response, change);
+
+    assertEquals(ConcernStatus.PRESENT, firstConcern(response, change).getStatus());
+    assertNull(
+        "nothing was closed, so there is nothing to tell the author about",
+        changeSetData.getReviewAppliedFixesMessage());
+  }
+
+  @Test
+  public void tellsTheAuthorWhichConcernTheAppliedFixClosed() throws Exception {
+    GerritChange change = change();
+    AiResponseContent response = responseWithFix(change, ConcernStatus.PRESENT);
+    ChangeSetData changeSetData = changeSetDataWithDelta(APPLIED_FIX);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(List.of("A.kt"), changeSetData, APPLIED_FIX);
+
+    reviewer.closeConcernsWithAppliedFixes(response, change);
+
+    assertEquals("Closed: A.kt", changeSetData.getReviewAppliedFixesMessage());
+  }
+
   private static AiResponseContent responseWithConcern(
       GerritChange change, String status, String filename) {
     ReviewConcern concern = new ReviewConcern();
@@ -378,12 +446,24 @@ public class PatchSetReviewerTest {
 
   private static PatchSetReviewer reviewerWithPatchSetFiles(
       List<String> patchSetFiles, ChangeSetData changeSetData) {
+    return reviewerWithPatchSetFiles(patchSetFiles, changeSetData, null);
+  }
+
+  private static PatchSetReviewer reviewerWithPatchSetFiles(
+      List<String> patchSetFiles, ChangeSetData changeSetData, String patchSetText) {
     IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
     when(patchSet.getPatchSetFiles()).thenReturn(patchSetFiles);
     GerritClientData clientData = mock(GerritClientData.class);
     when(clientData.getGerritClientPatchSet()).thenReturn(patchSet);
     GerritClient gerritClient = mock(GerritClient.class);
     when(gerritClient.getClientData(any())).thenReturn(clientData);
+    if (patchSetText != null) {
+      try {
+        when(gerritClient.getPatchSet(any(GerritChange.class))).thenReturn(patchSetText);
+      } catch (Exception e) {
+        throw new IllegalStateException(e);
+      }
+    }
 
     Configuration config = mock(Configuration.class);
     when(config.isVotingEnabled()).thenReturn(true);
@@ -416,12 +496,57 @@ public class PatchSetReviewerTest {
               String key = invocation.getArgument(0);
               return switch (key) {
                 case "message.review.concerns.dismissed" -> "Closed: %s";
+                case "message.review.concerns.fix.applied" -> "Closed: %s";
                 case "message.review.comments.not.anchored" -> "Not anchored: %s";
                 default -> "";
               };
             });
     return localizer;
   }
+
+  private static ChangeSetData changeSetDataWithDelta(String delta) {
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setIncrementalPatchSet(delta);
+    return changeSetData;
+  }
+
+  private static AiResponseContent responseWithFix(GerritChange change, ConcernStatus status) {
+    SuggestedFix fix = new SuggestedFix();
+    fix.setFilename("A.kt");
+    fix.setCode("val applied = true");
+    fix.setResolvedWhen("the key survives a transient failure");
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("c1");
+    concern.setStatus(status);
+    concern.setSuggestedFix(fix);
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewerConcerns));
+    AiResponseContent response = new AiResponseContent("");
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    response.setPendingConcernUpdates(updates);
+    return response;
+  }
+
+  private static final String APPLIED_FIX =
+      """
+      diff --git a/A.kt b/A.kt
+      --- a/A.kt
+      +++ b/A.kt
+      @@ -1,1 +1,1 @@
+      +    val applied = true
+      """;
+
+  private static final String UNRELATED_DELTA =
+      """
+      diff --git a/A.kt b/A.kt
+      --- a/A.kt
+      +++ b/A.kt
+      @@ -1,1 +1,1 @@
+      +    val somethingElse = true
+      """;
 
   private static GerritChange change() {
     GerritChange change = mock(GerritChange.class);
