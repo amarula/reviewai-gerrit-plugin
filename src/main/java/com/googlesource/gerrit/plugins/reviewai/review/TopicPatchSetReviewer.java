@@ -16,6 +16,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.extractFilesFromPatch;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -108,15 +111,13 @@ class TopicPatchSetReviewer {
     }
 
     GerritChange primaryChange = patchSets.getFirst().change();
+    String mergedPatchSet = topicPatchSetReviewMerger.buildMergedPatchSet(patchSets);
     gerritClient.getPatchSet(primaryChange);
     ChangeSetDataHandler.update(config, primaryChange, gerritClient, changeSetData, localizer);
     AiResponseContent reviewReply = null;
     try {
       reviewReply =
-          patchSetReviewer.getReviewReply(
-              primaryChange,
-              topicPatchSetReviewMerger.buildMergedPatchSet(patchSets),
-              largestChangePatch);
+          patchSetReviewer.getReviewReply(primaryChange, mergedPatchSet, largestChangePatch);
       log.debug("AI final response for topic review: {}", reviewReply);
     } catch (AiRequestSupersededException e) {
       throw e;
@@ -144,6 +145,20 @@ class TopicPatchSetReviewer {
       return;
     }
 
+    if (reviewReply != null) {
+      List<String> topicFiles = extractFilesFromPatch(mergedPatchSet);
+      for (TopicReviewPatchSet patchSet : patchSets) {
+        patchSetReviewer.detachConcernsWithoutFiles(
+            reviewReply,
+            patchSet.change(),
+            filename ->
+                filename != null
+                    && !filename.isEmpty()
+                    && (GERRIT_PATCH_SET_FILENAME.equals(filename)
+                        || topicFiles.isEmpty()
+                        || topicFiles.stream().anyMatch(path -> path.contains(filename))));
+      }
+    }
     List<Double> topicReviewScores = patchSetReviewer.getReviewScores(reviewReply);
     for (TopicReviewPatchSet patchSet : patchSets) {
       gerritClient.requireCurrentRevision(patchSet.change());
