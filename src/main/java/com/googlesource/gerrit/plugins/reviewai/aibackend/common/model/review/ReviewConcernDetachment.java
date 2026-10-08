@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GerritUtils.isGerritNonFilePath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -113,11 +114,7 @@ public final class ReviewConcernDetachment {
     boolean anyInRevision =
         locations.stream()
             .map(ConcernLocation::getFilename)
-            .anyMatch(
-                filename ->
-                    GERRIT_PATCH_SET_FILENAME.equals(filename)
-                        || (filename != null && filename.endsWith("/COMMIT_MSG"))
-                        || fileInRevision.test(filename));
+            .anyMatch(filename -> isGerritNonFilePath(filename) || fileInRevision.test(filename));
     if (anyInRevision) {
       return concern;
     }
