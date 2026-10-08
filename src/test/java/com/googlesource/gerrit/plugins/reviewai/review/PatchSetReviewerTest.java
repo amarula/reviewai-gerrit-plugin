@@ -16,10 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,11 +29,14 @@ import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
@@ -39,10 +44,15 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import org.junit.Test;
 
 public class PatchSetReviewerTest {
@@ -265,6 +275,73 @@ public class PatchSetReviewerTest {
         localizer,
         mock(PatchSetReviewConversationRecorder.class),
         mock(ReviewConcernPublisher.class),
+        mock(ReviewFeedbackLifecycle.class),
+        mock(AiReviewApplicabilityChecker.class),
+        null);
+  }
+
+  @Test
+  public void publishesAndScoresRepliesWithoutConcernIds() throws Exception {
+    DetachmentRegression fixture = readDetachmentRegression();
+    AiReplyItem reply = fixture.replies.get(1);
+    reply.setConcernId(null);
+    AiResponseContent response = new AiResponseContent("");
+    response.setReplies(List.of(reply));
+    ChangeSetData data = new ChangeSetData(1);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(fixture.patchSetFiles, data, mock(ReviewConcernPublisher.class));
+
+    assertEquals(List.of(reply.getScore()), reviewer.getReviewScores(response));
+    assertEquals(
+        List.of(reply.getReply()),
+        reviewer.retrieveReviewBatches(response, change()).stream()
+            .map(ReviewBatch::getContent)
+            .toList());
+  }
+
+  private static DetachmentRegression readDetachmentRegression() throws IOException {
+    try (var reader =
+        new InputStreamReader(
+            PatchSetReviewerTest.class
+                .getClassLoader()
+                .getResourceAsStream("__files/review/concernDetachmentRegression.json"),
+            StandardCharsets.UTF_8)) {
+      return getGson().fromJson(reader, DetachmentRegression.class);
+    }
+  }
+
+  private static final class DetachmentRegression {
+    List<AiReplyItem> replies;
+    List<String> patchSetFiles;
+  }
+
+  private static PatchSetReviewer reviewerWithPatchSetFiles(List<String> patchSetFiles) {
+    return reviewerWithPatchSetFiles(
+        patchSetFiles, new ChangeSetData(1), mock(ReviewConcernPublisher.class));
+  }
+
+  private static PatchSetReviewer reviewerWithPatchSetFiles(
+      List<String> patchSetFiles, ChangeSetData changeSetData, ReviewConcernPublisher publisher) {
+    IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
+    when(patchSet.getPatchSetFiles()).thenReturn(patchSetFiles);
+    GerritClientData clientData = mock(GerritClientData.class);
+    when(clientData.getGerritClientPatchSet()).thenReturn(patchSet);
+    GerritClient gerritClient = mock(GerritClient.class);
+    when(gerritClient.getClientData(any())).thenReturn(clientData);
+
+    Configuration config = mock(Configuration.class);
+    when(config.isVotingEnabled()).thenReturn(true);
+    when(config.getConvertNeutralReviewScoreToPositive()).thenReturn(true);
+    when(config.getLocaleDefault()).thenReturn(Locale.ROOT);
+    return new PatchSetReviewer(
+        gerritClient,
+        config,
+        changeSetData,
+        Providers.of(mock(GerritClientReview.class)),
+        mock(IAiClient.class),
+        new Localizer(config),
+        mock(PatchSetReviewConversationRecorder.class),
+        publisher,
         mock(ReviewFeedbackLifecycle.class),
         mock(AiReviewApplicabilityChecker.class),
         null);
