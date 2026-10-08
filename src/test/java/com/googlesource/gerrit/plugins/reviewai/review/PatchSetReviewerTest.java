@@ -408,6 +408,7 @@ public class PatchSetReviewerTest {
         reviewer.retrieveReviewBatches(response, change).stream()
             .map(ReviewBatch::getContent)
             .toList());
+    assertEquals(fixture.detachedNotice, data.getReviewDetachedConcernsMessage());
 
     // Detached concerns remain unpublished even if the response includes their text.
     List<AiReplyItem> replies = new ArrayList<>(fixture.replies);
@@ -444,6 +445,7 @@ public class PatchSetReviewerTest {
         reviewer.retrieveReviewBatches(response, change).stream()
             .map(ReviewBatch::getContent)
             .toList());
+    assertNull(data.getReviewDetachedConcernsMessage());
   }
 
   @Test
@@ -463,6 +465,7 @@ public class PatchSetReviewerTest {
         reviewer.retrieveReviewBatches(response, change()).stream()
             .map(ReviewBatch::getContent)
             .toList());
+    assertNull(data.getReviewDetachedConcernsMessage());
   }
 
   private static DetachmentRegression readDetachmentRegression() throws IOException {
@@ -480,6 +483,7 @@ public class PatchSetReviewerTest {
     ReviewConcernLedger previousLedger;
     List<AiReplyItem> replies;
     List<String> patchSetFiles;
+    String detachedNotice;
   }
 
   private static AiResponseContent responseWithConcern(

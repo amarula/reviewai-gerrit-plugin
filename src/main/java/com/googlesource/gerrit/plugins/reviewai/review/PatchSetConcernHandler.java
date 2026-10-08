@@ -24,12 +24,16 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.fi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDetachment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 
 /** Applies file removal to concern lifecycle, persistence, and review notices. */
@@ -65,6 +69,7 @@ final class PatchSetConcernHandler {
         filename ->
             GERRIT_PATCH_SET_FILENAME.equals(filename)
                 || (filename != null && filename.endsWith("/COMMIT_MSG")));
+    setDetachedConcernsMessage(response, change, null);
     if (updates.get(change.getFullChangeId()).orElseThrow() != previousLedger) {
       reviewConcernPublisher.persist(response, change);
     }
@@ -99,6 +104,40 @@ final class PatchSetConcernHandler {
                 ReviewConcernDetachment.detachConcernsWithoutFiles(
                     ledger, changeSetData.getPreviousReviewConcernLedger(), fileInRevision, reason))
         .ifPresent(ledger -> pendingUpdates.replace(change.getFullChangeId(), ledger));
+  }
+
+  /**
+   * Lists files whose detached concerns are omitted from publication and scoring.
+   *
+   * <p>Set as a change-level message rather than as {@code reviewSystemMessage}, which suppresses
+   * every comment: detached findings are skipped while current findings are still published.
+   */
+  void setDetachedConcernsMessage(
+      AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix) {
+    changeSetData.setReviewDetachedConcernsMessage(null);
+    PendingReviewConcernUpdates updates = reviewReply.getPendingConcernUpdates();
+    if (updates == null) {
+      return;
+    }
+    Set<String> detachedFilenames = new TreeSet<>();
+    updates.get(change.getFullChangeId()).stream()
+        .flatMap(ledger -> ledger.getReviewers().stream())
+        .flatMap(reviewer -> reviewer.getConcerns().stream())
+        .filter(concern -> concern.getStatus() == ConcernStatus.DETACHED)
+        .flatMap(concern -> concern.getLocations().stream())
+        .map(ConcernLocation::getFilename)
+        .filter(filename -> filename != null && !filename.isBlank())
+        .map(
+            filename ->
+                topicFilenamePrefix != null && filename.startsWith(topicFilenamePrefix)
+                    ? filename.substring(topicFilenamePrefix.length())
+                    : filename)
+        .forEach(detachedFilenames::add);
+    if (!detachedFilenames.isEmpty()) {
+      changeSetData.setReviewDetachedConcernsMessage(
+          SystemMessageFormatter.getLocalizedMessage(
+              localizer, "message.review.concerns.detached", String.join(", ", detachedFilenames)));
+    }
   }
 
   static Set<String> detachedConcernIds(AiResponseContent response) {

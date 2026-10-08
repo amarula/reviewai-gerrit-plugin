@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -41,6 +42,7 @@ import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.json.OutputFormat;
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -134,6 +136,31 @@ public class GerritClientReviewTest {
     ReviewInput reviewInput = reviewInputCaptor.getValue();
     assertTrue(reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().unresolved);
     assertTrue(reviewInput.comments.get("src/Example.java").getFirst().unresolved);
+  }
+
+  @Test
+  public void publishesDetachedConcernNoticeSeparatelyFromNewFindings() throws Exception {
+    JsonObject fixture =
+        getGson()
+            .fromJson(
+                Files.readString(
+                    TestResourceLoader.getTestResourcePath()
+                        .resolve("__files/review/concernDetachmentRegression.json")),
+                JsonObject.class);
+    String detachedNotice = fixture.get("detachedNotice").getAsString();
+    String deletionFinding =
+        fixture.getAsJsonArray("replies").get(1).getAsJsonObject().get("reply").getAsString();
+    changeSetData.setReviewDetachedConcernsMessage(detachedNotice);
+
+    client.setReview(change, List.of(new ReviewBatch(deletionFinding)), changeSetData, -1);
+
+    ArgumentCaptor<ReviewInput> reviewInputCaptor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(reviewInputCaptor.capture());
+    ReviewInput reviewInput = reviewInputCaptor.getValue();
+    assertEquals(detachedNotice, reviewInput.message);
+    assertEquals(1, reviewInput.comments.get("/PATCHSET_LEVEL").size());
+    assertEquals(deletionFinding, reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().message);
+    assertTrue(reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().unresolved);
   }
 
   @Test
