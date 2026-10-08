@@ -79,6 +79,7 @@ public final class ChangeSetData {
   private String reviewStatusMessage;
   private String reviewNoticeMessage;
   private String reviewRepeatedCommentsMessage;
+  private String reviewUnanchoredCommentsMessage;
   private Set<String> parsedCommands = new HashSet<>();
   private Map<String, Map<String, String>> parsedCommandOptions = new HashMap<>();
 

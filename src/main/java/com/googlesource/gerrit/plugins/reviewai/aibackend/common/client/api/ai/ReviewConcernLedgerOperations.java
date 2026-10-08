@@ -176,30 +176,40 @@ public final class ReviewConcernLedgerOperations {
 
   public AiReplyItem toPresentReply(
       ReviewConcernLedger previousLedger, ConcernReviewerId reviewer, ReviewConcern concern) {
-    Optional<ConcernStatus> previousStatus = previousStatus(previousLedger, reviewer, concern);
-    if (previousStatus.filter(ConcernStatus::shouldResolveGerritThread).isEmpty()) {
+    Optional<ReviewConcern> previousConcern = previousConcern(previousLedger, reviewer, concern);
+    if (previousConcern
+        .filter(previous -> previous.getStatus().shouldResolveGerritThread())
+        .isEmpty()) {
       return toRepeatedReply(concern);
     }
     ReviewConcern reactivatedConcern = concern.copy();
     reactivatedConcern.setRepeated(false);
     reactivatedConcern.setRepeatedReason(null);
     AiReplyItem reply = ReviewConcernReplyMapper.toReply(reactivatedConcern);
-    reply.setReply(reactivationHeading(previousStatus.orElseThrow()) + "\n\n" + reply.getReply());
+    reply.setReply(reactivationHeading(previousConcern.orElseThrow()) + "\n\n" + reply.getReply());
     return reply;
   }
 
-  private Optional<ConcernStatus> previousStatus(
+  private Optional<ReviewConcern> previousConcern(
       ReviewConcernLedger previousLedger, ConcernReviewerId reviewer, ReviewConcern concern) {
     if (previousLedger == null || reviewer == null || concern == null || concern.getId() == null) {
       return Optional.empty();
     }
     return reviewerConcerns(previousLedger, reviewer).getConcerns().stream()
         .filter(previous -> concern.getId().equals(previous.getId()))
-        .map(ReviewConcern::getStatus)
         .findFirst();
   }
 
-  private String reactivationHeading(ConcernStatus previousStatus) {
+  private String reactivationHeading(ReviewConcern previousConcern) {
+    ConcernStatus previousStatus = previousConcern.getStatus();
+    if (previousStatus == ConcernStatus.DISMISSED
+        && Boolean.TRUE.equals(previousConcern.getAutomaticDismissal())) {
+      // ReviewAI closed it only because the code was gone, so nothing was ever judged
+      // non-actionable
+      // and there is no dismissal to re-open. Claiming otherwise would tell the author they had
+      // dismissed something they never saw.
+      return "AI concern on code that had left the Change Set is actionable again:";
+    }
     return switch (previousStatus) {
       case FIXED -> "Regression of a previously fixed AI concern:";
       case DISMISSED -> "Previously dismissed AI concern is actionable again:";

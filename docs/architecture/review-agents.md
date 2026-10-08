@@ -25,12 +25,16 @@ New concerns start as `PRESENT`. Tracked concerns use these lifecycle states:
 | `FIXED` | Current code demonstrates that the concern has been resolved. |
 | `UNCERTAIN` | Available evidence is insufficient to prove either `PRESENT` or `FIXED`. |
 | `SKIPPED` | The concern was deliberately not reassessed because its review scope was disabled. |
-| `DISMISSED` | A user explicitly declared the concern non-actionable under a recorded rationale. |
+| `DISMISSED` | The concern was closed rather than resolved: either a user declared it non-actionable under a recorded rationale, or every file it was about left the Change Set. |
 
 No state is terminal. In particular, a `FIXED` concern is reassessed and can return to `PRESENT` after a regression. A
 `DISMISSED` concern remains suppressed while its rationale applies, but it can return to `PRESENT` after explicit user
 feedback reopens it or concrete later code or specification evidence invalidates that rationale. Only a user-feedback
-workflow may newly assign `DISMISSED`; the Concern Reviewer cannot invent a dismissal. `SKIPPED` is assigned
+workflow may newly assign `DISMISSED` from a model response; the Concern Reviewer cannot invent a dismissal. The client
+also assigns it deterministically, outside any model response, when a concern's every location has left the Change Set
+— there is no line to fix and nowhere to reply, so the concern is not actionable here. Such a dismissal is marked
+automatically assigned in the ledger, because a ledger read later should distinguish "a user judged this
+non-actionable" from "the code is gone", and the reactivation message differs accordingly. `SKIPPED` is assigned
 deterministically by the client, not by the Concern Reviewer. When its scope is enabled again, the Concern Reviewer
 reassesses it and returns an evidence-based state.
 
@@ -41,8 +45,8 @@ Both states suppress a concern from normal repeated-comment publication, but the
 | Dimension | `DISMISSED` | `SKIPPED` |
 | --- | --- | --- |
 | Scope | One specific concern. | Every applicable concern owned by a disabled review scope. |
-| Meaning | The concern was considered and explicitly declared non-actionable, such as an accepted risk or intentional constraint. | No conclusion was reached because the concern was deliberately not reassessed. |
-| Assignment | The user-feedback workflow records an explicit concern-level rationale. | The client assigns it when feedback disables the concern's review scope. |
+| Meaning | The concern was considered and explicitly declared non-actionable, such as an accepted risk or intentional constraint — or its code is no longer part of the Change Set at all. | No conclusion was reached because the concern was deliberately not reassessed. |
+| Assignment | The user-feedback workflow records an explicit concern-level rationale, or the client assigns it when every location the concern had has left the Change Set. | The client assigns it when feedback disables the concern's review scope. |
 | Duration | Remains suppressed while its recorded rationale applies. | Remains suppressed while the scope is disabled. |
 | Reactivation | Explicit user feedback reopens it, or later evidence invalidates the dismissal rationale. | Enabling the scope causes the Concern Reviewer to reassess it. |
 

@@ -34,7 +34,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDismissal;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
@@ -179,13 +182,13 @@ public class PatchSetReviewer {
     }
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change);
+      dismissConcernsWithoutFiles(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change, reviewReply);
     Map<String, String> publishedCommentIdsByConcern;
     try {
       publishedCommentIdsByConcern =
-          clientReviewProvider
-              .get()
+          reviewClientFor(change)
               .setReviewAndGetPublishedCommentIds(
                   change, reviewBatches, changeSetData, reviewScore, reviewReply);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
@@ -240,6 +243,7 @@ public class PatchSetReviewer {
     ChangeSetDataHandler.update(config, change, gerritClient, changeSetData, localizer);
     if (reviewReply != null) {
       reviewBatches = retrieveReviewBatches(reviewReply, change, topicFilenamePrefix);
+      dismissConcernsWithoutFiles(reviewReply, change);
     }
     Integer reviewScore =
         reviewReply == null
@@ -247,18 +251,127 @@ public class PatchSetReviewer {
             : getReviewScore(
                 change, topicReviewScores == null ? reviewScores : topicReviewScores, reviewReply);
     Map<String, String> publishedCommentIdsByConcern =
-        clientReviewProvider
-            .get()
+        reviewClientFor(change)
             .setReviewAndGetPublishedCommentIds(
                 change, reviewBatches, changeSetData, reviewScore, reviewReply);
     reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
-  private void setCommentBatchMap(ReviewBatch batchMap, Integer batchID) {
+  /**
+   * Re-anchors a reply to another location of its concern, when the one it names has left.
+   *
+   * <p>A concern records every location it was raised at, and a rewritten change can drop some of
+   * them while others survive. The reply names the first location, which need not be a surviving
+   * one, so without this a concern that still points at real code would be demoted to a
+   * patch-set-level comment merely because its first location went away.
+   *
+   * @return whether the reply now names a file in this revision
+   */
+  private boolean retargetToSurvivingLocation(
+      AiReplyItem replyItem,
+      AiResponseContent reviewReply,
+      GerritChange change,
+      FilenameSanitizer filenameSanitizer) {
+    String filename = replyItem.getFilename();
+    if (filename == null
+        || filename.isEmpty()
+        || filenameSanitizer.isPartOfPatchSet(filename)
+        || reviewReply.getPendingConcernUpdates() == null) {
+      return false;
+    }
+    String concernId = replyItem.getConcernId();
+    if (concernId == null || concernId.isBlank()) {
+      return false;
+    }
+    Optional<ConcernLocation> survivingLocation =
+        reviewReply.getPendingConcernUpdates().get(change.getFullChangeId()).stream()
+            .flatMap(ledger -> ledger.getReviewers().stream())
+            .flatMap(reviewer -> reviewer.getConcerns().stream())
+            .filter(concern -> concernId.equals(concern.getId()))
+            .flatMap(concern -> concern.getLocations().stream())
+            .filter(location -> filenameSanitizer.isPartOfPatchSet(location.getFilename()))
+            .findFirst();
+    if (survivingLocation.isEmpty()) {
+      return false;
+    }
+    ConcernLocation location = survivingLocation.get();
+    log.debug("Concern {} moved from '{}' to '{}'", concernId, filename, location.getFilename());
+    replyItem.setFilename(location.getFilename());
+    replyItem.setLineNumber(location.getLineNumber());
+    replyItem.setCodeSnippet(location.getCodeSnippet());
+    return true;
+  }
+
+  /**
+   * Closes concerns whose code this revision no longer contains, before anything reads the ledger.
+   *
+   * <p>Runs before the score is computed as well as before publication: a concern closed here is
+   * not an open one when the vote is decided, and the ledger the publisher stores is the one the
+   * next review reasons from. In the plain case the reviewer itself notices a vanished file; this
+   * is for the one it cannot, where it keeps insisting on code that is not there.
+   */
+  void dismissConcernsWithoutFiles(AiResponseContent reviewReply, GerritChange change) {
+    PendingReviewConcernUpdates pendingUpdates = reviewReply.getPendingConcernUpdates();
+    if (pendingUpdates == null) {
+      return;
+    }
+    FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
+    String reason = localizer.getText("message.review.concern.resolution.file.removed");
+    pendingUpdates
+        .get(change.getFullChangeId())
+        .map(
+            ledger ->
+                ReviewConcernDismissal.dismissConcernsWithoutFiles(
+                    ledger, filenameSanitizer::isPartOfPatchSet, reason))
+        .ifPresent(ledger -> pendingUpdates.replace(change.getFullChangeId(), ledger));
+  }
+
+  /**
+   * Returns the review client, told which files this revision contains.
+   *
+   * <p>Every publication path goes through here. The list is always reset, so a failed lookup
+   * cannot leave the previous change's files behind on a client that is reused across changes; a
+   * lookup that fails yields an empty list, which the client reads as "unknown" and accepts
+   * everything. A guard that cannot see the file list must not be the thing that breaks the review.
+   */
+  private GerritClientReview reviewClientFor(GerritChange change) {
+    GerritClientReview clientReview = clientReviewProvider.get();
+    List<String> patchSetFiles = List.of();
+    try {
+      patchSetFiles =
+          gerritClient.getClientData(change).getGerritClientPatchSet().getPatchSetFiles();
+    } catch (RuntimeException e) {
+      log.warn(
+          "Could not read the patch set files for {}; publishing without path validation",
+          change.getFullChangeId(),
+          e);
+    }
+    clientReview.setPatchSetFiles(patchSetFiles);
+    return clientReview;
+  }
+
+  /**
+   * Anchors a reply to a comment to the same file and line as the comment it answers.
+   *
+   * <p>The comment being answered is not necessarily on a file that still exists in this revision -
+   * a patch set can drop it - and Gerrit rejects a comment posted against a file outside the
+   * revision, failing the whole review. When the file is gone the reply keeps its text but loses
+   * the anchor, becoming a patch-set-level comment instead; the author is told which files those
+   * were.
+   */
+  private void setCommentBatchMap(
+      ReviewBatch batchMap,
+      Integer batchID,
+      FilenameSanitizer filenameSanitizer,
+      List<String> unanchoredFilenames) {
     if (commentProperties != null && batchID < commentProperties.size()) {
       GerritComment commentProperty = commentProperties.get(batchID);
       if (commentProperty != null) {
+        if (!isPartOfCurrentPatchSet(filenameSanitizer, commentProperty.getFilename())) {
+          unanchoredFilenames.add(commentProperty.getFilename());
+          return;
+        }
         batchMap.setId(commentProperty.getId());
         batchMap.setFilename(commentProperty.getFilename());
         batchMap.setLine(commentProperty.getLine());
@@ -267,6 +380,19 @@ public class PatchSetReviewer {
         }
       }
     }
+  }
+
+  /**
+   * Whether a file may be named in a comment for this revision.
+   *
+   * <p>{@link FilenameSanitizer#isPartOfPatchSet} answers {@code true} when the patch file list is
+   * unknown, so an unknown list keeps the previous behaviour of anchoring whatever the reply named.
+   * That is deliberate: the list is unavailable for comment events, which is exactly the case where
+   * replying in-thread is the point.
+   */
+  private static boolean isPartOfCurrentPatchSet(
+      FilenameSanitizer filenameSanitizer, String filename) {
+    return filename != null && !filename.isEmpty() && filenameSanitizer.isPartOfPatchSet(filename);
   }
 
   private void setPatchSetReviewBatchMap(ReviewBatch batchMap, AiReplyItem replyItem) {
@@ -293,6 +419,7 @@ public class PatchSetReviewer {
     List<ReviewBatch> batches = new ArrayList<>();
     FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
+    List<String> unanchoredFilenames = new ArrayList<>();
     List<String> debugDetails = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
     if (reviewReply.getMessageContent() != null && !reviewReply.getMessageContent().isEmpty()) {
@@ -333,10 +460,17 @@ public class PatchSetReviewer {
       ReviewBatch batchMap = new ReviewBatch(reply);
       batchMap.setConcernId(replyItem.getConcernId());
       if (change.getIsCommentEvent() && replyItem.getId() != null) {
-        setCommentBatchMap(batchMap, replyItem.getId());
-      } else {
-        filenameSanitizer.sanitizeFilename(replyItem);
+        setCommentBatchMap(batchMap, replyItem.getId(), filenameSanitizer, unanchoredFilenames);
+      } else if (retargetToSurvivingLocation(replyItem, reviewReply, change, filenameSanitizer)
+          || filenameSanitizer.sanitizeFilename(replyItem)) {
         setPatchSetReviewBatchMap(batchMap, replyItem);
+      } else {
+        // The file this finding was anchored to is not part of this revision - it was reverted, or
+        // its content moved. Sending that path makes Gerrit reject the whole review, so the finding
+        // is flattened to a patch-set-level comment instead of anchoring it: the batch keeps its
+        // text and concern, and loses only the file, leaving the author the finding rather than
+        // nothing. They are told which files could not be anchored.
+        unanchoredFilenames.add(replyItem.getFilename());
       }
       batches.add(batchMap);
       log.debug("Added review batch from reply item: {}", batchMap);
@@ -345,7 +479,25 @@ public class PatchSetReviewer {
       changeSetData.setReviewStatusMessage(String.join("\n\n", debugDetails));
     }
     setRepeatedCommentsMessage(filteredRepeatedReplyItems, change);
+    setUnanchoredCommentsMessage(unanchoredFilenames);
     return batches;
+  }
+
+  /**
+   * Tells the author which findings were left out because their file is not in this Change Set.
+   *
+   * <p>Set as a change-level message rather than as {@code reviewSystemMessage}, which suppresses
+   * every comment: the review did happen, and only some of its findings could not be anchored.
+   */
+  private void setUnanchoredCommentsMessage(List<String> unanchoredFilenames) {
+    if (unanchoredFilenames.isEmpty()) {
+      return;
+    }
+    changeSetData.setReviewUnanchoredCommentsMessage(
+        SystemMessageFormatter.getLocalizedMessage(
+            localizer,
+            "message.review.comments.not.anchored",
+            String.join(", ", new TreeSet<>(unanchoredFilenames))));
   }
 
   List<Double> getReviewScores(AiResponseContent reviewReply) {

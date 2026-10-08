@@ -55,6 +55,22 @@ public class ReviewConcern {
   @SerializedName(value = "past_comment_id", alternate = "previous_comment_id")
   private String previousCommentId;
 
+  /**
+   * Whether ReviewAI closed this concern itself because the change no longer holds the code it was
+   * about, rather than a user declaring it non-actionable.
+   *
+   * <p>Both end up {@code DISMISSED} and resolve the Gerrit thread the same way, but they are not
+   * the same event and a ledger read later should not have to guess which happened: one is a
+   * judgement about the concern, the other only says the code it was about is gone. It also decides
+   * what a reactivation means - a user's dismissal coming back is worth challenging, an automatic
+   * one reappearing is just the file having returned.
+   *
+   * <p>It deliberately does not change the vote: {@link ReviewConcernLedger#allConcernsDismissed}
+   * treats an automatic dismissal like any other, which keeps the neutral score standing.
+   */
+  @SerializedName("dismissal_automatic")
+  private Boolean automaticDismissal;
+
   public void normalize() {
     if (status == null) {
       status = ConcernStatus.PRESENT;
@@ -89,6 +105,7 @@ public class ReviewConcern {
     copy.setScore(score);
     copy.setRelevance(relevance);
     copy.setPreviousCommentId(previousCommentId);
+    copy.setAutomaticDismissal(automaticDismissal);
     return copy;
   }
 }

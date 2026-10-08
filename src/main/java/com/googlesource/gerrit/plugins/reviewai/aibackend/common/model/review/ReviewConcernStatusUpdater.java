@@ -63,6 +63,11 @@ public final class ReviewConcernStatusUpdater {
               ReviewConcern updated = existing.copy();
               updated.setStatus(update.getStatus());
               updated.setStatusReason(update.getStatusReason());
+              if (update.getStatus() != ConcernStatus.DISMISSED) {
+                // The concern is live again, so whatever ReviewAI concluded when its file was
+                // missing no longer applies and must not keep suppressing the positive score.
+                updated.setAutomaticDismissal(null);
+              }
               return updated;
             })
         .toList();

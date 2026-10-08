@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
@@ -39,6 +42,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.gerrit.IGerritClientPatchSet;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
@@ -263,6 +267,112 @@ public class PatchSetReviewerTest {
         Providers.of(mock(GerritClientReview.class)),
         mock(IAiClient.class),
         localizer,
+        mock(PatchSetReviewConversationRecorder.class),
+        mock(ReviewConcernPublisher.class),
+        mock(ReviewFeedbackLifecycle.class),
+        mock(AiReviewApplicabilityChecker.class),
+        null);
+  }
+
+  @Test
+  public void closesAConcernWhoseFileLeftTheChange() {
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
+
+    reviewerWithPatchSetFiles(List.of("src/Present.java"))
+        .dismissConcernsWithoutFiles(response, change);
+
+    ReviewConcern concern = firstConcern(response, change);
+    assertEquals(ConcernStatus.DISMISSED, concern.getStatus());
+    assertEquals(
+        "a ledger read later must be able to tell this apart from a user's dismissal",
+        Boolean.TRUE,
+        concern.getAutomaticDismissal());
+  }
+
+  @Test
+  public void keepsAConcernWhoseFileIsStillInTheChange() {
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "src/Present.java");
+
+    reviewerWithPatchSetFiles(List.of("src/Present.java"))
+        .dismissConcernsWithoutFiles(response, change);
+
+    ReviewConcern concern = firstConcern(response, change);
+    assertEquals(ConcernStatus.PRESENT, concern.getStatus());
+    assertNull(concern.getAutomaticDismissal());
+  }
+
+  @Test
+  public void closingAConcernBecauseItsFileLeftDoesNotProduceAPositiveVote() {
+    // The end-to-end shape of the hazard: the ledger now reads all-dismissed, which suppresses the
+    // neutral-to-positive conversion. Reading that predicate the other way round would turn
+    // deleting a file into a positive review.
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
+    PatchSetReviewer reviewer = reviewerWithPatchSetFiles(List.of("src/Present.java"));
+
+    assertEquals(
+        Integer.valueOf(1), reviewer.getReviewScore(change, responseWithoutFileDismissal(change)));
+
+    reviewer.dismissConcernsWithoutFiles(response, change);
+
+    assertEquals(Integer.valueOf(0), reviewer.getReviewScore(change, response));
+  }
+
+  private static AiResponseContent responseWithConcern(
+      GerritChange change, String status, String filename) {
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("c1");
+    concern.setStatus(ConcernStatus.valueOf(status));
+    ConcernLocation location = new ConcernLocation();
+    location.setFilename(filename);
+    concern.setLocations(List.of(location));
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewerConcerns));
+    AiResponseContent response = new AiResponseContent("");
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    response.setPendingConcernUpdates(updates);
+    return response;
+  }
+
+  /** The same response with the concern still open, so the vote is taken before the dismissal. */
+  private static AiResponseContent responseWithoutFileDismissal(GerritChange change) {
+    return responseWithConcern(change, "PRESENT", "src/Present.java");
+  }
+
+  private static ReviewConcern firstConcern(AiResponseContent response, GerritChange change) {
+    return response
+        .getPendingConcernUpdates()
+        .get(change.getFullChangeId())
+        .orElseThrow()
+        .getReviewers()
+        .get(0)
+        .getConcerns()
+        .get(0);
+  }
+
+  private static PatchSetReviewer reviewerWithPatchSetFiles(List<String> patchSetFiles) {
+    IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
+    when(patchSet.getPatchSetFiles()).thenReturn(patchSetFiles);
+    GerritClientData clientData = mock(GerritClientData.class);
+    when(clientData.getGerritClientPatchSet()).thenReturn(patchSet);
+    GerritClient gerritClient = mock(GerritClient.class);
+    when(gerritClient.getClientData(any())).thenReturn(clientData);
+
+    Configuration config = mock(Configuration.class);
+    when(config.isVotingEnabled()).thenReturn(true);
+    when(config.getConvertNeutralReviewScoreToPositive()).thenReturn(true);
+    return new PatchSetReviewer(
+        gerritClient,
+        config,
+        new ChangeSetData(1),
+        Providers.of(mock(GerritClientReview.class)),
+        mock(IAiClient.class),
+        mock(Localizer.class),
         mock(PatchSetReviewConversationRecorder.class),
         mock(ReviewConcernPublisher.class),
         mock(ReviewFeedbackLifecycle.class),

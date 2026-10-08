@@ -36,6 +36,10 @@ public class ReviewConcernLedger {
     normalize();
     List<ReviewConcern> concerns =
         reviewers.stream().flatMap(reviewer -> reviewer.getConcerns().stream()).toList();
+    // Automatic dismissals count here. This predicate suppresses the neutral-to-positive score
+    // conversion, and that suppression is right precisely when no user judged the code: a concern
+    // ReviewAI closed because its file left the change is no more a human approval than one a user
+    // waved off, and letting it through would turn deleting a file into a positive vote.
     return !concerns.isEmpty()
         && concerns.stream().allMatch(concern -> concern.getStatus() == ConcernStatus.DISMISSED);
   }
