@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.review;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSuper
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.util.List;
 import org.junit.Test;
 
@@ -83,13 +85,79 @@ public class PatchSetReviewerTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     PatchSetReviewer reviewer = reviewer(config, changeSetData);
 
-    AiResponseContent response = reviewer.getReviewReply(change(), "first line\nsecond line");
+    AiResponseContent response = reviewer.getReviewReply(change(), twoChangedLines());
 
     assertNull(response);
     assertEquals(
-        "Too many changes. Please consider splitting into patches smaller than 1 lines for review.",
+        "Too many changes. Please consider splitting into patches smaller than 1 changed lines for"
+            + " review.",
         changeSetData.getReviewSystemMessage());
     assertNull(reviewer.getReviewScore(change(), response));
+  }
+
+  @Test
+  public void manySmallFilesAreNotMistakenForALargeChange() throws Exception {
+    // The reported bug. Each file costs its diff --git / index / --- / +++ lines, a hunk header and
+    // three lines of context before a single changed line, so the patch text runs far past the
+    // limit
+    // while the change itself is comfortably inside it. Counting patch lines refused this; counting
+    // changed lines must not.
+    int limit = 1000;
+    String patch = manySmallFiles(120, 3);
+
+    assertTrue(
+        "the fixture is only meaningful if the old measure would have refused it: "
+            + patch.split("\n").length
+            + " patch lines for 120 changed lines",
+        patch.split("\n").length > limit);
+
+    Configuration config = mock(Configuration.class);
+    when(config.getMaxReviewLines()).thenReturn(limit);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    PatchSetReviewer reviewer = reviewer(config, changeSetData);
+
+    assertEquals(120, DiffStats.changedLines(patch));
+    reviewer.getReviewReply(change(), patch);
+
+    assertNull(
+        "a change of 120 lines must not be refused because it spans 120 files",
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void aFollowUpMeasuresTheIncrementalPatch() throws Exception {
+    // On a re-review the model reasons about the delta, so the delta is what the limit should see.
+    // The
+    // full patch is mostly history by then, and checking it refused follow-ups whose delta was
+    // tiny.
+    Configuration config = mock(Configuration.class);
+    when(config.getMaxReviewLines()).thenReturn(50);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setIncrementalPatchSet(twoChangedLines());
+    PatchSetReviewer reviewer = reviewer(config, changeSetData);
+
+    reviewer.getReviewReply(change(), manySmallFiles(120, 3));
+
+    assertNull(
+        "the full patch must not be measured when the review works from the delta",
+        changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void aFollowUpStillRefusesALargeIncrementalPatch() throws Exception {
+    Configuration config = mock(Configuration.class);
+    when(config.getMaxReviewLines()).thenReturn(50);
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setIncrementalPatchSet(manySmallFiles(120, 3));
+    PatchSetReviewer reviewer = reviewer(config, changeSetData);
+
+    reviewer.getReviewReply(change(), twoChangedLines());
+
+    assertEquals(
+        "a large delta is a large change, however small the patch it sits in",
+        "Too many changes. Please consider splitting into patches smaller than 50 changed lines for"
+            + " review.",
+        changeSetData.getReviewSystemMessage());
   }
 
   @Test
@@ -130,6 +198,53 @@ public class PatchSetReviewerTest {
             null);
 
     reviewer.getReviewReply(change, "diff");
+  }
+
+  private static String twoChangedLines() {
+    return """
+        diff --git a/A.java b/A.java
+        --- a/A.java
+        +++ b/A.java
+        @@ -1 +1,3 @@
+         context
+        -removed
+        +added one
+        +added two
+        """;
+  }
+
+  /**
+   * A patch of {@code fileCount} files, each changing one line, with {@code context} lines around
+   * it.
+   */
+  private static String manySmallFiles(int fileCount, int context) {
+    StringBuilder patch = new StringBuilder();
+    for (int i = 0; i < fileCount; i++) {
+      patch
+          .append("diff --git a/File")
+          .append(i)
+          .append(".java b/File")
+          .append(i)
+          .append(".java\n")
+          .append("index 0000000..1111111 100644\n")
+          .append("--- a/File")
+          .append(i)
+          .append(".java\n")
+          .append("+++ b/File")
+          .append(i)
+          .append(".java\n")
+          .append("@@ -1,")
+          .append(context + 1)
+          .append(" +1,")
+          .append(context + 2)
+          .append(" @@\n");
+      for (int line = 0; line < context; line++) {
+        patch.append(" context ").append(line).append('\n');
+      }
+      patch.append("+added in File").append(i).append('\n');
+      patch.append(" context after\n");
+    }
+    return patch.toString();
   }
 
   private static PatchSetReviewer reviewer() {

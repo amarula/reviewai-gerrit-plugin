@@ -27,6 +27,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicPatchSetReviewMerger;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewPatchSet;
+import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -78,10 +79,22 @@ class TopicPatchSetReviewer {
     log.debug("Starting topic review process for {} changes", changes.size());
     List<TopicReviewPatchSet> patchSets = new ArrayList<>();
     changeSetData.setReviewRepeatedCommentsMessage(null);
+    // The review is a single call over the merged patch, but the limit applies per change: an
+    // author
+    // can split a change, not a topic. Measuring the largest change keeps a topic of many small
+    // changes from being refused for being numerous, while still refusing one that is genuinely too
+    // large. See PatchSetReviewer#getReviewReply(GerritChange, String, String).
+    String largestChangePatch = "";
+    int largestChangedLines = 0;
     for (GerritChange topicChange : changes) {
       gerritClient.requireCurrentRevision(topicChange);
       String patchSet = gerritClient.getPatchSet(topicChange);
       if (!patchSetReviewer.shouldSkipAiReviewForEmptyPatchSet(topicChange)) {
+        int changedLines = DiffStats.changedLines(patchSet);
+        if (changedLines > largestChangedLines) {
+          largestChangedLines = changedLines;
+          largestChangePatch = patchSet;
+        }
         patchSets.add(topicPatchSetReviewMerger.patchSet(topicChange, patchSets.size(), patchSet));
       }
     }
@@ -101,7 +114,9 @@ class TopicPatchSetReviewer {
     try {
       reviewReply =
           patchSetReviewer.getReviewReply(
-              primaryChange, topicPatchSetReviewMerger.buildMergedPatchSet(patchSets));
+              primaryChange,
+              topicPatchSetReviewMerger.buildMergedPatchSet(patchSets),
+              largestChangePatch);
       log.debug("AI final response for topic review: {}", reviewReply);
     } catch (AiRequestSupersededException e) {
       throw e;
