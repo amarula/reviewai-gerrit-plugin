@@ -412,6 +412,7 @@ public class GerritClientReview extends GerritClientAccount {
           case FIXED -> localizer.getText("message.review.concern.resolution.fixed");
           case DISMISSED -> localizer.getText("message.review.concern.resolution.dismissed");
           case SKIPPED -> localizer.getText("message.review.concern.resolution.skipped");
+          case DETACHED -> localizer.getText("message.review.concern.resolution.file.removed");
           case PRESENT, UNCERTAIN ->
               throw new IllegalArgumentException(
                   "Cannot resolve concern with status " + concern.getStatus());

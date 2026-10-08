@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -24,15 +25,25 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonObject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernReplyMapper;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDetachment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import org.junit.Test;
 
 public class LangChainNewIssueFinderTest {
@@ -98,6 +109,40 @@ public class LangChainNewIssueFinderTest {
   }
 
   @Test
+  public void detachedConcernsAreAbsentFromNewIssueFinderInput() throws Exception {
+    ReviewerConcerns reviewed = reviewerConcerns();
+    ReviewConcern detached = new ReviewConcern();
+    detached.setStatus(ConcernStatus.DETACHED);
+    ReviewConcern missing = new ReviewConcern();
+    ConcernLocation missingLocation = new ConcernLocation();
+    missingLocation.setFilename("src/Removed.java");
+    missing.setLocations(List.of(missingLocation));
+    ReviewConcern present = new ReviewConcern();
+    ConcernLocation presentLocation = new ConcernLocation();
+    presentLocation.setFilename("src/Example.java");
+    present.setLocations(List.of(presentLocation));
+    reviewed.setConcerns(List.of(detached, missing, present));
+    CapturedRequest capturedRequest = new CapturedRequest();
+
+    new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE))
+        .find(
+            new ChangeSetData(1),
+            mock(GerritChange.class),
+            reviewed,
+            readTestResource(INCREMENTAL_PATCH_RESOURCE),
+            readTestResource(FULL_PATCH_RESOURCE),
+            (requestData, change, patchSet) -> {
+              capturedRequest.requestData = requestData;
+              return readTestResource(RESPONSE_RESOURCE);
+            });
+
+    assertEquals(
+        List.of(present),
+        capturedRequest.requestData.getConcernWorkflowInput().getConcerns().getConcerns());
+    assertEquals(List.of(detached, missing, present), reviewed.getConcerns());
+  }
+
+  @Test
   public void emptyIncrementalPatchSkipsNewIssueFinderRequest() throws Exception {
     LangChainNewIssueFinder finder =
         new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE));
@@ -115,6 +160,46 @@ public class LangChainNewIssueFinderTest {
             });
 
     assertNull(result);
+  }
+
+  @Test
+  public void newDeletionAndCommitMessageConcernsRemainKnownOnTheNextReview() throws Exception {
+    JsonObject fixture =
+        getGson()
+            .fromJson(
+                readTestResource("__files/review/concernDetachmentRegression.json"),
+                JsonObject.class);
+    ReviewerConcerns reviewed = reviewerConcerns();
+    reviewed.setConcerns(
+        Arrays.stream(getGson().fromJson(fixture.get("replies"), AiReplyItem[].class))
+            .map(
+                reply ->
+                    ReviewConcernReplyMapper.fromReply(
+                        reply, reviewed.getReviewer(), reply.getConcernId()))
+            .toList());
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewed));
+    ReviewerConcerns stored =
+        ReviewConcernDetachment.detachConcernsWithoutFiles(
+                ledger, null, "dynloader.py"::equals, "file removed")
+            .getReviewers()
+            .get(0);
+    CapturedRequest capturedRequest = new CapturedRequest();
+
+    new LangChainNewIssueFinder(configuration(CodeContextPolicies.NONE))
+        .find(
+            new ChangeSetData(1),
+            mock(GerritChange.class),
+            stored,
+            fixture.get("incrementalPatch").getAsString(),
+            fixture.get("fullPatch").getAsString(),
+            (requestData, change, patchSet) -> {
+              capturedRequest.requestData = requestData;
+              return null;
+            });
+
+    assertEquals(3, stored.getConcerns().size());
+    assertSame(stored, capturedRequest.requestData.getConcernWorkflowInput().getConcerns());
   }
 
   private static ReviewerConcerns reviewerConcerns() {

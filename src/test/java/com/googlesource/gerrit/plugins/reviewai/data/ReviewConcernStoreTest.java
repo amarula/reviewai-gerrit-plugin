@@ -66,7 +66,8 @@ public class ReviewConcernStoreTest extends TestBase {
                 concern("concern-1", ConcernStatus.PRESENT),
                 concern("concern-2", ConcernStatus.FIXED),
                 concern("concern-3", ConcernStatus.DISMISSED),
-                concern("concern-4", ConcernStatus.SKIPPED)),
+                concern("concern-4", ConcernStatus.SKIPPED),
+                concern("concern-5", ConcernStatus.DETACHED)),
             reviewer(ConcernReviewerId.Kind.SCOPED_AGENT, "COMMIT_MESSAGE"));
     ledger.setLastReviewedCommit(REVIEWED_COMMIT);
 
@@ -77,10 +78,11 @@ public class ReviewConcernStoreTest extends TestBase {
     assertEquals(ledger, restored);
     assertEquals(1, rowCount("review_concern_ledgers"));
     assertEquals(2, rowCount("review_concern_reviewers"));
-    assertEquals(4, rowCount("review_concerns"));
+    assertEquals(5, rowCount("review_concerns"));
     assertEquals(1, concernCount(ConcernStatus.FIXED));
     assertEquals(1, concernCount(ConcernStatus.DISMISSED));
     assertEquals(1, concernCount(ConcernStatus.SKIPPED));
+    assertEquals(1, concernCount(ConcernStatus.DETACHED));
   }
 
   @Test

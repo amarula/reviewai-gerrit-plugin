@@ -21,9 +21,10 @@ public enum ConcernStatus {
   FIXED,
   UNCERTAIN,
   SKIPPED,
+  DETACHED,
   DISMISSED;
 
   public boolean shouldResolveGerritThread() {
-    return this == FIXED || this == SKIPPED || this == DISMISSED;
+    return this == FIXED || this == SKIPPED || this == DETACHED || this == DISMISSED;
   }
 }

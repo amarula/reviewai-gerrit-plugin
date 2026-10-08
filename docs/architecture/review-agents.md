@@ -25,14 +25,19 @@ New concerns start as `PRESENT`. Tracked concerns use these lifecycle states:
 | `FIXED` | Current code demonstrates that the concern has been resolved. |
 | `UNCERTAIN` | Available evidence is insufficient to prove either `PRESENT` or `FIXED`. |
 | `SKIPPED` | The concern was deliberately not reassessed because its review scope was disabled. |
-| `DISMISSED` | A user explicitly declared the concern non-actionable under a recorded rationale. |
+| `DETACHED` | None of the concern's recorded files remains in the Change Set; its validity elsewhere is unknown. |
+| `DISMISSED` | A user declared the concern non-actionable under a recorded rationale. |
 
 No state is terminal. In particular, a `FIXED` concern is reassessed and can return to `PRESENT` after a regression. A
 `DISMISSED` concern remains suppressed while its rationale applies, but it can return to `PRESENT` after explicit user
 feedback reopens it or concrete later code or specification evidence invalidates that rationale. Only a user-feedback
-workflow may newly assign `DISMISSED`; the Concern Reviewer cannot invent a dismissal. `SKIPPED` is assigned
-deterministically by the client, not by the Concern Reviewer. When its scope is enabled again, the Concern Reviewer
-reassesses it and returns an evidence-based state.
+workflow may newly assign `DISMISSED` from a model response; the Concern Reviewer cannot invent a dismissal. The client
+assigns `DETACHED` deterministically to historical concerns when every recorded file leaves the Change Set. New findings
+about unavailable files retain their status and gain a patch-set location matching their change-level publication;
+commit-message concerns are independent of the changed file list. Detached concerns remain in the
+ledger but are omitted from New Issue Finder inputs and do not suppress neutral-to-positive vote conversion. `SKIPPED`
+is assigned deterministically by the client, not by the Concern Reviewer. When its scope is enabled again, the Concern
+Reviewer reassesses it and returns an evidence-based state.
 
 #### `DISMISSED` versus `SKIPPED`
 
@@ -49,7 +54,7 @@ Both states suppress a concern from normal repeated-comment publication, but the
 For example, “this null behavior is intentional; do not report it again” dismisses that specific concern. “Skip
 reviewing commit messages” does not reject each known commit-message concern; it marks them `SKIPPED` until
 commit-message review is enabled again. Neither state proves that the concern was fixed. Gerrit still displays
-`DISMISSED` and `SKIPPED` threads as resolved because they are not currently actionable. If either concern later
+`DISMISSED`, `DETACHED`, and `SKIPPED` threads as resolved because they are not currently actionable. If a concern later
 returns to `PRESENT`, ReviewAI publishes a new root comment rather than reopening the historical thread.
 
 `ReviewConcern` is the canonical lifecycle structure and is also used by the specialized-agent finding pipeline.
@@ -353,7 +358,7 @@ The Concern Reviewer receives every stored concern owned by that reviewer. It mu
 
 1. Return exactly one status update for every supplied concern.
 2. Preserve every concern ID.
-3. Reassess concerns in all prior states, including `FIXED` and `DISMISSED` concerns.
+3. Reassess concerns in all prior states, including `FIXED`, `DETACHED`, and `DISMISSED` concerns.
 4. Update only `status` and `status_reason`.
 5. Avoid searching for or reporting new concerns.
 
@@ -362,7 +367,8 @@ its status. This prevents a malformed model response from silently dropping know
 
 ### Stage 2: New Issue Finder
 
-The New Issue Finder receives the updated concern list as its source of truth. It must:
+The New Issue Finder receives the updated concern list, excluding `DETACHED` concerns and concerns whose recorded
+locations are absent from the current full patch, as its source of truth. It must:
 
 1. Search only for issues introduced by `incremental_patch`.
 2. Avoid reporting or rephrasing any known concern, regardless of status.
