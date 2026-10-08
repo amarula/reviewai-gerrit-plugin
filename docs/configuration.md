@@ -330,7 +330,11 @@ directive = End each reply with \"Hope this helps!\"
 - `aiFullFileReview`: Enabled by default. Activating this option sends both unchanged lines and changes to AI for
   review, offering additional context information. Deactivating it (set to false) results in only the changed lines
   being submitted for review.
-- `maxReviewLines`: The default value is 1000. This sets a limit on the number of lines of code included in the review.
+- `maxReviewLines`: The default value is 1000. This sets a limit on the number of changed lines a review may
+  cover — the lines a change adds or removes, counted across the whole change. Diff headers, hunk headers and
+  unchanged context lines are not counted, so a change spanning many files is measured by what it changes rather
+  than by how many files it touches. On a re-review of a change, the limit applies to the changes since the last
+  review, since that is what the review reads.
 - `patchContextLines`: The default value is 3. This sets how many unchanged context lines are included around each
   changed hunk in the patch passed to AI. Set it to 0 to include only changed lines.
 - `codeContextPolicy`: Defines the code context policy used when AI needs repository context outside the formatted

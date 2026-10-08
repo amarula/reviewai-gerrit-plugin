@@ -45,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityCh
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewReplyMapper;
+import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.util.*;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -54,7 +55,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PatchSetReviewer {
   private static final String SPLIT_REVIEW_MSG =
       "Too many changes. Please consider splitting into patches smaller "
-          + "than %s lines for review.";
+          + "than %s changed lines for review.";
 
   private final Configuration config;
   private final GerritClient gerritClient;
@@ -370,12 +371,33 @@ public class PatchSetReviewer {
   }
 
   AiResponseContent getReviewReply(GerritChange change, String patchSet) throws Exception {
+    return getReviewReply(change, patchSet, patchSet);
+  }
+
+  /**
+   * Generates the review reply, refusing when the change is larger than the configured limit.
+   *
+   * <p>The size is the number of changed lines, not the number of lines of patch: see {@link
+   * DiffStats#changedLines(String)} for why the difference matters.
+   *
+   * @param sizeReference the patch whose size decides whether the review runs. On a re-review the
+   *     delta is measured instead, because that is what the review reasons about — the full patch
+   *     of a change under review since an earlier patch set is mostly history by then. A topic
+   *     review passes the largest of its changes, because the limit applies to a change rather than
+   *     to a topic: an author can split a change, not a topic.
+   */
+  AiResponseContent getReviewReply(GerritChange change, String patchSet, String sizeReference)
+      throws Exception {
     log.debug("Generating review reply for patch set.");
-    List<String> patchLines = Arrays.asList(patchSet.split("\n"));
-    if (patchLines.size() > config.getMaxReviewLines()) {
+    String measured = changeSetData.getIncrementalPatchSet();
+    if (measured == null || measured.isBlank()) {
+      measured = sizeReference;
+    }
+    int changedLines = DiffStats.changedLines(measured);
+    if (changedLines > config.getMaxReviewLines()) {
       log.warn(
-          "Patch set too large for review, size: {}, max allowed: {}",
-          patchLines.size(),
+          "Change too large for review, changed lines: {}, max allowed: {}",
+          changedLines,
           config.getMaxReviewLines());
       changeSetData.setReviewSystemMessage(
           String.format(SPLIT_REVIEW_MSG, config.getMaxReviewLines()));
