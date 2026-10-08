@@ -17,7 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.extractFilesFromPatch;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+import static com.googlesource.gerrit.plugins.reviewai.utils.GerritUtils.isGerritNonFilePath;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
@@ -45,8 +45,7 @@ public final class NewIssueFinderConcernFilter {
                                 .anyMatch(
                                     filename ->
                                         filename != null
-                                            && (GERRIT_PATCH_SET_FILENAME.equals(filename)
-                                                || filename.endsWith("/COMMIT_MSG")
+                                            && (isGerritNonFilePath(filename)
                                                 || currentFiles.stream()
                                                     .anyMatch(path -> path.contains(filename))))))
             .toList();
