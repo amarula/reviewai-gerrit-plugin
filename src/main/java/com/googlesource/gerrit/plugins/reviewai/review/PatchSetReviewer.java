@@ -26,10 +26,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.debug.DebugCodeBlocksReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.review.RepeatedCommentReferenceFormatter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.comment.GerritCommentRange;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.filename.FilenameSanitizer;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritCodeRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -184,8 +182,7 @@ public class PatchSetReviewer {
     Map<String, String> publishedCommentIdsByConcern;
     try {
       publishedCommentIdsByConcern =
-          clientReviewProvider
-              .get()
+          reviewClientFor(change)
               .setReviewAndGetPublishedCommentIds(
                   change, reviewBatches, changeSetData, reviewScore, reviewReply);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
@@ -247,51 +244,26 @@ public class PatchSetReviewer {
             : getReviewScore(
                 change, topicReviewScores == null ? reviewScores : topicReviewScores, reviewReply);
     Map<String, String> publishedCommentIdsByConcern =
-        clientReviewProvider
-            .get()
+        reviewClientFor(change)
             .setReviewAndGetPublishedCommentIds(
                 change, reviewBatches, changeSetData, reviewScore, reviewReply);
     reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
-  private void setCommentBatchMap(ReviewBatch batchMap, Integer batchID) {
-    if (commentProperties != null && batchID < commentProperties.size()) {
-      GerritComment commentProperty = commentProperties.get(batchID);
-      if (commentProperty != null) {
-        batchMap.setId(commentProperty.getId());
-        batchMap.setFilename(commentProperty.getFilename());
-        batchMap.setLine(commentProperty.getLine());
-        if (commentProperty.getRange() != null) {
-          batchMap.setRange(commentProperty.getRange());
-        }
-      }
-    }
+  private GerritClientReview reviewClientFor(GerritChange change) {
+    return ReviewCommentAnchoring.prepareClient(clientReviewProvider.get(), gerritClient, change);
   }
 
-  private void setPatchSetReviewBatchMap(ReviewBatch batchMap, AiReplyItem replyItem) {
-    if (gerritCommentRange == null) {
-      return;
-    }
-    Optional<GerritCodeRange> optGerritCommentRange =
-        gerritCommentRange.getGerritCommentRange(replyItem);
-    if (optGerritCommentRange.isPresent()) {
-      GerritCodeRange gerritCodeRange = optGerritCommentRange.get();
-      batchMap.setFilename(replyItem.getFilename());
-      batchMap.setLine(gerritCodeRange.getStartLine());
-      batchMap.setRange(gerritCodeRange);
-    }
-  }
-
-  private List<ReviewBatch> retrieveReviewBatches(
-      AiResponseContent reviewReply, GerritChange change) {
+  List<ReviewBatch> retrieveReviewBatches(AiResponseContent reviewReply, GerritChange change) {
     return retrieveReviewBatches(reviewReply, change, null);
   }
 
   private List<ReviewBatch> retrieveReviewBatches(
       AiResponseContent reviewReply, GerritChange change, String topicFilenamePrefix) {
     List<ReviewBatch> batches = new ArrayList<>();
-    FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
+    ReviewCommentAnchoring commentAnchoring =
+        new ReviewCommentAnchoring(gerritClient, change, commentProperties, gerritCommentRange);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
     List<String> debugDetails = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
@@ -332,12 +304,7 @@ public class PatchSetReviewer {
       }
       ReviewBatch batchMap = new ReviewBatch(reply);
       batchMap.setConcernId(replyItem.getConcernId());
-      if (change.getIsCommentEvent() && replyItem.getId() != null) {
-        setCommentBatchMap(batchMap, replyItem.getId());
-      } else {
-        filenameSanitizer.sanitizeFilename(replyItem);
-        setPatchSetReviewBatchMap(batchMap, replyItem);
-      }
+      commentAnchoring.anchor(batchMap, replyItem, reviewReply);
       batches.add(batchMap);
       log.debug("Added review batch from reply item: {}", batchMap);
     }

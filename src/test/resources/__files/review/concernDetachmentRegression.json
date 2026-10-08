@@ -1,0 +1,61 @@
+{
+  "replies": [
+    {
+      "id": null,
+      "reply": "The `rsplit` limit now allows three pieces for names containing two or more dots, which cannot be unpacked into `module_name` and `class_name`. For example, `pkg.mod.Class` raises `ValueError` before the import. Restore a single split with `rsplit('.', 1)` so the module path remains intact and only the class name is separated.",
+      "score": -0.9,
+      "relevance": 0.95,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "dynloader.py",
+      "lineNumber": 20,
+      "codeSnippet": "module_name, class_name = module_name.rsplit('.', 2)",
+      "concern_id": "concern-61e90d67-c888-4f77-93d6-c94579603a43"
+    },
+    {
+      "id": null,
+      "reply": "This patch deletes `classregistry.py`, removing the `ClassRegistry` implementation and making imports from that module fail, even though the subject says the patch adds a class registry fixture. If the registry is meant to remain available, restore the module rather than deleting it.",
+      "score": -0.85,
+      "relevance": 0.9,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "classregistry.py",
+      "lineNumber": 1,
+      "codeSnippet": "class ClassRegistry:",
+      "concern_id": "concern-f94d6167-2195-41fa-89f8-bc2fae268367"
+    },
+    {
+      "id": null,
+      "reply": "The subject says this adds a class registry fixture, but the patch deletes `classregistry.py` and changes `dynloader.py`. Use a subject that describes the actual changes, for example: `fix: correct importclass path parsing and remove ClassRegistry`.",
+      "score": -0.7,
+      "relevance": 0.75,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "/COMMIT_MSG",
+      "lineNumber": null,
+      "codeSnippet": null,
+      "concern_id": "concern-ccab5df1-61cd-4e8f-bb0b-6d6d5f1ebff6"
+    }
+  ],
+  "patchSetFiles": [
+    "dynloader.py"
+  ]
+}
