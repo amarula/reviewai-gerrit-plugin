@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3335e2c9_53812c21",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1037991
+      },
+      "writtenOn": "2026-10-08T07:10:22Z",
+      "side": 1,
+      "message": "The new check no longer enforces `maxReviewLines` as a limit on the patch payload sent to AI. It counts only added and removed lines, while the full patchSet is still passed to some Agents. The new test shows the consequence: a patch with more than 1,000 lines passes a limit of 1,000 because it contains only 120 changed lines.\nThis can allow the large payloads the setting was intended to prevent. Please retain a limit on the patch text actually sent to the model. If limiting the size of the change is also useful, that could be a separate setting.",
+      "revId": "a4a4092174d3d7117002b039a5673503122547a5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735"
+    }
+  ]
+}
