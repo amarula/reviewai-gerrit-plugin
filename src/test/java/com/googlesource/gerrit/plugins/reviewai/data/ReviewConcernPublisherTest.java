@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.data;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.gerrit.entities.BranchNameKey;
@@ -25,10 +26,12 @@ import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.SuggestedFix;
 import java.util.List;
 import java.util.Map;
 import org.junit.Before;
@@ -94,6 +97,99 @@ public class ReviewConcernPublisherTest extends TestBase {
 
     assertTrue(
         new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId()).load().isEmpty());
+  }
+
+  @Test
+  public void recordsASuggestedFixAgainstItsConcernWithoutTouchingTheStatus() {
+    change.setPatchSetRevision(REVIEWED_COMMIT);
+    saveLedgerWithConcern(ConcernStatus.PRESENT);
+
+    publisher.recordSuggestedFixes(change, Map.of("concern-1", suggestedFix()));
+
+    ReviewConcern restored = restoreFirstConcern();
+    assertEquals(
+        "the fix is recorded", "loadKey(alias) != null", restored.getSuggestedFix().getCode());
+    assertEquals(
+        "what would resolve it travels with the fix",
+        "a transient failure can no longer delete the keyset",
+        restored.getSuggestedFix().getResolvedWhen());
+    assertEquals(
+        "a suggestion run decides nothing about the concern, so its status must survive",
+        ConcernStatus.PRESENT,
+        restored.getStatus());
+  }
+
+  @Test
+  public void recordingASuggestedFixDoesNotHideTheEditItIsWaitingFor() {
+    // The next review looks for the applied fix among the changes since lastReviewedCommit, so
+    // recording a
+    // suggestion must not advance it to the revision the suggestion was written against: the
+    // author's edit lands
+    // after that revision, and moving the marker would put it outside the window being watched.
+    saveLedgerWithConcern(ConcernStatus.PRESENT);
+    String suggestionRevision = "b".repeat(40);
+    change.setPatchSetRevision(suggestionRevision);
+
+    publisher.recordSuggestedFixes(change, Map.of("concern-1", suggestedFix()));
+
+    assertEquals(
+        REVIEWED_COMMIT,
+        new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
+            .load()
+            .orElseThrow()
+            .getLastReviewedCommit());
+  }
+
+  @Test
+  public void ignoresASuggestedFixForAConcernTheLedgerDoesNotHave() {
+    saveLedgerWithConcern(ConcernStatus.PRESENT);
+
+    publisher.recordSuggestedFixes(change, Map.of("some-other-concern", suggestedFix()));
+
+    assertNull(restoreFirstConcern().getSuggestedFix());
+  }
+
+  @Test
+  public void recordsSuggestedFixesWithoutALedger() {
+    // Nothing to attach to, and no ledger to create: a concern that was never stored cannot be
+    // fixed.
+    publisher.recordSuggestedFixes(change, Map.of("concern-1", suggestedFix()));
+
+    assertTrue(
+        new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId()).load().isEmpty());
+  }
+
+  private void saveLedgerWithConcern(ConcernStatus status) {
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("concern-1");
+    concern.setStatus(status);
+    ReviewerConcerns reviewer = new ReviewerConcerns();
+    reviewer.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    reviewer.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewer));
+    // What a completed review leaves behind, so the tests below can show what recording a
+    // suggestion changes.
+    ledger.setLastReviewedCommit(REVIEWED_COMMIT);
+    new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId()).save(ledger);
+  }
+
+  private ReviewConcern restoreFirstConcern() {
+    return new ReviewConcernStore(getTestReviewAiDb(), change.getFullChangeId())
+        .load()
+        .orElseThrow()
+        .getReviewers()
+        .getFirst()
+        .getConcerns()
+        .getFirst();
+  }
+
+  private static SuggestedFix suggestedFix() {
+    SuggestedFix fix = new SuggestedFix();
+    fix.setFilename("A.kt");
+    fix.setCode("loadKey(alias) != null");
+    fix.setResolvedWhen("a transient failure can no longer delete the keyset");
+    return fix;
   }
 
   @Test

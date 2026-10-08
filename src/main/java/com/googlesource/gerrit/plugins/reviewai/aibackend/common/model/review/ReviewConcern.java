@@ -73,6 +73,16 @@ public class ReviewConcern {
   @SerializedName("dismissal_automatic")
   private Boolean automaticDismissal;
 
+  /**
+   * The fix ReviewAI proposed for this concern, when one was suggested.
+   *
+   * <p>Present means a suggestion was published for this concern and states what would resolve it.
+   * An applied fix closes the concern rather than being re-raised, so this is both the record of
+   * what was asked for and the evidence that it was done.
+   */
+  @SerializedName("suggested_fix")
+  private SuggestedFix suggestedFix;
+
   public void normalize() {
     if (status == null) {
       status = ConcernStatus.PRESENT;
@@ -108,6 +118,7 @@ public class ReviewConcern {
     copy.setRelevance(relevance);
     copy.setPreviousCommentId(previousCommentId);
     copy.setAutomaticDismissal(automaticDismissal);
+    copy.setSuggestedFix(suggestedFix);
     return copy;
   }
 }

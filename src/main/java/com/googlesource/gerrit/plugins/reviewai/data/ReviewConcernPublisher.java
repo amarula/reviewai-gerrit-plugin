@@ -20,7 +20,10 @@ import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.SuggestedFix;
 import java.util.Map;
 import java.util.Optional;
 
@@ -65,6 +68,48 @@ public final class ReviewConcernPublisher {
               }
               new ReviewConcernStore(db, change.getFullChangeId()).save(ledger);
             });
+  }
+
+  /**
+   * Records the fixes proposed for a change's concerns, leaving every concern's status alone.
+   *
+   * <p>Separate from {@link #persist} on purpose: that one rewrites the ledger from a review
+   * response, and a suggestion run produces no concern statuses. Writing through it would either do
+   * nothing (there are no pending updates) or overwrite what the last review decided.
+   *
+   * <p>{@code lastReviewedCommit} is deliberately left where it is. The next review looks for the
+   * applied fix among the changes since that commit, so advancing it here would hide the very edit
+   * being watched for.
+   */
+  public void recordSuggestedFixes(GerritChange change, Map<String, SuggestedFix> suggestedFixes) {
+    if (suggestedFixes == null || suggestedFixes.isEmpty()) {
+      return;
+    }
+    ReviewConcernStore store = new ReviewConcernStore(db, change.getFullChangeId());
+    store
+        .load()
+        .ifPresent(
+            ledger -> {
+              ledger.normalize();
+              if (attachSuggestedFixes(ledger, suggestedFixes)) {
+                store.save(ledger);
+              }
+            });
+  }
+
+  private boolean attachSuggestedFixes(
+      ReviewConcernLedger ledger, Map<String, SuggestedFix> suggestedFixes) {
+    boolean attached = false;
+    for (ReviewerConcerns reviewerConcerns : ledger.getReviewers()) {
+      for (ReviewConcern concern : reviewerConcerns.getConcerns()) {
+        SuggestedFix fix = suggestedFixes.get(concern.getId());
+        if (fix != null) {
+          concern.setSuggestedFix(fix);
+          attached = true;
+        }
+      }
+    }
+    return attached;
   }
 
   private void bindPublishedCommentIds(

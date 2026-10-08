@@ -17,7 +17,9 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.SuggestedFix;
 import java.util.List;
+import java.util.Map;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -28,5 +30,16 @@ public final class AiResponseContent {
   private List<AiReplyItem> replies;
   private String changeId;
   private transient PendingReviewConcernUpdates pendingConcernUpdates;
+
+  /**
+   * Fixes proposed by this run, keyed by the concern each one is meant to resolve.
+   *
+   * <p>Transient for the same reason as {@link #pendingConcernUpdates}: it is state for the plugin
+   * to act on, not something to send to the model. It is also kept out of the published batches on
+   * purpose - a suggestion comment carrying a concern id would be bound as the concern's own
+   * comment, replacing the link to the thread it answers.
+   */
+  private transient Map<String, SuggestedFix> suggestedFixes;
+
   @NonNull private String messageContent;
 }
