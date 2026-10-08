@@ -17,6 +17,9 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import static com.googlesource.gerrit.plugins.reviewai.review.PatchSetConcernHandler.detachedConcernIds;
+import static com.googlesource.gerrit.plugins.reviewai.review.PatchSetConcernHandler.isDetachedConcern;
+
 import com.google.gerrit.server.config.CanonicalWebUrl;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -45,6 +48,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormat
 import com.googlesource.gerrit.plugins.reviewai.review.topic.TopicReviewReplyMapper;
 import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.util.*;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +71,7 @@ public class PatchSetReviewer {
   private final TopicPatchSetReviewer topicPatchSetReviewer;
   private final TopicReviewReplyMapper topicReviewReplyMapper;
   private final ReviewConcernPublisher reviewConcernPublisher;
+  private final PatchSetConcernHandler concernHandler;
   private final ReviewFeedbackLifecycle reviewFeedbackLifecycle;
   private final AiReviewApplicabilityChecker aiReviewApplicabilityChecker;
 
@@ -96,6 +101,7 @@ public class PatchSetReviewer {
     this.localizer = localizer;
     this.conversationRecorder = conversationRecorder;
     this.reviewConcernPublisher = reviewConcernPublisher;
+    this.concernHandler = new PatchSetConcernHandler(gerritClient, changeSetData, localizer);
     this.reviewFeedbackLifecycle = reviewFeedbackLifecycle;
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.repeatedCommentReferenceFormatter =
@@ -176,6 +182,7 @@ public class PatchSetReviewer {
       return;
     }
     if (reviewReply != null) {
+      detachConcernsWithoutFiles(reviewReply, change);
       reviewBatches = retrieveReviewBatches(reviewReply, change);
     }
     Integer reviewScore = getReviewScore(change, reviewReply);
@@ -251,6 +258,15 @@ public class PatchSetReviewer {
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
+  void detachConcernsWithoutFiles(AiResponseContent reviewReply, GerritChange change) {
+    concernHandler.detachConcernsWithoutFiles(reviewReply, change);
+  }
+
+  void detachConcernsWithoutFiles(
+      AiResponseContent reviewReply, GerritChange change, Predicate<String> fileInRevision) {
+    concernHandler.detachConcernsWithoutFiles(reviewReply, change, fileInRevision);
+  }
+
   private GerritClientReview reviewClientFor(GerritChange change) {
     return ReviewCommentAnchoring.prepareClient(clientReviewProvider.get(), gerritClient, change);
   }
@@ -265,6 +281,7 @@ public class PatchSetReviewer {
     ReviewCommentAnchoring commentAnchoring =
         new ReviewCommentAnchoring(gerritClient, change, commentProperties, gerritCommentRange);
     List<AiReplyItem> filteredRepeatedReplyItems = new ArrayList<>();
+    Set<String> detachedConcernIds = detachedConcernIds(reviewReply);
     List<String> debugDetails = new ArrayList<>();
     log.debug("Retrieving review batches for change: {}", change.getFullChangeId());
     if (reviewReply.getMessageContent() != null && !reviewReply.getMessageContent().isEmpty()) {
@@ -279,6 +296,9 @@ public class PatchSetReviewer {
         continue;
       }
       replyItem = topicReplyItem.get();
+      if (isDetachedConcern(replyItem, detachedConcernIds)) {
+        continue;
+      }
       String reply = replyItem.getReply();
       Double score = replyItem.getScore();
       boolean isIrrelevant = isIrrelevantReply(replyItem);
@@ -292,7 +312,9 @@ public class PatchSetReviewer {
       if (hiddenByReplyFilter && replyItem.isRepeated() && !isIrrelevant) {
         filteredRepeatedReplyItems.add(replyItem);
       }
-      if (isScoredReply(replyItem, isIrrelevant) && score != null) {
+      if (isScoredReply(replyItem, isIrrelevant)
+          && score != null
+          && !isDetachedConcern(replyItem, detachedConcernIds)) {
         log.debug("Score added: {}", score);
         reviewScores.add(score);
       }
@@ -320,10 +342,13 @@ public class PatchSetReviewer {
       return List.of();
     }
     List<Double> scores = new ArrayList<>();
+    Set<String> detachedConcernIds = detachedConcernIds(reviewReply);
     for (AiReplyItem replyItem : reviewReply.getReplies()) {
       boolean isIrrelevant = isIrrelevantReply(replyItem);
       Double score = replyItem.getScore();
-      if (isScoredReply(replyItem, isIrrelevant) && score != null) {
+      if (isScoredReply(replyItem, isIrrelevant)
+          && score != null
+          && !isDetachedConcern(replyItem, detachedConcernIds)) {
         scores.add(score);
       }
     }

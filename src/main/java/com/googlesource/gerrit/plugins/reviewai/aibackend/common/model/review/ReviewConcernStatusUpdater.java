@@ -54,6 +54,10 @@ public final class ReviewConcernStatusUpdater {
                 throw new IllegalArgumentException(
                     "SKIPPED can only be assigned by disabled-scope handling");
               }
+              if (update.getStatus() == ConcernStatus.DETACHED) {
+                throw new IllegalArgumentException(
+                    "DETACHED can only be assigned when a concern's locations leave the change");
+              }
               if (update.getStatus() == ConcernStatus.DISMISSED
                   && existing.getStatus() != ConcernStatus.DISMISSED
                   && !authorizedDismissals.contains(existing.getId())) {

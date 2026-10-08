@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.inject.util.Providers;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernReplyMapper;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
@@ -34,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
@@ -51,6 +53,7 @@ import com.googlesource.gerrit.plugins.reviewai.utils.DiffStats;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.junit.Test;
@@ -281,9 +284,147 @@ public class PatchSetReviewerTest {
   }
 
   @Test
+  public void detachesAConcernWhoseFileLeftTheChange() {
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
+
+    reviewerWithPreviousConcerns(List.of("src/Present.java"), response, change)
+        .detachConcernsWithoutFiles(response, change);
+
+    ReviewConcern concern = firstConcern(response, change);
+    assertEquals(ConcernStatus.DETACHED, concern.getStatus());
+  }
+
+  @Test
+  public void keepsAConcernWhoseFileIsStillInTheChange() {
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "src/Present.java");
+
+    reviewerWithPatchSetFiles(List.of("src/Present.java"))
+        .detachConcernsWithoutFiles(response, change);
+
+    ReviewConcern concern = firstConcern(response, change);
+    assertEquals(ConcernStatus.PRESENT, concern.getStatus());
+  }
+
+  @Test
+  public void detachingAllConcernsAllowsAPositiveVote() {
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
+    response.setReplies(List.of(AiReplyItem.builder().concernId("c1").score(-1.0).build()));
+    PatchSetReviewer reviewer =
+        reviewerWithPreviousConcerns(List.of("src/Present.java"), response, change);
+
+    assertEquals(List.of(-1.0), reviewer.getReviewScores(response));
+    reviewer.detachConcernsWithoutFiles(response, change);
+
+    assertEquals(ConcernStatus.DETACHED, firstConcern(response, change).getStatus());
+    assertTrue(reviewer.getReviewScores(response).isEmpty());
+    assertEquals(Integer.valueOf(1), reviewer.getReviewScore(change, response));
+    assertEquals(
+        Integer.valueOf(0),
+        reviewer.getReviewScore(change, responseWithConcern(change, "DISMISSED", "Gone.java")));
+  }
+
+  @Test
+  public void newDeletionAndCommitMessageFindingsRemainPresentAcrossReviews() throws Exception {
+    DetachmentRegression fixture = readDetachmentRegression();
+    GerritChange change = change();
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(fixture.previousLedger);
+    ReviewerConcerns previous = fixture.previousLedger.getReviewers().get(0);
+    List<ReviewConcern> concerns = new ArrayList<>();
+    for (ReviewConcern concern : previous.getConcerns()) {
+      ReviewConcern reviewed = concern.copy();
+      reviewed.setStatus(ConcernStatus.FIXED);
+      concerns.add(reviewed);
+    }
+    List<ReviewConcern> newConcerns =
+        fixture.replies.stream()
+            .map(
+                reply ->
+                    ReviewConcernReplyMapper.fromReply(
+                        reply, previous.getReviewer(), reply.getConcernId()))
+            .toList();
+    concerns.addAll(newConcerns);
+    ReviewerConcerns merged = new ReviewerConcerns();
+    merged.setReviewer(previous.getReviewer());
+    merged.setConcerns(concerns);
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(merged));
+    AiResponseContent response = new AiResponseContent("");
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    response.setPendingConcernUpdates(updates);
+    response.setReplies(fixture.replies);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(fixture.patchSetFiles, data, mock(ReviewConcernPublisher.class));
+
+    reviewer.detachConcernsWithoutFiles(response, change);
+
+    ReviewConcernLedger updated = updates.get(change.getFullChangeId()).orElseThrow();
+    List<ReviewConcern> updatedConcerns = updated.getReviewers().get(0).getConcerns();
+    assertEquals(
+        List.of(
+            ConcernStatus.DETACHED,
+            ConcernStatus.DETACHED,
+            ConcernStatus.PRESENT,
+            ConcernStatus.PRESENT,
+            ConcernStatus.PRESENT),
+        updatedConcerns.stream().map(ReviewConcern::getStatus).toList());
+    ReviewConcern deletionConcern = updatedConcerns.get(3);
+    assertEquals("classregistry.py", deletionConcern.getLocations().get(0).getFilename());
+    assertEquals("/PATCHSET_LEVEL", deletionConcern.getLocations().get(1).getFilename());
+    assertEquals(List.of(-0.9, -0.85, -0.7), reviewer.getReviewScores(response));
+
+    List<String> newFindingTexts = fixture.replies.stream().map(AiReplyItem::getReply).toList();
+    assertEquals(
+        newFindingTexts,
+        reviewer.retrieveReviewBatches(response, change).stream()
+            .map(ReviewBatch::getContent)
+            .toList());
+
+    // Detached concerns remain unpublished even if the response includes their text.
+    List<AiReplyItem> replies = new ArrayList<>(fixture.replies);
+    updatedConcerns.stream()
+        .filter(concern -> concern.getStatus() == ConcernStatus.DETACHED)
+        .map(ReviewConcernReplyMapper::toReply)
+        .forEach(replies::add);
+    response.setReplies(replies);
+    data.setReplyFilterEnabled(false);
+    assertEquals(
+        newFindingTexts,
+        reviewer.retrieveReviewBatches(response, change).stream()
+            .map(ReviewBatch::getContent)
+            .toList());
+
+    // Simulate loading the published ledger on the next review of the same change.
+    ReviewConcernLedger stored =
+        getGson().fromJson(getGson().toJson(updated), ReviewConcernLedger.class);
+    data.setPreviousReviewConcernLedger(stored);
+    updates.replace(change.getFullChangeId(), stored);
+    reviewer.detachConcernsWithoutFiles(response, change);
+    assertEquals(updated, updates.get(change.getFullChangeId()).orElseThrow());
+
+    // New findings with unavailable anchors do not imply anything was skipped.
+    ReviewerConcerns current = new ReviewerConcerns();
+    current.setReviewer(previous.getReviewer());
+    current.setConcerns(updatedConcerns.subList(2, 5));
+    ReviewConcernLedger currentLedger = new ReviewConcernLedger();
+    currentLedger.setReviewers(List.of(current));
+    updates.replace(change.getFullChangeId(), currentLedger);
+    response.setReplies(fixture.replies);
+    assertEquals(
+        newFindingTexts,
+        reviewer.retrieveReviewBatches(response, change).stream()
+            .map(ReviewBatch::getContent)
+            .toList());
+  }
+
+  @Test
   public void publishesAndScoresRepliesWithoutConcernIds() throws Exception {
     DetachmentRegression fixture = readDetachmentRegression();
-    AiReplyItem reply = fixture.replies.get(1);
+    AiReplyItem reply = fixture.replies.get(0);
     reply.setConcernId(null);
     AiResponseContent response = new AiResponseContent("");
     response.setReplies(List.of(reply));
@@ -311,13 +452,52 @@ public class PatchSetReviewerTest {
   }
 
   private static final class DetachmentRegression {
+    ReviewConcernLedger previousLedger;
     List<AiReplyItem> replies;
     List<String> patchSetFiles;
+  }
+
+  private static AiResponseContent responseWithConcern(
+      GerritChange change, String status, String filename) {
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId("c1");
+    concern.setStatus(ConcernStatus.valueOf(status));
+    ConcernLocation location = new ConcernLocation();
+    location.setFilename(filename);
+    concern.setLocations(List.of(location));
+    ReviewerConcerns reviewerConcerns = new ReviewerConcerns();
+    reviewerConcerns.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewerConcerns));
+    AiResponseContent response = new AiResponseContent("");
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), ledger);
+    response.setPendingConcernUpdates(updates);
+    return response;
+  }
+
+  private static ReviewConcern firstConcern(AiResponseContent response, GerritChange change) {
+    return response
+        .getPendingConcernUpdates()
+        .get(change.getFullChangeId())
+        .orElseThrow()
+        .getReviewers()
+        .get(0)
+        .getConcerns()
+        .get(0);
   }
 
   private static PatchSetReviewer reviewerWithPatchSetFiles(List<String> patchSetFiles) {
     return reviewerWithPatchSetFiles(
         patchSetFiles, new ChangeSetData(1), mock(ReviewConcernPublisher.class));
+  }
+
+  private static PatchSetReviewer reviewerWithPreviousConcerns(
+      List<String> patchSetFiles, AiResponseContent response, GerritChange change) {
+    ChangeSetData data = new ChangeSetData(1);
+    data.setPreviousReviewConcernLedger(
+        response.getPendingConcernUpdates().get(change.getFullChangeId()).orElseThrow());
+    return reviewerWithPatchSetFiles(patchSetFiles, data, mock(ReviewConcernPublisher.class));
   }
 
   private static PatchSetReviewer reviewerWithPatchSetFiles(
