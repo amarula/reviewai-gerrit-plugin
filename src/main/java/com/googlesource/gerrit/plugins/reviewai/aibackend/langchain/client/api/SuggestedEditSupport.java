@@ -53,6 +53,27 @@ public final class SuggestedEditSupport {
     return header.strip();
   }
 
+  /**
+   * The replacement code from a suggestion block: what the author's file will contain if they apply
+   * it.
+   *
+   * <p>Recorded with the fix so the plugin can look for it in a later revision and tell an applied
+   * fix from an ignored one, without asking a model.
+   */
+  static String extractSuggestedCode(AiReplyItem suggestion) {
+    String reply = suggestion.getReply();
+    if (reply == null) {
+      return null;
+    }
+    int fence = reply.indexOf(SUGGESTION_FENCE);
+    int contentStart = fence < 0 ? -1 : reply.indexOf('\n', fence);
+    if (contentStart < 0) {
+      return null;
+    }
+    int contentEnd = reply.indexOf("```", contentStart);
+    return contentEnd < 0 ? null : reply.substring(contentStart + 1, contentEnd).stripTrailing();
+  }
+
   static boolean hasSuggestionFence(AiReplyItem suggestion) {
     return suggestion.getReply().contains(SUGGESTION_FENCE);
   }

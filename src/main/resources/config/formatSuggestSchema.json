@@ -1,0 +1,51 @@
+{
+  "name": "format_suggest_edits",
+  "description": "Provide a Gerrit Suggested Edit for each open concern, and the condition that would settle it.",
+  "strict": false,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "replies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "resolved_when": {
+              "type": "string"
+            },
+            "reply": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "lineNumber": {
+              "type": "integer"
+            },
+            "codeSnippet": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "resolved_when",
+            "reply",
+            "filename",
+            "lineNumber",
+            "codeSnippet"
+          ]
+        }
+      },
+      "changeId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "replies",
+      "changeId"
+    ]
+  }
+}

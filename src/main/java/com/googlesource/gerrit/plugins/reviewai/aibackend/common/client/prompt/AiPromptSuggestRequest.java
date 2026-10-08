@@ -25,6 +25,17 @@ public final class AiPromptSuggestRequest {
 
   private AiPromptSuggestRequest() {}
 
+  /**
+   * Asks for fixes to the open concerns, each supplied with the concern it answers.
+   *
+   * <p>Distinct from {@link #forReviewReplies}: this one is given problems the reviewer has already
+   * raised and kept, so it proposes fixes for those rather than for whatever a fresh review
+   * happened to call negative.
+   */
+  public static String forOpenConcerns(String patchSet, String concerns) {
+    return String.format(prompt("DEFAULT_AI_SUGGEST_OPEN_CONCERNS_REQUEST"), patchSet, concerns);
+  }
+
   public static String forReviewReplies(String patchSet, String reviewReplies) {
     return String.format(
         prompt("DEFAULT_AI_SUGGEST_REVIEW_REPLIES_REQUEST"), patchSet, reviewReplies);

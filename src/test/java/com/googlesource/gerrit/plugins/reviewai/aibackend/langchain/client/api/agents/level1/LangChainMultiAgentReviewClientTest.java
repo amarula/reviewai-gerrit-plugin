@@ -38,8 +38,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.Comm
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.OpenConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
@@ -352,6 +354,57 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(2, client.recordedPatchSets.size());
     assertTrue(client.recordedPatchSets.get(1).contains("Code review issue"));
     assertTrue(client.recordedPatchSets.get(1).contains("Commit message review issue"));
+  }
+
+  @Test
+  public void suggestFixIsRequestedFromTheOpenConcernNotFromAFreshReview() throws Exception {
+    // The reported loop: the suggestion was written from a review reply's wording while the review
+    // later
+    // judged the concern, so an author could apply exactly what they were told and be told it still
+    // holds. The concern is now what the model is given.
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
+    client.suggestionReplies =
+        List.of(
+            codeSuggestionReply(
+                // The client numbers the targets it sends, and the response refers to them that
+                // way.
+                0,
+                readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE),
+                "a.py",
+                2,
+                "return value.strip().lower()"));
+
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    changeSetData.setSuggestionTargets(
+        OpenConcerns.asSuggestionTargets(
+            ledgerWithOpenConcern("concern-7", "The key is deleted after a transient failure"),
+            filename -> true,
+            null));
+    client.patchSetSuggestion = readTestResource(SUGGEST_PATCH_SET_FIX_REPLY_RESOURCE);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertEquals(1, response.getReplies().size());
+    assertTrue(
+        "the concern's own words, not a review reply's",
+        client
+            .recordedPatchSets
+            .getFirst()
+            .contains("The key is deleted after a transient failure"));
+    assertTrue(
+        "asked to resolve a concern, not to review again",
+        client.recordedPatchSets.getFirst().contains("Resolve every open concern"));
+    assertEquals(
+        "the ledger already says what to fix, so no review is run first",
+        List.of(true),
+        client.recordedSuggestModes);
   }
 
   @Test
@@ -708,6 +761,25 @@ public class LangChainMultiAgentReviewClientTest {
 
   private static List<String> readTestResourceLines(String resourceName) throws Exception {
     return Files.readAllLines(TEST_RESOURCES_PATH.resolve(resourceName));
+  }
+
+  /** A ledger holding one open concern, as a review would have left it. */
+  static ReviewConcernLedger ledgerWithOpenConcern(String id, String description) {
+    ConcernLocation location = new ConcernLocation();
+    location.setFilename("a.py");
+    location.setLineNumber(2);
+    location.setCodeSnippet("return value.strip().lower()");
+    ReviewConcern concern = new ReviewConcern();
+    concern.setId(id);
+    concern.setStatus(ConcernStatus.PRESENT);
+    concern.setDescription(description);
+    concern.setLocations(List.of(location));
+    ReviewerConcerns reviewer = new ReviewerConcerns();
+    reviewer.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    reviewer.setConcerns(List.of(concern));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(reviewer));
+    return ledger;
   }
 
   private static AiReplyItem reviewReply(

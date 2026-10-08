@@ -78,6 +78,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LangChainClient extends AiClientBase implements IAiClient {
 
   private static final String FORMAT_REPLIES_SCHEMA_RESOURCE = "config/formatRepliesSchema.json";
+  private static final String FORMAT_SUGGEST_SCHEMA_RESOURCE = "config/formatSuggestSchema.json";
   private static final String FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE =
       "config/formatSpecializedRepliesSchema.json";
   private static final String FORMAT_SPECIALIZED_TRIAGE_SCHEMA_RESOURCE =
@@ -105,6 +106,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected final AiCostTracker costTracker;
   // Field exposed only for test usage
   private final ResponseFormat structuredResponseFormat;
+  private final ResponseFormat suggestResponseFormat;
   private final ResponseFormat specializedRepliesResponseFormat;
   private final ResponseFormat specializedTriageResponseFormat;
   private final ResponseFormat specializedConsolidationResponseFormat;
@@ -179,6 +181,9 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     this.costTracker = new AiCostTracker(config, metrics);
     this.structuredResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_REPLIES_SCHEMA_RESOURCE)
+            .loadStructuredResponseFormat();
+    this.suggestResponseFormat =
+        new LangChainStructuredResponseFactory(FORMAT_SUGGEST_SCHEMA_RESOURCE)
             .loadStructuredResponseFormat();
     this.specializedRepliesResponseFormat =
         new LangChainStructuredResponseFactory(FORMAT_SPECIALIZED_REPLIES_SCHEMA_RESOURCE)
@@ -848,7 +853,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   private LangChainExecutor buildToolExecutor(ChangeSetData changeSetData) {
     ResponseFormat responseFormat = structuredResponseFormat;
-    if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
+    if (changeSetData != null && Boolean.TRUE.equals(changeSetData.getSuggestMode())) {
+      // A suggestion answers a concern and states the condition that settles it, which a review
+      // reply's shape cannot express. Chosen by mode rather than by a stage of its own, because the
+      // stage also keys the conversation and the scoped suggestion requests must keep keying apart.
+      responseFormat = suggestResponseFormat;
+    } else if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
       responseFormat =
           switch (changeSetData.getReviewAssistantStage()) {
             case REVIEW_CONCERNS -> concernReviewer.getResponseFormat();

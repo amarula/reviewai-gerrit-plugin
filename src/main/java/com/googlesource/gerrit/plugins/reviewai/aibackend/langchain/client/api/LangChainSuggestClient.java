@@ -24,9 +24,11 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.SuggestedFix;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.agents.level1.LangChainMultiAgentReviewClient;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,12 +40,25 @@ import lombok.extern.slf4j.Slf4j;
 public class LangChainSuggestClient {
   protected final LangChainClient client;
 
+  private final Map<String, SuggestedFix> suggestionsByConcern = new LinkedHashMap<>();
+
   public LangChainSuggestClient(LangChainClient client) {
     this.client = client;
   }
 
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
+    // What to fix, when the ledger already says so. Asking the model to find the problems first
+    // would
+    // have it work from its own fresh wording rather than the concern's, and the two readings are
+    // what
+    // the review later disagrees with.
+    List<AiReplyItem> targets = changeSetData.getSuggestionTargets();
+    if (!targets.isEmpty()) {
+      log.info("Proposing fixes for {} open concern(s)", targets.size());
+      return responseFor(askSuggestionRequests(changeSetData, change, patchSet, targets, true));
+    }
+
     ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
     if (hasExistingReviewContext(reviewData, changeSetData, change)) {
       return askExistingReviewContext(changeSetData, change, patchSet);
@@ -52,9 +67,14 @@ public class LangChainSuggestClient {
     List<AiReplyItem> suggestions =
         negativeReplies.isEmpty()
             ? List.of()
-            : askSuggestionRequests(changeSetData, change, patchSet, negativeReplies);
+            : askSuggestionRequests(changeSetData, change, patchSet, negativeReplies, false);
+    return responseFor(suggestions);
+  }
+
+  private AiResponseContent responseFor(List<AiReplyItem> suggestions) {
     AiResponseContent response = new AiResponseContent("");
     response.setReplies(suggestions);
+    response.setSuggestedFixes(suggestionsByConcern);
     return response;
   }
 
@@ -96,7 +116,8 @@ public class LangChainSuggestClient {
       ChangeSetData changeSetData,
       GerritChange change,
       String patchSet,
-      List<AiReplyItem> negativeReplies)
+      List<AiReplyItem> negativeReplies,
+      boolean fromConcerns)
       throws Exception {
     assignReplyIds(negativeReplies);
     if (shouldSplitSuggestionRequests(changeSetData)) {
@@ -109,7 +130,8 @@ public class LangChainSuggestClient {
               negativeReplies.stream()
                   .filter(reply -> !SuggestedEditSupport.isCommitMessageFile(reply.getFilename()))
                   .toList(),
-              ReviewScope.PATCHSET));
+              ReviewScope.PATCHSET,
+              fromConcerns));
       suggestions.addAll(
           askSuggestions(
               changeSetData,
@@ -118,11 +140,17 @@ public class LangChainSuggestClient {
               negativeReplies.stream()
                   .filter(reply -> SuggestedEditSupport.isCommitMessageFile(reply.getFilename()))
                   .toList(),
-              ReviewScope.COMMIT_MESSAGE));
+              ReviewScope.COMMIT_MESSAGE,
+              fromConcerns));
       return suggestions;
     }
     return askSuggestions(
-        changeSetData, change, patchSet, negativeReplies, changeSetData.getReviewScope());
+        changeSetData,
+        change,
+        patchSet,
+        negativeReplies,
+        changeSetData.getReviewScope(),
+        fromConcerns);
   }
 
   private boolean shouldSplitSuggestionRequests(ChangeSetData changeSetData) {
@@ -135,18 +163,22 @@ public class LangChainSuggestClient {
       GerritChange change,
       String patchSet,
       List<AiReplyItem> negativeReplies,
-      ReviewScope reviewScope)
+      ReviewScope reviewScope,
+      boolean fromConcerns)
       throws Exception {
     if (negativeReplies.isEmpty()) {
       return List.of();
     }
     log.info(
-        "Requesting Gerrit suggested edits in one AI query for {} negative review replies",
-        negativeReplies.size());
+        "Requesting Gerrit suggested edits in one AI query for {} {}",
+        negativeReplies.size(),
+        fromConcerns ? "open concerns" : "negative review replies");
     ChangeSetData suggestionData = LangChainSuggestData.suggestion(changeSetData, reviewScope);
     LangChainClient.ReviewRequestResult suggestionResult =
         client.askSingleRequest(
-            suggestionData, change, buildSuggestionRequest(patchSet, negativeReplies));
+            suggestionData,
+            change,
+            buildSuggestionRequest(patchSet, negativeReplies, fromConcerns));
     client.setRequestBody(suggestionResult == null ? null : suggestionResult.getRequestBody());
     if (suggestionResult == null || suggestionResult.getResponseContent() == null) {
       return List.of();
@@ -160,6 +192,7 @@ public class LangChainSuggestClient {
             .map(AiReplyItem::getId)
             .collect(Collectors.toSet());
     List<AiReplyItem> suggestions = new ArrayList<>();
+    Map<String, SuggestedFix> fixes = new LinkedHashMap<>();
     Set<Integer> suggestedReviewIds = new HashSet<>();
     boolean commitMessageSuggestionAdded = false;
     for (AiReplyItem suggestion :
@@ -179,6 +212,7 @@ public class LangChainSuggestClient {
       }
       suggestion.setScore(null);
       if (prepareNativeSuggestedEdit(suggestion, reviewReply)) {
+        recordFix(fixes, reviewReply, suggestion);
         if (commitMessageSuggestion) {
           suggestedReviewIds.addAll(commitMessageReviewIds);
           commitMessageSuggestionAdded = true;
@@ -203,7 +237,30 @@ public class LangChainSuggestClient {
       log.warn(
           "AI did not provide a valid suggested edit for negative review IDs {}", missingReviewIds);
     }
+    suggestionsByConcern.putAll(fixes);
     return suggestions;
+  }
+
+  /**
+   * Remembers which concern a suggestion answers, so the next review can tell an applied fix from
+   * an ignored one.
+   *
+   * <p>Kept off the reply itself: a published batch carrying a concern id would be bound as that
+   * concern's own comment, pointing the concern's thread link at the suggestion instead of the
+   * discussion it came from.
+   */
+  private void recordFix(
+      Map<String, SuggestedFix> fixes, AiReplyItem target, AiReplyItem suggestion) {
+    String concernId = target.getConcernId();
+    String code = SuggestedEditSupport.extractSuggestedCode(suggestion);
+    if (concernId == null || concernId.isBlank() || code == null || code.isBlank()) {
+      return;
+    }
+    SuggestedFix fix = new SuggestedFix();
+    fix.setFilename(suggestion.getFilename());
+    fix.setCode(code);
+    fix.setResolvedWhen(suggestion.getResolvedWhen());
+    fixes.put(concernId, fix);
   }
 
   private List<AiReplyItem> negativeReplies(AiResponseContent responseContent) {
@@ -239,8 +296,12 @@ public class LangChainSuggestClient {
     }
   }
 
-  private String buildSuggestionRequest(String patchSet, List<AiReplyItem> negativeReplies) {
-    return AiPromptSuggestRequest.forReviewReplies(patchSet, getGson().toJson(negativeReplies));
+  private String buildSuggestionRequest(
+      String patchSet, List<AiReplyItem> targets, boolean fromConcerns) {
+    String payload = getGson().toJson(targets);
+    return fromConcerns
+        ? AiPromptSuggestRequest.forOpenConcerns(patchSet, payload)
+        : AiPromptSuggestRequest.forReviewReplies(patchSet, payload);
   }
 
   private void prepareReviewLocation(

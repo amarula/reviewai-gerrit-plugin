@@ -58,6 +58,15 @@ public final class ChangeSetData {
   private transient ReviewConcernLedger previousReviewConcernLedger;
   private transient String incrementalPatchSet;
   private transient ConcernWorkflowInput concernWorkflowInput;
+
+  /**
+   * The open concerns a suggestion run is being asked to fix, built from the ledger by the caller
+   * that knows which files the revision still has.
+   */
+  private transient List<
+          com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem>
+      suggestionTargets = List.of();
+
   private transient ReviewFeedbackMemory reviewFeedbackMemory;
   private transient ReviewFeedbackClassificationInput reviewFeedbackClassificationInput;
   private transient List<String> pendingReviewFeedbackCommentIds = List.of();
@@ -162,6 +171,7 @@ public final class ChangeSetData {
     copy.setPreviousReviewConcernLedger(previousReviewConcernLedger);
     copy.setIncrementalPatchSet(incrementalPatchSet);
     copy.setConcernWorkflowInput(concernWorkflowInput);
+    copy.setSuggestionTargets(suggestionTargets);
     copy.setReviewFeedbackMemory(reviewFeedbackMemory);
     copy.setReviewFeedbackClassificationInput(reviewFeedbackClassificationInput);
     copy.setPendingReviewFeedbackCommentIds(pendingReviewFeedbackCommentIds);

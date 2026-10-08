@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerri
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernLocation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.OpenConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDismissal;
@@ -136,6 +137,7 @@ public class PatchSetReviewer {
     gerritCommentRange = new GerritCommentRange(gerritClient, change);
     String patchSet = gerritClient.getPatchSet(change);
     prepareConcernContext(change);
+    prepareSuggestionTargets(change);
     if (shouldSkipAiReviewForEmptyPatchSet(change)) {
       changeSetData.setReviewSystemMessage(
           SystemMessageFormatter.getLocalizedMessage(localizer, "message.review.skipped"));
@@ -195,12 +197,39 @@ public class PatchSetReviewer {
               .setReviewAndGetPublishedCommentIds(
                   change, reviewBatches, changeSetData, reviewScore, reviewReply);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
+      recordSuggestedFixes(reviewReply, change);
       reviewFeedbackLifecycle.settle(change, changeSetData, feedbackSession, reviewReply != null);
       conversationRecorder.record(change, reviewBatches, reviewScore);
     } catch (Exception e) {
       reviewFeedbackLifecycle.release(change, feedbackSession, e);
       throw e;
     }
+  }
+
+  /**
+   * Hands a suggestion run the open concerns it should be fixing.
+   *
+   * <p>Built here rather than in the client because deciding whether a concern's code is still in
+   * the revision needs the file list, which lives with the Gerrit client. The concerns themselves
+   * come from the ledger {@link #prepareConcernContext} has just loaded.
+   *
+   * <p>Nothing is set when the ledger holds no open concern, which leaves the suggestion run on its
+   * original footing: review first, then propose fixes for whatever came out negative. That keeps
+   * {@code /suggest} working on a change that has never been reviewed.
+   */
+  private void prepareSuggestionTargets(GerritChange change) {
+    if (!Boolean.TRUE.equals(changeSetData.getSuggestMode())) {
+      return;
+    }
+    FilenameSanitizer filenameSanitizer = new FilenameSanitizer(gerritClient, change);
+    changeSetData.setSuggestionTargets(
+        OpenConcerns.asSuggestionTargets(
+            changeSetData.getPreviousReviewConcernLedger(),
+            filenameSanitizer::isPartOfPatchSet,
+            changeSetData.getReviewScope()));
+    log.debug(
+        "Suggestion run has {} open concern(s) to fix",
+        changeSetData.getSuggestionTargets().size());
   }
 
   private void prepareConcernContext(GerritChange change) throws Exception {
@@ -259,6 +288,7 @@ public class PatchSetReviewer {
             .setReviewAndGetPublishedCommentIds(
                 change, reviewBatches, changeSetData, reviewScore, reviewReply);
     reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
+    recordSuggestedFixes(reviewReply, change);
     conversationRecorder.record(change, reviewBatches, reviewScore);
   }
 
@@ -404,6 +434,20 @@ public class PatchSetReviewer {
             localizer,
             "message.review.concerns.fix.applied",
             String.join(", ", new TreeSet<>(filenames))));
+  }
+
+  /**
+   * Records the fixes this run proposed, for the concern each one answers.
+   *
+   * <p>The response is absent whenever the AI call failed but a message is still published - an
+   * unreachable server, a bad request - so this must tolerate it. Reaching for the fixes unguarded
+   * turned those failures into a NullPointerException inside the publication block, which marked
+   * the request failed and hid the very error the author was supposed to read.
+   */
+  private void recordSuggestedFixes(AiResponseContent reviewReply, GerritChange change) {
+    if (reviewReply != null) {
+      reviewConcernPublisher.recordSuggestedFixes(change, reviewReply.getSuggestedFixes());
+    }
   }
 
   /**

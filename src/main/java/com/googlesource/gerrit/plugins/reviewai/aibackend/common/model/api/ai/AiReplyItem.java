@@ -28,6 +28,15 @@ public class AiReplyItem extends AiDialogueItem {
   @SerializedName("concern_id")
   private String concernId;
 
+  /**
+   * What would settle the concern this reply answers, as the suggestion pass stated it.
+   *
+   * <p>Recorded so the review that later judges the applied fix has the same sentence to judge
+   * against, instead of forming its own reading of an older complaint.
+   */
+  @SerializedName("resolved_when")
+  private String resolvedWhen;
+
   private String reply;
   private Double score;
   private Double relevance;
