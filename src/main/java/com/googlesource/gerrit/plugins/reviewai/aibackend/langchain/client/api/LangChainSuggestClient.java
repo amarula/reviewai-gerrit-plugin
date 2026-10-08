@@ -48,13 +48,21 @@ public class LangChainSuggestClient {
     if (hasExistingReviewContext(reviewData, changeSetData, change)) {
       return askExistingReviewContext(changeSetData, change, patchSet);
     }
-    List<AiReplyItem> negativeReplies = askReview(changeSetData, change, patchSet);
+    AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
+    List<AiReplyItem> negativeReplies =
+        reviewResponse == null ? List.of() : negativeReplies(reviewResponse);
+    for (AiReplyItem reviewReply : negativeReplies) {
+      prepareReviewLocation(reviewReply, reviewData.getReviewScope(), patchSet);
+    }
     List<AiReplyItem> suggestions =
         negativeReplies.isEmpty()
             ? List.of()
             : askSuggestionRequests(changeSetData, change, patchSet, negativeReplies);
     AiResponseContent response = new AiResponseContent("");
     response.setReplies(suggestions);
+    if (reviewResponse != null) {
+      response.setPendingConcernUpdates(reviewResponse.getPendingConcernUpdates());
+    }
     return response;
   }
 
@@ -75,21 +83,6 @@ public class LangChainSuggestClient {
       String patchSet)
       throws Exception {
     return new LangChainDirectSuggestClient(directClient).ask(changeSetData, change, patchSet);
-  }
-
-  private List<AiReplyItem> askReview(
-      ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
-    ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
-    AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
-    if (reviewResponse == null) {
-      return List.of();
-    }
-
-    List<AiReplyItem> negativeReplies = negativeReplies(reviewResponse);
-    for (AiReplyItem reviewReply : negativeReplies) {
-      prepareReviewLocation(reviewReply, reviewData.getReviewScope(), patchSet);
-    }
-    return negativeReplies;
   }
 
   private List<AiReplyItem> askSuggestionRequests(
@@ -179,6 +172,7 @@ public class LangChainSuggestClient {
       }
       suggestion.setScore(null);
       if (prepareNativeSuggestedEdit(suggestion, reviewReply)) {
+        suggestion.setConcernId(reviewReply.getConcernId());
         if (commitMessageSuggestion) {
           suggestedReviewIds.addAll(commitMessageReviewIds);
           commitMessageSuggestionAdded = true;
