@@ -101,7 +101,8 @@ public class PatchSetReviewer {
     this.localizer = localizer;
     this.conversationRecorder = conversationRecorder;
     this.reviewConcernPublisher = reviewConcernPublisher;
-    this.concernHandler = new PatchSetConcernHandler(gerritClient, changeSetData, localizer);
+    this.concernHandler =
+        new PatchSetConcernHandler(gerritClient, changeSetData, reviewConcernPublisher, localizer);
     this.reviewFeedbackLifecycle = reviewFeedbackLifecycle;
     this.aiReviewApplicabilityChecker = aiReviewApplicabilityChecker;
     this.repeatedCommentReferenceFormatter =
@@ -136,6 +137,7 @@ public class PatchSetReviewer {
     String patchSet = gerritClient.getPatchSet(change);
     prepareConcernContext(change);
     if (shouldSkipAiReviewForEmptyPatchSet(change)) {
+      detachPreviousConcernsForEmptyPatchSet(change);
       changeSetData.setReviewSystemMessage(
           SystemMessageFormatter.getLocalizedMessage(localizer, "message.review.skipped"));
       log.debug(
@@ -210,6 +212,10 @@ public class PatchSetReviewer {
       changeSetData.setIncrementalPatchSet(gerritClient.getIncrementalPatchSet(change));
     }
     reviewFeedbackLifecycle.loadMemory(change, changeSetData);
+  }
+
+  void detachPreviousConcernsForEmptyPatchSet(GerritChange change) {
+    concernHandler.detachPreviousConcernsForEmptyPatchSet(change);
   }
 
   public void reviewTopic(List<GerritChange> changes, boolean includeAiFailureDetails)

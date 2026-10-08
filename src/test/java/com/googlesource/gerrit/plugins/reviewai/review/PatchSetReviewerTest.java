@@ -22,7 +22,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.inject.util.Providers;
@@ -57,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class PatchSetReviewerTest {
   @Test
@@ -324,6 +327,28 @@ public class PatchSetReviewerTest {
     assertEquals(
         Integer.valueOf(0),
         reviewer.getReviewScore(change, responseWithConcern(change, "DISMISSED", "Gone.java")));
+  }
+
+  @Test
+  public void detachesStoredConcernWhenNoFilesRemainInThePatchSet() {
+    GerritChange change = change();
+    ReviewConcernLedger previousLedger =
+        responseWithConcern(change, "PRESENT", "Gone.java")
+            .getPendingConcernUpdates()
+            .get(change.getFullChangeId())
+            .orElseThrow();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setPreviousReviewConcernLedger(previousLedger);
+    ReviewConcernPublisher publisher = mock(ReviewConcernPublisher.class);
+    PatchSetReviewer reviewer = reviewerWithPatchSetFiles(List.of(), changeSetData, publisher);
+
+    reviewer.detachPreviousConcernsForEmptyPatchSet(change);
+
+    ArgumentCaptor<AiResponseContent> responseCaptor =
+        ArgumentCaptor.forClass(AiResponseContent.class);
+    verify(publisher).persist(responseCaptor.capture(), eq(change));
+    assertEquals(
+        ConcernStatus.DETACHED, firstConcern(responseCaptor.getValue(), change).getStatus());
   }
 
   @Test

@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.filename.FilenameSanitizer;
@@ -24,6 +26,8 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.Ai
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.PendingReviewConcernUpdates;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernDetachment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernLedger;
+import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -32,13 +36,38 @@ import java.util.function.Predicate;
 final class PatchSetConcernHandler {
   private final GerritClient gerritClient;
   private final ChangeSetData changeSetData;
+  private final ReviewConcernPublisher reviewConcernPublisher;
   private final Localizer localizer;
 
   PatchSetConcernHandler(
-      GerritClient gerritClient, ChangeSetData changeSetData, Localizer localizer) {
+      GerritClient gerritClient,
+      ChangeSetData changeSetData,
+      ReviewConcernPublisher reviewConcernPublisher,
+      Localizer localizer) {
     this.gerritClient = gerritClient;
     this.changeSetData = changeSetData;
+    this.reviewConcernPublisher = reviewConcernPublisher;
     this.localizer = localizer;
+  }
+
+  void detachPreviousConcernsForEmptyPatchSet(GerritChange change) {
+    ReviewConcernLedger previousLedger = changeSetData.getPreviousReviewConcernLedger();
+    if (previousLedger == null) {
+      return;
+    }
+    PendingReviewConcernUpdates updates = new PendingReviewConcernUpdates();
+    updates.put(change.getFullChangeId(), previousLedger);
+    AiResponseContent response = new AiResponseContent("");
+    response.setPendingConcernUpdates(updates);
+    detachConcernsWithoutFiles(
+        response,
+        change,
+        filename ->
+            GERRIT_PATCH_SET_FILENAME.equals(filename)
+                || (filename != null && filename.endsWith("/COMMIT_MSG")));
+    if (updates.get(change.getFullChangeId()).orElseThrow() != previousLedger) {
+      reviewConcernPublisher.persist(response, change);
+    }
   }
 
   /**
