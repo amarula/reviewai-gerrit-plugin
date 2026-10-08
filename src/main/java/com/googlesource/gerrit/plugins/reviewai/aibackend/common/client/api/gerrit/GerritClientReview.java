@@ -18,6 +18,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -61,6 +62,14 @@ public class GerritClientReview extends GerritClientAccount {
 
   private GerritChange change;
 
+  /**
+   * Files in the revision being reviewed, used to keep comments off paths Gerrit would reject.
+   *
+   * <p>Per review, like {@link #change}: one client serves many changes. Empty means the list is
+   * unknown, and nothing is filtered - guessing there would silently drop resolutions.
+   */
+  private List<String> patchSetFiles = List.of();
+
   @VisibleForTesting
   @Inject
   public GerritClientReview(Configuration config, Localizer localizer) {
@@ -68,6 +77,17 @@ public class GerritClientReview extends GerritClientAccount {
     this.localizer = localizer;
     concernBinder = new PublishedCommentConcernBinder();
     log.debug("GerritClientReview initialized.");
+  }
+
+  /**
+   * Tells this client which files the revision it is about to review contains.
+   *
+   * <p>This client extends {@link GerritClientAccount}, which cannot reach the patch set client, so
+   * the list is handed in by the caller that already has it. Both publication paths set it before
+   * publishing.
+   */
+  public void setPatchSetFiles(List<String> patchSetFiles) {
+    this.patchSetFiles = patchSetFiles == null ? List.of() : List.copyOf(patchSetFiles);
   }
 
   public void setReview(
@@ -131,14 +151,23 @@ public class GerritClientReview extends GerritClientAccount {
             || !resolvedCommentIds.add(comment.id)) {
           continue;
         }
+        String filename = filenamesByCommentId.get(comment.id);
+        if (!isResolvableInCurrentRevision(filename)) {
+          // The thread lives on a file this revision no longer has. A resolution has to reply
+          // in-thread - it needs inReplyTo and unresolved=false, neither of which a patch-set-level
+          // comment supports - so there is nowhere to move it. Sending it against the vanished path
+          // makes Gerrit reject the whole review, so the resolution is skipped; the concern still
+          // leaves the ledger, and the next patch set that carries the file resolves the thread.
+          log.debug(
+              "Skipping resolution of concern on '{}': not part of the current revision", filename);
+          continue;
+        }
         CommentInput resolution = new CommentInput();
         resolution.message = resolutionMessage(concern);
         resolution.inReplyTo = comment.id;
         resolution.line = comment.line;
         resolution.unresolved = false;
-        resolutionComments
-            .computeIfAbsent(filenamesByCommentId.get(comment.id), unused -> new ArrayList<>())
-            .add(resolution);
+        resolutionComments.computeIfAbsent(filename, unused -> new ArrayList<>()).add(resolution);
       }
       return resolutionComments;
     } catch (Exception e) {
@@ -191,6 +220,23 @@ public class GerritClientReview extends GerritClientAccount {
       return concernBinder.bind(
           refreshedChangeApi, reviewBatches, reviewInput.tag, existingCommentIds);
     }
+  }
+
+  /**
+   * Whether a concern thread on this file can still be resolved in the current revision.
+   *
+   * <p>Patch-set-level comments are always resolvable: that key is Gerrit's own and is accepted
+   * whatever the revision contains. For a real path, an unknown file list accepts, matching the
+   * behaviour before this guard.
+   */
+  private boolean isResolvableInCurrentRevision(String filename) {
+    if (filename == null || filename.isEmpty()) {
+      return false;
+    }
+    if (GERRIT_PATCH_SET_FILENAME.equals(filename)) {
+      return true;
+    }
+    return patchSetFiles.isEmpty() || patchSetFiles.contains(filename);
   }
 
   private static void appendConcernResolutionComments(
@@ -246,6 +292,11 @@ public class GerritClientReview extends GerritClientAccount {
       boolean emptyComments,
       String systemMessage) {
     List<String> messages = new ArrayList<>();
+    if (changeSetData.getReviewDetachedConcernsMessage() != null) {
+      messages.add(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewDetachedConcernsMessage()));
+    }
     Optional.ofNullable(ClientCommandBase.getDeprecationWarning(changeSetData, localizer))
         .ifPresent(messages::add);
     if (changeSetData.getReviewNoticeMessage() != null) {
@@ -273,6 +324,7 @@ public class GerritClientReview extends GerritClientAccount {
     if (reviewScore == null
         || changeSetData.getReviewSystemMessage() != null
         || changeSetData.getReviewRepeatedCommentsMessage() != null
+        || changeSetData.getReviewDetachedConcernsMessage() != null
         || changeSetData.hasParsedCommand("forget_thread")) {
       return false;
     }
@@ -366,6 +418,7 @@ public class GerritClientReview extends GerritClientAccount {
           case FIXED -> localizer.getText("message.review.concern.resolution.fixed");
           case DISMISSED -> localizer.getText("message.review.concern.resolution.dismissed");
           case SKIPPED -> localizer.getText("message.review.concern.resolution.skipped");
+          case DETACHED -> localizer.getText("message.review.concern.resolution.file.removed");
           case PRESENT, UNCERTAIN ->
               throw new IllegalArgumentException(
                   "Cannot resolve concern with status " + concern.getStatus());

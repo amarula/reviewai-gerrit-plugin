@@ -35,7 +35,10 @@ public class ReviewConcernLedger {
   public boolean allConcernsDismissed() {
     normalize();
     List<ReviewConcern> concerns =
-        reviewers.stream().flatMap(reviewer -> reviewer.getConcerns().stream()).toList();
+        reviewers.stream()
+            .flatMap(reviewer -> reviewer.getConcerns().stream())
+            .filter(concern -> concern.getStatus() != ConcernStatus.DETACHED)
+            .toList();
     return !concerns.isEmpty()
         && concerns.stream().allMatch(concern -> concern.getStatus() == ConcernStatus.DISMISSED);
   }

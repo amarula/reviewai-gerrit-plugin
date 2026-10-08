@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 public class PendingReviewConcernUpdates {
   private final Map<String, ReviewConcernLedger> ledgersByChange = new LinkedHashMap<>();
@@ -31,6 +32,27 @@ public class PendingReviewConcernUpdates {
 
   public Optional<ReviewConcernLedger> get(String fullChangeId) {
     return Optional.ofNullable(ledgersByChange.get(fullChangeId));
+  }
+
+  public Set<String> detachedConcernIds() {
+    return ledgersByChange.values().stream()
+        .flatMap(ledger -> ledger.getReviewers().stream())
+        .flatMap(reviewer -> reviewer.getConcerns().stream())
+        .filter(concern -> concern.getStatus() == ConcernStatus.DETACHED)
+        .map(ReviewConcern::getId)
+        .filter(id -> id != null)
+        .collect(java.util.stream.Collectors.toSet());
+  }
+
+  /**
+   * Replaces a change's ledger outright.
+   *
+   * <p>Unlike {@link #put}, which merges the two ledgers reviewer by reviewer, this drops whatever
+   * was stored before. Use it when the ledger has been rewritten as a whole and the merge semantics
+   * would only obscure that.
+   */
+  public void replace(String fullChangeId, ReviewConcernLedger ledger) {
+    ledgersByChange.put(fullChangeId, ledger);
   }
 
   public void mergeFrom(PendingReviewConcernUpdates updates) {

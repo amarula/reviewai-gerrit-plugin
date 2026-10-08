@@ -116,6 +116,16 @@ public class ReviewConcernStatusUpdaterTest {
         () -> ReviewConcernStatusUpdater.apply(List.of(existing), List.of(skipped)));
   }
 
+  @Test
+  public void rejectsDetachedStatusFromConcernReviewer() {
+    ReviewConcern existing = concern("concern-1", ConcernStatus.PRESENT, "Still actionable");
+    ReviewConcern detached = concern("concern-1", ConcernStatus.DETACHED, "File left the change");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewConcernStatusUpdater.apply(List.of(existing), List.of(detached)));
+  }
+
   private static ReviewConcern concern(String id, ConcernStatus status, String statusReason) {
     ReviewConcern concern = new ReviewConcern();
     concern.setId(id);

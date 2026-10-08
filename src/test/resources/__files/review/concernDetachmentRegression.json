@@ -1,0 +1,125 @@
+{
+  "previousLedger": {
+    "schema_version": 1,
+    "reviewers": [
+      {
+        "reviewer": {
+          "kind": "SINGLE_AGENT",
+          "name": "PATCHSET"
+        },
+        "concerns": [
+          {
+            "id": "concern-2c4e9f2b-7ea8-401d-81dc-bbe9f561114c",
+            "status": "PRESENT",
+            "description": "`_classes` is a class attribute, so every `ClassRegistry` instance shares the same registrations. Registering, unregistering, or clearing entries through one instance therefore changes every other instance, contrary to the \u201cindependent registry\u201d contract. Initialize `self._classes` in `__init__` instead.",
+            "repeated": false,
+            "merged_concern_ids": [],
+            "reviewers": [
+              {
+                "kind": "SINGLE_AGENT",
+                "name": "PATCHSET"
+              }
+            ],
+            "locations": [
+              {
+                "filename": "classregistry.py",
+                "lineNumber": 10,
+                "codeSnippet": "    _classes: Dict[str, Type] = {}"
+              }
+            ],
+            "reply": "`_classes` is a class attribute, so every `ClassRegistry` instance shares the same registrations. Registering, unregistering, or clearing entries through one instance therefore changes every other instance, contrary to the \u201cindependent registry\u201d contract. Initialize `self._classes` in `__init__` instead.",
+            "score": -0.9,
+            "relevance": 0.95,
+            "past_comment_id": "fe4abb6d_a7b7ed2d"
+          },
+          {
+            "id": "concern-8af68d74-4307-4c16-a086-54e2429096d2",
+            "status": "PRESENT",
+            "description": "The `register` docstring says an already-registered name raises `ValueError`, but this assignment silently replaces the existing class. Check whether the name is already present and raise `ValueError` before assigning, or change the documented behavior if replacement is intentional.",
+            "repeated": false,
+            "merged_concern_ids": [],
+            "reviewers": [
+              {
+                "kind": "SINGLE_AGENT",
+                "name": "PATCHSET"
+              }
+            ],
+            "locations": [
+              {
+                "filename": "classregistry.py",
+                "lineNumber": 31,
+                "codeSnippet": "        self._classes[name] = resolved_class"
+              }
+            ],
+            "reply": "The `register` docstring says an already-registered name raises `ValueError`, but this assignment silently replaces the existing class. Check whether the name is already present and raise `ValueError` before assigning, or change the documented behavior if replacement is intentional.",
+            "score": -0.8,
+            "relevance": 0.85,
+            "past_comment_id": "0adb686f_ce15d545"
+          }
+        ]
+      }
+    ]
+  },
+  "replies": [
+    {
+      "id": null,
+      "reply": "The `rsplit` limit now allows three pieces for names containing two or more dots, which cannot be unpacked into `module_name` and `class_name`. For example, `pkg.mod.Class` raises `ValueError` before the import. Restore a single split with `rsplit('.', 1)` so the module path remains intact and only the class name is separated.",
+      "score": -0.9,
+      "relevance": 0.95,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "dynloader.py",
+      "lineNumber": 20,
+      "codeSnippet": "module_name, class_name = module_name.rsplit('.', 2)",
+      "concern_id": "concern-61e90d67-c888-4f77-93d6-c94579603a43"
+    },
+    {
+      "id": null,
+      "reply": "This patch deletes `classregistry.py`, removing the `ClassRegistry` implementation and making imports from that module fail, even though the subject says the patch adds a class registry fixture. If the registry is meant to remain available, restore the module rather than deleting it.",
+      "score": -0.85,
+      "relevance": 0.9,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "classregistry.py",
+      "lineNumber": 1,
+      "codeSnippet": "class ClassRegistry:",
+      "concern_id": "concern-f94d6167-2195-41fa-89f8-bc2fae268367"
+    },
+    {
+      "id": null,
+      "reply": "The subject says this adds a class registry fixture, but the patch deletes `classregistry.py` and changes `dynloader.py`. Use a subject that describes the actual changes, for example: `fix: correct importclass path parsing and remove ClassRegistry`.",
+      "score": -0.7,
+      "relevance": 0.75,
+      "repeated": false,
+      "duplicated": false,
+      "conflicting": false,
+      "source_agent": null,
+      "repetition_reply_id": null,
+      "repeated_reason": null,
+      "duplicated_reason": null,
+      "conflicting_reason": null,
+      "filename": "/COMMIT_MSG",
+      "lineNumber": null,
+      "codeSnippet": null,
+      "concern_id": "concern-ccab5df1-61cd-4e8f-bb0b-6d6d5f1ebff6"
+    }
+  ],
+  "patchSetFiles": [
+    "dynloader.py"
+  ],
+  "fullPatch": "Subject: test: add class registry fixture for ReviewAI\n\nAdd a class registry supporting dynamic imports, instance creation, and\nregistration removal. Include deliberate defects for review testing.\n\nRationale:\nExercise ReviewAI's ability to detect shared mutable state and mismatches\nbetween documented behavior and implementation.\n\nChange-Id: Id21a84f72a4cb914b69174043db7d939e46825bd\n---\n\ndiff --git a/dynloader.py b/dynloader.py\nindex 3f1072e..a267ea4 100644\n--- a/dynloader.py\n+++ b/dynloader.py\n@@ -17,7 +17,7 @@\n     :return: The dynamically imported class.\n     \"\"\"\n     if not class_name:\n-        module_name, class_name = module_name.rsplit('.', 1)\n+        module_name, class_name = module_name.rsplit('.', 2)\n     loaded_module = __import__(module_name)\n     return getattr(loaded_module, class_name)\n \n",
+  "incrementalPatch": "Subject: test: add class registry fixture for ReviewAI\n\nAdd a class registry supporting dynamic imports, instance creation, and\nregistration removal. Include deliberate defects for review testing.\n\nRationale:\nExercise ReviewAI's ability to detect shared mutable state and mismatches\nbetween documented behavior and implementation.\n\nChange-Id: Id21a84f72a4cb914b69174043db7d939e46825bd\n---\n\ndiff --git a/classregistry.py b/classregistry.py\ndeleted file mode 100644\nindex 42c8a26..0000000\n--- a/classregistry.py\n+++ /dev/null\n@@ -1,48 +0,0 @@\n-from typing import Any, Dict, Type\n-\n-from dyndesign.dynloader import TypeClassOrPath, importclass\n-\n-__all__ = [\"ClassRegistry\"]\n-\n-\n-class ClassRegistry:\n-    \"\"\"An independent registry of named classes and import paths.\"\"\"\n-\n-    _classes: Dict[str, Type] = {}\n-\n-    def register(self, name: str, class_or_path: TypeClassOrPath) -> None:\n-        \"\"\"Register a class.\n-\n-        :param name: A nonempty registration name.\n-        :param class_or_path: A class or its fully qualified import path.\n-        :raises ValueError: If the name is empty or already registered.\n-        :raises TypeError: If the resolved object is not a class.\n-        \"\"\"\n-        if not name:\n-            raise ValueError(\"The registration name must not be empty\")\n-\n-        resolved_class = (\n-            importclass(class_or_path)\n-            if isinstance(class_or_path, str)\n-            else class_or_path\n-        )\n-\n-        if not isinstance(resolved_class, type):\n-            raise TypeError(\"The registered object must be a class\")\n-\n-        self._classes[name] = resolved_class\n-\n-    def create(self, name: str, *args: Any, **kwargs: Any) -> Any:\n-        \"\"\"Create a fresh instance of a registered class.\n-\n-        :raises KeyError: If the name is not registered.\n-        \"\"\"\n-        return self._classes[name](*args, **kwargs)\n-\n-    def unregister(self, name: str) -> None:\n-        \"\"\"Remove a registration, raising KeyError if it does not exist.\"\"\"\n-        del self._classes[name]\n-\n-    def clear(self) -> None:\n-        \"\"\"Remove every registration from this registry.\"\"\"\n-        self._classes.clear()\ndiff --git a/dynloader.py b/dynloader.py\nindex 3f1072e..a267ea4 100644\n--- a/dynloader.py\n+++ b/dynloader.py\n@@ -17,7 +17,7 @@\n     :return: The dynamically imported class.\n     \"\"\"\n     if not class_name:\n-        module_name, class_name = module_name.rsplit('.', 1)\n+        module_name, class_name = module_name.rsplit('.', 2)\n     loaded_module = __import__(module_name)\n     return getattr(loaded_module, class_name)\n \n",
+  "detachedNotice": "Some findings are skipped because the file is not part of this Change Set: classregistry.py"
+}

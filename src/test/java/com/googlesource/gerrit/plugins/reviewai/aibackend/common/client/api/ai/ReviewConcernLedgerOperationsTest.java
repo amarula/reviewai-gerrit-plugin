@@ -98,7 +98,7 @@ public class ReviewConcernLedgerOperationsTest {
   }
 
   @Test
-  public void reactivatedDismissedAndSkippedConcernsBecomeNewComments() {
+  public void reactivatedClosedConcernsBecomeNewComments() {
     ConcernReviewerId reviewer =
         new ConcernReviewerId(ConcernReviewerId.Kind.SCOPED_AGENT, "PATCHSET");
     ReviewConcernLedger previousLedger = new ReviewConcernLedger();
@@ -107,7 +107,8 @@ public class ReviewConcernLedgerOperationsTest {
     previousConcerns.setConcerns(
         List.of(
             concern("dismissed", ConcernStatus.DISMISSED),
-            concern("skipped", ConcernStatus.SKIPPED)));
+            concern("skipped", ConcernStatus.SKIPPED),
+            concern("detached", ConcernStatus.DETACHED)));
     previousLedger.setReviewers(List.of(previousConcerns));
     ReviewConcernLedgerOperations operations = ledgerOperations();
 
@@ -117,6 +118,9 @@ public class ReviewConcernLedgerOperationsTest {
     AiReplyItem skipped =
         operations.toPresentReply(
             previousLedger, reviewer, concern("skipped", ConcernStatus.PRESENT));
+    AiReplyItem detached =
+        operations.toPresentReply(
+            previousLedger, reviewer, concern("detached", ConcernStatus.PRESENT));
 
     assertFalse(dismissed.isRepeated());
     assertTrue(
@@ -126,6 +130,11 @@ public class ReviewConcernLedgerOperationsTest {
         skipped
             .getReply()
             .startsWith("Previously skipped AI concern is actionable after review resumed:"));
+    assertFalse(detached.isRepeated());
+    assertTrue(
+        detached
+            .getReply()
+            .startsWith("AI concern on code that had left the Change Set is actionable again:"));
   }
 
   private static ReviewConcern concern(String id, ConcernStatus status) {

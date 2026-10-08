@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.NewIssueFinderConcernFilter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
@@ -45,10 +46,12 @@ final class LangChainNewIssueFinder {
     finderData.setReviewAssistantStage(ReviewAssistantStage.FIND_NEW_ISSUES);
     finderData.setForcedStagedReview(true);
     finderData.setReviewAssistantStageConversationSuffix(conversationSuffix(reviewedConcerns));
+    ReviewerConcerns finderConcerns =
+        NewIssueFinderConcernFilter.filter(reviewedConcerns, fullPatchSet);
     finderData.setConcernWorkflowInput(
         LangChainConcernWorkflowInputFactory.create(
             config,
-            reviewedConcerns,
+            finderConcerns,
             incrementalPatchSet,
             fullPatchSet,
             changeSetData.getReviewFeedbackMemory()));
