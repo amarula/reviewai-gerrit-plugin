@@ -65,8 +65,10 @@ public class ReviewConcern {
    * what a reactivation means - a user's dismissal coming back is worth challenging, an automatic
    * one reappearing is just the file having returned.
    *
-   * <p>It deliberately does not change the vote: {@link ReviewConcernLedger#allConcernsDismissed}
-   * treats an automatic dismissal like any other, which keeps the neutral score standing.
+   * <p>It also decides the vote. {@link ReviewConcernLedger#allConcernsDismissed} resets the score
+   * to neutral when every concern was dismissed, on the grounds that a user overruled the AI; a
+   * dismissal the plugin made itself is not an overrule, so it is left out of that count and cannot
+   * silently undo a positive vote.
    */
   @SerializedName("dismissal_automatic")
   private Boolean automaticDismissal;

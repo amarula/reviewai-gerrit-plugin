@@ -33,27 +33,43 @@ public final class ReviewConcernDismissal {
   private ReviewConcernDismissal() {}
 
   /**
+   * What a dismissal pass did.
+   *
+   * @param ledger the ledger to carry on with; the same instance that was passed in when nothing
+   *     was dismissed, so a caller can compare by identity
+   * @param dismissedFilenames the files of the concerns this pass closed, so the author can be told
+   *     which ones went away - the dismissal is otherwise silent, because the thread lives on a
+   *     file that is no longer there to comment on
+   */
+  public record Result(ReviewConcernLedger ledger, List<String> dismissedFilenames) {}
+
+  /**
    * Returns the ledger with every concern whose locations have all left the revision dismissed.
    *
    * <p>{@code fileInRevision} decides what "left" means, so this stays independent of Gerrit and
    * testable on its own. Concerns that are already closed are left untouched, because their status
    * reason records what a user or the reviewer concluded and that is worth more than this one.
-   *
-   * @return the same ledger when nothing changed, so callers can compare by identity
    */
-  public static ReviewConcernLedger dismissConcernsWithoutFiles(
+  public static Result dismissConcernsWithoutFiles(
       ReviewConcernLedger ledger, Predicate<String> fileInRevision, String reason) {
     if (ledger == null) {
-      return null;
+      return new Result(null, List.of());
     }
     ledger.normalize();
     List<ReviewerConcerns> reviewers = new ArrayList<>();
+    List<String> dismissedFilenames = new ArrayList<>();
     boolean changed = false;
     for (ReviewerConcerns reviewerConcerns : ledger.getReviewers()) {
       List<ReviewConcern> concerns = new ArrayList<>();
       for (ReviewConcern concern : reviewerConcerns.getConcerns()) {
         ReviewConcern updated = dismissIfWithoutFile(concern, fileInRevision, reason);
-        changed |= updated != concern;
+        if (updated != concern) {
+          changed = true;
+          concern.getLocations().stream()
+              .map(ConcernLocation::getFilename)
+              .filter(filename -> filename != null && !filename.isBlank())
+              .forEach(dismissedFilenames::add);
+        }
         concerns.add(updated);
       }
       ReviewerConcerns updatedReviewer = new ReviewerConcerns();
@@ -62,13 +78,13 @@ public final class ReviewConcernDismissal {
       reviewers.add(updatedReviewer);
     }
     if (!changed) {
-      return ledger;
+      return new Result(ledger, List.of());
     }
     ReviewConcernLedger updatedLedger = new ReviewConcernLedger();
     updatedLedger.setSchemaVersion(ledger.getSchemaVersion());
     updatedLedger.setLastReviewedCommit(ledger.getLastReviewedCommit());
     updatedLedger.setReviewers(reviewers);
-    return updatedLedger;
+    return new Result(updatedLedger, List.copyOf(dismissedFilenames));
   }
 
   private static ReviewConcern dismissIfWithoutFile(

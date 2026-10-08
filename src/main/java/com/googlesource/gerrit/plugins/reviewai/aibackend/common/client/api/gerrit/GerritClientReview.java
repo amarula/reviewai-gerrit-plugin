@@ -18,7 +18,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.MessageSanitizer.sanitizeAiMessage;
-import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.isGerritNonFilePath;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithDoubleNewLine;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -225,15 +225,15 @@ public class GerritClientReview extends GerritClientAccount {
   /**
    * Whether a concern thread on this file can still be resolved in the current revision.
    *
-   * <p>Patch-set-level comments are always resolvable: that key is Gerrit's own and is accepted
-   * whatever the revision contains. For a real path, an unknown file list accepts, matching the
-   * behaviour before this guard.
+   * <p>Change-level and commit-message comments are always resolvable: those keys are Gerrit's own
+   * and are accepted whatever the revision contains. For a real path, an unknown file list accepts,
+   * matching the behaviour before this guard.
    */
   private boolean isResolvableInCurrentRevision(String filename) {
     if (filename == null || filename.isEmpty()) {
       return false;
     }
-    if (GERRIT_PATCH_SET_FILENAME.equals(filename)) {
+    if (isGerritNonFilePath(filename)) {
       return true;
     }
     return patchSetFiles.isEmpty() || patchSetFiles.contains(filename);
@@ -309,7 +309,14 @@ public class GerritClientReview extends GerritClientAccount {
           SystemMessageFormatter.getPrefixedSystemMessage(
               localizer, changeSetData.getReviewUnanchoredCommentsMessage()));
     }
-    if (emptyComments && changeSetData.getReviewRepeatedCommentsMessage() == null) {
+    if (changeSetData.getReviewDismissedConcernsMessage() != null) {
+      messages.add(
+          SystemMessageFormatter.getPrefixedSystemMessage(
+              localizer, changeSetData.getReviewDismissedConcernsMessage()));
+    }
+    if (emptyComments
+        && changeSetData.getReviewRepeatedCommentsMessage() == null
+        && changeSetData.getReviewDismissedConcernsMessage() == null) {
       messages.add(SystemMessageFormatter.getPrefixedSystemMessage(localizer, systemMessage));
     }
     SystemMessageFormatter.appendConfigurationWarningMessages(config, localizer, messages);
@@ -325,6 +332,7 @@ public class GerritClientReview extends GerritClientAccount {
         || changeSetData.getReviewSystemMessage() != null
         || changeSetData.getReviewRepeatedCommentsMessage() != null
         || changeSetData.getReviewUnanchoredCommentsMessage() != null
+        || changeSetData.getReviewDismissedConcernsMessage() != null
         || changeSetData.hasParsedCommand("forget_thread")) {
       return false;
     }

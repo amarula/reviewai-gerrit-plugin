@@ -324,7 +324,27 @@ public class PatchSetReviewer {
             ledger ->
                 ReviewConcernDismissal.dismissConcernsWithoutFiles(
                     ledger, filenameSanitizer::isPartOfPatchSet, reason))
-        .ifPresent(ledger -> pendingUpdates.replace(change.getFullChangeId(), ledger));
+        .filter(result -> !result.dismissedFilenames().isEmpty())
+        .ifPresent(
+            result -> {
+              pendingUpdates.replace(change.getFullChangeId(), result.ledger());
+              setDismissedConcernsMessage(result.dismissedFilenames());
+            });
+  }
+
+  /**
+   * Tells the author which concerns were closed because their code had left the Change Set.
+   *
+   * <p>Without it the dismissal leaves no trace in the review: the concern stops being published
+   * and its thread cannot be resolved, because the file it lived on is no longer there to comment
+   * on, so all the author sees is a review with nothing in it.
+   */
+  private void setDismissedConcernsMessage(List<String> dismissedFilenames) {
+    changeSetData.setReviewDismissedConcernsMessage(
+        SystemMessageFormatter.getLocalizedMessage(
+            localizer,
+            "message.review.concerns.dismissed",
+            String.join(", ", new TreeSet<>(dismissedFilenames))));
   }
 
   /**

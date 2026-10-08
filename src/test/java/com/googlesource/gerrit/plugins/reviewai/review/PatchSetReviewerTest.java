@@ -304,10 +304,11 @@ public class PatchSetReviewerTest {
   }
 
   @Test
-  public void closingAConcernBecauseItsFileLeftDoesNotProduceAPositiveVote() {
-    // The end-to-end shape of the hazard: the ledger now reads all-dismissed, which suppresses the
-    // neutral-to-positive conversion. Reading that predicate the other way round would turn
-    // deleting a file into a positive review.
+  public void closingAConcernBecauseItsFileLeftDoesNotResetTheVote() {
+    // The reported regression. Treating an automatic dismissal as an all-concerns-dismissed ledger
+    // suppressed the neutral-to-positive conversion, so the next review silently replaced the vote
+    // the author had earned with a neutral one. A dismissal ReviewAI made because the code is gone
+    // is not a user overruling the AI, and must not read like one.
     GerritChange change = change();
     AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
     PatchSetReviewer reviewer = reviewerWithPatchSetFiles(List.of("src/Present.java"));
@@ -317,7 +318,23 @@ public class PatchSetReviewerTest {
 
     reviewer.dismissConcernsWithoutFiles(response, change);
 
-    assertEquals(Integer.valueOf(0), reviewer.getReviewScore(change, response));
+    assertEquals(Integer.valueOf(1), reviewer.getReviewScore(change, response));
+  }
+
+  @Test
+  public void closingAConcernBecauseItsFileLeftTellsTheAuthorWhichFile() {
+    // The dismissal is otherwise invisible: the concern stops being published, and its thread
+    // cannot be resolved because the file is no longer there to comment on, so the review would
+    // come back empty with nothing explaining why.
+    GerritChange change = change();
+    AiResponseContent response = responseWithConcern(change, "PRESENT", "Gone.java");
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    PatchSetReviewer reviewer =
+        reviewerWithPatchSetFiles(List.of("src/Present.java"), changeSetData);
+
+    reviewer.dismissConcernsWithoutFiles(response, change);
+
+    assertEquals("Closed: Gone.java", changeSetData.getReviewDismissedConcernsMessage());
   }
 
   private static AiResponseContent responseWithConcern(
@@ -356,6 +373,11 @@ public class PatchSetReviewerTest {
   }
 
   private static PatchSetReviewer reviewerWithPatchSetFiles(List<String> patchSetFiles) {
+    return reviewerWithPatchSetFiles(patchSetFiles, new ChangeSetData(1));
+  }
+
+  private static PatchSetReviewer reviewerWithPatchSetFiles(
+      List<String> patchSetFiles, ChangeSetData changeSetData) {
     IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
     when(patchSet.getPatchSetFiles()).thenReturn(patchSetFiles);
     GerritClientData clientData = mock(GerritClientData.class);
@@ -369,15 +391,36 @@ public class PatchSetReviewerTest {
     return new PatchSetReviewer(
         gerritClient,
         config,
-        new ChangeSetData(1),
+        changeSetData,
         Providers.of(mock(GerritClientReview.class)),
         mock(IAiClient.class),
-        mock(Localizer.class),
+        localizer(),
         mock(PatchSetReviewConversationRecorder.class),
         mock(ReviewConcernPublisher.class),
         mock(ReviewFeedbackLifecycle.class),
         mock(AiReviewApplicabilityChecker.class),
         null);
+  }
+
+  /**
+   * A localizer that behaves like the real one for formatting.
+   *
+   * <p>A bare mock returns null for every key, and the formatter runs the result through {@code
+   * String.format}, so a null template throws rather than producing a message.
+   */
+  private static Localizer localizer() {
+    Localizer localizer = mock(Localizer.class);
+    when(localizer.getText(any()))
+        .thenAnswer(
+            invocation -> {
+              String key = invocation.getArgument(0);
+              return switch (key) {
+                case "message.review.concerns.dismissed" -> "Closed: %s";
+                case "message.review.comments.not.anchored" -> "Not anchored: %s";
+                default -> "";
+              };
+            });
+    return localizer;
   }
 
   private static GerritChange change() {

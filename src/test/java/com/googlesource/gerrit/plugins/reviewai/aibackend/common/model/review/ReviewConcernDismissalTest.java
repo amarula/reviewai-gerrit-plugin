@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -36,13 +37,13 @@ public class ReviewConcernDismissalTest {
     ReviewConcern dismissed =
         firstConcern(
             ReviewConcernDismissal.dismissConcernsWithoutFiles(
-                ledger, "Present.java"::equals, REASON));
+                    ledger, "Present.java"::equals, REASON)
+                .ledger());
 
     assertEquals(ConcernStatus.DISMISSED, dismissed.getStatus());
     assertEquals(REASON, dismissed.getStatusReason());
     assertTrue(
-        "an automatic dismissal must be recognisable, or it would earn the vote a user's "
-            + "dismissal earns",
+        "an automatic dismissal must be recognisable, so nothing reads it as a user's",
         Boolean.TRUE.equals(dismissed.getAutomaticDismissal()));
   }
 
@@ -54,7 +55,8 @@ public class ReviewConcernDismissalTest {
         ConcernStatus.DISMISSED,
         firstConcern(
                 ReviewConcernDismissal.dismissConcernsWithoutFiles(
-                    ledger, "Present.java"::equals, REASON))
+                        ledger, "Present.java"::equals, REASON)
+                    .ledger())
             .getStatus());
   }
 
@@ -67,7 +69,8 @@ public class ReviewConcernDismissalTest {
     ReviewConcern kept =
         firstConcern(
             ReviewConcernDismissal.dismissConcernsWithoutFiles(
-                ledger, "Present.java"::equals, REASON));
+                    ledger, "Present.java"::equals, REASON)
+                .ledger());
 
     assertEquals(ConcernStatus.PRESENT, kept.getStatus());
     assertNull(kept.getAutomaticDismissal());
@@ -83,7 +86,8 @@ public class ReviewConcernDismissalTest {
     ReviewConcern kept =
         firstConcern(
             ReviewConcernDismissal.dismissConcernsWithoutFiles(
-                ledger(concern), filename -> false, REASON));
+                    ledger(concern), filename -> false, REASON)
+                .ledger());
 
     assertEquals(ConcernStatus.PRESENT, kept.getStatus());
   }
@@ -96,7 +100,8 @@ public class ReviewConcernDismissalTest {
     ReviewConcern kept =
         firstConcern(
             ReviewConcernDismissal.dismissConcernsWithoutFiles(
-                ledger(concern), filename -> false, REASON));
+                    ledger(concern), filename -> false, REASON)
+                .ledger());
 
     assertEquals(ConcernStatus.FIXED, kept.getStatus());
     assertEquals(
@@ -111,7 +116,8 @@ public class ReviewConcernDismissalTest {
 
     assertSame(
         ledger,
-        ReviewConcernDismissal.dismissConcernsWithoutFiles(ledger, "Present.java"::equals, REASON));
+        ReviewConcernDismissal.dismissConcernsWithoutFiles(ledger, "Present.java"::equals, REASON)
+            .ledger());
   }
 
   @Test
@@ -123,7 +129,8 @@ public class ReviewConcernDismissalTest {
     ledger.setLastReviewedCommit("abc123");
 
     ReviewConcernLedger updated =
-        ReviewConcernDismissal.dismissConcernsWithoutFiles(ledger, "Present.java"::equals, REASON);
+        ReviewConcernDismissal.dismissConcernsWithoutFiles(ledger, "Present.java"::equals, REASON)
+            .ledger();
 
     assertEquals("abc123", updated.getLastReviewedCommit());
     assertEquals(1, updated.getReviewers().size());
@@ -134,23 +141,48 @@ public class ReviewConcernDismissalTest {
 
   @Test
   public void nullLedgerStaysNull() {
-    assertNull(ReviewConcernDismissal.dismissConcernsWithoutFiles(null, filename -> true, REASON));
+    assertNull(
+        ReviewConcernDismissal.dismissConcernsWithoutFiles(null, filename -> true, REASON)
+            .ledger());
   }
 
   @Test
-  public void automaticDismissalCountsTowardsAllConcernsDismissed() {
-    // The predicate suppresses the neutral-to-positive score conversion, and that suppression is
-    // right exactly when no user judged the code. Excluding automatic dismissals here would let an
-    // author earn a positive vote by deleting the file the concern was about.
+  public void automaticDismissalDoesNotCountAsAllConcernsDismissed() {
+    // The predicate resets the score to neutral because a user overruled the AI. Nobody overruled
+    // anything here - the code left the Change Set - and counting it reset a positive vote on the
+    // next review, which is the regression this pins.
     ReviewConcern userDismissed = concern("c1", ConcernStatus.PRESENT, "Gone.java");
     userDismissed.setStatus(ConcernStatus.DISMISSED);
     assertTrue(ledger(userDismissed).allConcernsDismissed());
 
     ReviewConcernLedger automatic =
         ReviewConcernDismissal.dismissConcernsWithoutFiles(
+                ledger(concern("c1", ConcernStatus.PRESENT, "Gone.java")),
+                filename -> false,
+                REASON)
+            .ledger();
+
+    assertFalse(automatic.allConcernsDismissed());
+  }
+
+  @Test
+  public void reportsTheFilesItClosedSoTheAuthorCanBeTold() {
+    ReviewConcernDismissal.Result result =
+        ReviewConcernDismissal.dismissConcernsWithoutFiles(
             ledger(concern("c1", ConcernStatus.PRESENT, "Gone.java")), filename -> false, REASON);
 
-    assertTrue(automatic.allConcernsDismissed());
+    assertEquals(List.of("Gone.java"), result.dismissedFilenames());
+  }
+
+  @Test
+  public void reportsNothingWhenItClosedNothing() {
+    ReviewConcernDismissal.Result result =
+        ReviewConcernDismissal.dismissConcernsWithoutFiles(
+            ledger(concern("c1", ConcernStatus.PRESENT, "Present.java")),
+            "Present.java"::equals,
+            REASON);
+
+    assertTrue(result.dismissedFilenames().isEmpty());
   }
 
   private static ReviewConcern firstConcern(ReviewConcernLedger ledger) {

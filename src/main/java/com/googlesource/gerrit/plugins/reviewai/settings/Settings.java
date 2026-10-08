@@ -20,6 +20,7 @@ import java.util.Map;
 
 public class Settings {
   public static final String GERRIT_PATCH_SET_FILENAME = "/PATCHSET_LEVEL";
+  public static final String GERRIT_COMMIT_MESSAGE_FILENAME = "/COMMIT_MSG";
   public static final String GERRIT_DEFAULT_MESSAGE_DONE = "Done";
   public static final String GERRIT_DEFAULT_MESSAGE_PATCH_SET = "Patch Set";
   public static final String GERRIT_DEFAULT_MESSAGE_COMMENTS = "comments";
@@ -36,4 +37,21 @@ public class Settings {
 
   public static final String OPENAI_ROLE_USER = "user";
   public static final String OPENAI_ROLE_ASSISTANT = "assistant";
+
+  /**
+   * Whether a path is one of Gerrit's own placeholders rather than a file of the revision.
+   *
+   * <p>{@code /PATCHSET_LEVEL} names the change and {@code /COMMIT_MSG} names its commit message.
+   * Both are valid comment targets whatever the revision contains, so they must never be treated as
+   * a file the revision has stopped having - a commit-message concern is not stale just because the
+   * patch set lists no such file, and the patch set only lists {@code /COMMIT_MSG} in suggest mode.
+   *
+   * <p>The commit-message path is matched by suffix because a topic review prefixes every filename
+   * with the change it came from, so the concern carries {@code <prefix>/COMMIT_MSG}.
+   */
+  public static boolean isGerritNonFilePath(String filename) {
+    return filename != null
+        && (GERRIT_PATCH_SET_FILENAME.equals(filename)
+            || filename.endsWith(GERRIT_COMMIT_MESSAGE_FILENAME));
+  }
 }

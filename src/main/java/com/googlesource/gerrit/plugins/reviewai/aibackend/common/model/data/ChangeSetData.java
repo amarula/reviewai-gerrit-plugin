@@ -80,6 +80,7 @@ public final class ChangeSetData {
   private String reviewNoticeMessage;
   private String reviewRepeatedCommentsMessage;
   private String reviewUnanchoredCommentsMessage;
+  private String reviewDismissedConcernsMessage;
   private Set<String> parsedCommands = new HashSet<>();
   private Map<String, Map<String, String>> parsedCommandOptions = new HashMap<>();
 
@@ -180,6 +181,8 @@ public final class ChangeSetData {
     copy.setReviewStatusMessage(reviewStatusMessage);
     copy.setReviewNoticeMessage(reviewNoticeMessage);
     copy.setReviewRepeatedCommentsMessage(reviewRepeatedCommentsMessage);
+    copy.setReviewUnanchoredCommentsMessage(reviewUnanchoredCommentsMessage);
+    copy.setReviewDismissedConcernsMessage(reviewDismissedConcernsMessage);
     copy.setParsedCommands(new HashSet<>(parsedCommands));
     Map<String, Map<String, String>> copiedParsedCommandOptions = new HashMap<>();
     parsedCommandOptions.forEach(
