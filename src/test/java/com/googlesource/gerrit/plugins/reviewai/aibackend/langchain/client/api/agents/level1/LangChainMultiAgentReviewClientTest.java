@@ -410,6 +410,36 @@ public class LangChainMultiAgentReviewClientTest {
     assertEquals(patchSet, client.recordedPatchSets.get(0));
     assertTrue(client.recordedPatchSets.get(1).contains("First issue"));
     assertTrue(client.recordedPatchSets.get(1).contains("Second issue"));
+    List<ReviewConcern> concerns =
+        response
+            .getPendingConcernUpdates()
+            .get("change~1")
+            .orElseThrow()
+            .getReviewers()
+            .getFirst()
+            .getConcerns();
+    assertEquals(2, concerns.size());
+    assertEquals(concerns.get(0).getId(), response.getReplies().get(0).getConcernId());
+    assertEquals(concerns.get(1).getId(), response.getReplies().get(1).getConcernId());
+  }
+
+  @Test
+  public void suggestPreservesLedgerWhenReviewHasNoNegativeReplies() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
+    client.reviewReplies = List.of();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    GerritChange change = mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertTrue(response.getReplies().isEmpty());
+    assertTrue(response.getPendingConcernUpdates().get("change~1").isPresent());
+    assertEquals(List.of(false), client.recordedSuggestModes);
   }
 
   @Test
