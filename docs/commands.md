@@ -83,14 +83,23 @@ The `/suggest` command generates native Gerrit suggested edits for negative revi
 
 ### Basic Syntax
 
-* `/suggest`: Generates one or more native Gerrit suggested edits for each negative review reply in the selected scope,
-  based on the available review results.
+* `/suggest`: Generates one or more native Gerrit suggested edits for each open review concern in the selected scope.
+  The concerns come from the tracked concern ledger, so the fix answers the problem the reviewer actually raised. On a
+  Change with no open concern, ReviewAI reviews first and then proposes edits for whatever it reports as negative.
 
 ### Command Options
 
 * `--scope=[patchset/commit_message]`: Limits the suggestion scope. `patchset` suggests fixes only for Patch Set code
   changes, and `commit_message` suggests fixes only for the commit message. If omitted, suggestions are generated for
   both.
+
+### After a suggestion is applied
+
+Each suggested edit states what would resolve its concern. When the applied code is found in the Change, that concern
+is closed and its Gerrit thread resolved with the applied fix as the reason, and the review names the concerns it closed
+this way. A concern closed by an applied fix is never raised again: if the condition is still unmet, ReviewAI reports it
+as a new concern with its own wording, so a fix that turns out to be insufficient is never presented as advice that was
+ignored.
 
 ## Dynamic Configuration
 

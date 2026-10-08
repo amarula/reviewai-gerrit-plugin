@@ -87,6 +87,12 @@ The concern ledger is ReviewAI's persisted record of the concerns currently trac
 concerns by logical reviewer and preserves each concern's identity, status, location, and publication data across
 successive Patch Sets. A ledger can exist even when it contains no concerns.
 
+A concern may also carry a suggested fix: the replacement code ReviewAI proposed for it, and the condition
+(`resolved_when`) that fix was meant to establish, both stated by the pass that wrote it. When that code is later found
+in the Change, the concern is closed as `FIXED` and never re-raised - a proposed fix the author applied is an accepted
+fix, not a repeated comment. Whatever remains wrong afterwards is a new concern with its own wording and its own
+condition. See "Suggested Fixes".
+
 ### Review feedback memory
 
 Review feedback memory is the persisted, change-scoped summary of durable user guidance. It contains:
@@ -144,8 +150,9 @@ even if the ledger contains no concerns.
 This selection is not currently guarded by commit SHA. Concern-aware stages run on every eligible review for which a
 ledger exists, even if the current SHA is unchanged.
 
-Ordinary conversational comment events do not use the concern workflow unless they force a review. Suggestion mode
-also follows its dedicated workflow rather than creating or updating the concern ledger.
+Ordinary conversational comment events do not use the concern workflow unless they force a review. Suggestion mode reads
+the ledger to find what to fix, and records the fix it proposes against the concern (see "Suggested Fixes" below), but it
+decides no concern status of its own.
 
 ## User Feedback Classification
 
@@ -433,6 +440,23 @@ Assume the correctness reviewer discovers a null dereference in Patch Set 1.
 Fixed concerns remain in the ledger so regressions can be detected and so the New Issue Finder knows that the issue is
 already known.
 
+## Suggested Fixes
+
+A `/suggest` run works from the ledger rather than from a fresh review: it collects the concerns still asking for
+something, with the problem as raised and the code it was raised at, and asks for a minimal edit for each. A concern
+whose code has left the Change is skipped rather than proposed against. When the ledger holds no open concern, the run
+falls back to its original behaviour - review first, then propose fixes for what came out negative - so `/suggest` still
+works on a Change that has never been reviewed.
+
+Each suggestion states `resolved_when`, the observable condition under which the concern no longer applies. It is stored
+on the concern with the proposed code. On the next review, if that code is present in the Change, the concern is closed
+as `FIXED` with the applied fix as the reason. This is decided by the client, not by the reviewer: a reviewer holding the
+fix to a stricter standard the second time round is indistinguishable from one whose advice was ignored, and the plugin
+used to render exactly that as "my previous comment still holds". If the condition is still unmet afterwards, it is a
+new concern.
+
+`/suggest` decides no concern status of its own. It reads what is open and records what it proposed.
+
 ## Repeated Comments
 
 The `repeated` field remains supported as publication metadata. Its source depends on the workflow:
@@ -597,6 +621,7 @@ review therefore behaves like an initial ledger-backed review and can rebuild th
 - Scoped reviewers and specialized reviewers can execute concurrently, subject to `aiMaxConcurrentRequests`.
 - Changing `agentSpecializationLevel` changes reviewer identities. Existing concerns owned by another reviewer kind
   remain in the ledger but are not automatically reassigned.
-- Topic, suggestion, and conversational workflows have separate orchestration and are outside the concern lifecycle
-  described in this document.
+- Topic and conversational workflows have separate orchestration and are outside the concern lifecycle described in
+  this document. Suggestion mode is inside it only as a reader of open concerns and a recorder of proposed fixes; it
+  reaches no status decision.
 - User annotations are not part of the concern status lifecycle described here.
