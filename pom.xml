@@ -11,11 +11,11 @@
 
     <properties>
         <Gerrit-ApiType>plugin</Gerrit-ApiType>
-        <Gerrit-ApiVersion>3.13.1</Gerrit-ApiVersion>
+        <Gerrit-ApiVersion>3.15.0-rc1</Gerrit-ApiVersion>
         <maven.test.skip>false</maven.test.skip>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <checkstyle.version>3.6.0</checkstyle.version>
-        <pmd.version>3.26.0</pmd.version>
+        <pmd.version>3.28.0</pmd.version>
         <spotbugs.version>4.8.6.6</spotbugs.version>
         <frontend-maven.version>1.15.0</frontend-maven.version>
     </properties>
@@ -281,7 +281,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
+                <version>0.8.14</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
