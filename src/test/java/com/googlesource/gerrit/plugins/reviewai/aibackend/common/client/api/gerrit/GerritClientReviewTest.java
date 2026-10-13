@@ -304,7 +304,7 @@ public class GerritClientReviewTest {
   }
 
   @Test
-  public void publishesPatchSetAndInlineCommentsAsUnresolved() throws Exception {
+  public void publishesPatchSetAndInlineCommentsAsUnresolvedAiComments() throws Exception {
     ReviewBatch patchSetComment = new ReviewBatch("Patch set comment");
     ReviewBatch inlineComment = new ReviewBatch("Inline comment");
     inlineComment.setFilename("src/Example.java");
@@ -317,6 +317,8 @@ public class GerritClientReviewTest {
     ReviewInput reviewInput = reviewInputCaptor.getValue();
     assertTrue(reviewInput.comments.get("/PATCHSET_LEVEL").getFirst().unresolved);
     assertTrue(reviewInput.comments.get("src/Example.java").getFirst().unresolved);
+    assertAiFlagWhenSupported(reviewInput.comments.get("/PATCHSET_LEVEL").getFirst());
+    assertAiFlagWhenSupported(reviewInput.comments.get("src/Example.java").getFirst());
   }
 
   @Test
@@ -454,6 +456,7 @@ public class GerritClientReviewTest {
     assertEquals("ai-concern", resolution.inReplyTo);
     assertEquals(Integer.valueOf(42), resolution.line);
     assertFalse(resolution.unresolved);
+    assertAiFlagWhenSupported(resolution);
     assertEquals(
         "Resolved by ReviewAI (FIXED): The guard now handles the input.", resolution.message);
   }
@@ -565,6 +568,14 @@ public class GerritClientReviewTest {
     verify(revisionApi).review(reviewInputCaptor.capture());
     assertEquals("Main review message", reviewInputCaptor.getValue().message);
     assertNull(reviewInputCaptor.getValue().comments);
+  }
+
+  private static void assertAiFlagWhenSupported(ReviewInput.CommentInput comment) throws Exception {
+    try {
+      assertEquals(Boolean.TRUE, ReviewInput.CommentInput.class.getField("isAi").get(comment));
+    } catch (NoSuchFieldException e) {
+      // Gerrit 3.14 publishes comments without an AI flag.
+    }
   }
 
   private static CommentInfo openTaggedComment(String commentId) {
