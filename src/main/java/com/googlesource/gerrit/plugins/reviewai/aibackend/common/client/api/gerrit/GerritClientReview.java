@@ -168,6 +168,7 @@ public class GerritClientReview extends GerritClientAccount {
           continue;
         }
         CommentInput resolution = new CommentInput();
+        markAiComment(resolution);
         resolution.message = resolutionMessage(concern);
         resolution.inReplyTo = comment.id;
         resolution.line = comment.line;
@@ -395,6 +396,16 @@ public class GerritClientReview extends GerritClientAccount {
     }
   }
 
+  private static void markAiComment(CommentInput comment) {
+    try {
+      CommentInput.class.getField("isAi").set(comment, Boolean.TRUE);
+    } catch (NoSuchFieldException e) {
+      log.debug("Gerrit does not expose the AI comment flag; publishing without it.");
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException("Could not set Gerrit's AI comment flag", e);
+    }
+  }
+
   private Map<String, List<CommentInput>> getReviewComments(List<ReviewBatch> reviewBatches) {
     log.debug("Getting review comments.");
     Map<String, List<CommentInput>> comments = new HashMap<>();
@@ -408,6 +419,7 @@ public class GerritClientReview extends GerritClientAccount {
       String filename = reviewBatch.getFilename();
       List<CommentInput> filenameComments = comments.getOrDefault(filename, new ArrayList<>());
       CommentInput filenameComment = new CommentInput();
+      markAiComment(filenameComment);
       filenameComment.message = message;
       if (reviewBatch.getLine() != null || reviewBatch.getRange() != null) {
         filenameComment.line = reviewBatch.getLine();

@@ -215,7 +215,8 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
     String tagPrefix = "reviewai:concerns:";
     Assert.assertTrue(reviewTag.getAsString().startsWith(tagPrefix));
     UUID.fromString(reviewTag.getAsString().substring(tagPrefix.length()));
-    Assert.assertEquals(gson.fromJson(reviewMessage, JsonObject.class), actualReview);
+    JsonElement expectedReview = gson.toJsonTree(gson.fromJson(reviewMessage, ReviewInput.class));
+    Assert.assertEquals(expectedReview, actualReview);
   }
 
   @Test
