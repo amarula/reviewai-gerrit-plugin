@@ -1,0 +1,10 @@
+[
+  {
+    "id": "suggest-command",
+    "message": "@gpt /suggest --scope=patchset"
+  },
+  {
+    "id": "feedback-comment",
+    "message": "The null fallback is intentional for legacy callers."
+  }
+]

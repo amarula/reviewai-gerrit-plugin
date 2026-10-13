@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +87,8 @@ public class LangChainMultiAgentReviewClientTest {
       "__files/feedback/reviewFeedbackMemory.json";
   private static final String DISABLED_COMMIT_MESSAGE_MEMORY_RESOURCE =
       "__files/feedback/reviewFeedbackMemoryDisabledCommitMessage.json";
+  private static final String SUGGEST_FEEDBACK_COMMENTS_RESOURCE =
+      "__files/feedback/suggestFeedbackComments.json";
 
   @Test
   public void mergesSeparatePatchsetAndCommitMessageReviews() throws Exception {
@@ -440,6 +443,91 @@ public class LangChainMultiAgentReviewClientTest {
     assertTrue(response.getReplies().isEmpty());
     assertTrue(response.getPendingConcernUpdates().get("change~1").isPresent());
     assertEquals(List.of(false), client.recordedSuggestModes);
+  }
+
+  @Test
+  public void suggestReassessesScopedConcernsDespiteExistingReviewContext() throws Exception {
+    ConcernRecordingLangChainMultiAgentReviewClient client =
+        new ConcernRecordingLangChainMultiAgentReviewClient();
+    ((RecordingLangChainMultiAgentReviewClient) client).existingReviewContext = true;
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    changeSetData.setPreviousReviewConcernLedger(scopedLedger());
+    changeSetData.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH_RESOURCE));
+    GerritChange change = mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(FULL_PATCH_RESOURCE));
+
+    assertEquals(List.of("review-PATCHSET", "find-PATCHSET"), client.concernEvents);
+    assertEquals(
+        ConcernStatus.PRESENT,
+        reviewer(
+                response.getPendingConcernUpdates().get("change~1").orElseThrow(),
+                ConcernReviewerId.Kind.SCOPED_AGENT,
+                "PATCHSET")
+            .getConcerns()
+            .getFirst()
+            .getStatus());
+  }
+
+  @Test
+  public void suggestReviewsEmptyLedgerDespiteExistingReviewContext() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient();
+    client.existingReviewContext = true;
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    changeSetData.setPreviousReviewConcernLedger(new ReviewConcernLedger());
+    GerritChange change = mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    AiResponseContent response =
+        client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertTrue(response.getReplies().isEmpty());
+    assertTrue(response.getPendingConcernUpdates().get("change~1").isPresent());
+    assertTrue(client.recordedSuggestModes.isEmpty());
+  }
+
+  @Test
+  public void suggestReassessesPendingFeedbackWithoutLedgerDespiteExistingContext()
+      throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = suggestClientWithPendingComments();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("suggest-command", "feedback-comment"));
+    client.classifiedFeedback = readFeedbackMemory();
+    GerritChange change = mock(GerritChange.class);
+    when(change.getFullChangeId()).thenReturn("change~1");
+
+    client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertEquals(1, client.feedbackCalls);
+    assertEquals(List.of(false, true), client.recordedSuggestModes);
+    assertTrue(changeSetData.isReviewFeedbackClassified());
+    assertSame(client.classifiedFeedback, changeSetData.getReviewFeedbackMemory());
+    assertSame(client.classifiedFeedback, client.recordedFeedback.getFirst());
+  }
+
+  @Test
+  public void suggestCommandAloneReusesExistingContext() throws Exception {
+    RecordingLangChainMultiAgentReviewClient client = suggestClientWithPendingComments();
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setReviewScope(ReviewScope.PATCHSET);
+    changeSetData.setPendingReviewFeedbackCommentIds(List.of("suggest-command"));
+    GerritChange change = mock(GerritChange.class);
+
+    client.ask(changeSetData, change, readTestResource(SUGGEST_ORIGINAL_PATCH_SET_RESOURCE));
+
+    assertEquals(0, client.feedbackCalls);
+    assertEquals(List.of(true), client.recordedSuggestModes);
   }
 
   @Test
@@ -943,7 +1031,11 @@ public class LangChainMultiAgentReviewClientTest {
     private int routeCalls;
 
     RecordingLangChainMultiAgentReviewClient() {
-      super(null, null, null, null, Runnable::run);
+      this(null);
+    }
+
+    RecordingLangChainMultiAgentReviewClient(GerritClient gerritClient) {
+      super(null, null, gerritClient, null, Runnable::run);
     }
 
     @Override
@@ -997,10 +1089,31 @@ public class LangChainMultiAgentReviewClientTest {
     protected ReviewFeedbackMemory reviewFeedback(
         ChangeSetData changeSetData, GerritChange change) {
       feedbackCalls++;
+      changeSetData.setReviewFeedbackClassified(true);
       return classifiedFeedback == null
           ? changeSetData.getReviewFeedbackMemory()
           : classifiedFeedback;
     }
+  }
+
+  private static RecordingLangChainMultiAgentReviewClient suggestClientWithPendingComments()
+      throws Exception {
+    GerritComment[] comments =
+        GsonUtils.getGson()
+            .fromJson(readTestResource(SUGGEST_FEEDBACK_COMMENTS_RESOURCE), GerritComment[].class);
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    for (GerritComment comment : comments) {
+      commentsById.put(comment.getId(), comment);
+    }
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritClientData clientData =
+        new GerritClientData(
+            null, List.of(), new CommentData(List.of(), commentsById, new HashMap<>()), 0);
+    when(gerritClient.getClientData(any())).thenReturn(clientData);
+    RecordingLangChainMultiAgentReviewClient client =
+        new RecordingLangChainMultiAgentReviewClient(gerritClient);
+    client.existingReviewContext = true;
+    return client;
   }
 
   private static class RecordingLangChainClient extends LangChainClient {

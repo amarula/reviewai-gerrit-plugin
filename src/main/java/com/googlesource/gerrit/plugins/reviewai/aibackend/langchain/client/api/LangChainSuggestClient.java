@@ -45,10 +45,17 @@ public class LangChainSuggestClient {
   public AiResponseContent ask(ChangeSetData changeSetData, GerritChange change, String patchSet)
       throws Exception {
     ChangeSetData reviewData = LangChainSuggestData.review(changeSetData);
-    if (hasExistingReviewContext(reviewData, changeSetData, change)) {
+    if (changeSetData.getPreviousReviewConcernLedger() == null
+        && !client.hasSubstantivePendingReviewFeedback(changeSetData, change)
+        && hasExistingReviewContext(reviewData, changeSetData, change)) {
       return askExistingReviewContext(changeSetData, change, patchSet);
     }
     AiResponseContent reviewResponse = client.askReview(reviewData, change, patchSet);
+    if (reviewResponse != null) {
+      changeSetData.setReviewFeedbackMemory(reviewData.getReviewFeedbackMemory());
+      changeSetData.setReviewFeedbackClassified(reviewData.isReviewFeedbackClassified());
+      changeSetData.setReviewNoticeMessage(reviewData.getReviewNoticeMessage());
+    }
     List<AiReplyItem> negativeReplies =
         reviewResponse == null ? List.of() : negativeReplies(reviewResponse);
     for (AiReplyItem reviewReply : negativeReplies) {
