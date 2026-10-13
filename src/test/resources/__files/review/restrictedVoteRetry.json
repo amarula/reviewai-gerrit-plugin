@@ -1,0 +1,15 @@
+{
+  "negativeError": "Applying label \"Code-Review\": -2 is restricted",
+  "positiveError": "Applying label \"Code-Review\": 2 is restricted",
+  "unrelatedError": "Applying label \"Verified\": -2 is restricted",
+  "comment": "The wrapper has invalid syntax and cannot be imported.",
+  "commentId": "published-syntax",
+  "changeInfo": {
+    "labels": {
+      "Code-Review": { "all": [] }
+    },
+    "permitted_labels": {
+      "Code-Review": ["-1", " 0", "+1"]
+    }
+  }
+}

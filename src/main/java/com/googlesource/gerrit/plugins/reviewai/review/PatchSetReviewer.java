@@ -200,13 +200,13 @@ public class PatchSetReviewer {
     Integer reviewScore = getReviewScore(change, reviewReply);
     Map<String, String> publishedCommentIdsByConcern;
     try {
+      GerritClientReview reviewClient = reviewClientFor(change);
       publishedCommentIdsByConcern =
-          reviewClientFor(change)
-              .setReviewAndGetPublishedCommentIds(
-                  change, reviewBatches, changeSetData, reviewScore, reviewReply);
+          reviewClient.setReviewAndGetPublishedCommentIds(
+              change, reviewBatches, changeSetData, reviewScore, reviewReply);
       reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
       reviewFeedbackLifecycle.settle(change, changeSetData, feedbackSession, reviewReply != null);
-      conversationRecorder.record(change, reviewBatches, reviewScore);
+      conversationRecorder.record(change, reviewBatches, reviewClient.getPublishedReviewScore());
     } catch (Exception e) {
       reviewFeedbackLifecycle.release(change, feedbackSession, e);
       throw e;
@@ -300,12 +300,12 @@ public class PatchSetReviewer {
             ? null
             : getReviewScore(
                 change, topicReviewScores == null ? reviewScores : topicReviewScores, reviewReply);
+    GerritClientReview reviewClient = reviewClientFor(change);
     Map<String, String> publishedCommentIdsByConcern =
-        reviewClientFor(change)
-            .setReviewAndGetPublishedCommentIds(
-                change, reviewBatches, changeSetData, reviewScore, reviewReply);
+        reviewClient.setReviewAndGetPublishedCommentIds(
+            change, reviewBatches, changeSetData, reviewScore, reviewReply);
     reviewConcernPublisher.persist(reviewReply, change, publishedCommentIdsByConcern);
-    conversationRecorder.record(change, reviewBatches, reviewScore);
+    conversationRecorder.record(change, reviewBatches, reviewClient.getPublishedReviewScore());
   }
 
   void detachConcernsWithoutFiles(AiResponseContent reviewReply, GerritChange change) {

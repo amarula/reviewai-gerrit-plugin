@@ -21,10 +21,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +45,7 @@ import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.ChangeInfo;
 import com.google.gerrit.extensions.common.CommentInfo;
+import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.json.OutputFormat;
 import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
@@ -120,6 +125,182 @@ public class GerritClientReviewTest {
     client.setReview(change, List.of(new ReviewBatch("Review comment")), changeSetData);
 
     verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void clampsRestrictedNegativeVoteWithoutPriorApproval() throws Exception {
+    assertRestrictedVoteRetry(-2, -1, "negativeError");
+  }
+
+  @Test
+  public void clampsRestrictedPositiveVote() throws Exception {
+    assertRestrictedVoteRetry(2, 1, "positiveError");
+  }
+
+  private void assertRestrictedVoteRetry(int requested, int expected, String errorKey)
+      throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    ChangeInfo info =
+        OutputFormat.JSON.newGson().fromJson(fixture.get("changeInfo"), ChangeInfo.class);
+    assertTrue(info.labels.get("Code-Review").all.isEmpty());
+    when(changeApi.get(ListChangesOption.DETAILED_LABELS)).thenReturn(info);
+    List<ReviewInput> attempts = new ArrayList<>();
+    List<Short> attemptedScores = new ArrayList<>();
+    when(revisionApi.review(any(ReviewInput.class)))
+        .thenAnswer(
+            invocation -> {
+              ReviewInput input = invocation.getArgument(0);
+              attempts.add(input);
+              attemptedScores.add(input.labels.get("Code-Review"));
+              if (attempts.size() == 1) {
+                throw new AuthException(fixture.get(errorKey).getAsString());
+              }
+              return reviewResult;
+            });
+    ReviewBatch batch = new ReviewBatch(fixture.get("comment").getAsString());
+    batch.setConcernId("syntax");
+    CommentInfo publishedComment = new CommentInfo();
+    publishedComment.id = fixture.get("commentId").getAsString();
+    publishedComment.message = batch.getContent();
+    when(changeApi.commentsRequest()).thenReturn(commentsRequest);
+    when(commentsRequest.get()).thenReturn(Map.of());
+    when(refreshedChangeApi.commentsRequest()).thenReturn(refreshedCommentsRequest);
+    when(refreshedCommentsRequest.get())
+        .thenReturn(Map.of("/PATCHSET_LEVEL", List.of(publishedComment)));
+
+    Map<String, String> publishedIds =
+        client.setReviewAndGetPublishedCommentIds(change, List.of(batch), changeSetData, requested);
+
+    assertEquals(Map.of(batch.getConcernId(), publishedComment.id), publishedIds);
+    assertEquals(List.of((short) requested, (short) expected), attemptedScores);
+    assertSame(attempts.getFirst(), attempts.getLast());
+    assertNotNull(attempts.getLast().tag);
+    assertEquals(
+        batch.getContent(), attempts.getLast().comments.get("/PATCHSET_LEVEL").getFirst().message);
+    assertTrue(attempts.getLast().comments.get("/PATCHSET_LEVEL").getFirst().unresolved);
+    assertEquals(Integer.valueOf(expected), client.getPublishedReviewScore());
+    verify(revisionApi, times(2)).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void doesNotRetryUnrelatedAuthorizationError() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    AuthException rejection = new AuthException(fixture.get("unrelatedError").getAsString());
+    when(revisionApi.review(any(ReviewInput.class))).thenThrow(rejection);
+
+    assertSame(
+        rejection,
+        assertThrows(
+            AuthException.class, () -> client.setReview(change, List.of(), changeSetData, -2)));
+
+    verify(changeApi, never()).get(ListChangesOption.DETAILED_LABELS);
+    verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void doesNotRetryWhenPermittedVotesAreUnavailable() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    AuthException rejection = new AuthException(fixture.get("negativeError").getAsString());
+    when(revisionApi.review(any(ReviewInput.class))).thenThrow(rejection);
+    when(changeApi.get(ListChangesOption.DETAILED_LABELS)).thenReturn(new ChangeInfo());
+
+    assertSame(
+        rejection,
+        assertThrows(
+            AuthException.class, () -> client.setReview(change, List.of(), changeSetData, -2)));
+
+    assertNull(client.getPublishedReviewScore());
+    verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void retriesRestrictedVoteOnlyOnce() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    AuthException rejection = new AuthException(fixture.get("negativeError").getAsString());
+    when(revisionApi.review(any(ReviewInput.class))).thenThrow(rejection);
+    when(changeApi.get(ListChangesOption.DETAILED_LABELS))
+        .thenReturn(
+            OutputFormat.JSON.newGson().fromJson(fixture.get("changeInfo"), ChangeInfo.class));
+
+    assertSame(
+        rejection,
+        assertThrows(
+            AuthException.class, () -> client.setReview(change, List.of(), changeSetData, -2)));
+
+    assertNull(client.getPublishedReviewScore());
+    verify(revisionApi, times(2)).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void doesNotRetryWhenRejectedVoteIsStillReportedAsPermitted() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    AuthException rejection = new AuthException(fixture.get("negativeError").getAsString());
+    when(revisionApi.review(any(ReviewInput.class))).thenThrow(rejection);
+    ChangeInfo info =
+        OutputFormat.JSON.newGson().fromJson(fixture.get("changeInfo"), ChangeInfo.class);
+    info.permittedLabels.get("Code-Review").add("-2");
+    when(changeApi.get(ListChangesOption.DETAILED_LABELS)).thenReturn(info);
+
+    assertSame(
+        rejection,
+        assertThrows(
+            AuthException.class, () -> client.setReview(change, List.of(), changeSetData, -2)));
+
+    verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void doesNotRetryWhenPinnedRevisionBecomesStale() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    change.setPatchSetRevision("revision-2");
+    ChangeInfo initial = new ChangeInfo();
+    initial.currentRevision = "revision-2";
+    ChangeInfo updated = new ChangeInfo();
+    updated.currentRevision = "revision-3";
+    when(changeApi.get(ListChangesOption.CURRENT_REVISION)).thenReturn(initial, updated);
+    when(changeApi.revision("revision-2")).thenReturn(revisionApi);
+    when(revisionApi.review(any(ReviewInput.class)))
+        .thenThrow(new AuthException(fixture.get("negativeError").getAsString()));
+    when(changeApi.get(ListChangesOption.DETAILED_LABELS))
+        .thenReturn(
+            OutputFormat.JSON.newGson().fromJson(fixture.get("changeInfo"), ChangeInfo.class));
+
+    assertThrows(
+        StalePatchSetException.class, () -> client.setReview(change, List.of(), changeSetData, -2));
+
+    verify(revisionApi).review(any(ReviewInput.class));
+  }
+
+  @Test
+  public void resetsPublishedScoreForReviewWithoutVote() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+    when(changes.id("project", "main", "I1234567890")).thenReturn(changeApi);
+    List<ReviewBatch> batches = List.of(new ReviewBatch(fixture.get("comment").getAsString()));
+    client.setReview(change, batches, changeSetData, 1);
+    assertEquals(Integer.valueOf(1), client.getPublishedReviewScore());
+
+    client.setReview(change, batches, changeSetData);
+
+    assertNull(client.getPublishedReviewScore());
+  }
+
+  private JsonObject prepareVotingReview() throws Exception {
+    JsonObject fixture = readRestrictedVoteFixture();
+    when(changes.id("project", "main", "I1234567890"))
+        .thenReturn(changeApi, changeApi, refreshedChangeApi);
+    when(changeApi.get())
+        .thenReturn(
+            OutputFormat.JSON.newGson().fromJson(fixture.get("changeInfo"), ChangeInfo.class));
+    return fixture;
+  }
+
+  private static JsonObject readRestrictedVoteFixture() throws Exception {
+    return getGson()
+        .fromJson(
+            Files.readString(
+                TestResourceLoader.getTestResourcePath()
+                    .resolve("__files/review/restrictedVoteRetry.json")),
+            JsonObject.class);
   }
 
   @Test
