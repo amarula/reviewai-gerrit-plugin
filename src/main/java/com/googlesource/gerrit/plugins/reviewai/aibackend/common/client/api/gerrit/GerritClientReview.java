@@ -30,7 +30,9 @@ import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.ReviewInput.CommentInput;
 import com.google.gerrit.extensions.api.changes.ReviewResult;
 import com.google.gerrit.extensions.client.Comment;
+import com.google.gerrit.extensions.client.ListChangesOption;
 import com.google.gerrit.extensions.common.CommentInfo;
+import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
@@ -43,6 +45,7 @@ import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewEx
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +56,7 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -61,6 +65,7 @@ public class GerritClientReview extends GerritClientAccount {
   private final PublishedCommentConcernBinder concernBinder;
 
   private GerritChange change;
+  @Getter private Integer publishedReviewScore;
 
   /**
    * Files in the revision being reviewed, used to keep comments off paths Gerrit would reject.
@@ -195,6 +200,7 @@ public class GerritClientReview extends GerritClientAccount {
       throws Exception {
     log.debug("Setting review for change ID: {}", change.getFullChangeId());
     this.change = change;
+    publishedReviewScore = null;
     ReviewInput reviewInput = buildReview(reviewBatches, changeSetData, reviewScore);
     try (ManualRequestContext ignored = config.openRequestContext()) {
       ChangeApi changeApi = change.getChangeApi(config);
@@ -210,16 +216,60 @@ public class GerritClientReview extends GerritClientAccount {
       change.requireCurrentRevision(changeApi);
       Optional<Set<String>> existingCommentIds =
           concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
-      ReviewResult result = change.getRevisionApi(changeApi).review(reviewInput);
+      ReviewResult result = postReview(changeApi, reviewInput);
 
       changeSetData.setReviewPublished(Strings.isNullOrEmpty(result.error));
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);
         throw new GerritReviewException(result.error);
       }
+      if (reviewInput.labels != null && reviewInput.labels.containsKey(LabelId.CODE_REVIEW)) {
+        publishedReviewScore = reviewInput.labels.get(LabelId.CODE_REVIEW).intValue();
+      }
       ChangeApi refreshedChangeApi = change.getChangeApi(config);
       return concernBinder.bind(
           refreshedChangeApi, reviewBatches, reviewInput.tag, existingCommentIds);
+    }
+  }
+
+  private ReviewResult postReview(ChangeApi changeApi, ReviewInput reviewInput) throws Exception {
+    try {
+      return change.getRevisionApi(changeApi).review(reviewInput);
+    } catch (AuthException e) {
+      Short requestedScore =
+          reviewInput.labels == null ? null : reviewInput.labels.get(LabelId.CODE_REVIEW);
+      if (requestedScore == null
+          || !String.format("Applying label \"Code-Review\": %d is restricted", requestedScore)
+              .equals(e.getMessage())) {
+        throw e;
+      }
+      // Gerrit checks labels before publishing comments, so this rejection can be retried safely.
+      // Read the current caller's permissions: labels.all omits an AI user who has not reviewed
+      // yet.
+      Map<String, Collection<String>> permittedLabels =
+          changeApi.get(ListChangesOption.DETAILED_LABELS).permittedLabels;
+      Collection<String> permittedValues =
+          permittedLabels == null
+              ? List.of()
+              : permittedLabels.getOrDefault(LabelId.CODE_REVIEW, List.of());
+      Optional<Integer> permittedScore =
+          permittedValues.stream()
+              .map(value -> Integer.parseInt(value.trim()))
+              .min(
+                  Comparator.<Integer>comparingInt(value -> Math.abs(value - requestedScore))
+                      .thenComparingInt(Math::abs));
+      if (permittedScore.isEmpty()
+          || permittedScore.get().intValue() == requestedScore.intValue()) {
+        throw e;
+      }
+      change.requireCurrentRevision(changeApi);
+      reviewInput.label(LabelId.CODE_REVIEW, permittedScore.get());
+      log.info(
+          "Retrying review for {} with permitted Code-Review score {} instead of {}",
+          change.getFullChangeId(),
+          permittedScore.get(),
+          requestedScore);
+      return change.getRevisionApi(changeApi).review(reviewInput);
     }
   }
 
