@@ -20,7 +20,12 @@ package com.googlesource.gerrit.plugins.reviewai.review;
 import static com.googlesource.gerrit.plugins.reviewai.review.PatchSetConcernHandler.detachedConcernIds;
 import static com.googlesource.gerrit.plugins.reviewai.review.PatchSetConcernHandler.isDetachedConcern;
 
+import com.google.gerrit.extensions.api.changes.ChangeApi;
+import com.google.gerrit.extensions.api.changes.NotifyHandling;
+import com.google.gerrit.extensions.api.changes.ReviewInput;
+import com.google.gerrit.extensions.api.changes.ReviewResult;
 import com.google.gerrit.server.config.CanonicalWebUrl;
+import com.google.gerrit.server.util.ManualRequestContext;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -41,6 +46,8 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.ChangeSetDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewConcernPublisher;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.GerritReviewException;
+import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.api.ai.IAiClient;
 import com.googlesource.gerrit.plugins.reviewai.listener.AiReviewApplicabilityChecker;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
@@ -120,6 +127,8 @@ public class PatchSetReviewer {
   }
 
   public void review(GerritChange change, boolean includeAiFailureDetails) throws Exception {
+    changeSetData.setReviewChange(change);
+    changeSetData.setReviewPublished(false);
     log.debug("Starting review process for change: {}", change.getFullChangeId());
     gerritClient.requireCurrentRevision(change);
     reviewBatches = new ArrayList<>();
@@ -204,6 +213,37 @@ public class PatchSetReviewer {
     }
   }
 
+  /** Publishes failure feedback only when the review has not already been accepted by Gerrit. */
+  public void reportReviewFailure(GerritChange requestedChange) {
+    if (changeSetData.isReviewPublished() || Thread.currentThread().isInterrupted()) {
+      return;
+    }
+    GerritChange failedChange =
+        Optional.ofNullable(changeSetData.getReviewChange()).orElse(requestedChange);
+    try (ManualRequestContext ignored = config.openRequestContext()) {
+      changeSetData.getAiRequestCancellation().throwIfSupersessionRequested();
+      ChangeApi changeApi = failedChange.getChangeApi(config);
+      failedChange.requireCurrentRevision(changeApi);
+      ReviewInput input = ReviewInput.create();
+      input.message(
+          SystemMessageFormatter.getLocalizedErrorMessage(localizer, "message.review.failed"));
+      input.notify = NotifyHandling.NONE;
+      ReviewResult result = failedChange.getRevisionApi(changeApi).review(input);
+      if (result.error != null && !result.error.isEmpty()) {
+        throw new GerritReviewException(result.error);
+      }
+    } catch (StalePatchSetException | AiRequestSupersededException e) {
+      log.debug(
+          "Skipping failure feedback for superseded review {}", failedChange.getFullChangeId());
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      log.warn(
+          "Could not publish review failure feedback for {}", failedChange.getFullChangeId(), e);
+    }
+  }
+
   private void prepareConcernContext(GerritChange change) throws Exception {
     changeSetData.setPreviousReviewConcernLedger(null);
     changeSetData.setIncrementalPatchSet(null);
@@ -240,6 +280,8 @@ public class PatchSetReviewer {
       String topicFilenamePrefix,
       List<Double> topicReviewScores)
       throws Exception {
+    changeSetData.setReviewChange(change);
+    changeSetData.setReviewPublished(false);
     reviewBatches = new ArrayList<>();
     reviewScores = new ArrayList<>();
     changeSetData.setReviewNoticeMessage(null);

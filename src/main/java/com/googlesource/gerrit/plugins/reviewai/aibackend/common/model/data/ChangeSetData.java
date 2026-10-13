@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
@@ -65,6 +66,8 @@ public final class ChangeSetData {
   private transient Set<String> reviewFeedbackControlAuthorizedCommentIds = Set.of();
   private transient Boolean moderatorFeaturesAllowed = false;
   private transient boolean reviewFeedbackClassified;
+  private transient GerritChange reviewChange;
+  private transient boolean reviewPublished;
   private transient AiRequestCancellation aiRequestCancellation = new AiRequestCancellation();
 
   // Command variables
