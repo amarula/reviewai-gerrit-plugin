@@ -142,21 +142,6 @@ junit_tests(
     ] + TEST_DEPS,
 )
 
-java_library(
-    name = "reviewai_dev_test_support",
-    srcs = glob(
-        ["src/dev/test/java/**/*.java"],
-        exclude = [
-            "src/dev/test/java/**/*IT.java",
-            "src/dev/test/java/**/*Test.java",
-        ],
-    ),
-    deps = [
-        ":reviewai_test_support",
-        ":reviewai_plugin_dev_test_lib",
-    ] + TEST_DEPS,
-)
-
 junit_tests(
     name = "reviewai_dev_tests",
     srcs = glob(["src/dev/test/java/**/*Test.java"]),
@@ -165,7 +150,6 @@ junit_tests(
     resources = glob(["src/test/resources/**"]) + glob(["src/dev/test/resources/**"], allow_empty = True),
     jvm_flags = ["-Dbazel.test.resourceBase=" + plugin_package() + "/src/test/resources"],
     deps = [
-        ":reviewai_dev_test_support",
         ":reviewai_test_support",
         ":reviewai_plugin_dev_test_lib",
     ] + TEST_DEPS,
