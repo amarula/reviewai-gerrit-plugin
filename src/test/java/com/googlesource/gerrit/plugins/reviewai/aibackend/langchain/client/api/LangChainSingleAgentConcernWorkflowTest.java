@@ -332,12 +332,17 @@ public class LangChainSingleAgentConcernWorkflowTest {
 
     assertEquals(
         List.of(
-            ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK,
-            ReviewAssistantStage.REVIEW_CONCERNS),
+            ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK, ReviewAssistantStage.REVIEW_CONCERNS),
         client.stages);
     assertEquals(
         "old-present",
-        client.concernData.getConcernWorkflowInput().getConcerns().getConcerns().getFirst().getId());
+        client
+            .concernData
+            .getConcernWorkflowInput()
+            .getConcerns()
+            .getConcerns()
+            .getFirst()
+            .getId());
     assertTrue(data.isReviewFeedbackClassified());
     assertTrue(data.getReviewFeedbackMemory().isConcernDismissalAuthorized("old-present"));
     assertEquals(

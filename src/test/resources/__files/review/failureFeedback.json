@@ -1,0 +1,6 @@
+{
+  "failure": "Applying label \"Code-Review\": -2 is restricted",
+  "systemMessage": "Unable to complete AI review. Please try again.",
+  "connectionMessage": "Unable to connect to AI server",
+  "finding": "The wrapper has invalid syntax and cannot be imported."
+}

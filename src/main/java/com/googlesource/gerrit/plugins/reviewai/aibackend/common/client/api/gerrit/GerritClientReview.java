@@ -212,6 +212,7 @@ public class GerritClientReview extends GerritClientAccount {
           concernBinder.snapshotCommentIds(changeApi, reviewInput.tag);
       ReviewResult result = change.getRevisionApi(changeApi).review(reviewInput);
 
+      changeSetData.setReviewPublished(Strings.isNullOrEmpty(result.error));
       if (!Strings.isNullOrEmpty(result.error)) {
         log.error("Review setting failed with status code: {}", result.error);
         throw new GerritReviewException(result.error);

@@ -501,7 +501,8 @@ public class LangChainMultiAgentReviewClientTest {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setSuggestMode(true);
     changeSetData.setReviewScope(ReviewScope.PATCHSET);
-    changeSetData.setPendingReviewFeedbackCommentIds(List.of("suggest-command", "feedback-comment"));
+    changeSetData.setPendingReviewFeedbackCommentIds(
+        List.of("suggest-command", "feedback-comment"));
     client.classifiedFeedback = readFeedbackMemory();
     GerritChange change = mock(GerritChange.class);
     when(change.getFullChangeId()).thenReturn("change~1");

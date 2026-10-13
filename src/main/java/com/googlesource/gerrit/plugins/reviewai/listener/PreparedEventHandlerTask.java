@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.listener;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.data.AiRequest;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiRequestSupersededException;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.StalePatchSetException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.listener.IEventHandlerType;
@@ -27,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormatter;
 import com.googlesource.gerrit.plugins.reviewai.metrics.ReviewAiMetrics;
 import com.googlesource.gerrit.plugins.reviewai.review.PatchSetReviewer;
+import java.util.concurrent.CancellationException;
 import lombok.extern.slf4j.Slf4j;
 
 /** Owns the execution state produced by preprocessing one event handler task. */
@@ -114,10 +116,28 @@ final class PreparedEventHandlerTask {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      if (decision.kind() == AiRequest.Kind.REVIEW && shouldReportFailure(e)) {
+        reviewer.reportReviewFailure(change);
+      }
       return Result.FAILURE;
     }
     pendingRequest.completeReview();
     return Result.OK;
+  }
+
+  private static boolean shouldReportFailure(Throwable failure) {
+    // These exceptions suppress error feedback for interrupted or superseded work, including
+    // wrapped causes. Other failures are eligible for a generic Change Log message unless the
+    // thread is interrupted; reportReviewFailure also skips reviews already accepted by Gerrit.
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof InterruptedException
+          || cause instanceof CancellationException
+          || cause instanceof StalePatchSetException
+          || cause instanceof AiRequestSupersededException) {
+        return false;
+      }
+    }
+    return !Thread.currentThread().isInterrupted();
   }
 
   @FunctionalInterface
