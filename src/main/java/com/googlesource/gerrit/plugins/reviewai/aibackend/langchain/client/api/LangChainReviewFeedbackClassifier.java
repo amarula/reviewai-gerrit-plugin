@@ -192,7 +192,20 @@ final class LangChainReviewFeedbackClassifier {
     return new ReviewFeedbackClassificationInput(memory, concerns, comments);
   }
 
-  private boolean hasSubstantiveFeedback(String message) {
+  static boolean hasPendingSubstantiveFeedback(
+      ChangeSetData changeSetData, GerritClientData clientData) {
+    CommentData commentData = clientData == null ? null : clientData.getCommentData();
+    Map<String, GerritComment> commentsById =
+        commentData == null || commentData.getCommentMap() == null
+            ? Map.of()
+            : commentData.getCommentMap();
+    // Leave missing comments to the review workflow's feedback validation.
+    return changeSetData.getPendingReviewFeedbackCommentIds().stream()
+        .map(commentsById::get)
+        .anyMatch(comment -> comment == null || hasSubstantiveFeedback(comment.getMessage()));
+  }
+
+  private static boolean hasSubstantiveFeedback(String message) {
     if (message == null || message.isBlank()) {
       return false;
     }

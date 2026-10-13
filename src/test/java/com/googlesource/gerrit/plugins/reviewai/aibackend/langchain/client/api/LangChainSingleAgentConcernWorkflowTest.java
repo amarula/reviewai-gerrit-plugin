@@ -315,6 +315,38 @@ public class LangChainSingleAgentConcernWorkflowTest {
   }
 
   @Test
+  public void suggestReassessesLedgerAndDismissalDespiteExistingReviewContext() throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    when(gerritClient.getClientData(change)).thenReturn(dismissalClientData());
+    TestClient client = new TestClient(gerritClient);
+    client.existingReviewContext = true;
+    client.feedbackResponse = DISMISS_FEEDBACK_RESPONSE;
+    client.concernReviewResponse = DISMISS_CONCERN_REVIEW_RESPONSE;
+    ChangeSetData data = dismissalChangeSetData();
+    data.setSuggestMode(true);
+    data.setIncrementalPatchSet(null);
+    data.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of("dismiss-request"));
+
+    AiResponseContent response = client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(
+        List.of(
+            ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK,
+            ReviewAssistantStage.REVIEW_CONCERNS),
+        client.stages);
+    assertEquals(
+        "old-present",
+        client.concernData.getConcernWorkflowInput().getConcerns().getConcerns().getFirst().getId());
+    assertTrue(data.isReviewFeedbackClassified());
+    assertTrue(data.getReviewFeedbackMemory().isConcernDismissalAuthorized("old-present"));
+    assertEquals(
+        ConcernStatus.DISMISSED,
+        pendingLedger(response).getReviewers().getFirst().getConcerns().getFirst().getStatus());
+    assertTrue(response.getReplies().isEmpty());
+  }
+
+  @Test
   public void authorizedModeratorFeedbackCanDismissConcern() throws Exception {
     GerritClient gerritClient = mock(GerritClient.class);
     GerritChange change = change(true);
@@ -594,6 +626,7 @@ public class LangChainSingleAgentConcernWorkflowTest {
     private ChangeSetData feedbackData;
     private String concernReviewResponse = CONCERN_REVIEW_RESPONSE;
     private String feedbackResponse = FEEDBACK_RESPONSE;
+    private boolean existingReviewContext;
 
     private TestClient() {
       this(null);
@@ -601,6 +634,11 @@ public class LangChainSingleAgentConcernWorkflowTest {
 
     private TestClient(GerritClient gerritClient) {
       super(configuration(), null, gerritClient, null);
+    }
+
+    @Override
+    protected boolean hasExistingReviewContext(ChangeSetData changeSetData) {
+      return existingReviewContext;
     }
 
     @Override

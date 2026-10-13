@@ -86,6 +86,12 @@ The `/suggest` command generates native Gerrit suggested edits for negative revi
 * `/suggest`: Generates one or more native Gerrit suggested edits for each negative review reply in the selected scope,
   based on the available review results.
 
+When a concern ledger exists or substantive feedback comments are pending, `/suggest` runs the review workflow first
+to reassess concerns and apply feedback. It generates edits from that review's negative replies and saves the updated
+concern ledger and feedback after successful publication. A comment containing only a command and an AI mention does
+not require reassessment by itself. Without a ledger or substantive pending feedback, `/suggest` can use existing AI
+review context directly; otherwise, it runs a fresh review.
+
 ### Command Options
 
 * `--scope=[patchset/commit_message]`: Limits the suggestion scope. `patchset` suggests fixes only for Patch Set code

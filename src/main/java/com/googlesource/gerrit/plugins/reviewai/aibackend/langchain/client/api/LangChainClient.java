@@ -461,6 +461,15 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     return hasPendingComments || hasConditionLabels;
   }
 
+  protected boolean hasSubstantivePendingReviewFeedback(
+      ChangeSetData changeSetData, GerritChange change) {
+    List<String> pendingComments = changeSetData.getPendingReviewFeedbackCommentIds();
+    return pendingComments != null
+        && !pendingComments.isEmpty()
+        && LangChainReviewFeedbackClassifier.hasPendingSubstantiveFeedback(
+            changeSetData, gerritClient == null ? null : gerritClient.getClientData(change));
+  }
+
   private String askSingleRawResponseTextWithFallback(
       ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
     RawReviewRequestResult result =

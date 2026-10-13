@@ -535,6 +535,36 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
+  public void suggestReassessesSpecializedConcernsDespitePreviousReviewContext() throws Exception {
+    Configuration config = config();
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.getAiProviderZdr()).thenReturn(false);
+    RecordingSpecializedClient client = new RecordingSpecializedClient(config);
+    client.useReviewSuggestClient = true;
+    client.triage = triage(plan("CORRECTNESS", true));
+    ChangeSetData changeSetData = new ChangeSetData(1);
+    changeSetData.setSuggestMode(true);
+    changeSetData.setAiDataPrompt(readTestResource(SUGGEST_PREVIOUS_REVIEW_CONTEXT_RESOURCE));
+    ReviewConcernLedger ledger = specializedLedger();
+    ledger.setReviewers(List.of(ledger.getReviewers().getFirst()));
+    changeSetData.setPreviousReviewConcernLedger(ledger);
+    changeSetData.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH_RESOURCE));
+
+    AiResponseContent response =
+        client.ask(changeSetData, change(true), readTestResource(FULL_PATCH_RESOURCE));
+
+    assertTrue(client.triageCalled);
+    assertEquals(List.of("review-CORRECTNESS", "find-CORRECTNESS"), client.concernEvents);
+    assertTrue(client.suggestionRequestCalled);
+    assertEquals(
+        ConcernStatus.PRESENT,
+        reviewer(pendingLedger(response), ConcernReviewerId.Kind.SPECIALIZED_AGENT, "CORRECTNESS")
+            .getConcerns()
+            .getFirst()
+            .getStatus());
+  }
+
+  @Test
   public void openAiNonZdrSuggestUsesPreviousReviewContextAfterForgetThread() throws Exception {
     Configuration config = config();
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
@@ -1016,6 +1046,8 @@ public class LangChainSpecializedAgentReviewClientTest {
     private boolean triageCalled;
     private boolean suggestClientCalled;
     private boolean messageRequestCalled;
+    private boolean useReviewSuggestClient;
+    private boolean suggestionRequestCalled;
 
     RecordingSpecializedClient(Configuration config) {
       super(config, null, null, localizer(), Runnable::run);
@@ -1039,6 +1071,18 @@ public class LangChainSpecializedAgentReviewClientTest {
         ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
       messageRequestCalled = true;
       return rawReviewRequestResult(readTestResource(MESSAGE_RESPONSE_RESOURCE), "message request");
+    }
+
+    @Override
+    protected ReviewRequestResult askSingleRequest(
+        ChangeSetData changeSetData, GerritChange change, String patchSet) throws Exception {
+      if (changeSetData.getSuggestMode()) {
+        suggestionRequestCalled = true;
+        AiResponseContent response = new AiResponseContent("");
+        response.setReplies(List.of());
+        return new ReviewRequestResult(response, "suggestion request") {};
+      }
+      return super.askSingleRequest(changeSetData, change, patchSet);
     }
 
     @Override
@@ -1143,6 +1187,10 @@ public class LangChainSpecializedAgentReviewClientTest {
 
     @Override
     protected LangChainSuggestClient getSuggestClient() {
+      if (useReviewSuggestClient) {
+        return new LangChainSpecializedSuggestClient(
+            this, this, new SpecializedSuggestReviewContext(config));
+      }
       return new LangChainSuggestClient(new LangChainClient(null, null, null, null)) {
         @Override
         public AiResponseContent ask(
