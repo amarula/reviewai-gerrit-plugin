@@ -67,9 +67,9 @@ gerrit_plugin(
 java_library(
     name = "provided_deps",
     exports = [
+        "//plugins:plugin-lib",
         "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
         "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
-        "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
         "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
     ],
     neverlink = True,
@@ -106,12 +106,12 @@ java_import(
 )
 
 TEST_DEPS = [
+    "//plugins:plugin-lib",
     ":reviewai_plugin_test_lib",
     ":lombok",
     ":provided_deps",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
-    "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
     "@reviewai_plugin_deps//:junit_junit",
     "@reviewai_plugin_deps//:org_mockito_mockito_core",
     "@reviewai_plugin_deps//:org_slf4j_slf4j_api",

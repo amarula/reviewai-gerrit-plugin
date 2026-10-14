@@ -19,18 +19,23 @@ For commercial support, please contact Amarula Solutions at https://www.amarulas
 
 ### Build
 
-The default target is Gerrit 3.15.0-rc1 with Java 25.
-From the Gerrit checkout, link the plugin Bazel dependencies, update the module lockfile, and build the production plugin:
+Bazel builds use the API and Java toolchain configured by the Gerrit source checkout. Use a checkout matching the
+Gerrit version you plan to deploy to, such as Gerrit 3.14.2 with Java 21 or Gerrit 3.15.0-rc1 with Java 25.
+With the plugin under `plugins/reviewai-gerrit-plugin` in that checkout, link its Bazel dependencies, update the module
+lockfile, and build the production plugin:
 
 ```bash
-cd gerrit/plugins
+cd /path/to/gerrit/plugins
 rm external_plugin_deps.MODULE.bazel
 ln -s reviewai-gerrit-plugin/external_plugin_deps.MODULE.bazel external_plugin_deps.MODULE.bazel
 
 cd ..
-bazel mod deps --lockfile_mode=update
-bazelisk build --config=java25 plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin
+bazelisk mod deps --lockfile_mode=update
+bazelisk build //plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin
 ```
+
+Run Bazel builds and tests from the Gerrit checkout root, so they use Gerrit's workspace and toolchain
+settings. To target another Gerrit version, use a checkout of that version.
 
 The generated JAR is available under Gerrit's `bazel-bin/plugins/reviewai-gerrit-plugin/` directory. See
 [Development and Debugging](docs/development.md) for the development build and test commands.

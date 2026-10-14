@@ -11,7 +11,6 @@ maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     name = "reviewai_plugin_deps", # MUST BE PLUGIN-SCOPED
     artifacts = [
-        "com.google.gerrit:gerrit-plugin-api:3.15.0-rc1",
         "dev.langchain4j:langchain4j:1.13.0",
         "dev.langchain4j:langchain4j-open-ai:1.13.0",
         "dev.langchain4j:langchain4j-google-ai-gemini:1.13.0",
