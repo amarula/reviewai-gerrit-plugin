@@ -1,15 +1,3 @@
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <filter class="com.googlesource.gerrit.plugins.reviewai.logging.LoggerFilterTesting">
-            <param name="filterLevel" value="${GERRIT_AI_TEST_FILTER_LEVEL}"/>
-            <param name="filterValue" value="${GERRIT_AI_TEST_FILTER_VALUE}"/>
-        </filter>
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-
-    <root level="debug">
-        <appender-ref ref="STDOUT"/>
-    </root>
+    <root level="OFF"/>
 </configuration>

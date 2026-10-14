@@ -52,54 +52,10 @@ Run both the standard and development-build tests with:
 bazelisk test plugins/reviewai-gerrit-plugin:reviewai_tests plugins/reviewai-gerrit-plugin:reviewai_dev_tests
 ```
 
-### Test Log Level Override
+### Test Logging
 
-During tests, the default log level is set to DEBUG, which may result in a surplus of DEBUG messages. To manage this,
-adjust the log level by setting the `GERRIT_AI_TEST_FILTER_LEVEL` environment variable. For instance, to set the
-testing log level to INFO on a Linux-based OS:
-
-```
-$ export GERRIT_AI_TEST_FILTER_LEVEL=INFO
-```
-
-### Filtering Test Logs
-
-To continue receiving certain DEBUG-leveled messages after elevating the test log level, use
-the `GERRIT_AI_TEST_FILTER_VALUE` environment variable. For example, to keep seeing DEBUG messages from the
-class `ClientMessage` even with the log level set to INFO:
-
-```
-$ export GERRIT_AI_TEST_FILTER_VALUE=ClientMessage
-```
-
-The syntax for the filter value is as follows:
-
-```
-export GERRIT_AI_TEST_FILTER_VALUE="[<class_name_1>]|[<message_1>], ..., [<class_name_N>]|[<message_N>]"
-```
-
-Double quotes are required when specifying multiple filter items. Each filter item can include a `className` and
-a `message` filter. Since the filter uses a "contain" criterion, you can select multiple items with a common substring,
-such as all DEBUG messages in classes containing `EventHandler`:
-
-```
-$ export GERRIT_AI_TEST_FILTER_VALUE=EventHandler
-```
-
-For example, to filter DEBUG messages containing the OpenAI Responses request log, the pipe ("|") prefix must be used:
-
-```
-$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI Responses LangChain request"
-```
-
-For multiple items with spaces, enclose the settings string in double quotes and escape any internal double quotes:
-
-```
-$ export GERRIT_AI_TEST_FILTER_VALUE="|OpenAI Responses LangChain request, LangChainExecutor"
-```
-
-This setting shows the DEBUG log messages whose message starts with "OpenAI Responses LangChain request" and the ones
-from classes containing `LangChainExecutor`.
+Application logging is disabled during tests by `src/test/resources/logback.xml`, so `mvn test` requires no logging
+environment variables. Maven build output and JVM warnings are still displayed.
 
 ## Debugging
 
@@ -146,10 +102,9 @@ relevance and scores, by using the `--debug` command option. For example:
 
 ### Selective Production Logging
 
-As with testing, setting the general log level to DEBUG in operational environments can lead to an excess of DEBUG
-messages from various sources in the Gerrit log file. The `selectiveLogLevelOverride` configuration option functions
-similarly to the `GERRIT_AI_TEST_FILTER_VALUE`, permitting the logging of specific messages below the current log
-level threshold.
+Setting the general log level to DEBUG in operational environments can lead to an excess of DEBUG messages from
+various sources in the Gerrit log file. The `selectiveLogLevelOverride` configuration option permits logging specific
+messages below the current log level threshold.
 
 For instance, to log all DEBUG messages from the `ClientMessage` and `ClientCommandExecutor` classes for a specific
 project, add the following to the related `project.config`:
