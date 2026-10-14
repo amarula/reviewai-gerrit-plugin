@@ -19,7 +19,7 @@ For commercial support, please contact Amarula Solutions at https://www.amarulas
 
 ### Build
 
-The default target is Gerrit 3.15.0-rc1 with Java 25.
+The default target is Gerrit 3.15.0-rc1 with Java 25. Gerrit 3.14.2 with Java 21 is also supported.
 From the Gerrit checkout, link the plugin Bazel dependencies, update the module lockfile, and build the production plugin:
 
 ```bash
@@ -31,6 +31,14 @@ cd ..
 bazel mod deps --lockfile_mode=update
 bazelisk build --config=java25 plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin
 ```
+
+For Gerrit 3.14.2, select both the Java toolchain and the API dependency:
+
+```bash
+bazelisk build --config=java21 --define=gerrit_api=3.14.2 plugins/reviewai-gerrit-plugin:reviewai-gerrit-plugin
+```
+
+Use the same options for Bazel tests.
 
 The generated JAR is available under Gerrit's `bazel-bin/plugins/reviewai-gerrit-plugin/` directory. See
 [Development and Debugging](docs/development.md) for the development build and test commands.

@@ -32,4 +32,10 @@ maven.install(
     ],
 )
 
-use_repo(maven, "reviewai_plugin_deps")
+maven.install(
+    name = "reviewai_gerrit_3_14_deps",
+    artifacts = ["com.google.gerrit:gerrit-plugin-api:3.14.2"],
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+
+use_repo(maven, "reviewai_plugin_deps", "reviewai_gerrit_3_14_deps")
