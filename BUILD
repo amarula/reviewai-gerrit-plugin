@@ -64,14 +64,23 @@ gerrit_plugin(
     deps = PLUGIN_DEPS,
 )
 
+config_setting(
+    name = "gerrit_api_3_14_2",
+    define_values = {"gerrit_api": "3.14.2"},
+)
+
+GERRIT_API_DEPS = select({
+    ":gerrit_api_3_14_2": ["@reviewai_gerrit_3_14_deps//:com_google_gerrit_gerrit_plugin_api"],
+    "//conditions:default": ["@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api"],
+})
+
 java_library(
     name = "provided_deps",
     exports = [
         "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
         "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
-        "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
         "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
-    ],
+    ] + GERRIT_API_DEPS,
     neverlink = True,
 )
 
@@ -111,12 +120,11 @@ TEST_DEPS = [
     ":provided_deps",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_classic",
     "@reviewai_plugin_deps//:ch_qos_logback_logback_core",
-    "@reviewai_plugin_deps//:com_google_gerrit_gerrit_plugin_api",
     "@reviewai_plugin_deps//:junit_junit",
     "@reviewai_plugin_deps//:org_mockito_mockito_core",
     "@reviewai_plugin_deps//:org_slf4j_slf4j_api",
     "@reviewai_plugin_deps//:org_wiremock_wiremock_standalone",
-] + EXTERNAL_PLUGIN_DEPS
+] + EXTERNAL_PLUGIN_DEPS + GERRIT_API_DEPS
 
 java_library(
     name = "reviewai_test_support",
