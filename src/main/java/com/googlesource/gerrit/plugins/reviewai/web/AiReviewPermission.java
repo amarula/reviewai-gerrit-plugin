@@ -16,216 +16,61 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
-import com.google.gerrit.entities.AccessSection;
-import com.google.gerrit.entities.Permission;
-import com.google.gerrit.entities.PermissionRule;
-import com.google.gerrit.entities.Project;
+import com.google.gerrit.entities.Change;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.server.CurrentUser;
-import com.google.gerrit.server.account.ServiceUserClassifier;
 import com.google.gerrit.server.change.ChangeResource;
-import com.google.gerrit.server.project.ProjectCache;
-import com.google.gerrit.server.project.SectionMatcher;
+import com.google.gerrit.server.permissions.ChangePermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.permissions.PermissionBackendException;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import lombok.extern.slf4j.Slf4j;
 
 @Singleton
 @Slf4j
 public class AiReviewPermission {
-  static final String AI_REVIEW_ACCESS_PERMISSION = "aiReview";
-
-  private final ProjectCache projectCache;
-  private final ServiceUserClassifier serviceUserClassifier;
+  private final PermissionBackend permissionBackend;
+  private final ChangeData.Factory changeDataFactory;
 
   @Inject
-  AiReviewPermission(ProjectCache projectCache, ServiceUserClassifier serviceUserClassifier) {
-    this.projectCache = projectCache;
-    this.serviceUserClassifier = serviceUserClassifier;
+  AiReviewPermission(PermissionBackend permissionBackend, ChangeData.Factory changeDataFactory) {
+    this.permissionBackend = permissionBackend;
+    this.changeDataFactory = changeDataFactory;
   }
 
   public Boolean canAiReview(ChangeResource resource) {
-    return !isAiReviewExplicitlyDisallowed(
-        resource.getProject(), resource.getChange().getDest().branch(), resource.getUser());
+    try {
+      return resource.permissions().test(ChangePermission.AI_REVIEW);
+    } catch (PermissionBackendException | RuntimeException e) {
+      log.warn("Failed to check AI review permission", e);
+      return false;
+    }
   }
 
   public void checkCanAiReview(ChangeResource resource) throws AuthException {
-    if (Boolean.FALSE.equals(canAiReview(resource))) {
+    if (!canAiReview(resource)) {
       throw new AuthException("AI review is not allowed for this change");
     }
   }
 
-  public boolean isAiReviewExplicitlyDisallowed(Project.NameKey projectNameKey, String refName) {
-    return isAiReviewExplicitlyDisallowed(projectNameKey, refName, null);
-  }
-
-  public boolean isAiReviewConfigured(Project.NameKey projectNameKey) {
-    try {
-      return projectCache
-          .get(projectNameKey)
-          .map(
-              projectState ->
-                  projectState.getAllSections().stream()
-                      .anyMatch(
-                          sectionMatcher ->
-                              hasAiReviewAllow(getAiReviewPermission(sectionMatcher.getSection()))))
-          .orElse(false);
-    } catch (RuntimeException e) {
-      log.warn("Failed to inspect AI review configuration for project {}", projectNameKey, e);
+  public boolean canAiReview(GerritChange change, CurrentUser user) {
+    if (user == null) {
       return false;
     }
-  }
-
-  public boolean isAiReviewExplicitlyDisallowed(
-      Project.NameKey projectNameKey, String refName, CurrentUser user) {
     try {
-      return projectCache
-          .get(projectNameKey)
-          .map(
-              projectState ->
-                  projectState.getAllSections().stream()
-                      .filter(sectionMatcher -> matchesAny(sectionMatcher, refName, user))
-                      .collect(
-                          AiReviewAccessDecision::new,
-                          (decision, sectionMatcher) ->
-                              decision.withRules(
-                                  projectNameKey.equals(sectionMatcher.getProject()),
-                                  getAiReviewPermission(sectionMatcher.getSection()),
-                                  user),
-                          AiReviewAccessDecision::merge)
-                      .isDisallowed(isServiceUser(user)))
-          .orElse(false);
-    } catch (RuntimeException e) {
-      log.warn(
-          "Failed to inspect AI review access rules for project {} and ref {}",
-          projectNameKey,
-          refName,
-          e);
-      return false;
-    }
-  }
-
-  private boolean appliesToUser(PermissionRule rule, CurrentUser user) {
-    return user == null || user.getEffectiveGroups().contains(rule.getGroup().getUUID());
-  }
-
-  private boolean isServiceUser(CurrentUser user) {
-    return user != null
-        && user.isIdentifiedUser()
-        && serviceUserClassifier.isServiceUser(user.getAccountId());
-  }
-
-  private class AiReviewAccessDecision {
-    private boolean hasBlock;
-    private boolean hasLocalDeny;
-    private boolean hasInheritedDeny;
-    private boolean hasAllow;
-
-    void withRules(boolean localProject, Permission permission, CurrentUser user) {
-      if (permission == null) {
-        return;
-      }
-
-      permission.getRules().stream()
-          .filter(rule -> appliesToUser(rule, user))
-          .forEach(rule -> applyRule(localProject, rule));
-    }
-
-    void merge(AiReviewAccessDecision other) {
-      hasBlock |= other.hasBlock;
-      hasLocalDeny |= other.hasLocalDeny;
-      hasInheritedDeny |= other.hasInheritedDeny;
-      hasAllow |= other.hasAllow;
-    }
-
-    boolean isDisallowed(boolean serviceUserDefaultAllow) {
-      // Service Users and inherited ALLOWs from parent projects override inherited DENYs
-      // from more distant ancestors. Local DENYs and blocks always win.
-      return hasBlock || hasLocalDeny || hasInheritedDeny && !hasAllow && !serviceUserDefaultAllow;
-    }
-
-    private void applyRule(boolean localProject, PermissionRule rule) {
-      if (rule.isBlock()) {
-        hasBlock = true;
-      } else if (rule.isDeny()) {
-        if (localProject) {
-          hasLocalDeny = true;
-        } else {
-          hasInheritedDeny = true;
-        }
-      } else if (rule.getAction() == PermissionRule.Action.ALLOW) {
-        hasAllow = true;
-      }
-    }
-  }
-
-  private Permission getAiReviewPermission(AccessSection section) {
-    Permission permission = section.getPermission(AI_REVIEW_ACCESS_PERMISSION);
-    if (permission != null) {
-      return permission;
-    }
-    return section.getPermissions().stream()
-        .filter(candidate -> isAiReviewPermissionName(candidate.getName()))
-        .findFirst()
-        .orElse(null);
-  }
-
-  private boolean hasAiReviewAllow(Permission permission) {
-    return permission != null
-        && permission.getRules().stream()
-            .anyMatch(rule -> rule.getAction() == PermissionRule.Action.ALLOW);
-  }
-
-  private boolean isAiReviewPermissionName(String permissionName) {
-    return AI_REVIEW_ACCESS_PERMISSION.equalsIgnoreCase(permissionName)
-        || permissionName.endsWith("~" + AI_REVIEW_ACCESS_PERMISSION);
-  }
-
-  private boolean matchesAny(SectionMatcher sectionMatcher, String refName, CurrentUser user) {
-    return refNameCandidates(refName).stream()
-        .anyMatch(candidate -> matches(sectionMatcher, candidate, user));
-  }
-
-  private boolean matches(SectionMatcher sectionMatcher, String refName, CurrentUser user) {
-    try {
-      return sectionMatcher.match(refName, user);
-    } catch (RuntimeException e) {
-      return user == null && simpleRefMatch(sectionMatcher.getSection().getName(), refName);
-    }
-  }
-
-  static Set<String> refNameCandidates(String refName) {
-    if (refName == null || refName.isBlank()) {
-      return Set.of();
-    }
-    if (refName.startsWith("refs/heads/")) {
-      return Set.of(refName, refName.substring("refs/heads/".length()));
-    }
-    if (refName.startsWith("refs/")) {
-      return Set.of(refName);
-    }
-    return Set.of(refName, "refs/heads/" + refName);
-  }
-
-  private boolean simpleRefMatch(String sectionName, String refName) {
-    if (AccessSection.ALL.equals(sectionName) || sectionName.equals(refName)) {
-      return true;
-    }
-    if (sectionName.endsWith("/*")) {
-      return refName.startsWith(sectionName.substring(0, sectionName.length() - 1));
-    }
-    if (sectionName.startsWith(AccessSection.REGEX_PREFIX)) {
-      try {
-        return Pattern.compile(sectionName.substring(AccessSection.REGEX_PREFIX.length()))
-            .matcher(refName)
-            .matches();
-      } catch (PatternSyntaxException e) {
+      var changeNumber = change.getChangeNumber();
+      if (changeNumber.isEmpty()) {
         return false;
       }
+      ChangeData changeData =
+          changeDataFactory.create(change.getProjectNameKey(), Change.id(changeNumber.get()));
+      return permissionBackend.user(user).change(changeData).test(ChangePermission.AI_REVIEW);
+    } catch (PermissionBackendException | RuntimeException e) {
+      log.warn("Failed to check AI review permission for change {}", change.getFullChangeId(), e);
+      return false;
     }
-    return false;
   }
 }
