@@ -56,6 +56,7 @@ import com.google.inject.Guice;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ProjectUserMentionResolver;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientComments;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientFacade;
@@ -398,7 +399,7 @@ public class ReviewTestBase extends TestBase {
     changeSetData = new ChangeSetData(AI_USER_ACCOUNT_ID);
     when(changeSetDataProvider.get()).thenReturn(changeSetData);
 
-    when(aiReviewPermission.isAiReviewConfigured(any())).thenReturn(true);
+    when(aiReviewPermission.canAiReview(any(GerritChange.class), eq(eventUser))).thenReturn(true);
 
     localizer = new Localizer(config);
     reviewFeedbackPublisher = new ReviewFeedbackPublisher(getTestReviewAiDb());

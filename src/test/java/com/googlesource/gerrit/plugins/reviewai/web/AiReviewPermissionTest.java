@@ -16,32 +16,24 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.gerrit.entities.AccessSection;
-import com.google.gerrit.entities.Account;
-import com.google.gerrit.entities.AccountGroup;
 import com.google.gerrit.entities.Change;
-import com.google.gerrit.entities.GroupReference;
-import com.google.gerrit.entities.Permission;
-import com.google.gerrit.entities.PermissionRule;
-import com.google.gerrit.entities.Project;
+import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.server.CurrentUser;
-import com.google.gerrit.server.account.GroupMembership;
-import com.google.gerrit.server.account.ServiceUserClassifier;
 import com.google.gerrit.server.change.ChangeResource;
-import com.google.gerrit.server.project.ProjectCache;
-import com.google.gerrit.server.project.ProjectState;
-import com.google.gerrit.server.project.SectionMatcher;
+import com.google.gerrit.server.permissions.ChangePermission;
+import com.google.gerrit.server.permissions.PermissionBackend;
+import com.google.gerrit.server.permissions.PermissionBackendException;
+import com.google.gerrit.server.query.change.ChangeData;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,242 +42,112 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AiReviewPermissionTest extends TestBase {
-  private static final Project.NameKey ALL_PROJECTS = Project.NameKey.parse("All-Projects");
-  private static final Project.NameKey PARENT_PROJECT = Project.NameKey.parse("parent/child");
-  private static final AccountGroup.UUID DUMMY_GROUP_UUID = AccountGroup.uuid("dummy-group");
-  private static final Account.Id SERVICE_USER_ID = Account.id(101);
-  private static final GroupReference DUMMY_GROUP =
-      GroupReference.create(DUMMY_GROUP_UUID, "Dummy");
-
-  @Mock private ProjectCache projectCache;
-  @Mock private ProjectState projectState;
+  @Mock private PermissionBackend permissionBackend;
+  @Mock private PermissionBackend.WithUser permissionsForUser;
+  @Mock private PermissionBackend.ForChange permissionsForChange;
+  @Mock private ChangeData.Factory changeDataFactory;
+  @Mock private ChangeData changeData;
   @Mock private CurrentUser currentUser;
-  @Mock private GroupMembership groupMembership;
-  @Mock private ServiceUserClassifier serviceUserClassifier;
   @Mock private ChangeResource changeResource;
 
   private AiReviewPermission aiReviewPermission;
+  private GerritChange change;
 
   @Before
   public void setUp() {
-    aiReviewPermission = new AiReviewPermission(projectCache, serviceUserClassifier);
+    aiReviewPermission = new AiReviewPermission(permissionBackend, changeDataFactory);
+    change = getGerritChange();
+    change.setChangeNumber(1);
   }
 
   @Test
-  public void refNameCandidatesIncludesFullRefsHeadsNameForShortBranch() {
-    assertEquals(
-        Set.of("myBranchName", "refs/heads/myBranchName"),
-        AiReviewPermission.refNameCandidates("myBranchName"));
-  }
-
-  @Test
-  public void missingAiReviewRuleAllowsReviewByDefault() {
-    AccessSection accessSection = AccessSection.builder("refs/heads/*").build();
-    setupMatchingAccessSection(accessSection);
-
-    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void allowAiReviewRuleAllowsReview() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.ALLOW));
-
-    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void denyAiReviewRuleDisallowsReview() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY));
-
-    assertTrue(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void blockAiReviewRuleDisallowsReview() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.BLOCK));
-
-    assertTrue(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void projectAllowOverridesInheritedDeny() {
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
-        matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
-
-    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void inheritedParentAllowOverridesInheritedGrandparentDeny() {
-    // PARENT_PROJECT has ALLOW, ALL_PROJECTS has DENY.
-    // The child PROJECT_NAME inherits both. The closer ALLOW from PARENT should win.
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), null),
-        matcher(PARENT_PROJECT, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
-
-    assertFalse(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void projectAllowDoesNotOverrideInheritedBlock() {
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.BLOCK), null),
-        matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.ALLOW), null));
-
-    assertTrue(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void projectDenyOverridesInheritedAllow() {
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.ALLOW), null),
-        matcher(PROJECT_NAME, accessSectionWithRule(PermissionRule.Action.DENY), null));
-
-    assertTrue(aiReviewPermission.isAiReviewExplicitlyDisallowed(PROJECT_NAME, "myBranchName"));
-  }
-
-  @Test
-  public void serviceUserDefaultAllowOverridesInheritedDeny() {
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.DENY), currentUser));
-    setupServiceUser();
-
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, "myBranchName", currentUser));
-  }
-
-  @Test
-  public void localDenyOverridesServiceUserDefaultAllow() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY), currentUser);
-    setupServiceUser();
-
-    assertTrue(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, "myBranchName", currentUser));
-  }
-
-  @Test
-  public void inheritedBlockOverridesServiceUserDefaultAllow() {
-    setupMatchingAccessSections(
-        matcher(ALL_PROJECTS, accessSectionWithRule(PermissionRule.Action.BLOCK), currentUser));
-    setupServiceUser();
-
-    assertTrue(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, "myBranchName", currentUser));
-  }
-
-  @Test
-  public void denyAiReviewRuleForUnrelatedGroupAllowsReviewForCurrentUser() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY), currentUser);
-    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
-    when(groupMembership.contains(DUMMY_GROUP_UUID)).thenReturn(false);
-
-    assertFalse(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, "myBranchName", currentUser));
-  }
-
-  @Test
-  public void denyAiReviewRuleForUserGroupDisallowsReviewForCurrentUser() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY), currentUser);
-    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
-    when(groupMembership.contains(DUMMY_GROUP_UUID)).thenReturn(true);
-
-    assertTrue(
-        aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, "myBranchName", currentUser));
-  }
-
-  @Test
-  public void canAiReviewIgnoresAllowRuleForUnrelatedGroup() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.ALLOW), currentUser);
-    setupChangeResource(currentUser);
+  public void allowsRestRequestWhenGerritGrantsAiReview() throws Exception {
+    when(changeResource.permissions()).thenReturn(permissionsForChange);
+    when(permissionsForChange.test(ChangePermission.AI_REVIEW)).thenReturn(true);
 
     assertTrue(aiReviewPermission.canAiReview(changeResource));
+    aiReviewPermission.checkCanAiReview(changeResource);
   }
 
   @Test
-  public void isAiReviewConfiguredReturnsTrueWhenPermissionExists() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.ALLOW));
+  public void deniesRestRequestWhenGerritDoesNotGrantAiReview() throws Exception {
+    when(changeResource.permissions()).thenReturn(permissionsForChange);
 
-    assertTrue(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+    assertFalse(aiReviewPermission.canAiReview(changeResource));
+    assertThrows(AuthException.class, () -> aiReviewPermission.checkCanAiReview(changeResource));
+    verify(permissionsForChange, times(2)).test(ChangePermission.AI_REVIEW);
   }
 
   @Test
-  public void isAiReviewConfiguredReturnsFalseWhenOnlyDenyRuleExists() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.DENY));
+  public void deniesRestRequestWhenPermissionBackendFails() throws Exception {
+    when(changeResource.permissions()).thenReturn(permissionsForChange);
+    when(permissionsForChange.test(ChangePermission.AI_REVIEW))
+        .thenThrow(new PermissionBackendException(new IllegalStateException()));
 
-    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+    assertThrows(AuthException.class, () -> aiReviewPermission.checkCanAiReview(changeResource));
   }
 
   @Test
-  public void isAiReviewConfiguredReturnsFalseWhenOnlyBlockRuleExists() {
-    setupMatchingAccessSection(accessSectionWithRule(PermissionRule.Action.BLOCK));
+  public void deniesRestRequestWhenPermissionsCannotBeLoaded() {
+    when(changeResource.permissions()).thenThrow(new IllegalStateException());
 
-    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+    assertFalse(aiReviewPermission.canAiReview(changeResource));
+    assertThrows(AuthException.class, () -> aiReviewPermission.checkCanAiReview(changeResource));
   }
 
   @Test
-  public void isAiReviewConfiguredReturnsFalseWhenNoPermissionExists() {
-    AccessSection accessSection = AccessSection.builder("refs/heads/*").build();
-    setupMatchingAccessSection(accessSection);
+  public void allowsEventWhenGerritGrantsAiReviewToEventUser() throws Exception {
+    setupEventPermissions();
+    when(permissionsForChange.test(ChangePermission.AI_REVIEW)).thenReturn(true);
 
-    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+    assertTrue(aiReviewPermission.canAiReview(change, currentUser));
+    verify(permissionBackend).user(currentUser);
+    verify(permissionsForUser).change(changeData);
   }
 
   @Test
-  public void isAiReviewConfiguredReturnsFalseWhenProjectNotCached() {
-    when(projectCache.get(PROJECT_NAME)).thenReturn(Optional.empty());
+  public void deniesEventWhenGerritDoesNotGrantAiReview() throws Exception {
+    setupEventPermissions();
 
-    assertFalse(aiReviewPermission.isAiReviewConfigured(PROJECT_NAME));
+    assertFalse(aiReviewPermission.canAiReview(change, currentUser));
+    verify(permissionsForChange).test(ChangePermission.AI_REVIEW);
   }
 
-  private void setupMatchingAccessSection(AccessSection accessSection) {
-    setupMatchingAccessSection(accessSection, null);
+  @Test
+  public void deniesEventWhenPermissionBackendFails() throws Exception {
+    setupEventPermissions();
+    when(permissionsForChange.test(ChangePermission.AI_REVIEW))
+        .thenThrow(new PermissionBackendException(new IllegalStateException()));
+
+    assertFalse(aiReviewPermission.canAiReview(change, currentUser));
   }
 
-  private void setupMatchingAccessSection(AccessSection accessSection, CurrentUser user) {
-    setupMatchingAccessSections(matcher(PROJECT_NAME, accessSection, user));
+  @Test
+  public void deniesEventWhenChangeCannotBeLoaded() {
+    when(changeDataFactory.create(PROJECT_NAME, Change.id(1)))
+        .thenThrow(new IllegalStateException());
+
+    assertFalse(aiReviewPermission.canAiReview(change, currentUser));
+    verifyNoInteractions(permissionBackend);
   }
 
-  private void setupMatchingAccessSections(SectionMatcher... sectionMatchers) {
-    when(projectCache.get(PROJECT_NAME)).thenReturn(Optional.of(projectState));
-    when(projectState.getAllSections()).thenReturn(List.of(sectionMatchers));
+  @Test
+  public void deniesEventWithoutAnAuthor() {
+    assertFalse(aiReviewPermission.canAiReview(change, null));
+    verifyNoInteractions(permissionBackend, changeDataFactory);
   }
 
-  private SectionMatcher matcher(
-      Project.NameKey projectNameKey, AccessSection accessSection, CurrentUser user) {
-    SectionMatcher matcher = mock(SectionMatcher.class);
-    when(matcher.match("refs/heads/myBranchName", user)).thenReturn(true);
-    when(matcher.getProject()).thenReturn(projectNameKey);
-    when(matcher.getSection()).thenReturn(accessSection);
-    return matcher;
+  @Test
+  public void deniesEventWithoutAChangeNumber() {
+    change.setChangeNumber(null);
+
+    assertFalse(aiReviewPermission.canAiReview(change, currentUser));
+    verifyNoInteractions(permissionBackend, changeDataFactory);
   }
 
-  private AccessSection accessSectionWithRule(PermissionRule.Action action) {
-    return AccessSection.builder("refs/heads/*")
-        .addPermission(
-            Permission.builder(AiReviewPermission.AI_REVIEW_ACCESS_PERMISSION)
-                .add(PermissionRule.builder(DUMMY_GROUP).setAction(action)))
-        .build();
-  }
-
-  private void setupChangeResource(CurrentUser user) {
-    Change change =
-        new Change(CHANGE_ID, Change.id(1), Account.id(100), BRANCH_NAME, Instant.now());
-    when(changeResource.getProject()).thenReturn(PROJECT_NAME);
-    when(changeResource.getChange()).thenReturn(change);
-    when(changeResource.getUser()).thenReturn(user);
-  }
-
-  private void setupServiceUser() {
-    when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
-    when(groupMembership.contains(DUMMY_GROUP_UUID)).thenReturn(true);
-    when(currentUser.isIdentifiedUser()).thenReturn(true);
-    when(currentUser.getAccountId()).thenReturn(SERVICE_USER_ID);
-    when(serviceUserClassifier.isServiceUser(SERVICE_USER_ID)).thenReturn(true);
+  private void setupEventPermissions() {
+    when(changeDataFactory.create(PROJECT_NAME, Change.id(1))).thenReturn(changeData);
+    when(permissionBackend.user(currentUser)).thenReturn(permissionsForUser);
+    when(permissionsForUser.change(changeData)).thenReturn(permissionsForChange);
   }
 }

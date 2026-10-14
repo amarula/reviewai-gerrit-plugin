@@ -31,6 +31,7 @@ import com.google.gerrit.server.query.change.ChangeData;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.BaseOptionSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
@@ -502,8 +503,9 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewSkippedWhenAiReviewAccessIsNotConfigured() throws RestApiException {
-    when(aiReviewPermission.isAiReviewConfigured(Mockito.any())).thenReturn(false);
+  public void commandReviewSkippedWhenAiReviewPermissionIsNotGranted() throws RestApiException {
+    when(aiReviewPermission.canAiReview(Mockito.any(GerritChange.class), Mockito.eq(eventUser)))
+        .thenReturn(false);
 
     setupCommandComment("/review");
     setupMockRequestCreateResponse("openAiResponseRequest.json");
@@ -528,33 +530,44 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
-  public void commandReviewSkippedWhenAiReviewAccessIsExplicitlyDisallowed()
-      throws RestApiException {
-    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
-        .thenReturn(true);
-
-    setupCommandComment("/review");
-
-    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
-
-    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
-  }
-
-  @Test
-  public void commandReviewSkippedWhenAiReviewAccessIsExplicitlyDisallowedAndEventHasOnlyUsername()
-      throws RestApiException {
+  public void commandReviewSkippedWhenEventAuthorCannotBeResolved() throws RestApiException {
     includeEventAccountId = false;
-    when(aiReviewPermission.isAiReviewExplicitlyDisallowed(
-            PROJECT_NAME, BRANCH_NAME.branch(), eventUser))
-        .thenReturn(true);
+    when(accountCacheMock.getByUsername(Mockito.anyString())).thenReturn(java.util.Optional.empty());
 
     setupCommandComment("/review");
 
     handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
 
     Mockito.verify(aiReviewPermission)
-        .isAiReviewExplicitlyDisallowed(PROJECT_NAME, BRANCH_NAME.branch(), eventUser);
+        .canAiReview(Mockito.any(GerritChange.class), Mockito.isNull());
+    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
+  }
+
+  @Test
+  public void commandReviewSkippedWhenAiReviewPermissionIsNotGrantedAndEventHasOnlyUsername()
+      throws RestApiException {
+    includeEventAccountId = false;
+    when(aiReviewPermission.canAiReview(Mockito.any(GerritChange.class), Mockito.eq(eventUser)))
+        .thenReturn(false);
+
+    setupCommandComment("/review");
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Mockito.verify(aiReviewPermission)
+        .canAiReview(Mockito.any(GerritChange.class), Mockito.eq(eventUser));
+    Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
+  }
+
+  @Test
+  public void patchSetReviewSkippedWhenAiReviewPermissionIsNotGranted() throws RestApiException {
+    when(aiReviewPermission.canAiReview(Mockito.any(GerritChange.class), Mockito.eq(eventUser)))
+        .thenReturn(false);
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.PATCH_SET_CREATED);
+
+    Mockito.verify(aiReviewPermission)
+        .canAiReview(Mockito.any(GerritChange.class), Mockito.eq(eventUser));
     Mockito.verify(revisionApiMock, Mockito.never()).review(Mockito.any());
   }
 

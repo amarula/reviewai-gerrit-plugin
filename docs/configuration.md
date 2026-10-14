@@ -55,6 +55,18 @@ To add the following content, please edit the `project.config` file in `refs/met
     ...
 ```
 
+### AI Review Permission
+
+ReviewAI uses Gerrit's native **AI Review** permission for the specific change. On Gerrit 3.15, grant this permission
+to the intended groups on the destination branches through the project's Access settings, or inherit the grant
+from a parent project. By default, without an applicable grant, REST requests are rejected and automatic reviews
+are skipped.
+For event-triggered reviews, the permission is checked for the comment author or patch set uploader.
+
+Gerrit's `GerritBackendFeature__allow_ai_review_for_registered_users` feature flag also applies to ReviewAI through
+the native permission backend. Events whose author cannot be resolved and failed permission checks do not start
+reviews.
+
 ### Secure Configuration
 
 Please ensure **strict control over the access permissions of `refs/meta/config`** if sensitive information such as
