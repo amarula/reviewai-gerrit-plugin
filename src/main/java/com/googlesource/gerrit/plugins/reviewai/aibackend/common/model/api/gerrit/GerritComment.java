@@ -81,6 +81,10 @@ public class GerritComment {
     return unresolved != null && !unresolved;
   }
 
+  public boolean isDisagreement() {
+    return Settings.GERRIT_DEFAULT_MESSAGE_DISAGREE.equals(message);
+  }
+
   public Integer getAuthorAccountId() {
     return author == null || author.getAccountId() <= 0 ? null : author.getAccountId();
   }
