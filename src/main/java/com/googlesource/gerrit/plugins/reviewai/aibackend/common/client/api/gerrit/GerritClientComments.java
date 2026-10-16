@@ -327,8 +327,12 @@ public class GerritClientComments extends GerritClientAccount {
                     authorUsername,
                     config.getGerritUserName(),
                     change.getBranchNameKey());
+        // Gerrit's Disagree action resolves the thread while replying to the AI comment.
         boolean isAddressed =
-            isAddressedToBot || (isReplyInAssistantThread && !isResolved && !addressesProjectUser);
+            isAddressedToBot
+                || (isReplyInAssistantThread
+                    && (!isResolved || "Disagree.".equals(commentMessage))
+                    && !addressesProjectUser);
         log.debug(
             "Comment routing: id={}, parentId={}, botMention={}, aiAncestor={}, resolved={}, "
                 + "projectUserMention={}, addressed={}",
