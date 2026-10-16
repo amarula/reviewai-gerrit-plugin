@@ -67,6 +67,7 @@ public class GerritClientCommentsTest {
   private static final String COMMENTS_RESOURCE = "__files/gerritImplicitReplyComments.json";
   private static final String RESOLVED_REPLY_RESOURCE =
       "__files/gerritImplicitResolvedReplyComments.json";
+  private static final String DISAGREE_REPLY_RESOURCE = "__files/gerritDisagreeReplyComments.json";
   private static final Type COMMENTS_TYPE =
       new TypeToken<Map<String, List<CommentInfo>>>() {}.getType();
 
@@ -261,6 +262,41 @@ public class GerritClientCommentsTest {
     when(commentsRequest.get()).thenReturn(comments);
 
     assertFalse(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void resolvedDisagreeReplyToAssistantIsProcessed() throws Exception {
+    comments = readComments(DISAGREE_REPLY_RESOURCE);
+    when(commentsRequest.get()).thenReturn(comments);
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+
+    assertEquals("disagree-reply", client.getCommentProperties().getFirst().getId());
+    assertTrue(client.getCommentProperties().getFirst().isResolved());
+    assertEquals("latest-review", client.getCommentData().getSourceChangeMessageId());
+    assertEquals(
+        "disagree-reply", client.getCommentData().getAddressedComments().getFirst().getId());
+    verifyNoInteractions(accountCache);
+  }
+
+  @Test
+  public void resolvedDisagreeReplyToHumanIsIgnored() throws Exception {
+    comments = readComments(DISAGREE_REPLY_RESOURCE);
+    comments.get("src/Test.java").getFirst().author._accountId = REVIEWER_ACCOUNT_ID;
+    when(commentsRequest.get()).thenReturn(comments);
+
+    assertFalse(client.retrieveComments(change, AiRole.USER));
+    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+  }
+
+  @Test
+  public void topLevelDisagreeCommentIsIgnored() throws Exception {
+    comments = readComments(DISAGREE_REPLY_RESOURCE);
+    latestComment().inReplyTo = null;
+    when(commentsRequest.get()).thenReturn(comments);
+
+    assertFalse(client.retrieveComments(change, AiRole.USER));
+    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
   }
 
   private CommentInfo latestComment() {
