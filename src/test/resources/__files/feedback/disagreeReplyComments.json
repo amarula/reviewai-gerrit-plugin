@@ -1,0 +1,20 @@
+{
+  "allComments": [
+    {
+      "id": "ai-concern",
+      "message": "The null fallback hides an invalid state.",
+      "filename": "src/Service.java",
+      "line": 42,
+      "author": { "_account_id": 1 }
+    },
+    {
+      "id": "dismiss-request",
+      "in_reply_to": "ai-concern",
+      "message": "Disagree.",
+      "filename": "src/Service.java",
+      "line": 42,
+      "unresolved": false,
+      "author": { "_account_id": 2 }
+    }
+  ]
+}

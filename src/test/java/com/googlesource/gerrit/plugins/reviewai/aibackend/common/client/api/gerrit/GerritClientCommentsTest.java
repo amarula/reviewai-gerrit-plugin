@@ -272,6 +272,7 @@ public class GerritClientCommentsTest {
     assertTrue(client.retrieveComments(change, AiRole.USER));
 
     assertEquals("disagree-reply", client.getCommentProperties().getFirst().getId());
+    assertEquals(latestComment().message, client.getCommentProperties().getFirst().getMessage());
     assertTrue(client.getCommentProperties().getFirst().isResolved());
     assertEquals("latest-review", client.getCommentData().getSourceChangeMessageId());
     assertEquals(
@@ -280,13 +281,37 @@ public class GerritClientCommentsTest {
   }
 
   @Test
+  public void moderatorDisagreeReplyToAssistantBecomesDismissalRequest() throws Exception {
+    comments = readComments(DISAGREE_REPLY_RESOURCE);
+    when(commentsRequest.get()).thenReturn(comments);
+    String originalMessage = latestComment().message;
+    String dismissalRequest =
+        Files.readString(
+                TestResourceLoader.getTestResourcePath()
+                    .resolve("__files/feedback/dismissConcernRequest.txt"))
+            .trim();
+
+    for (AiRole role : List.of(AiRole.MODERATOR, AiRole.ADMINISTRATOR)) {
+      assertTrue(client.retrieveComments(change, role));
+
+      assertEquals(dismissalRequest, client.getCommentProperties().getFirst().getMessage());
+      assertEquals(
+          dismissalRequest, client.getCommentData().getAddressedComments().getFirst().getMessage());
+      assertTrue(client.getCommentProperties().getFirst().isResolved());
+    }
+    assertEquals(originalMessage, latestComment().message);
+  }
+
+  @Test
   public void resolvedDisagreeReplyToHumanIsIgnored() throws Exception {
     comments = readComments(DISAGREE_REPLY_RESOURCE);
     comments.get("src/Test.java").getFirst().author._accountId = REVIEWER_ACCOUNT_ID;
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveComments(change, AiRole.USER));
-    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+    for (AiRole role : AiRole.values()) {
+      assertFalse(client.retrieveComments(change, role));
+      assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+    }
   }
 
   @Test
@@ -295,8 +320,10 @@ public class GerritClientCommentsTest {
     latestComment().inReplyTo = null;
     when(commentsRequest.get()).thenReturn(comments);
 
-    assertFalse(client.retrieveComments(change, AiRole.USER));
-    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+    for (AiRole role : AiRole.values()) {
+      assertFalse(client.retrieveComments(change, role));
+      assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+    }
   }
 
   private CommentInfo latestComment() {
