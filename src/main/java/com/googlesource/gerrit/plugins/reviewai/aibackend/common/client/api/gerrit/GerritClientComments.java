@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ger
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toAuthor;
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientDetail.toDateString;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.AI_REQUEST_DISMISS_CONCERN;
 import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
 import static java.util.stream.Collectors.toList;
 
@@ -46,7 +47,9 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.listener.EventBuildFeatures;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRole;
+import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
 import com.googlesource.gerrit.plugins.reviewai.utils.TimeUtils;
 import java.util.*;
 import lombok.Getter;
@@ -317,6 +320,7 @@ public class GerritClientComments extends GerritClientAccount {
         log.debug("Processing comment: {}", commentMessage);
         boolean isAddressedToBot = messageParser.isBotAddressed(commentMessage);
         boolean isReplyInAssistantThread = isReplyInAssistantThread(latestComment);
+        boolean isDisagreement = latestComment.isDisagreement();
         boolean isResolved = latestComment.isResolved();
         boolean addressesProjectUser =
             !isAddressedToBot
@@ -331,7 +335,7 @@ public class GerritClientComments extends GerritClientAccount {
         boolean isAddressed =
             isAddressedToBot
                 || (isReplyInAssistantThread
-                    && (!isResolved || "Disagree.".equals(commentMessage))
+                    && (!isResolved || isDisagreement)
                     && !addressesProjectUser);
         log.debug(
             "Comment routing: id={}, parentId={}, botMention={}, aiAncestor={}, resolved={}, "
@@ -344,6 +348,12 @@ public class GerritClientComments extends GerritClientAccount {
             addressesProjectUser,
             isAddressed);
         if (isAddressed) {
+          if (isReplyInAssistantThread
+              && isDisagreement
+              && AiRolePolicy.isAllowed(userRole, AiAction.USE_MODERATOR_FEATURES)) {
+            commentMessage = AI_REQUEST_DISMISS_CONCERN;
+            latestComment.setMessage(commentMessage);
+          }
           addressedComments.add(latestComment);
           if (messageParser.parseCommands(commentMessage)) {
             log.debug("Comment {} was handled as a command", latestComment.getId());

@@ -17,6 +17,7 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.COMMAND_PATTERN;
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.AI_REQUEST_DISMISS_CONCERN;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.isJsonObjectAsString;
 import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJsonCode;
@@ -180,10 +181,20 @@ final class LangChainReviewFeedbackClassifier {
                               : "USER",
                           entry.getMessage()))
               .toList();
+      String targetMessage = comment.getMessage();
+      if (isDismissalAuthorized(changeSetData, commentId)
+          && comment.isDisagreement()
+          && threadIndex
+              .nearestAncestor(
+                  comment,
+                  ancestor -> ReviewAiUser.matches(ancestor, changeSetData.getAiAccountId()))
+              .isPresent()) {
+        targetMessage = AI_REQUEST_DISMISS_CONCERN;
+      }
       comments.add(
           new ReviewFeedbackClassificationInput.Comment(
               new TargetComment(
-                  comment.getId(), comment.getMessage(), comment.getFilename(), comment.getLine()),
+                  comment.getId(), targetMessage, comment.getFilename(), comment.getLine()),
               threadConcernId,
               threadContext,
               isDismissalAuthorized(changeSetData, commentId),

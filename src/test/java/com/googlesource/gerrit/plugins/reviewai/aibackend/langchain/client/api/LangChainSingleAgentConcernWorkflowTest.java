@@ -378,6 +378,50 @@ public class LangChainSingleAgentConcernWorkflowTest {
   }
 
   @Test
+  public void authorizedModeratorDisagreementBecomesDismissalRequest() throws Exception {
+    assertDisagreementClassification(true);
+  }
+
+  @Test
+  public void ordinaryUserDisagreementRemainsFeedback() throws Exception {
+    assertDisagreementClassification(false);
+  }
+
+  private void assertDisagreementClassification(boolean dismissalAllowed) throws Exception {
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(true);
+    GerritClientData clientData = feedbackClientData("__files/feedback/disagreeReplyComments.json");
+    GerritComment original = clientData.getCommentData().getCommentMap().get("dismiss-request");
+    String originalMessage = original.getMessage();
+    when(gerritClient.getClientData(change)).thenReturn(clientData);
+    TestClient client = new TestClient(gerritClient);
+    client.feedbackResponse = DISMISS_FEEDBACK_RESPONSE;
+    ChangeSetData data = dismissalChangeSetData();
+    if (dismissalAllowed) {
+      data.setReviewFeedbackDismissalAuthorizedCommentIds(Set.of("dismiss-request"));
+      client.concernReviewResponse = DISMISS_CONCERN_REVIEW_RESPONSE;
+    }
+
+    AiResponseContent response = client.ask(data, change, readTestResource(FULL_PATCH));
+
+    var classified =
+        client.feedbackData.getReviewFeedbackClassificationInput().getComments().getFirst();
+    assertEquals(dismissalAllowed, classified.isDismissalAllowed());
+    assertEquals(
+        dismissalAllowed
+            ? readTestResource("__files/feedback/dismissConcernRequest.txt").trim()
+            : originalMessage,
+        classified.getTargetComment().getMessage());
+    assertEquals(originalMessage, original.getMessage());
+    assertEquals(
+        dismissalAllowed ? ConcernStatus.DISMISSED : ConcernStatus.PRESENT,
+        pendingLedger(response).getReviewers().getFirst().getConcerns().getFirst().getStatus());
+    assertEquals(
+        dismissalAllowed,
+        data.getReviewFeedbackMemory().isConcernDismissalAuthorized("old-present"));
+  }
+
+  @Test
   public void ordinaryUserFeedbackCannotDismissConcern() throws Exception {
     GerritClient gerritClient = mock(GerritClient.class);
     GerritChange change = change(true);
@@ -578,8 +622,12 @@ public class LangChainSingleAgentConcernWorkflowTest {
   }
 
   private static GerritClientData feedbackClientData() throws IOException {
+    return feedbackClientData(FEEDBACK_COMMENTS);
+  }
+
+  private static GerritClientData feedbackClientData(String resource) throws IOException {
     FeedbackCommentsFixture fixture =
-        getGson().fromJson(readTestResource(FEEDBACK_COMMENTS), FeedbackCommentsFixture.class);
+        getGson().fromJson(readTestResource(resource), FeedbackCommentsFixture.class);
     HashMap<String, GerritComment> commentsById = new HashMap<>();
     fixture.allComments.forEach(comment -> commentsById.put(comment.getId(), comment));
     return new GerritClientData(
