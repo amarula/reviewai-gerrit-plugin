@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.util.Providers;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.ai.ReviewConcernReplyMapper;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
@@ -34,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.AiRequestCancellation;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -58,10 +60,50 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
 public class PatchSetReviewerTest {
+  @Test
+  public void conversationalRepliesPreserveResolutionOnlyWhenExplicitlyMarked() throws Exception {
+    Map<String, List<GerritComment>> comments;
+    try (InputStreamReader reader =
+        new InputStreamReader(
+            getClass()
+                .getClassLoader()
+                .getResourceAsStream("__files/gerritDisagreeReplyComments.json"),
+            StandardCharsets.UTF_8)) {
+      comments =
+          getGson()
+              .fromJson(reader, new TypeToken<Map<String, List<GerritComment>>>() {}.getType());
+    }
+    var fileComments = comments.entrySet().iterator().next();
+    GerritComment target = fileComments.getValue().getLast();
+    target.setFilename(fileComments.getKey());
+    assertTrue(target.isResolved());
+    GerritChange change = change();
+    when(change.getIsCommentEvent()).thenReturn(true);
+    IGerritClientPatchSet patchSet = mock(IGerritClientPatchSet.class);
+    when(patchSet.getPatchSetFiles()).thenReturn(List.of(target.getFilename()));
+    GerritClientData clientData = mock(GerritClientData.class);
+    when(clientData.getGerritClientPatchSet()).thenReturn(patchSet);
+    GerritClient gerritClient = mock(GerritClient.class);
+    when(gerritClient.getClientData(change)).thenReturn(clientData);
+    ReviewCommentAnchoring anchoring =
+        new ReviewCommentAnchoring(gerritClient, change, List.of(target), null);
+
+    for (boolean preserveResolvedThread : List.of(false, true)) {
+      target.setPreserveResolvedThread(preserveResolvedThread);
+      ReviewBatch batch = new ReviewBatch(target.getMessage());
+      anchoring.anchor(batch, AiReplyItem.builder().id(0).build(), new AiResponseContent(""));
+
+      assertEquals(target.getId(), batch.getId());
+      assertEquals(target.getFilename(), batch.getFilename());
+      assertEquals(!preserveResolvedThread, batch.isUnresolved());
+    }
+  }
+
   @Test
   public void absentAiResponseDoesNotProduceVote() {
     PatchSetReviewer reviewer = reviewer();
