@@ -322,6 +322,22 @@ public class GerritClientReviewTest {
   }
 
   @Test
+  public void publishesResolvedReplyWithoutReopeningThread() throws Exception {
+    JsonObject fixture = readRestrictedVoteFixture();
+    ReviewBatch reply = new ReviewBatch(fixture.get("comment").getAsString());
+    reply.setId(fixture.get("commentId").getAsString());
+    reply.setUnresolved(false);
+
+    client.setReview(change, List.of(reply), changeSetData);
+
+    ArgumentCaptor<ReviewInput> input = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(input.capture());
+    var publishedReply = input.getValue().comments.get(reply.getFilename()).getFirst();
+    assertEquals(reply.getId(), publishedReply.inReplyTo);
+    assertFalse(publishedReply.unresolved);
+  }
+
+  @Test
   public void publishesDetachedConcernNoticeSeparatelyFromNewFindings() throws Exception {
     JsonObject fixture =
         getGson()
