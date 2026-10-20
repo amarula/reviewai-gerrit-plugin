@@ -145,6 +145,7 @@ final class ReviewCommentAnchoring {
           return;
         }
         batchMap.setId(commentProperty.getId());
+        batchMap.setUnresolved(!commentProperty.isPreserveResolvedThread());
         batchMap.setFilename(commentProperty.getFilename());
         batchMap.setLine(commentProperty.getLine());
         if (commentProperty.getRange() != null) {

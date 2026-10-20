@@ -54,6 +54,9 @@ public class GerritComment {
   // Metadata field populated from Gerrit change messages when a label vote is attached.
   private String reviewScore;
 
+  // Publication metadata captured before moderator disagreement is normalized to dismissal.
+  private transient boolean preserveResolvedThread;
+
   @Data
   public static class Author {
     @SerializedName("_account_id")
