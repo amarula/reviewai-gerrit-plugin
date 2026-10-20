@@ -274,6 +274,7 @@ public class GerritClientCommentsTest {
     assertEquals("disagree-reply", client.getCommentProperties().getFirst().getId());
     assertEquals(latestComment().message, client.getCommentProperties().getFirst().getMessage());
     assertTrue(client.getCommentProperties().getFirst().isResolved());
+    assertTrue(client.getCommentProperties().getFirst().isPreserveResolvedThread());
     assertEquals("latest-review", client.getCommentData().getSourceChangeMessageId());
     assertEquals(
         "disagree-reply", client.getCommentData().getAddressedComments().getFirst().getId());
@@ -298,8 +299,41 @@ public class GerritClientCommentsTest {
       assertEquals(
           dismissalRequest, client.getCommentData().getAddressedComments().getFirst().getMessage());
       assertTrue(client.getCommentProperties().getFirst().isResolved());
+      assertTrue(client.getCommentProperties().getFirst().isPreserveResolvedThread());
     }
     assertEquals(originalMessage, latestComment().message);
+  }
+
+  @Test
+  public void unresolvedDisagreeReplyKeepsExistingPublicationBehavior() throws Exception {
+    comments = readComments(DISAGREE_REPLY_RESOURCE);
+    latestComment().unresolved = true;
+    when(commentsRequest.get()).thenReturn(comments);
+
+    for (AiRole role : AiRole.values()) {
+      assertTrue(client.retrieveComments(change, role));
+      assertFalse(client.getCommentProperties().getFirst().isPreserveResolvedThread());
+    }
+  }
+
+  @Test
+  public void otherResolvedRepliesKeepExistingPublicationBehavior() throws Exception {
+    comments = readComments(RESOLVED_REPLY_RESOURCE);
+    when(commentsRequest.get()).thenReturn(comments);
+    String dismissalRequest =
+        Files.readString(
+                TestResourceLoader.getTestResourcePath()
+                    .resolve("__files/feedback/dismissConcernRequest.txt"))
+            .trim();
+
+    for (String message : List.of(latestComment().message, dismissalRequest)) {
+      latestComment().message = "@reviewai " + message;
+      for (AiRole role : AiRole.values()) {
+        assertTrue(client.retrieveComments(change, role));
+        assertTrue(client.getCommentProperties().getFirst().isResolved());
+        assertFalse(client.getCommentProperties().getFirst().isPreserveResolvedThread());
+      }
+    }
   }
 
   @Test
