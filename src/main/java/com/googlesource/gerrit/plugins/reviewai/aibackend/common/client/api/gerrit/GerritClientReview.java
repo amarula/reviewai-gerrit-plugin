@@ -451,7 +451,7 @@ public class GerritClientReview extends GerritClientAccount {
                 });
       }
       filenameComment.inReplyTo = reviewBatch.getId();
-      filenameComment.unresolved = true;
+      filenameComment.unresolved = reviewBatch.isUnresolved();
       filenameComments.add(filenameComment);
       comments.putIfAbsent(filename, filenameComments);
     }
