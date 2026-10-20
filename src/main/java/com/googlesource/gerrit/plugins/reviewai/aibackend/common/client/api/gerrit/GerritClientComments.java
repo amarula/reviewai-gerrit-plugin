@@ -348,6 +348,8 @@ public class GerritClientComments extends GerritClientAccount {
             addressesProjectUser,
             isAddressed);
         if (isAddressed) {
+          latestComment.setPreserveResolvedThread(
+              isReplyInAssistantThread && isDisagreement && isResolved);
           if (isReplyInAssistantThread
               && isDisagreement
               && AiRolePolicy.isAllowed(userRole, AiAction.USE_MODERATOR_FEATURES)) {

@@ -32,6 +32,7 @@ public final class ReviewBatch {
   private String filename;
   private Integer line;
   private GerritCodeRange range;
+  private boolean unresolved = true;
 
   public String getFilename() {
     return filename == null ? GERRIT_PATCH_SET_FILENAME : filename;
