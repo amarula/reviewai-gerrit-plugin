@@ -1,0 +1,28 @@
+{
+  "aiAccountId": 1,
+  "concerns": {
+    "reviewer": {"kind": "SPECIALIZED_AGENT", "name": "CORRECTNESS"},
+    "concerns": [
+      {"id": "concern-1", "status": "PRESENT", "past_comment_id": "ai-finding"}
+    ]
+  },
+  "comments": [
+    {"id": "ai-finding", "author": {"_account_id": 1}, "updated": "2026-10-21T10:00:00Z", "message": "The registration removal behavior has no test."},
+    {"id": "old-user", "in_reply_to": "ai-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:01:00Z", "message": "Which behavior needs testing?"},
+    {"id": "old-ack", "in_reply_to": "old-user", "author": {"_account_id": 1}, "updated": "2026-10-21T10:02:00Z", "message": "Removing an existing registration needs a test."},
+    {"id": "dismiss-request", "in_reply_to": "ai-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:41:29Z", "message": "Dismiss this concern."},
+    {"id": "dismiss-ack", "in_reply_to": "dismiss-request", "author": {"_account_id": 1}, "date": "2026-10-21T10:41:34Z", "message": "Dismissed as requested. I will not report the concern about missing tests."},
+    {"id": "other-finding", "author": {"_account_id": 1}, "updated": "2026-10-21T10:42:00Z", "message": "Another concern about shared state."},
+    {"id": "other-user", "in_reply_to": "other-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:43:00Z", "message": "Keep investigating this other concern."},
+    {"id": "other-ack", "in_reply_to": "other-user", "author": {"_account_id": 1}, "updated": "2026-10-21T10:44:00Z", "message": "This other concern is still active."}
+  ],
+  "expectedThreadContext": {
+    "concern-1": [
+      {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."}
+    ]
+  },
+  "dismissedResponse": {
+    "concerns": [{"id": "concern-1", "status": "DISMISSED", "status_reason": "The AI acknowledged the dismissal request."}]
+  },
+  "authorizationError": "DISMISSED requires an authorized moderator decision for concern-1"
+}

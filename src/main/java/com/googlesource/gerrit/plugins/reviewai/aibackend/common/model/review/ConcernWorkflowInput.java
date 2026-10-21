@@ -17,6 +17,8 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review;
 
 import com.google.gson.annotations.SerializedName;
+import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -33,6 +35,17 @@ public class ConcernWorkflowInput {
 
   @SerializedName("review_feedback")
   private ReviewFeedbackMemory reviewFeedback;
+
+  @SerializedName("thread_context")
+  private Map<String, List<ReviewFeedbackClassificationInput.ThreadMessage>> threadContext;
+
+  public ConcernWorkflowInput(
+      ReviewerConcerns concerns,
+      String incrementalPatch,
+      String fullPatch,
+      ReviewFeedbackMemory reviewFeedback) {
+    this(concerns, incrementalPatch, fullPatch, reviewFeedback, null);
+  }
 
   public ConcernWorkflowInput(
       ReviewerConcerns concerns, String incrementalPatch, String fullPatch) {
