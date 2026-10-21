@@ -558,11 +558,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
           projectInstructionsAppender.append(
               prompt, change, prompt.getDefaultAiAssistantInstructions());
       Object memoryId = LangChainMemoryId.from(changeSetData, change);
+      boolean useConversationHistory = shouldUseConversationHistory(changeSetData, change);
       boolean forgetThreadRequested = isForgetThreadRequested(changeSetData);
-      if (forgetThreadRequested && chatMemoryStore != null) {
+      if (useConversationHistory && forgetThreadRequested && chatMemoryStore != null) {
         chatMemoryStore.deleteMessages(memoryId);
       }
-      boolean useConversationHistory = shouldUseConversationHistory(changeSetData);
       ConversationResolution conversationResolution =
           resolveConversation(providerType, changeSetData, change);
       boolean omitRequestContext =
@@ -583,7 +583,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       boolean hasStoredMemory =
           prepareMemoryForRequest(memory, useOpenAiResponses, systemInstructions);
 
-      if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData)) {
+      if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData, change)) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
         AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
         List<ChatMessage> history =
@@ -664,7 +664,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GerritChange change,
       Throwable failure) {
     if (pluginDataHandlerProvider == null
-        || !shouldUseConversationHistory(changeSetData)
+        || !shouldUseConversationHistory(changeSetData, change)
         || !shouldUseOpenAiConversation(providerType)
         || !OpenAiSdkClientFactory.isTimeout(failure)) {
       return;
@@ -673,13 +673,18 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     log.info("Cleared OpenAI conversation after request timeout");
   }
 
-  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return shouldUseConversationHistory(changeSetData) && !isForgetThreadRequested(changeSetData);
+  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData, GerritChange change) {
+    return shouldUseConversationHistory(changeSetData, change)
+        && !isForgetThreadRequested(changeSetData);
   }
 
-  protected boolean shouldUseConversationHistory(ChangeSetData changeSetData) {
-    return changeSetData == null
-        || changeSetData.getReviewAssistantStage() != ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK;
+  protected boolean shouldUseConversationHistory(ChangeSetData changeSetData, GerritChange change) {
+    return change != null
+        && Boolean.TRUE.equals(change.getIsCommentEvent())
+        && (changeSetData == null
+            || (!Boolean.TRUE.equals(changeSetData.getForcedReview())
+                && changeSetData.getReviewAssistantStage()
+                    != ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK));
   }
 
   protected boolean isForgetThreadRequested(ChangeSetData changeSetData) {
@@ -757,7 +762,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   protected ConversationResolution resolveConversation(
       AiProviderType providerType, ChangeSetData changeSetData, GerritChange change)
       throws AiConnectionFailException {
-    if (!shouldUseConversationHistory(changeSetData)
+    if (!shouldUseConversationHistory(changeSetData, change)
         || !shouldUseOpenAiConversation(providerType)
         || pluginDataHandlerProvider == null) {
       return new ConversationResolution(null, false);
@@ -781,9 +786,12 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean hasExistingReviewContext(ChangeSetData changeSetData) {
-    return new LangChainReviewContextChecker(
-            config, pluginDataHandlerProvider, requireOpenAiScopeForExistingReviewContext())
-        .hasExistingReviewContext(changeSetData);
+    // Reviewer executions no longer populate or reuse OpenAI conversations.
+    return config != null
+        && !shouldUseOpenAiConversation(config.getAiProviderType())
+        && new LangChainReviewContextChecker(
+                config, pluginDataHandlerProvider, requireOpenAiScopeForExistingReviewContext())
+            .hasExistingReviewContext(changeSetData);
   }
 
   protected boolean shouldUseOpenAiResponses(AiProviderType providerType) {

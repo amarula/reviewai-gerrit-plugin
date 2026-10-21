@@ -303,8 +303,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
   }
 
   @Override
-  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData) {
-    return super.shouldIncludeInitialHistory(changeSetData)
+  protected boolean shouldIncludeInitialHistory(ChangeSetData changeSetData, GerritChange change) {
+    return super.shouldIncludeInitialHistory(changeSetData, change)
         && changeSetData.getReviewAssistantStage() != ReviewAssistantStage.REVIEW_SPECIALIZED_TRIAGE
         && !isSpecializedAgentStage(changeSetData.getReviewAssistantStage());
   }
