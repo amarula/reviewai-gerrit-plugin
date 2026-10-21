@@ -1,0 +1,65 @@
+{
+  "aiAccountId": 1,
+  "concerns": {
+    "reviewer": {"kind": "SPECIALIZED_AGENT", "name": "CORRECTNESS"},
+    "concerns": [
+      {"id": "concern-1", "status": "PRESENT", "past_comment_id": "ai-finding"}
+    ]
+  },
+  "comments": [
+    {"id": "ai-finding", "author": {"_account_id": 1}, "updated": "2026-10-21T10:00:00Z", "message": "The registration removal behavior has no test."},
+    {"id": "old-user", "in_reply_to": "ai-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:01:00Z", "message": "Which behavior needs testing?"},
+    {"id": "old-ack", "in_reply_to": "old-user", "author": {"_account_id": 1}, "updated": "2026-10-21T10:02:00Z", "message": "Removing an existing registration needs a test."},
+    {"id": "dismiss-request", "in_reply_to": "ai-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:41:29Z", "message": "Dismiss this concern."},
+    {"id": "dismiss-ack", "in_reply_to": "dismiss-request", "author": {"_account_id": 1}, "date": "2026-10-21T10:41:34Z", "message": "Dismissed as requested. I will not report the concern about missing tests."},
+    {"id": "other-finding", "author": {"_account_id": 1}, "updated": "2026-10-21T10:42:00Z", "message": "Another concern about shared state."},
+    {"id": "other-user", "in_reply_to": "other-finding", "author": {"_account_id": 10}, "updated": "2026-10-21T10:43:00Z", "message": "Keep investigating this other concern."},
+    {"id": "other-ack", "in_reply_to": "other-user", "author": {"_account_id": 1}, "updated": "2026-10-21T10:44:00Z", "message": "This other concern is still active."}
+  ],
+  "expectedThreadContext": {
+    "concern-1": [
+      {"id": "old-user", "role": "USER", "message": "Which behavior needs testing?"},
+      {"id": "old-ack", "role": "AI", "message": "Removing an existing registration needs a test."},
+      {"id": "dismiss-request", "role": "USER", "message": "Dismiss this concern."},
+      {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."}
+    ]
+  },
+  "unansweredMessage": {"id": "later-user", "in_reply_to": "dismiss-ack", "author": {"_account_id": 10}, "updated": "2026-10-21T10:45:00Z", "message": "Reconsider this concern; testing is now required."},
+  "unansweredContext": {
+    "concern-1": [
+      {"id": "old-user", "role": "USER", "message": "Which behavior needs testing?"},
+      {"id": "old-ack", "role": "AI", "message": "Removing an existing registration needs a test."},
+      {"id": "dismiss-request", "role": "USER", "message": "Dismiss this concern."},
+      {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."},
+      {"id": "later-user", "role": "USER", "message": "Reconsider this concern; testing is now required."}
+    ]
+  },
+  "overflowMessages": [
+    {"id": "followup-1", "in_reply_to": "old-ack", "author": {"_account_id": 10}, "updated": "2026-10-21T10:46:00Z", "message": "Should the test cover clearing one registry?"},
+    {"id": "followup-2", "in_reply_to": "followup-1", "author": {"_account_id": 1}, "updated": "2026-10-21T10:47:00Z", "message": "Yes, verify that another registry keeps its registrations."},
+    {"id": "followup-3", "in_reply_to": "dismiss-ack", "author": {"_account_id": 10}, "updated": "2026-10-21T10:48:00Z", "message": "Keep this concern active while I add the test."},
+    {"id": "followup-4", "in_reply_to": "followup-3", "author": {"_account_id": 1}, "updated": "2026-10-21T10:49:00Z", "message": "The concern remains active."},
+    {"id": "followup-5", "in_reply_to": "followup-2", "author": {"_account_id": 10}, "updated": "2026-10-21T10:50:00Z", "message": "Should registration isolation also be tested?"},
+    {"id": "followup-6", "in_reply_to": "followup-5", "author": {"_account_id": 1}, "updated": "2026-10-21T10:51:00Z", "message": "Yes, registrations must remain independent before clearing."},
+    {"id": "followup-7", "in_reply_to": "followup-6", "author": {"_account_id": 10}, "updated": "2026-10-21T10:52:00Z", "message": "I will add both isolation checks."},
+    {"id": "followup-8", "in_reply_to": "followup-7", "author": {"_account_id": 1}, "date": "2026-10-21T10:53:00Z", "message": "Both checks should verify the other registry is unchanged."}
+  ],
+  "limitedThreadContext": {
+    "concern-1": [
+      {"id": "dismiss-request", "role": "USER", "message": "Dismiss this concern."},
+      {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."},
+      {"id": "followup-1", "role": "USER", "message": "Should the test cover clearing one registry?"},
+      {"id": "followup-2", "role": "AI", "message": "Yes, verify that another registry keeps its registrations."},
+      {"id": "followup-3", "role": "USER", "message": "Keep this concern active while I add the test."},
+      {"id": "followup-4", "role": "AI", "message": "The concern remains active."},
+      {"id": "followup-5", "role": "USER", "message": "Should registration isolation also be tested?"},
+      {"id": "followup-6", "role": "AI", "message": "Yes, registrations must remain independent before clearing."},
+      {"id": "followup-7", "role": "USER", "message": "I will add both isolation checks."},
+      {"id": "followup-8", "role": "AI", "message": "Both checks should verify the other registry is unchanged."}
+    ]
+  },
+  "dismissedResponse": {
+    "concerns": [{"id": "concern-1", "status": "DISMISSED", "status_reason": "The AI acknowledged the dismissal request."}]
+  },
+  "authorizationError": "DISMISSED requires an authorized moderator decision for concern-1"
+}
