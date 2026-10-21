@@ -56,7 +56,7 @@ public class LangChainConcernReviewTest {
       "__files/langchain/concernThreadContext.json";
 
   @Test
-  public void providesLatestAiReplyOnlyFromTheConcernThread() throws Exception {
+  public void providesLatestUserAndAiExchangeOnlyFromTheConcernThread() throws Exception {
     ThreadContextFixture fixture = threadContextFixture();
 
     ConcernWorkflowInput input =

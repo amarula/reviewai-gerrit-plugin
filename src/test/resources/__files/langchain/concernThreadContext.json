@@ -18,6 +18,7 @@
   ],
   "expectedThreadContext": {
     "concern-1": [
+      {"id": "dismiss-request", "role": "USER", "message": "Dismiss this concern."},
       {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."}
     ]
   },
