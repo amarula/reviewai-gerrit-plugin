@@ -86,12 +86,20 @@ final class LangChainConcernWorkflowInputFactory {
                         .anyMatch(ancestor -> anchorId.equals(ancestor.getId())))
             .max(COMMENT_ORDER)
             .ifPresent(
-                latest ->
-                    context.put(concern.getId(), List.of(threadMessage(latest, aiAccountId))));
+                latest -> context.put(concern.getId(), latestExchange(index, latest, aiAccountId)));
       }
     }
     input.setThreadContext(context);
     return input;
+  }
+
+  private static List<ThreadMessage> latestExchange(
+      GerritCommentThreadIndex index, GerritComment latest, int aiAccountId) {
+    ThreadMessage message = threadMessage(latest, aiAccountId);
+    return index
+        .nearestAncestor(latest, comment -> !ReviewAiUser.matches(comment, aiAccountId))
+        .map(user -> List.of(threadMessage(user, aiAccountId), message))
+        .orElseGet(() -> List.of(message));
   }
 
   private static ThreadMessage threadMessage(GerritComment comment, int aiAccountId) {
