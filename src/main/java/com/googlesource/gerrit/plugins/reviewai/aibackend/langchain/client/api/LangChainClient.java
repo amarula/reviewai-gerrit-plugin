@@ -417,12 +417,14 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String incrementalPatchSet,
       String fullPatchSet)
       throws Exception {
+    GerritClientData clientData = gerritClient == null ? null : gerritClient.getClientData(change);
     return concernReviewer.review(
         changeSetData,
         change,
         existingConcerns,
         incrementalPatchSet,
         fullPatchSet,
+        clientData == null ? null : clientData.getCommentData(),
         (requestData, requestChange, requestPatchSet) -> {
           RawReviewRequestResult rawResult =
               askSingleRawRequestWithFallback(requestData, requestChange, requestPatchSet);

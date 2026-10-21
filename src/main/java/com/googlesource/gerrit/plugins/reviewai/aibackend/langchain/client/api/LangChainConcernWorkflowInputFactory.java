@@ -16,13 +16,31 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput.ThreadMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 final class LangChainConcernWorkflowInputFactory {
+  private static final Comparator<GerritComment> COMMENT_ORDER =
+      Comparator.comparing(
+              (GerritComment comment) ->
+                  comment.getUpdated() != null ? comment.getUpdated() : comment.getDate(),
+              Comparator.nullsFirst(Comparator.<String>naturalOrder()))
+          .thenComparing(GerritComment::getId);
+
   private LangChainConcernWorkflowInputFactory() {}
 
   static ConcernWorkflowInput create(
@@ -37,5 +55,49 @@ final class LangChainConcernWorkflowInputFactory {
             : null;
     return new ConcernWorkflowInput(
         concerns, incrementalPatchSet, fullPatchContext, reviewFeedback);
+  }
+
+  static ConcernWorkflowInput create(
+      Configuration config,
+      ReviewerConcerns concerns,
+      String incrementalPatchSet,
+      String fullPatchSet,
+      ReviewFeedbackMemory reviewFeedback,
+      CommentData commentData,
+      int aiAccountId) {
+    ConcernWorkflowInput input =
+        create(config, concerns, incrementalPatchSet, fullPatchSet, reviewFeedback);
+    Map<String, List<ThreadMessage>> context = new LinkedHashMap<>();
+    if (commentData != null && commentData.getCommentMap() != null) {
+      Map<String, GerritComment> comments = commentData.getCommentMap();
+      GerritCommentThreadIndex index = new GerritCommentThreadIndex(comments.values());
+      for (ReviewConcern concern : concerns.getConcerns()) {
+        String anchorId = concern.getPreviousCommentId();
+        if (anchorId == null || !comments.containsKey(anchorId)) {
+          continue;
+        }
+        comments.values().stream()
+            .filter(Objects::nonNull)
+            .filter(comment -> ReviewAiUser.matches(comment, aiAccountId))
+            .filter(comment -> comment.getId() != null && !anchorId.equals(comment.getId()))
+            .filter(
+                comment ->
+                    index.lineage(comment).stream()
+                        .anyMatch(ancestor -> anchorId.equals(ancestor.getId())))
+            .max(COMMENT_ORDER)
+            .ifPresent(
+                latest ->
+                    context.put(concern.getId(), List.of(threadMessage(latest, aiAccountId))));
+      }
+    }
+    input.setThreadContext(context);
+    return input;
+  }
+
+  private static ThreadMessage threadMessage(GerritComment comment, int aiAccountId) {
+    return new ThreadMessage(
+        comment.getId(),
+        ReviewAiUser.matches(comment, aiAccountId) ? "AI" : "USER",
+        comment.getMessage());
   }
 }

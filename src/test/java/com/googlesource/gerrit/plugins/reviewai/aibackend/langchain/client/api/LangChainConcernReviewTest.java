@@ -16,26 +16,33 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernStatus;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput.ThreadMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -45,6 +52,89 @@ public class LangChainConcernReviewTest {
   private static final String INCREMENTAL_PATCH_RESOURCE =
       "__files/langchain/newIssueIncrementalPatch.txt";
   private static final String FULL_PATCH_RESOURCE = "__files/langchain/newIssueFullPatch.txt";
+  private static final String THREAD_CONTEXT_RESOURCE =
+      "__files/langchain/concernThreadContext.json";
+
+  @Test
+  public void providesLatestAiReplyOnlyFromTheConcernThread() throws Exception {
+    ThreadContextFixture fixture = threadContextFixture();
+
+    ConcernWorkflowInput input =
+        reviewWithContext(fixture, fixture.comments, readTestResource(RESPONSE_RESOURCE));
+
+    assertEquals(fixture.expectedThreadContext, input.getThreadContext());
+    assertEquals(
+        getGson().toJsonTree(fixture.expectedThreadContext),
+        getGson().toJsonTree(input).getAsJsonObject().get("thread_context"));
+  }
+
+  @Test
+  public void omitsContextWhenTheConcernCommentCannotBeFound() throws Exception {
+    ThreadContextFixture fixture = threadContextFixture();
+    List<GerritComment> comments =
+        fixture.comments.stream()
+            .filter(
+                comment ->
+                    !comment
+                        .getId()
+                        .equals(fixture.concerns.getConcerns().getFirst().getPreviousCommentId()))
+            .toList();
+
+    ConcernWorkflowInput input =
+        reviewWithContext(fixture, comments, readTestResource(RESPONSE_RESOURCE));
+
+    assertTrue(input.getThreadContext().isEmpty());
+  }
+
+  @Test
+  public void aiAcknowledgementDoesNotAuthorizeConcernDismissal() throws Exception {
+    ThreadContextFixture fixture = threadContextFixture();
+
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                reviewWithContext(
+                    fixture, fixture.comments, getGson().toJson(fixture.dismissedResponse)));
+
+    assertEquals(fixture.authorizationError, failure.getMessage());
+  }
+
+  private static ConcernWorkflowInput reviewWithContext(
+      ThreadContextFixture fixture, List<GerritComment> comments, String response)
+      throws Exception {
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    comments.forEach(comment -> commentsById.put(comment.getId(), comment));
+    CommentData commentData = new CommentData(List.of(), commentsById, new HashMap<>());
+    CapturedRequest captured = new CapturedRequest();
+    concernReviewer(mock(Configuration.class))
+        .review(
+            new ChangeSetData(fixture.aiAccountId),
+            mock(GerritChange.class),
+            fixture.concerns,
+            readTestResource(INCREMENTAL_PATCH_RESOURCE),
+            readTestResource(FULL_PATCH_RESOURCE),
+            commentData,
+            (requestData, change, patchSet) -> {
+              captured.requestData = requestData;
+              return response;
+            });
+    return captured.requestData.getConcernWorkflowInput();
+  }
+
+  private static ThreadContextFixture threadContextFixture() throws IOException {
+    return getGson()
+        .fromJson(readTestResource(THREAD_CONTEXT_RESOURCE), ThreadContextFixture.class);
+  }
+
+  private static final class ThreadContextFixture {
+    private int aiAccountId;
+    private ReviewerConcerns concerns;
+    private List<GerritComment> comments;
+    private Map<String, List<ThreadMessage>> expectedThreadContext;
+    private ReviewerConcerns dismissedResponse;
+    private String authorizationError;
+  }
 
   @Test
   public void nonePolicyProvidesSamePatchContextAsNewIssueFinder() throws Exception {
@@ -71,6 +161,7 @@ public class LangChainConcernReviewTest {
             reviewerConcerns,
             incrementalPatch,
             fullPatch,
+            null,
             (requestData, change, patchSet) -> {
               capturedRequest.requestData = requestData;
               capturedRequest.patchSet = patchSet;
@@ -114,6 +205,7 @@ public class LangChainConcernReviewTest {
         concerns,
         readTestResource(INCREMENTAL_PATCH_RESOURCE),
         readTestResource(FULL_PATCH_RESOURCE),
+        null,
         (requestData, change, patchSet) -> {
           capturedRequest.requestData = requestData;
           capturedRequest.patchSet = patchSet;
@@ -144,6 +236,7 @@ public class LangChainConcernReviewTest {
         concerns,
         readTestResource(INCREMENTAL_PATCH_RESOURCE),
         readTestResource(FULL_PATCH_RESOURCE),
+        null,
         (requestData, change, patchSet) -> {
           capturedRequest.requestData = requestData;
           return readTestResource(RESPONSE_RESOURCE);

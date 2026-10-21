@@ -23,6 +23,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.JsonUtils.unwrapJso
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcern;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewConcernStatusUpdater;
@@ -69,6 +70,7 @@ final class LangChainConcernReviewer {
       ReviewerConcerns existingConcerns,
       String incrementalPatchSet,
       String fullPatchSet,
+      CommentData commentData,
       RequestExecutor requestExecutor)
       throws Exception {
     existingConcerns.normalize();
@@ -87,7 +89,9 @@ final class LangChainConcernReviewer {
             existingConcerns,
             incrementalPatchSet,
             fullPatchSet,
-            changeSetData.getReviewFeedbackMemory()));
+            changeSetData.getReviewFeedbackMemory(),
+            commentData,
+            changeSetData.getAiAccountId()));
     String responseText = requestExecutor.execute(concernReviewData, change, "");
     if (responseText == null || !isJsonObjectAsString(responseText)) {
       throw new IllegalStateException("Concern reviewer returned no structured response");
