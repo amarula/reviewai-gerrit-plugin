@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
@@ -400,6 +401,40 @@ public class LangChainSingleAgentConcernWorkflowTest {
     assertEquals(
         ConcernStatus.PRESENT,
         pendingLedger(response).getReviewers().getFirst().getConcerns().getFirst().getStatus());
+  }
+
+  @Test
+  public void concernReviewReceivesLatestPublishedAiAcknowledgement() throws Exception {
+    JsonObject fixture =
+        getGson()
+            .fromJson(
+                readTestResource("__files/langchain/concernThreadContext.json"), JsonObject.class);
+    ReviewerConcerns concerns = getGson().fromJson(fixture.get("concerns"), ReviewerConcerns.class);
+    concerns.setReviewer(new ConcernReviewerId(ConcernReviewerId.Kind.SINGLE_AGENT, "PATCHSET"));
+    ReviewConcernLedger ledger = new ReviewConcernLedger();
+    ledger.setReviewers(List.of(concerns));
+    HashMap<String, GerritComment> commentsById = new HashMap<>();
+    for (GerritComment comment :
+        getGson().fromJson(fixture.get("comments"), GerritComment[].class)) {
+      commentsById.put(comment.getId(), comment);
+    }
+    GerritClient gerritClient = mock(GerritClient.class);
+    GerritChange change = change(false);
+    when(gerritClient.getClientData(change))
+        .thenReturn(
+            new GerritClientData(
+                null, List.of(), new CommentData(List.of(), commentsById, new HashMap<>()), 0));
+    TestClient client = new TestClient(gerritClient);
+    client.concernReviewResponse = "__files/langchain/concernReviewResponse.json";
+    ChangeSetData data = new ChangeSetData(fixture.get("aiAccountId").getAsInt());
+    data.setPreviousReviewConcernLedger(ledger);
+    data.setIncrementalPatchSet(readTestResource(INCREMENTAL_PATCH));
+
+    client.ask(data, change, readTestResource(FULL_PATCH));
+
+    assertEquals(
+        fixture.get("expectedThreadContext"),
+        getGson().toJsonTree(client.concernData.getConcernWorkflowInput().getThreadContext()));
   }
 
   @Test
