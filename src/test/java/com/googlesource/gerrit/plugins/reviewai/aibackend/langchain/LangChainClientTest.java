@@ -24,33 +24,44 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
+import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.TokenCountEstimator;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.request.ResponseFormatType;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
 import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -60,6 +71,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class LangChainClientTest {
@@ -341,7 +353,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void resolvesOpenAiConversationForLangChainOpenAiProvider() throws Exception {
+  public void ignoresExistingOpenAiConversationForForcedSingleAgentReview() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
         .thenReturn("conv_langchain_openai");
@@ -359,7 +371,8 @@ public class LangChainClientTest {
             AiProviderType.OPENAI,
             changeSetData);
 
-    assertEquals("conv_langchain_openai", conversationId);
+    assertNull(conversationId);
+    verify(changeDataHandler, never()).getValue(OpenAiConversation.KEY_CONVERSATION_ID);
   }
 
   @Test
@@ -447,9 +460,117 @@ public class LangChainClientTest {
   }
 
   @Test
+  public void automaticReviewStagesDoNotUseConversationHistory() throws Exception {
+    FakeOpenAiConversation conversation = new FakeOpenAiConversation("conv_old_review", true);
+    OpenAiConversationTestLangChainClient client =
+        new OpenAiConversationTestLangChainClient(conversation);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    ChangeSetData data = new ChangeSetData(1);
+
+    assertNull(resolveConversationId(client, AiProviderType.OPENAI, data, change));
+    assertFalse(client.shouldIncludeInitialHistory(data, change));
+    for (ReviewAssistantStage stage : ReviewAssistantStage.values()) {
+      data.setReviewAssistantStage(stage);
+      assertNull(resolveConversationId(client, AiProviderType.OPENAI, data, change));
+      assertFalse(client.shouldUseConversationHistory(data, change));
+      assertFalse(client.shouldIncludeInitialHistory(data, change));
+    }
+    assertFalse(conversation.hasExistingConversationCalled);
+  }
+
+  @Test
+  public void routedRepliesKeepConversationHistory() throws Exception {
+    FakeOpenAiConversation conversation = new FakeOpenAiConversation("conv_message", true);
+    OpenAiConversationTestLangChainClient client =
+        new OpenAiConversationTestLangChainClient(conversation);
+    for (ReviewAssistantStage stage :
+        List.of(ReviewAssistantStage.REVIEW_CODE, ReviewAssistantStage.REVIEW_COMMIT_MESSAGE)) {
+      ChangeSetData data = new ChangeSetData(1);
+      data.setReviewAssistantStage(stage);
+      data.setForcedStagedReview(true);
+
+      assertEquals("conv_message", resolveConversationId(client, AiProviderType.OPENAI, data));
+      assertTrue(client.useConversationHistory(data));
+      assertTrue(client.includeInitialHistory(data));
+    }
+  }
+
+  @Test
+  public void reviewRequestsStartFreshAcrossProviders() throws Exception {
+    String instructions = readTestResource("__files/langchain/chatMemoryUserMessage.txt");
+    String patch = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
+    String response = readTestResource("__files/langchain/chatMemoryAiMessage.txt");
+    for (AiProviderType providerType : List.of(AiProviderType.OPENAI, AiProviderType.OLLAMA)) {
+      for (boolean zdr : List.of(false, true)) {
+        Configuration config = Mockito.mock(Configuration.class);
+        when(config.getAiProviderType()).thenReturn(providerType);
+        when(config.getAiProviderZdr()).thenReturn(zdr);
+        when(config.getAiReviewTemperature()).thenReturn("0");
+        when(config.getAiCommentTemperature()).thenReturn("0");
+        GerritClient gerritClient = Mockito.mock(GerritClient.class);
+        PluginDataHandlerProvider dataProvider = Mockito.mock(PluginDataHandlerProvider.class);
+        PluginChatMemoryStore memoryStore = Mockito.mock(PluginChatMemoryStore.class);
+        when(memoryStore.getMessages(Mockito.any()))
+            .thenReturn(
+                List.of(LangChainChatMessages.userMessage(instructions), AiMessage.from(response)));
+        TestableLangChainClient client =
+            new TestableLangChainClient(config, gerritClient, dataProvider, memoryStore);
+        ChangeSetData data = new ChangeSetData(1);
+        GerritChange change = Mockito.mock(GerritChange.class);
+        when(change.getFullChangeId()).thenReturn("project~branch~change");
+        IAiPrompt prompt = Mockito.mock(IAiPrompt.class);
+        when(prompt.getDefaultAiAssistantInstructions()).thenReturn(instructions);
+        when(prompt.getDefaultAiThreadReviewMessage(patch)).thenReturn(patch);
+        ILangChainProvider provider = Mockito.mock(ILangChainProvider.class);
+        ChatModel model = Mockito.mock(ChatModel.class);
+        when(provider.buildChatModel(config, 0.0, null, instructions))
+            .thenReturn(new LangChainProvider(model, "test"));
+        when(model.chat(Mockito.any(ChatRequest.class)))
+            .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from(response)).build());
+
+        try (var prompts = Mockito.mockStatic(AiPromptFactory.class);
+            var providers = Mockito.mockStatic(LangChainProviderFactory.class)) {
+          prompts
+              .when(() -> AiPromptFactory.getAiPrompt(config, data, change, null))
+              .thenReturn(prompt);
+          providers.when(() -> LangChainProviderFactory.get(providerType)).thenReturn(provider);
+
+          assertEquals(patch, client.request(data, change, patch));
+          assertEquals(patch, client.request(data, change, patch));
+          data.setForcedReview(true);
+          when(change.getIsCommentEvent()).thenReturn(true);
+          assertEquals(patch, client.request(data, change, patch));
+        }
+
+        ArgumentCaptor<ChatRequest> requests = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(model, Mockito.times(3)).chat(requests.capture());
+        for (ChatRequest request : requests.getAllValues()) {
+          assertEquals(providerType == AiProviderType.OPENAI ? 1 : 2, request.messages().size());
+          assertEquals(patch, LangChainChatMessages.content(request.messages().getLast()));
+        }
+        verifyNoInteractions(memoryStore, dataProvider, gerritClient);
+      }
+    }
+  }
+
+  @Test
+  public void oldOpenAiReviewerConversationsAreNotSuggestionContext() {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    PluginDataHandler changeData = Mockito.mock(PluginDataHandler.class);
+    when(changeData.getValue(OpenAiConversation.KEY_CONVERSATION_ID)).thenReturn("conv_old_review");
+    PluginDataHandlerProvider dataProvider = Mockito.mock(PluginDataHandlerProvider.class);
+    when(dataProvider.getChangeScope()).thenReturn(changeData);
+    TestableLangChainClient client = new TestableLangChainClient(config, null, dataProvider, null);
+
+    assertFalse(client.hasExistingReviewContext(new ChangeSetData(1)));
+    verifyNoInteractions(dataProvider, changeData);
+  }
+
+  @Test
   public void resolvesOpenAiConversationForNormalFollowUpMessage() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
-    when(changeDataHandler.getValue(OpenAiConversation.KEY_CONVERSATION_ID))
+    when(changeDataHandler.getValue(OpenAiConversation.getMessagesConversationKey()))
         .thenReturn("conv_follow_up");
     PluginDataHandlerProvider pluginDataHandlerProvider =
         Mockito.mock(PluginDataHandlerProvider.class);
@@ -492,7 +613,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void resolvesStageConversationForLangChainOpenAiMultiAgentProvider() throws Exception {
+  public void ignoresExistingOpenAiConversationForForcedScopedReview() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =
         OpenAiConversation.getMultiAgentConversationKey(ReviewAssistantStage.REVIEW_CODE);
@@ -511,11 +632,12 @@ public class LangChainClientTest {
             AiProviderType.OPENAI,
             changeSetData);
 
-    assertEquals("conv_review_code", conversationId);
+    assertNull(conversationId);
+    verify(changeDataHandler, never()).getValue(conversationKey);
   }
 
   @Test
-  public void resolvesSeparateOpenAiConversationForSuffixedStage() throws Exception {
+  public void ignoresExistingOpenAiConversationForSuffixedReviewStage() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     String conversationKey =
         OpenAiConversation.getMultiAgentConversationKey(
@@ -536,7 +658,8 @@ public class LangChainClientTest {
             AiProviderType.OPENAI,
             changeSetData);
 
-    assertEquals("conv_verification_topic_1", conversationId);
+    assertNull(conversationId);
+    verify(changeDataHandler, never()).getValue(conversationKey);
     verify(changeDataHandler, never())
         .getValue(
             OpenAiConversation.getMultiAgentConversationKey(
@@ -544,7 +667,7 @@ public class LangChainClientTest {
   }
 
   @Test
-  public void resolvesSeparateOpenAiConversationForEachSpecializedAgent() throws Exception {
+  public void ignoresExistingOpenAiConversationForEachSpecializedReviewer() throws Exception {
     PluginDataHandler changeDataHandler = Mockito.mock(PluginDataHandler.class);
     PluginDataHandlerProvider pluginDataHandlerProvider =
         Mockito.mock(PluginDataHandlerProvider.class);
@@ -565,7 +688,8 @@ public class LangChainClientTest {
               AiProviderType.OPENAI,
               changeSetData);
 
-      assertEquals("conv_" + agent, conversationId);
+      assertNull(conversationId);
+      verify(changeDataHandler, never()).getValue(conversationKey);
     }
   }
 
@@ -714,11 +838,7 @@ public class LangChainClientTest {
   private String resolveConversationId(
       LangChainClient client, AiProviderType providerType, ChangeSetData changeSetData)
       throws Exception {
-    Method method =
-        LangChainClient.class.getDeclaredMethod(
-            "resolveConversationId", AiProviderType.class, ChangeSetData.class);
-    method.setAccessible(true);
-    return (String) method.invoke(client, providerType, changeSetData);
+    return resolveConversationId(client, providerType, changeSetData, commentChange());
   }
 
   private String resolveConversationId(
@@ -841,15 +961,25 @@ public class LangChainClientTest {
 
     private void clearTimedOutConversation(
         AiProviderType providerType, ChangeSetData changeSetData, Throwable failure) {
-      clearTimedOutOpenAiConversation(providerType, changeSetData, null, failure);
+      clearTimedOutOpenAiConversation(providerType, changeSetData, commentChange(), failure);
     }
 
     private boolean includeInitialHistory(ChangeSetData changeSetData) {
-      return shouldIncludeInitialHistory(changeSetData);
+      return shouldIncludeInitialHistory(changeSetData, commentChange());
     }
 
     private boolean useConversationHistory(ChangeSetData changeSetData) {
-      return shouldUseConversationHistory(changeSetData);
+      return shouldUseConversationHistory(changeSetData, commentChange());
+    }
+
+    @Override
+    public boolean shouldUseConversationHistory(ChangeSetData changeSetData, GerritChange change) {
+      return super.shouldUseConversationHistory(changeSetData, change);
+    }
+
+    @Override
+    public boolean shouldIncludeInitialHistory(ChangeSetData changeSetData, GerritChange change) {
+      return super.shouldIncludeInitialHistory(changeSetData, change);
     }
   }
 
@@ -900,6 +1030,31 @@ public class LangChainClientTest {
       super(config, null, null, null);
     }
 
+    private TestableLangChainClient(
+        Configuration config,
+        GerritClient gerritClient,
+        PluginDataHandlerProvider dataProvider,
+        PluginChatMemoryStore memoryStore) {
+      super(config, null, gerritClient, null, dataProvider, memoryStore, null, null);
+    }
+
+    private String request(ChangeSetData data, GerritChange change, String patch) throws Exception {
+      return askSingleRequest(data, change, patch).getRequestBody();
+    }
+
+    @Override
+    protected ChatMemory buildTransientMemory(Object memoryId) {
+      return TokenWindowChatMemory.builder()
+          .id(memoryId)
+          .maxTokens(10000, new TestTokenCountEstimator())
+          .build();
+    }
+
+    @Override
+    public boolean hasExistingReviewContext(ChangeSetData changeSetData) {
+      return super.hasExistingReviewContext(changeSetData);
+    }
+
     private AiResponseContent parseResponseContent(String responseText) {
       return toResponseContent(responseText);
     }
@@ -917,7 +1072,7 @@ public class LangChainClientTest {
     }
 
     private boolean includeInitialHistory(ChangeSetData changeSetData) {
-      return shouldIncludeInitialHistory(changeSetData);
+      return shouldIncludeInitialHistory(changeSetData, commentChange());
     }
 
     private boolean useOpenAiConversation(AiProviderType providerType) {
@@ -935,6 +1090,12 @@ public class LangChainClientTest {
         .id(id)
         .maxTokens(1000, new TestTokenCountEstimator())
         .build();
+  }
+
+  private static GerritChange commentChange() {
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(change.getIsCommentEvent()).thenReturn(true);
+    return change;
   }
 
   private static class TestTokenCountEstimator implements TokenCountEstimator {
