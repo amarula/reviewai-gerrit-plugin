@@ -78,7 +78,6 @@ final class LangChainConcernWorkflowInputFactory {
         }
         comments.values().stream()
             .filter(Objects::nonNull)
-            .filter(comment -> ReviewAiUser.matches(comment, aiAccountId))
             .filter(comment -> comment.getId() != null && !anchorId.equals(comment.getId()))
             .filter(
                 comment ->
@@ -96,10 +95,13 @@ final class LangChainConcernWorkflowInputFactory {
   private static List<ThreadMessage> latestExchange(
       GerritCommentThreadIndex index, GerritComment latest, int aiAccountId) {
     ThreadMessage message = threadMessage(latest, aiAccountId);
-    return index
-        .nearestAncestor(latest, comment -> !ReviewAiUser.matches(comment, aiAccountId))
-        .map(user -> List.of(threadMessage(user, aiAccountId), message))
-        .orElseGet(() -> List.of(message));
+    if (ReviewAiUser.matches(latest, aiAccountId)) {
+      return index
+          .nearestAncestor(latest, comment -> !ReviewAiUser.matches(comment, aiAccountId))
+          .map(user -> List.of(threadMessage(user, aiAccountId), message))
+          .orElseGet(() -> List.of(message));
+    }
+    return List.of(message);
   }
 
   private static ThreadMessage threadMessage(GerritComment comment, int aiAccountId) {

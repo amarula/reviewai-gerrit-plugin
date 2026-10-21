@@ -22,6 +22,12 @@
       {"id": "dismiss-ack", "role": "AI", "message": "Dismissed as requested. I will not report the concern about missing tests."}
     ]
   },
+  "unansweredMessage": {"id": "later-user", "in_reply_to": "dismiss-ack", "author": {"_account_id": 10}, "updated": "2026-10-21T10:45:00Z", "message": "Reconsider this concern; testing is now required."},
+  "unansweredContext": {
+    "concern-1": [
+      {"id": "later-user", "role": "USER", "message": "Reconsider this concern; testing is now required."}
+    ]
+  },
   "dismissedResponse": {
     "concerns": [{"id": "concern-1", "status": "DISMISSED", "status_reason": "The AI acknowledged the dismissal request."}]
   },
