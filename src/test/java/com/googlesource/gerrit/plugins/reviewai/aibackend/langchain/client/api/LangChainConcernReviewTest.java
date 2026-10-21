@@ -42,6 +42,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.metrics.cost.AiCostTracker;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,18 @@ public class LangChainConcernReviewTest {
     assertEquals(
         getGson().toJsonTree(fixture.expectedThreadContext),
         getGson().toJsonTree(input).getAsJsonObject().get("thread_context"));
+  }
+
+  @Test
+  public void providesNewerUnansweredUserMessageInsteadOfAnOlderAcknowledgement() throws Exception {
+    ThreadContextFixture fixture = threadContextFixture();
+    List<GerritComment> comments = new ArrayList<>(fixture.comments);
+    comments.add(fixture.unansweredMessage);
+
+    ConcernWorkflowInput input =
+        reviewWithContext(fixture, comments, readTestResource(RESPONSE_RESOURCE));
+
+    assertEquals(fixture.unansweredContext, input.getThreadContext());
   }
 
   @Test
@@ -132,6 +145,8 @@ public class LangChainConcernReviewTest {
     private ReviewerConcerns concerns;
     private List<GerritComment> comments;
     private Map<String, List<ThreadMessage>> expectedThreadContext;
+    private GerritComment unansweredMessage;
+    private Map<String, List<ThreadMessage>> unansweredContext;
     private ReviewerConcerns dismissedResponse;
     private String authorizationError;
   }
