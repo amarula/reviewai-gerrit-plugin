@@ -203,6 +203,49 @@ project entry is applied last and takes precedence. Ollama and mock routes are e
 [Telemetry](telemetry.md#cost-calculation) for the built-in catalog, calculation rules, and exported cost
 metrics.
 
+## Per-Agent Models
+
+Use `aiAgentModels` in `gerrit.config` or a project's `project.config` to assign a provider/model to a review role:
+
+```ini
+[plugin "reviewai-gerrit-plugin"]
+    aiModels = OpenAI/<review-model>
+    aiModels = Gemini/<security-model>
+    aiModels = DeepSeek/<commit-message-model>
+    aiModelsDefault = OpenAI/<review-model>
+    aiAgentModels = SECURITY=Gemini/<security-model>
+    aiAgentModels = COMMIT_MESSAGE=DeepSeek/<commit-message-model>
+```
+
+The model names in this example are placeholders. Each assigned route must appear in the effective `aiModels` list;
+credentials continue to use `aiTokens`. Unknown roles, malformed routes, and duplicate assignments for a role within
+one configuration scope are errors detected before model execution.
+
+Supported roles are `CODE`, `COMMIT_MESSAGE`, `CORRECTNESS`, `TESTABILITY`, `CODE_QUALITY`, `DOCUMENTATION`, and
+`SECURITY`. `CODE` covers the combined reviewer in `SINGLE_AGENT` mode and the Patch Set reviewer in `SCOPED_AGENTS`
+mode. An assignment only affects roles invoked by the selected specialization level. Specialist assignments also apply
+when that reviewer reassesses stored concerns or finds new issues; concern ownership remains independent of the model.
+Orchestration agents, including the router and feedback classifier, continue using the request's selected model.
+
+Project assignments override global assignments by role, retaining assignments for other roles. To make a role inherit
+the request's model instead of a global assignment, configure `aiAgentModels = SECURITY=REQUEST` in the project.
+Unassigned roles also inherit the request's selected model, which falls back to `aiModelsDefault`. Assignments are
+captured when the review client is created and applied independently within each parallel invocation and its tool loop.
+Token estimators use each provider's fixed estimator model and are cached separately by provider.
+
+In the Development build, Dynamic Configuration accepts assignments as a JSON array:
+
+```text
+/configure --aiAgentModels=["SECURITY=Gemini/<configured-model>","COMMIT_MESSAGE=REQUEST"]
+```
+
+Replace the model placeholder with a route from `aiModels`. Use `/configure --reset --aiAgentModels` to remove the
+change's dynamic assignments and return to the static configuration.
+
+Conversational replies and suggestion generation continue using the request's selected model. Review steps preceding suggestion generation can
+use agent assignments. A custom `aiDomain` still applies to every selected provider, so leave it unset when using different
+providers' standard endpoints.
+
 ## Conditional AI Review Trigger
 
 `aiReviewApplicableIf` delays automatic AI review until a Gerrit submit-requirement expression matches the change.
@@ -274,6 +317,8 @@ Patch Set or label-vote event rather than immediately.
   If unset or not found in the expanded `aiModels` list, the first available provider/model route is used.
 - `aiPricing`: Repeatable exact provider/model pricing override used by estimated-cost telemetry. See
   [AI Pricing Overrides](#ai-pricing-overrides).
+- `aiAgentModels`: Repeatable `ROLE=provider/model` assignment for review agents. Unassigned roles use the request's
+  selected model, falling back to `aiModelsDefault`. See [Per-Agent Models](#per-agent-models).
 - `aiTokens`: Provides provider tokens. Configure these as `OpenAI/{token}`, `DeepSeek/{token}`,
   `MoonShot/{token}`, and so on. Ollama does not require a token.
 - `aiDomain`: Defines the base endpoint for the selected provider. By default, it uses the provider’s standard domain:

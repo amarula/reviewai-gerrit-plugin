@@ -95,6 +95,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   private final ICodeContextPolicy codeContextPolicy;
   private final LangChainTokenEstimatorProvider tokenEstimatorProvider;
+  protected final LangChainAgentModelRouting agentModelRouting;
   private final GerritClient gerritClient;
   protected final GitRepoFiles gitRepoFiles;
   private final ProjectInstructionsAppender projectInstructionsAppender;
@@ -167,6 +168,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       GitRepoFiles gitRepoFiles,
       ReviewAiMetrics metrics) {
     super(config);
+    this.agentModelRouting = new LangChainAgentModelRouting(config);
     this.codeContextPolicy = codeContextPolicy;
     this.tokenEstimatorProvider = new LangChainTokenEstimatorProvider(config);
     this.gerritClient = gerritClient;
@@ -528,11 +530,11 @@ public class LangChainClient extends AiClientBase implements IAiClient {
       String patchSet,
       AiModelRoute aiModelRouteOverride)
       throws Exception {
-    if (aiModelRouteOverride == null) {
-      return doAskSingleRawRequest(changeSetData, change, patchSet, false);
-    }
-    return config.withAiModelRoute(
-        aiModelRouteOverride, () -> doAskSingleRawRequest(changeSetData, change, patchSet, true));
+    return agentModelRouting.execute(
+        changeSetData,
+        shouldUseConversationHistory(changeSetData, change),
+        aiModelRouteOverride,
+        routeOverridden -> doAskSingleRawRequest(changeSetData, change, patchSet, routeOverridden));
   }
 
   @VisibleForTesting
