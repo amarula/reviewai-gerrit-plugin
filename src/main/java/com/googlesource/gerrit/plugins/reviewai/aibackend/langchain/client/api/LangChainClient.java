@@ -869,6 +869,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
   private LangChainExecutor buildToolExecutor(ChangeSetData changeSetData) {
     ResponseFormat responseFormat = structuredResponseFormat;
+    List<ToolSpecification> tools = contextTools;
     if (changeSetData != null && changeSetData.getReviewAssistantStage() != null) {
       responseFormat =
           switch (changeSetData.getReviewAssistantStage()) {
@@ -886,15 +887,20 @@ public class LangChainClient extends AiClientBase implements IAiClient {
                     ? specializedRepliesResponseFormat
                     : responseFormat;
           };
+      if (changeSetData.getReviewAssistantStage()
+          == ReviewAssistantStage.CLASSIFY_REVIEW_FEEDBACK) {
+        tools = List.of();
+      }
     }
     boolean requireInitialToolUse =
         config != null
+            && !tools.isEmpty()
             && config.getCodeContextPolicy() == CodeContextPolicies.ON_DEMAND
             && shouldUseOpenAiResponses(config.getAiProviderType());
     return new LangChainExecutor(
         config,
-        getProviderResponseFormat(config, contextTools, responseFormat),
-        contextTools,
+        getProviderResponseFormat(config, tools, responseFormat),
+        tools,
         requireInitialToolUse,
         gitRepoFiles,
         costTracker);

@@ -44,6 +44,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.Plugi
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
+import com.googlesource.gerrit.plugins.reviewai.config.AiAgentRole;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
@@ -409,15 +410,24 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
   @VisibleForTesting
   protected ReviewAssistantStage routeMessage(ChangeSetData changeSetData, GerritChange change)
       throws AiConnectionFailException {
+    try {
+      return agentModelRouting.execute(
+          AiAgentRole.ROUTER, () -> doRouteMessage(changeSetData, change));
+    } catch (AiConnectionFailException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new AiConnectionFailException(e);
+    }
+  }
+
+  private ReviewAssistantStage doRouteMessage(ChangeSetData changeSetData, GerritChange change)
+      throws AiConnectionFailException {
     LangChainMemoryId routerMemoryId =
         new LangChainMemoryId(
             change.getFullChangeId(), LangChainMemoryId.getPatchSetNumber(change), ROUTER_SCOPE);
     AiProviderType providerType = config.getAiProviderType();
     boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
-    ChatMemory memory =
-        shouldUseOpenAiConversation(providerType)
-            ? buildTransientMemory(routerMemoryId)
-            : buildMemory(routerMemoryId);
+    ChatMemory memory = buildTransientMemory(routerMemoryId);
     AiPromptReviewAgentRouter routerPrompt = new AiPromptReviewAgentRouter(config);
     String routerInstructions = routerPrompt.getDefaultAiAssistantInstructions();
     if (!useOpenAiResponses) {
