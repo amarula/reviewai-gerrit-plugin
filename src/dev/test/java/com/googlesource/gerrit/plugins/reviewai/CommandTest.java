@@ -940,6 +940,21 @@ public class CommandTest extends OpenAiLangChainReviewTestBase {
   }
 
   @Test
+  public void commandConfigureAgentModels() throws Exception {
+    String dynamicKey = "aiAgentModels";
+    String dynamicValue = readTestFile("__files/config/agentModelsDynamic.json").strip();
+    setupCommandComment(String.format("/configure --%s=%s", dynamicKey, dynamicValue));
+    grantAdministratorPrivileges();
+    PluginDataHandler changeHandler = getChangeDataHandler();
+
+    handleEventBasedOnType(EventHandlerTask.SupportedEvents.COMMENT_ADDED);
+
+    Assert.assertEquals(
+        getGson().toJson(Map.of(dynamicKey, dynamicValue)),
+        changeHandler.getValue(KEY_DYNAMIC_CONFIG));
+  }
+
+  @Test
   public void commandConfigureStatusShowsUpdatedDynamicConfig() throws Exception {
     setupCommandComment("/configure --multiAgentMode=false");
     grantAdministratorPrivileges();

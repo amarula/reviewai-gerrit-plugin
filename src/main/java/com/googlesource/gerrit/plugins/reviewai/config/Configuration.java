@@ -70,6 +70,7 @@ public class Configuration extends ConfigCore {
   private static final String KEY_AI_TOKENS = AiProviderConfiguration.KEY_AI_TOKENS;
   private static final String KEY_AI_MODELS = AiProviderConfiguration.KEY_AI_MODELS;
   private static final String KEY_AI_PROVIDER = AiProviderConfiguration.KEY_AI_PROVIDER;
+  private static final String KEY_AI_AGENT_MODELS = AiAgentModelConfiguration.KEY;
   private static final boolean DEFAULT_REVIEW_PATCH_SET = true;
   private static final boolean DEFAULT_REVIEW_COMMIT_MESSAGES = true;
   private static final boolean DEFAULT_FULL_FILE_REVIEW = true;
@@ -128,6 +129,7 @@ public class Configuration extends ConfigCore {
           KEY_SELECTIVE_LOG_LEVEL_OVERRIDE,
           KEY_AI_PROVIDER,
           KEY_AI_MODELS,
+          KEY_AI_AGENT_MODELS,
           KEY_AI_TOKENS,
           KEY_AI_PRICING);
 
@@ -201,6 +203,10 @@ public class Configuration extends ConfigCore {
 
   public String getAiModel() {
     return aiProviderConfiguration.getAiModel();
+  }
+
+  public Map<AiAgentRole, String> getAiAgentModels() {
+    return AiAgentModelConfiguration.resolve(this);
   }
 
   public List<String> getAiProviders() {
