@@ -23,6 +23,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 public final class LangChainAgentModelRouting {
   private final Configuration config;
@@ -52,10 +53,13 @@ public final class LangChainAgentModelRouting {
         && !agentModels.isEmpty()
         && !Boolean.TRUE.equals(data.getSuggestMode())
         && !useConversationHistory) {
-      AiAgentRole role = roleForRequest(data);
-      route = role == null ? null : agentModels.get(role);
+      route = agentModels.get(roleForRequest(data));
     }
     return execute(route, request);
+  }
+
+  public <T> T execute(AiAgentRole role, Callable<T> request) throws Exception {
+    return execute(agentModels.get(role), routeOverridden -> request.call());
   }
 
   private <T> T execute(AiModelRoute route, RoutedRequest<T> request) throws Exception {
@@ -69,11 +73,16 @@ public final class LangChainAgentModelRouting {
       return AiAgentRole.CODE;
     }
     return switch (data.getReviewAssistantStage()) {
-      case REVIEW_CODE, REVIEW_REITERATED -> AiAgentRole.CODE;
+      case CLASSIFY_REVIEW_FEEDBACK -> AiAgentRole.FEEDBACK_CLASSIFIER;
+      case REVIEW_SPECIALIZED_TRIAGE -> AiAgentRole.TRIAGE;
+      case REVIEW_SPECIALIZED_CONSOLIDATION -> AiAgentRole.CONSOLIDATION;
+      case REVIEW_SPECIALIZED_HISTORICAL_REPETITION -> AiAgentRole.HISTORICAL_REPETITION;
+      case REVIEW_SPECIALIZED_CONFLICT_RESOLUTION -> AiAgentRole.CONFLICT_RESOLUTION;
+      case REVIEW_SPECIALIZED_VERIFICATION -> AiAgentRole.VERIFICATION;
       case REVIEW_COMMIT_MESSAGE -> AiAgentRole.COMMIT_MESSAGE;
       case REVIEW_SPECIALIZED_AGENT -> AiAgentRole.valueOf(data.getSpecializedAgentName());
       case REVIEW_CONCERNS, FIND_NEW_ISSUES -> reviewerRole(data);
-      default -> null;
+      default -> AiAgentRole.CODE;
     };
   }
 
