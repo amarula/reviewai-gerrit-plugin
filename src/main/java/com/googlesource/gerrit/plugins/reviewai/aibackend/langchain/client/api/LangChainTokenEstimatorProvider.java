@@ -18,11 +18,14 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainMessageTextExtractor;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
+import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.TokenCountEstimator;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,27 +41,23 @@ class LangChainTokenEstimatorProvider {
 
   private final Configuration config;
 
-  private volatile TokenCountEstimator cachedEstimator;
+  private final Map<AiProviderType, TokenCountEstimator> cachedEstimators =
+      new EnumMap<>(AiProviderType.class);
 
   LangChainTokenEstimatorProvider(Configuration config) {
     this.config = config;
   }
 
-  TokenCountEstimator get() {
-    TokenCountEstimator current = cachedEstimator;
-    if (current != null) {
-      return current;
-    }
-    synchronized (this) {
-      if (cachedEstimator != null) {
-        return cachedEstimator;
-      }
-      AiProviderType provider = config.getAiProviderType();
+  synchronized TokenCountEstimator get() {
+    AiProviderType provider = config.getAiProviderType();
+    TokenCountEstimator cachedEstimator = cachedEstimators.get(provider);
+    if (cachedEstimator == null) {
+      AiModelRoute route = config.getSelectedAiModelRoute();
       String estimatorModel = getEstimatorModel(provider);
       try {
         log.info("Initializing {} token estimator for model {}", provider, estimatorModel);
         cachedEstimator =
-            CompletableFuture.supplyAsync(() -> createEstimator(provider))
+            CompletableFuture.supplyAsync(() -> createEstimator(provider, route))
                 .get(TOKEN_ESTIMATOR_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         log.info("Initialized {} token estimator for model {}", provider, estimatorModel);
       } catch (InterruptedException | ExecutionException | TimeoutException | RuntimeException e) {
@@ -72,7 +71,19 @@ class LangChainTokenEstimatorProvider {
             e);
         cachedEstimator = APPROXIMATE_ESTIMATOR;
       }
-      return cachedEstimator;
+      cachedEstimators.put(provider, cachedEstimator);
+    }
+    return cachedEstimator;
+  }
+
+  private TokenCountEstimator createEstimator(AiProviderType provider, AiModelRoute route) {
+    try {
+      // Initialization runs on another thread, so carry the selected provider credentials with it.
+      return route == null
+          ? createEstimator(provider)
+          : config.withAiModelRoute(route, () -> createEstimator(provider));
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to initialize token estimator for " + provider, e);
     }
   }
 
