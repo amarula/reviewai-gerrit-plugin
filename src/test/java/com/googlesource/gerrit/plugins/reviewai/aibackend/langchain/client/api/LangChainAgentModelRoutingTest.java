@@ -139,7 +139,7 @@ public class LangChainAgentModelRoutingTest {
             "Gemini/gemini-2.5-flash",
             "DeepSeek/deepseek-v4-flash",
             "OpenAI/gpt-4.1",
-            "OpenAI/gpt-4.1",
+            "Gemini/gemini-2.5-flash",
             "OpenAI/gpt-4.1",
             "OpenAI/gpt-4.1",
             "OpenAI/gpt-4.1"),
@@ -158,15 +158,14 @@ public class LangChainAgentModelRoutingTest {
             "gemini-2.5-flash",
             ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT,
             "SECURITY");
-    verify(metrics).recordAiEstimatedCostNanoUsd("Gemini", "gemini-2.5-flash", 20000L);
+    verify(metrics, org.mockito.Mockito.times(2))
+        .recordAiEstimatedCostNanoUsd("Gemini", "gemini-2.5-flash", 20000L);
   }
 
   @Test
   public void keepsParallelRoutesIsolatedAndRestoresThemAfterFailure() throws Exception {
     Configuration config = configuration(false);
     LangChainAgentModelRouting routing = new LangChainAgentModelRouting(config);
-    ChangeSetData securityData = reviewerData(AiAgentRole.SECURITY);
-    ChangeSetData commitData = reviewerData(AiAgentRole.COMMIT_MESSAGE);
     CyclicBarrier barrier = new CyclicBarrier(2);
     var executor = Executors.newFixedThreadPool(2);
     try {
@@ -174,10 +173,8 @@ public class LangChainAgentModelRoutingTest {
           executor.submit(
               () ->
                   routing.execute(
-                      securityData,
-                      false,
-                      null,
-                      routeOverridden -> {
+                      AiAgentRole.SECURITY,
+                      () -> {
                         barrier.await(5, TimeUnit.SECONDS);
                         return config.getSelectedAiModelRoute().modelRoute();
                       }));
@@ -188,10 +185,8 @@ public class LangChainAgentModelRoutingTest {
                     IllegalStateException.class,
                     () ->
                         routing.execute(
-                            commitData,
-                            false,
-                            null,
-                            routeOverridden -> {
+                            AiAgentRole.COMMIT_MESSAGE,
+                            () -> {
                               barrier.await(5, TimeUnit.SECONDS);
                               assertEquals(
                                   "DeepSeek/deepseek-v4-flash",
@@ -221,17 +216,11 @@ public class LangChainAgentModelRoutingTest {
     assertEquals(
         "DeepSeek/deepseek-v4-flash",
         routing.execute(
-            reviewerData(AiAgentRole.SECURITY),
-            false,
-            null,
-            routeOverridden -> requestConfig.getSelectedAiModelRoute().modelRoute()));
+            AiAgentRole.SECURITY, () -> requestConfig.getSelectedAiModelRoute().modelRoute()));
     assertEquals(
         "Gemini/gemini-2.5-flash",
         routing.execute(
-            reviewerData(AiAgentRole.CORRECTNESS),
-            false,
-            null,
-            routeOverridden -> requestConfig.getSelectedAiModelRoute().modelRoute()));
+            AiAgentRole.CORRECTNESS, () -> requestConfig.getSelectedAiModelRoute().modelRoute()));
   }
 
   @Test
@@ -271,7 +260,7 @@ public class LangChainAgentModelRoutingTest {
   }
 
   @Test
-  public void resolvesReviewerRolesAndKeepsPipelineStagesOnRequestModel() throws Exception {
+  public void resolvesPipelineRolesAndOriginalConcernReviewers() throws Exception {
     JsonArray cases =
         JsonParser.parseString(read("__files/config/agentModelRoles.json")).getAsJsonArray();
     for (var testCase : cases) {
@@ -281,23 +270,11 @@ public class LangChainAgentModelRoutingTest {
               .fromJson(
                   testCase.getAsJsonObject().get("concernWorkflowInput"),
                   ConcernWorkflowInput.class));
-      var expectedRole = testCase.getAsJsonObject().get("expectedRole");
-      AiAgentRole role = LangChainAgentModelRouting.roleForRequest(data);
       assertEquals(
           testCase.toString(),
-          expectedRole.isJsonNull() ? null : expectedRole.getAsString(),
-          role == null ? null : role.name());
+          testCase.getAsJsonObject().get("expectedRole").getAsString(),
+          LangChainAgentModelRouting.roleForRequest(data).name());
     }
-  }
-
-  private ChangeSetData reviewerData(AiAgentRole role) {
-    ChangeSetData data = new ChangeSetData(1);
-    data.setReviewAssistantStage(
-        role == AiAgentRole.COMMIT_MESSAGE
-            ? ReviewAssistantStage.REVIEW_COMMIT_MESSAGE
-            : ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
-    data.setSpecializedAgentName(role.name());
-    return data;
   }
 
   private Configuration configuration(boolean projectOverrides) throws Exception {
