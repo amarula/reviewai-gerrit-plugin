@@ -221,11 +221,11 @@ The model names in this example are placeholders. Each assigned route must appea
 credentials continue to use `aiTokens`. Unknown roles, malformed routes, and duplicate assignments for a role within
 one configuration scope are errors detected before model execution.
 
-Supported roles are `CODE`, `COMMIT_MESSAGE`, `CORRECTNESS`, `TESTABILITY`, `CODE_QUALITY`, `DOCUMENTATION`, and
-`SECURITY`. `CODE` covers the combined reviewer in `SINGLE_AGENT` mode and the Patch Set reviewer in `SCOPED_AGENTS`
+Supported roles are `CODE`, `COMMIT_MESSAGE`, `CORRECTNESS`, `TESTABILITY`, `CODE_QUALITY`, `DOCUMENTATION`, `SECURITY`,
+`ROUTER`, `FEEDBACK_CLASSIFIER`, `TRIAGE`, `CONSOLIDATION`, `HISTORICAL_REPETITION`, `CONFLICT_RESOLUTION`, and
+`VERIFICATION`. `CODE` covers the combined reviewer in `SINGLE_AGENT` mode and the Patch Set reviewer in `SCOPED_AGENTS`
 mode. An assignment only affects roles invoked by the selected specialization level. Specialist assignments also apply
 when that reviewer reassesses stored concerns or finds new issues; concern ownership remains independent of the model.
-Orchestration agents, including the router and feedback classifier, continue using the request's selected model.
 
 Project assignments override global assignments by role, retaining assignments for other roles. To make a role inherit
 the request's model instead of a global assignment, configure `aiAgentModels = SECURITY=REQUEST` in the project.
@@ -242,7 +242,8 @@ In the Development build, Dynamic Configuration accepts assignments as a JSON ar
 Replace the model placeholder with a route from `aiModels`. Use `/configure --reset --aiAgentModels` to remove the
 change's dynamic assignments and return to the static configuration.
 
-Conversational replies and suggestion generation continue using the request's selected model. Review steps preceding suggestion generation can
+Conversational replies and suggestion generation continue using the request's selected model; the router
+may use its own assignment and reconstructs its context for each call. Review steps preceding suggestion generation can
 use agent assignments. A custom `aiDomain` still applies to every selected provider, so leave it unset when using different
 providers' standard endpoints.
 
