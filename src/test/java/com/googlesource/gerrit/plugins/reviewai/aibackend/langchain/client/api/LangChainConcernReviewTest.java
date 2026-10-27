@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -219,7 +218,7 @@ public class LangChainConcernReviewTest {
   }
 
   @Test
-  public void onDemandPolicyOmitsFullPatchLikeNewIssueFinder() throws Exception {
+  public void onDemandPolicyProvidesFullPatchLikeNewIssueFinder() throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
     LangChainConcernReviewer concernReviewer = concernReviewer(config);
@@ -244,7 +243,9 @@ public class LangChainConcernReviewTest {
           return readTestResource(RESPONSE_RESOURCE);
         });
 
-    assertNull(capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals(
+        readTestResource(FULL_PATCH_RESOURCE),
+        capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   @Test

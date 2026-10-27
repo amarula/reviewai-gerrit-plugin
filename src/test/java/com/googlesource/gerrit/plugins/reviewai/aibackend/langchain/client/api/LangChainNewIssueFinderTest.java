@@ -88,7 +88,7 @@ public class LangChainNewIssueFinderTest {
   }
 
   @Test
-  public void onDemandPolicyOmitsFullPatchFromPayload() throws Exception {
+  public void onDemandPolicyProvidesFullPatchAsSupportingContext() throws Exception {
     LangChainNewIssueFinder finder =
         new LangChainNewIssueFinder(configuration(CodeContextPolicies.ON_DEMAND));
     CapturedRequest capturedRequest = new CapturedRequest();
@@ -105,7 +105,9 @@ public class LangChainNewIssueFinderTest {
           return readTestResource(RESPONSE_RESOURCE);
         });
 
-    assertNull(capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
+    assertEquals(
+        readTestResource(FULL_PATCH_RESOURCE),
+        capturedRequest.requestData.getConcernWorkflowInput().getFullPatch());
   }
 
   @Test

@@ -18,7 +18,6 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.CommentData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
@@ -50,12 +49,7 @@ final class LangChainConcernWorkflowInputFactory {
       String incrementalPatchSet,
       String fullPatchSet,
       ReviewFeedbackMemory reviewFeedback) {
-    String fullPatchContext =
-        config != null && config.getCodeContextPolicy() == CodeContextPolicies.NONE
-            ? fullPatchSet
-            : null;
-    return new ConcernWorkflowInput(
-        concerns, incrementalPatchSet, fullPatchContext, reviewFeedback);
+    return new ConcernWorkflowInput(concerns, incrementalPatchSet, fullPatchSet, reviewFeedback);
   }
 
   static ConcernWorkflowInput create(
