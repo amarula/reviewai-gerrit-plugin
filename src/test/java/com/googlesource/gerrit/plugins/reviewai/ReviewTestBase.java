@@ -38,6 +38,7 @@ import com.google.gerrit.json.OutputFormat;
 import com.google.gerrit.server.IdentifiedUser;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
+import com.google.gerrit.server.account.Emails;
 import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.config.PluginConfig;
@@ -420,7 +421,8 @@ public class ReviewTestBase extends TestBase {
                     new ReviewConcernPublisher(getTestReviewAiDb()),
                     reviewFeedbackPublisher,
                     getClientCommandExtension(),
-                    new ProjectUserMentionResolver(accountCacheMock, permissionBackend)),
+                    new ProjectUserMentionResolver(
+                        accountCacheMock, permissionBackend, mock(Emails.class))),
                 gerritClientPatchSet));
     aiReviewApplicabilityChecker = mock(AiReviewApplicabilityChecker.class);
     when(aiReviewApplicabilityChecker.isApplicable(any(), anyString())).thenReturn(true);

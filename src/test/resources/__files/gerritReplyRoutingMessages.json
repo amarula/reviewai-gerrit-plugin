@@ -1,0 +1,10 @@
+{
+  "unknownUser": "@fdfgsdfg Is it true?",
+  "otherUser": "@alice Is it true?",
+  "multipleUsers": "@unknown @alice Can you check this?",
+  "author": "@reviewer Can you check this?",
+  "botAndUser": "@reviewai @alice Can you both check this?",
+  "email": "Please send the details to alice@example.com.",
+  "quotedUser": "> @alice Is it true?\nCan you explain why?",
+  "quotedBotAndUser": "> @reviewai Can you check this?\n@alice Is it true?"
+}

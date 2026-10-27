@@ -21,9 +21,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.reflect.TypeToken;
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.entities.BranchNameKey;
@@ -37,6 +41,7 @@ import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.json.OutputFormat;
 import com.google.gerrit.server.account.AccountCache;
 import com.google.gerrit.server.account.AccountState;
+import com.google.gerrit.server.account.Emails;
 import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.events.CommentAddedEvent;
 import com.google.gerrit.server.permissions.PermissionBackend;
@@ -76,6 +81,8 @@ public class GerritClientCommentsTest {
   private Map<String, List<CommentInfo>> comments;
   private CommentsRequest commentsRequest;
   private AccountCache accountCache;
+  private AccountState alice;
+  private Emails emails;
   private PermissionBackend permissionBackend;
   private PermissionBackend.ForRef mentionRefPermissions;
 
@@ -112,12 +119,18 @@ public class GerritClientCommentsTest {
     when(change.getFullChangeId()).thenReturn("project~main~change-id");
 
     accountCache = mock(AccountCache.class);
-    AccountState alice = mock(AccountState.class);
+    alice = mock(AccountState.class);
     Account aliceAccount = mock(Account.class);
     when(alice.account()).thenReturn(aliceAccount);
+    when(alice.userName()).thenReturn(Optional.of("alice"));
     when(aliceAccount.id()).thenReturn(Account.id(3000));
     when(aliceAccount.isActive()).thenReturn(true);
     when(accountCache.getByUsername("alice")).thenReturn(Optional.of(alice));
+    emails = mock(Emails.class);
+    ImmutableSet<Account.Id> emailAccountIds = ImmutableSet.of(Account.id(3000));
+    when(emails.getAccountFor("test@email.com")).thenReturn(emailAccountIds);
+    when(accountCache.get(emailAccountIds)).thenReturn(ImmutableMap.of(Account.id(3000), alice));
+    when(accountCache.get(ImmutableSet.<Account.Id>of())).thenReturn(ImmutableMap.of());
     permissionBackend = mock(PermissionBackend.class);
     PermissionBackend.WithUser mentionPermissions = mock(PermissionBackend.WithUser.class);
     mentionRefPermissions = mock(PermissionBackend.ForRef.class);
@@ -133,7 +146,7 @@ public class GerritClientCommentsTest {
             mock(IGerritClientPatchSet.class),
             mock(PluginDataHandlerProvider.class),
             mock(Localizer.class),
-            new ProjectUserMentionResolver(accountCache, permissionBackend));
+            new ProjectUserMentionResolver(accountCache, permissionBackend, emails));
   }
 
   @Test
@@ -246,6 +259,58 @@ public class GerritClientCommentsTest {
 
     assertTrue(client.retrieveComments(change, AiRole.USER));
     verifyNoInteractions(accountCache);
+  }
+
+  @Test
+  public void emailMentionResolvesFullAddressAndChecksBranchAccess() throws IOException {
+    latestComment().message = readEmailMention();
+
+    assertFalse(client.retrieveComments(change, AiRole.USER));
+    assertTrue(client.getCommentData().getAddressedComments().isEmpty());
+    verify(emails).getAccountFor("test@email.com");
+    verify(accountCache, never()).getByUsername("test");
+
+    when(mentionRefPermissions.testOrFalse(RefPermission.READ)).thenReturn(false);
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void unknownEmailMentionDoesNotFallBackToLocalPartUsername() throws IOException {
+    latestComment().message = readEmailMention();
+    when(emails.getAccountFor("test@email.com")).thenReturn(ImmutableSet.of());
+    when(accountCache.getByUsername("test")).thenReturn(Optional.of(alice));
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+    verify(accountCache, never()).getByUsername("test");
+  }
+
+  @Test
+  public void inactiveEmailAccountDoesNotSuppressReplyToAssistant() throws IOException {
+    latestComment().message = readEmailMention();
+    when(alice.account().isActive()).thenReturn(false);
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
+  }
+
+  @Test
+  public void emailMentionOfAuthorOrAiDoesNotSuppressReplyToAssistant() throws IOException {
+    latestComment().message = readEmailMention();
+
+    for (String username : List.of("reviewer", "reviewai")) {
+      when(alice.userName()).thenReturn(Optional.of(username));
+
+      assertTrue(client.retrieveComments(change, AiRole.USER));
+    }
+  }
+
+  @Test
+  public void failedEmailLookupDoesNotSuppressReplyToAssistant() throws IOException {
+    latestComment().message = readEmailMention();
+    when(emails.getAccountFor("test@email.com"))
+        .thenThrow(new IOException("Email lookup unavailable"));
+
+    assertTrue(client.retrieveComments(change, AiRole.USER));
   }
 
   @Test
@@ -362,6 +427,12 @@ public class GerritClientCommentsTest {
 
   private CommentInfo latestComment() {
     return comments.get("src/Test.java").getLast();
+  }
+
+  private static String readEmailMention() throws IOException {
+    return Files.readString(
+            TestResourceLoader.getTestResourcePath().resolve("__files/gerritEmailMention.txt"))
+        .trim();
   }
 
   private static Map<String, List<CommentInfo>> readComments() throws IOException {
