@@ -128,6 +128,19 @@ public class GerritClientReviewTest {
   }
 
   @Test
+  public void marksReviewVoteAsAiWhenSupported() throws Exception {
+    JsonObject fixture = prepareVotingReview();
+
+    client.setReview(
+        change, List.of(new ReviewBatch(fixture.get("comment").getAsString())), changeSetData, 1);
+
+    ArgumentCaptor<ReviewInput> input = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(input.capture());
+    assertEquals(Short.valueOf((short) 1), input.getValue().labels.get("Code-Review"));
+    assertAiVoteFlagWhenSupported(input.getValue(), Boolean.TRUE);
+  }
+
+  @Test
   public void clampsRestrictedNegativeVoteWithoutPriorApproval() throws Exception {
     assertRestrictedVoteRetry(-2, -1, "negativeError");
   }
@@ -150,6 +163,7 @@ public class GerritClientReviewTest {
         .thenAnswer(
             invocation -> {
               ReviewInput input = invocation.getArgument(0);
+              assertAiVoteFlagWhenSupported(input, Boolean.TRUE);
               attempts.add(input);
               attemptedScores.add(input.labels.get("Code-Review"));
               if (attempts.size() == 1) {
@@ -282,6 +296,11 @@ public class GerritClientReviewTest {
     client.setReview(change, batches, changeSetData);
 
     assertNull(client.getPublishedReviewScore());
+    ArgumentCaptor<ReviewInput> input = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi, times(2)).review(input.capture());
+    assertAiVoteFlagWhenSupported(input.getAllValues().getFirst(), Boolean.TRUE);
+    assertNull(input.getValue().labels);
+    assertAiVoteFlagWhenSupported(input.getValue(), null);
   }
 
   private JsonObject prepareVotingReview() throws Exception {
@@ -584,6 +603,15 @@ public class GerritClientReviewTest {
     verify(revisionApi).review(reviewInputCaptor.capture());
     assertEquals("Main review message", reviewInputCaptor.getValue().message);
     assertNull(reviewInputCaptor.getValue().comments);
+  }
+
+  private static void assertAiVoteFlagWhenSupported(ReviewInput input, Boolean expected)
+      throws Exception {
+    try {
+      assertEquals(expected, ReviewInput.class.getField("isAi").get(input));
+    } catch (NoSuchFieldException e) {
+      // Gerrit versions before 3.15.0-rc2 publish votes without an AI flag.
+    }
   }
 
   private static void assertAiFlagWhenSupported(ReviewInput.CommentInput comment) throws Exception {
