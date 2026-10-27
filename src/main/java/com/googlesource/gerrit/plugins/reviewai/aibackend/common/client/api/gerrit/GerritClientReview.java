@@ -326,6 +326,7 @@ public class GerritClientReview extends GerritClientAccount {
       comments = getReviewComments(reviewBatches);
       if (reviewScore != null) {
         reviewInput.label(LabelId.CODE_REVIEW, reviewScore);
+        markAiVote(reviewInput);
       }
     }
     if (!shouldSuppressSystemMessage(changeSetData, reviewScore)) {
@@ -393,6 +394,16 @@ public class GerritClientReview extends GerritClientAccount {
           change.getFullChangeId(),
           e);
       return null;
+    }
+  }
+
+  private static void markAiVote(ReviewInput reviewInput) {
+    try {
+      ReviewInput.class.getField("isAi").set(reviewInput, Boolean.TRUE);
+    } catch (NoSuchFieldException e) {
+      log.debug("Gerrit does not expose the AI vote flag; publishing without it.");
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException("Could not set Gerrit's AI vote flag", e);
     }
   }
 
