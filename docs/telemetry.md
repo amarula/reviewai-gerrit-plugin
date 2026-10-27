@@ -227,7 +227,7 @@ Additional behavior:
 
 ### Built-in pricing
 
-The built-in prices are USD per one million tokens and were verified on 2026-09-30 against the official
+The built-in prices are USD per one million tokens and were verified on 2026-10-27 against the official
 [OpenAI](https://developers.openai.com/api/docs/pricing),
 [Gemini](https://ai.google.dev/gemini-api/docs/pricing),
 [DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/), and
@@ -238,6 +238,7 @@ plugin, as described below.
 |--------------------------------------------------------|------:|-------------:|------------:|-------:|----------------------------------------------|
 | `OpenAI/gpt-6-astra`                                   | 10.00 |         1.00 |       12.50 |  50.00 | 20.00 / 2.00 / 25.00 / 75.00 above 272K      |
 | `OpenAI/gpt-6.1-sol`                                   |  2.00 |         0.10 |        2.50 |  10.00 | 4.00 / 0.20 / 5.00 / 15.00 above 272K        |
+| `OpenAI/gpt-6.1-terra`                                 |  1.00 |         0.05 |        1.25 |   5.00 | 2.00 / 0.10 / 2.50 / 7.50 above 272K         |
 | `OpenAI/gpt-6-sol`                                     |  2.00 |         0.20 |        2.50 |  10.00 | 4.00 / 0.40 / 5.00 / 15.00 above 272K        |
 | `OpenAI/gpt-6-luna`                                    |  0.10 |         0.01 |       0.125 |   0.50 | 0.20 / 0.02 / 0.25 / 0.75 above 272K         |
 | `OpenAI/gpt-5.6-sol`                                   |  4.00 |         0.40 |        5.00 |  20.00 | 8.00 / 0.80 / 10.00 / 30.00 above 272K       |
