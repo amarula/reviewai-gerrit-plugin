@@ -16,9 +16,12 @@
 
 package com.googlesource.gerrit.plugins.reviewai.web;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.google.gerrit.entities.Account;
@@ -30,18 +33,26 @@ import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.account.GroupCache;
 import com.google.gerrit.server.account.GroupMembership;
 import com.google.gerrit.server.change.ChangeResource;
+import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.query.change.ChangeData;
+import com.google.gson.reflect.TypeToken;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import com.googlesource.gerrit.plugins.reviewai.config.AiAgentRole;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.permissions.ConfiguredAiGroupMembership;
 import com.googlesource.gerrit.plugins.reviewai.permissions.DevAiRoleResolver;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.eclipse.jgit.lib.Config;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,6 +61,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ReviewAgentModelTest extends TestBase {
+  private static final String PLUGIN_NAME = "reviewai-gerrit-plugin";
+
   @Mock private ChangeResource changeResource;
   @Mock private ConfigCreator configCreator;
   @Mock private Configuration config;
@@ -97,6 +110,66 @@ public class ReviewAgentModelTest extends TestBase {
     assertEquals("MoonShot", response.value().models.get(1).provider);
     assertEquals("moonshot-v1-8k", response.value().models.get(1).model);
     assertTrue(response.value().canAiReview);
+  }
+
+  @Test
+  public void exposesDistinctVisibleCustomizedModelsAndDistinguishesUnsetAssignments()
+      throws Exception {
+    String fixture =
+        Files.readString(
+            TestResourceLoader.getTestResourcePath()
+                .resolve("__files/review-agent/customizedModels.json"),
+            StandardCharsets.UTF_8);
+    Map<String, ModelMenuCase> cases =
+        getGson().fromJson(fixture, new TypeToken<Map<String, ModelMenuCase>>() {}.getType());
+
+    for (var entry : cases.entrySet()) {
+      ModelMenuCase testCase = entry.getValue();
+      when(config.getAiModels(false)).thenReturn(testCase.models);
+      when(config.getSelectedAiModelRoute())
+          .thenReturn(AiModelRoute.parse(testCase.selectedModel).orElseThrow());
+      if (testCase.agentModelsError == null) {
+        doReturn(testCase.agentModels).when(config).getAiAgentModels();
+      } else {
+        Config settings = new Config();
+        settings.setStringList("plugin", PLUGIN_NAME, "aiModels", testCase.models);
+        settings.setStringList(
+            "plugin",
+            PLUGIN_NAME,
+            "aiAgentModels",
+            testCase.agentModels.entrySet().stream()
+                .map(assignment -> assignment.getKey() + "=" + assignment.getValue())
+                .toList());
+        Configuration invalidConfig =
+            new Configuration(
+                null,
+                null,
+                PluginConfig.createFromGerritConfig(PLUGIN_NAME, settings),
+                PluginConfig.createFromGerritConfig(PLUGIN_NAME, new Config()),
+                "",
+                null);
+        doAnswer(invocation -> invalidConfig.getAiAgentModels()).when(config).getAiAgentModels();
+      }
+      if (!testCase.models.contains(testCase.selectedModel)) {
+        when(config.getDefaultRealAiModelRoute())
+            .thenReturn(Optional.ofNullable(testCase.fallbackModel).flatMap(AiModelRoute::parse));
+      }
+
+      ReviewAgentModel.Output output = view.apply(changeResource).value();
+
+      assertEquals(entry.getKey(), testCase.expectedDefaultModel, output.defaultModelId);
+      assertEquals(entry.getKey(), testCase.agentModelsError, output.agentModelsError);
+      assertEquals(
+          entry.getKey(),
+          testCase.models,
+          output.models.stream().map(model -> model.modelId).toList());
+      assertEquals(
+          entry.getKey(),
+          testCase.customizedModels,
+          output.customizedModels == null
+              ? null
+              : output.customizedModels.stream().map(model -> model.modelId).toList());
+    }
   }
 
   @Test
@@ -156,5 +229,15 @@ public class ReviewAgentModelTest extends TestBase {
     when(administratorGroup.getGroupUUID()).thenReturn(administratorGroupUuid);
     when(currentUser.getEffectiveGroups()).thenReturn(groupMembership);
     when(groupMembership.contains(administratorGroupUuid)).thenReturn(true);
+  }
+
+  private static class ModelMenuCase {
+    List<String> models;
+    String selectedModel;
+    String fallbackModel;
+    Map<AiAgentRole, String> agentModels;
+    List<String> customizedModels;
+    String expectedDefaultModel;
+    String agentModelsError;
   }
 }

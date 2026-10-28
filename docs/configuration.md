@@ -242,6 +242,11 @@ In the Development build, Dynamic Configuration accepts assignments as a JSON ar
 Replace the model placeholder with a route from `aiModels`. Use `/configure --reset --aiAgentModels` to remove the
 change's dynamic assignments and return to the static configuration.
 
+When `aiAgentModels` has assignments, the sidebar's model menu contains one entry showing the current request model
+and the distinct customized models. Assignments using `REQUEST` inherit the current model and add no extra model to
+the list. Clearing the assignments restores the normal model choices. Invalid assignments appear as a configuration
+error in the menu, keeping the sidebar available to correct the configuration.
+
 Conversational replies and suggestion generation continue using the request's selected model; the router
 may use its own assignment and reconstructs its context for each call. Review steps preceding suggestion generation can
 use agent assignments. A custom `aiDomain` still applies to every selected provider, so leave it unset when using different

@@ -9,7 +9,7 @@
         return agentUtils.emptyModelsResponse();
       }
 
-      const models = agentUtils.configuredModels(modelInfo).map(model => {
+      const toModel = model => {
         const provider = agentUtils.toProviderDisplayName(model && model.provider);
         const aiModel = model && (model.model || model.ai_model);
         const modelId =
@@ -20,14 +20,33 @@
           short_text: fullDisplayText,
           full_display_text: fullDisplayText,
         };
-      });
+      };
+      let models = agentUtils.configuredModels(modelInfo).map(toModel);
+      let defaultModelId =
+        (modelInfo && (modelInfo.default_model_id || modelInfo.defaultModelId)) ||
+        (models[0] && models[0].model_id) ||
+        null;
+      const customizedModels =
+        modelInfo && (modelInfo.customized_models || modelInfo.customizedModels);
+      const agentModelsError =
+        modelInfo && (modelInfo.agent_models_error || modelInfo.agentModelsError);
+      if (Array.isArray(customizedModels) && models.length) {
+        const currentModel = models.find(model => model.model_id === defaultModelId) || models[0];
+        const customized = new Map(customizedModels.map(toModel)
+          .filter(model => model.model_id !== currentModel.model_id)
+          .map(model => [model.model_id, model.full_display_text]));
+        defaultModelId = currentModel.model_id;
+        models = [{
+          ...currentModel,
+          full_display_text: currentModel.full_display_text +
+            (customized.size ? `; customized models: ${[...customized.values()].join(', ')}` : '') +
+            (agentModelsError ? `; configuration error: ${agentModelsError}` : ''),
+        }];
+      }
 
       return {
         models,
-        default_model_id:
-          (modelInfo && (modelInfo.default_model_id || modelInfo.defaultModelId)) ||
-          (models[0] && models[0].model_id) ||
-          null,
+        default_model_id: defaultModelId,
         custom_actions: this._actions(),
       };
     },

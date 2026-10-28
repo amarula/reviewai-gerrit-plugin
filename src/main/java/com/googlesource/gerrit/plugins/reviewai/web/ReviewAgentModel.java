@@ -20,6 +20,7 @@ import com.google.gerrit.extensions.restapi.Response;
 import com.google.gerrit.extensions.restapi.RestReadView;
 import com.google.gerrit.server.change.ChangeResource;
 import com.google.inject.Inject;
+import com.googlesource.gerrit.plugins.reviewai.config.AiAgentRole;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.ConfigCreator;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -27,6 +28,7 @@ import com.googlesource.gerrit.plugins.reviewai.permissions.AiAction;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRolePolicy;
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.util.List;
+import java.util.Map;
 
 public class ReviewAgentModel implements RestReadView<ChangeResource> {
   private final ConfigCreator configCreator;
@@ -53,11 +55,34 @@ public class ReviewAgentModel implements RestReadView<ChangeResource> {
                 config, resource.getUser(), resource.getProject(), resource.getChange().getId()),
             AiAction.USE_ADMINISTRATOR_FEATURES);
     List<String> models = config.getAiModels(administratorUser);
+    List<Model> customizedModels;
+    String agentModelsError = null;
+    try {
+      customizedModels = getCustomizedModels(config, models);
+    } catch (IllegalArgumentException e) {
+      // Keep the sidebar usable so users can correct invalid agent assignments.
+      customizedModels = List.of();
+      agentModelsError = e.getMessage();
+    }
     return Response.ok(
         new Output(
             models.stream().map(Model::fromRoute).toList(),
             getDefaultModelId(config, models),
+            customizedModels,
+            agentModelsError,
             aiReviewPermission.canAiReview(resource)));
+  }
+
+  private List<Model> getCustomizedModels(Configuration config, List<String> models) {
+    Map<AiAgentRole, String> assignments = config.getAiAgentModels();
+    if (assignments.isEmpty()) {
+      return null;
+    }
+    return models.stream()
+        .filter(assignments::containsValue)
+        .distinct()
+        .map(Model::fromRoute)
+        .toList();
   }
 
   private String getDefaultModelId(Configuration config, List<String> models) {
@@ -77,11 +102,21 @@ public class ReviewAgentModel implements RestReadView<ChangeResource> {
   public static class Output {
     public final List<Model> models;
     public final String defaultModelId;
+    // Null means no agent assignments; an empty list still selects the single-entry menu.
+    public final List<Model> customizedModels;
+    public final String agentModelsError;
     public final Boolean canAiReview;
 
-    public Output(List<Model> models, String defaultModelId, Boolean canAiReview) {
+    public Output(
+        List<Model> models,
+        String defaultModelId,
+        List<Model> customizedModels,
+        String agentModelsError,
+        Boolean canAiReview) {
       this.models = models;
       this.defaultModelId = defaultModelId;
+      this.customizedModels = customizedModels;
+      this.agentModelsError = agentModelsError;
       this.canAiReview = canAiReview;
     }
   }

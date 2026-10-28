@@ -1,0 +1,62 @@
+{
+  "multipleAssignments": {
+    "models": ["OpenAI/gpt-4.1", "Gemini/gemini-2.5-flash", "DeepSeek/deepseek-v4-flash"],
+    "selectedModel": "DeepSeek/deepseek-v4-flash",
+    "agentModels": {
+      "SECURITY": "Gemini/gemini-2.5-flash",
+      "CORRECTNESS": "Gemini/gemini-2.5-flash",
+      "TESTABILITY": "OpenAI/gpt-4.1",
+      "CODE": "DeepSeek/deepseek-v4-flash",
+      "COMMIT_MESSAGE": "REQUEST"
+    },
+    "customizedModels": ["OpenAI/gpt-4.1", "Gemini/gemini-2.5-flash", "DeepSeek/deepseek-v4-flash"],
+    "expectedDefaultModel": "DeepSeek/deepseek-v4-flash",
+    "expectedShortText": "DeepSeek (deepseek-v4-flash)",
+    "expectedFullText": "DeepSeek (deepseek-v4-flash); customized models: OpenAI (gpt-4.1), Gemini (gemini-2.5-flash)"
+  },
+  "requestOnly": {
+    "models": ["OpenAI/gpt-4.1", "Gemini/gemini-2.5-flash"],
+    "selectedModel": "Gemini/gemini-2.5-flash",
+    "agentModels": {"SECURITY": "REQUEST"},
+    "customizedModels": [],
+    "expectedDefaultModel": "Gemini/gemini-2.5-flash",
+    "expectedShortText": "Gemini (gemini-2.5-flash)",
+    "expectedFullText": "Gemini (gemini-2.5-flash)"
+  },
+  "hiddenMockAssignment": {
+    "models": ["OpenAI/gpt-4.1"],
+    "selectedModel": "OpenAI/mock-ai",
+    "fallbackModel": "OpenAI/gpt-4.1",
+    "agentModels": {"SECURITY": "OpenAI/mock-ai"},
+    "customizedModels": [],
+    "expectedDefaultModel": "OpenAI/gpt-4.1",
+    "expectedShortText": "OpenAI (gpt-4.1)",
+    "expectedFullText": "OpenAI (gpt-4.1)"
+  },
+  "unconfigured": {
+    "models": ["OpenAI/gpt-4.1", "Gemini/gemini-2.5-flash"],
+    "selectedModel": "Gemini/gemini-2.5-flash",
+    "agentModels": {},
+    "customizedModels": null,
+    "expectedDefaultModel": "Gemini/gemini-2.5-flash",
+    "expectedShortText": "Gemini (gemini-2.5-flash)",
+    "expectedFullText": "Gemini (gemini-2.5-flash)"
+  },
+  "invalidAssignment": {
+    "models": ["OpenAI/gpt-6-luna"],
+    "selectedModel": "OpenAI/gpt-6-luna",
+    "agentModels": {"CODE_QUALITY": "MoonShot/kimi-k3"},
+    "customizedModels": [],
+    "agentModelsError": "aiAgentModels: CODE_QUALITY references a route outside aiModels: MoonShot/kimi-k3",
+    "expectedDefaultModel": "OpenAI/gpt-6-luna",
+    "expectedShortText": "OpenAI (gpt-6-luna)",
+    "expectedFullText": "OpenAI (gpt-6-luna); configuration error: aiAgentModels: CODE_QUALITY references a route outside aiModels: MoonShot/kimi-k3"
+  },
+  "noVisibleModels": {
+    "models": [],
+    "selectedModel": "OpenAI/mock-ai",
+    "agentModels": {"SECURITY": "OpenAI/mock-ai"},
+    "customizedModels": [],
+    "expectedDefaultModel": null
+  }
+}
