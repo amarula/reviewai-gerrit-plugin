@@ -84,11 +84,11 @@ On Gerrit 3.15, choose **Add Context → Changed file** in the change-page chat 
 floating picker. Select one file and click **Attach file**, then send a chat message to include
 that file's whole contents as additional context. To attach a portion, enable **Select lines**, then
 select text in the numbered preview or enter inclusive **Start line** and **End line** values.
-Click **Attach selection** to include only those lines. Repeat **Add Context → Changed file** to
-attach up to eight files or ranges to the same message, including separate ranges from one file.
+Click **Attach selection** to include only those lines. The picker stays open after attaching, so
+you can add up to eight files or ranges to the same message, including separate ranges from one file.
 Adding an identical attachment again keeps one chip. Each native context chip shows its pinned
 revision and selected lines and can be removed independently. Attachments are consumed together
-when the message is accepted. Cancel, Escape, or clicking outside the picker closes it without
+when the message is accepted. **Finish**, Escape, or clicking outside the picker closes it without
 changing the attachments. Conversation history records the complete set, and regenerating the
 answer reuses the original files, revisions, and line ranges.
 Only changed, regular UTF-8 text files up to 64 KiB are supported; deleted and binary files are

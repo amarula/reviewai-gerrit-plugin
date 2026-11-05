@@ -105,7 +105,7 @@
           </fieldset>
           <div id="range-status" role="status" hidden></div>
           <div id="actions">
-            <button id="cancel" type="button">Cancel</button>
+            <button id="finish" type="button">Finish</button>
             <button id="attach" type="button" disabled>Attach file</button>
           </div>
         </section>`;
@@ -131,7 +131,10 @@
         this._lineNumbers.scrollTop = this._preview.scrollTop;
       });
       this._attachButton.addEventListener('click', () => this._attach());
-      this.shadowRoot.querySelector('#cancel').addEventListener('click', () => this._close());
+      this.shadowRoot.querySelector('#finish').addEventListener('click', () => {
+        this._close();
+        this._anchor?.focus();
+      });
       this._onMenuClick = event => this._handleMenuClick(event);
       this._positionPopover = () => this._position();
       this._observer = new MutationObserver(() => this._connectNativeMenu());
@@ -235,7 +238,10 @@
       // Restored turns retain their chips for history, but attachments are one-shot drafts.
       this._contextChips().filter(chip => chip.contextItem.reviewai_consumed)
         .forEach(chip => this._removeItem(chip.contextItem));
-      if (this._popover.matches(':popover-open')) this._updateRange();
+      if (this._popover.matches(':popover-open')) {
+        this._updateRange();
+        this._position();
+      }
     }
 
     _handleMenuClick(event) {
@@ -301,8 +307,6 @@
           detail: item, bubbles: true, composed: true,
         }));
       }
-      this._close();
-      this._anchor?.focus();
     }
 
     _fileChanged(existing) {
