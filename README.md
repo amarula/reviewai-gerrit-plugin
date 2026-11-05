@@ -82,13 +82,16 @@ as scoped Patch Set and Commit Message reviews.
 
 On Gerrit 3.15, choose **Add Context → Changed file** in the change-page chat sidebar to open a
 floating picker. Select one file and click **Attach file**, then send a chat message to include
-that file's whole contents as additional context. The native removable context chip shows its
-pinned revision and is consumed when the message is accepted. Cancel, Escape, or clicking outside
-the picker closes it without changing the attachment. Conversation
-history records the attachment, and regenerating the answer reuses the original file and revision.
+that file's whole contents as additional context. To attach a portion, enable **Select lines**, then
+select text in the numbered preview or enter inclusive **Start line** and **End line** values.
+Click **Attach selection** to include only those lines. The native removable context chip shows
+the pinned revision and selected lines, and is consumed when the message is accepted. Cancel,
+Escape, or clicking outside the picker closes it without changing the attachment. Conversation
+history records the attachment, and regenerating the answer reuses the original file, revision,
+and line range.
 Only changed, regular UTF-8 text files up to 64 KiB are supported; deleted and binary files are
-excluded. Attachments apply to chat messages, not review or configuration commands. Line-range
-selection and repository-wide browsing are not available yet.
+excluded. The 64 KiB limit applies to the whole file even when selecting a range. Attachments apply
+to chat messages, not review or configuration commands. Repository-wide browsing is not available yet.
 
 ### Model Selection
 

@@ -10,6 +10,9 @@ const fixture = JSON.parse(fs.readFileSync(
 const versions = JSON.parse(fs.readFileSync(
   path.join(__dirname, '../resources/__files/reviewagent/context-picker-versions.json'), 'utf8'
 ));
+const ranges = JSON.parse(fs.readFileSync(
+  path.join(__dirname, '../resources/__files/reviewagent/code-context-ranges.json'), 'utf8'
+));
 const scriptsRoot = path.join(__dirname, '../../main/resources/static/reviewai');
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -269,4 +272,37 @@ test('more than one native file chip is rejected before sending', async () => {
   const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}`);
   assert.match(await h.send({external_contexts: [item, {...item}]}), /Attach one changed file/);
   assert.equal(h.sent.length, 0);
+});
+
+test('a selected line range survives sending, saving and regeneration after reload', async () => {
+  const h = harness();
+  h.context.selected = h.nativeContext.selected;
+  const type = (await h.provider.getContextItemTypes())[0];
+  const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}#L${ranges.start_line}-L${ranges.end_line}`);
+  assert.ok(item.title.includes(`:${ranges.start_line}–${ranges.end_line}`));
+  const response = await h.send({external_contexts: [item]});
+  const expected = {revision: fixture.revision, path: fixture.path,
+    start_line: ranges.start_line, end_line: ranges.end_line};
+  assert.deepEqual(h.sent[0].code_context, expected);
+  const saved = h.conversations.get('conversation-1').turns[0];
+  assert.deepEqual(saved.code_context, expected);
+  assert.equal(JSON.parse(saved.user_input.client_data).contextItems[0].identifier, item.identifier);
+  assert.ok(response.includes(`lines ${ranges.start_line}–${ranges.end_line}`));
+  const restored = harness(h.conversations);
+  await restored.send({regeneration_index: 1});
+  assert.deepEqual(restored.sent[0].code_context, expected);
+  assert.deepEqual(restored.conversations.get('conversation-1').turns[0].code_context, expected);
+});
+
+test('invalid ranges cannot become native attachments', () => {
+  const h = harness();
+  const type = h.nativeContext.types()[0];
+  const reference = `reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}`;
+  for (const invalid of ranges.invalid_ranges.filter(value =>
+    !value.start_line || !value.end_line || value.start_line < 1 || value.end_line < value.start_line)) {
+    assert.equal(type.parse(`${reference}#L${invalid.start_line}-L${invalid.end_line}`), undefined);
+  }
+  const pathWithHash = `${fixture.path}#L1-L2`;
+  const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(pathWithHash)}`);
+  assert.equal(h.nativeContext.selected(h.request.change, {external_contexts: [item]}).path, pathWithHash);
 });

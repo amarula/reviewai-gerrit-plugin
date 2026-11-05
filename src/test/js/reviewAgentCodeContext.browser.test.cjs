@@ -6,6 +6,7 @@ const {chromium} = require('playwright');
 
 const resources = path.join(__dirname, '../resources/__files/reviewagent');
 const fixture = JSON.parse(fs.readFileSync(path.join(resources, 'code-context.json'), 'utf8'));
+const ranges = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-ranges.json'), 'utf8'));
 const files = JSON.parse(fs.readFileSync(path.join(resources, 'context-picker-files.json'), 'utf8'));
 const source = path.join(__dirname, '../../main/resources/static/reviewai/reviewAgent/reviewAgentCodeContext.js');
 let browser;
@@ -28,12 +29,23 @@ async function harness(t) {
     window.plugin = {
       getPluginName: () => 'reviewai',
       registerCustomComponent: () => {},
-      restApi: () => ({get: async url => {
-        window.fetches.push(url);
-        if (url.endsWith('ai-review-agent-model')) return window.models;
-        if (window.failFiles) throw new Error('Could not read changed files');
-        return window.files;
-      }}),
+      restApi: () => ({
+        get: async url => {
+          window.fetches.push(url);
+          if (url.endsWith('ai-review-agent-model')) return window.models;
+          if (window.failFiles) throw new Error('Could not read changed files');
+          return window.files;
+        },
+        fetch: async (method, url) => {
+          window.fetches.push(url);
+          if (window.failPreview) throw new Error('Could not read file preview');
+          if (window.delayPreview) await new Promise(resolve => { window.resolvePreview = resolve; });
+          const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(window.previewContent ?? fixture.content)));
+          return window.previewJson
+            ? new Response(")]}'\n" + JSON.stringify(encoded), {headers: {'Content-Type': 'application/json'}})
+            : new Response(encoded, {headers: {'Content-Type': 'text/plain'}});
+        },
+      }),
     };
     window.change = {_number: 42, current_revision: fixture.revision,
       revisions: {[fixture.revision]: {_number: 1}}};
@@ -68,7 +80,17 @@ async function harness(t) {
     await dialog.getByRole('button', {name: 'Attach file', exact: true}).click();
     await dialog.waitFor({state: 'hidden'});
   };
-  return {page, picker, dialog, select, items, open, attach};
+  const rangeToggle = dialog.getByRole('checkbox', {name: 'Select lines', exact: true});
+  const preview = dialog.getByRole('textbox', {name: 'File preview', exact: true});
+  const selectRange = async () => {
+    await open();
+    await select.selectOption(fixture.path);
+    await rangeToggle.check();
+    await preview.waitFor({state: 'visible'});
+    await dialog.getByRole('spinbutton', {name: 'Start line'}).waitFor();
+    await page.waitForFunction(() => !document.querySelector('reviewai-code-context').shadowRoot.querySelector('#range-fields').disabled);
+  };
+  return {page, picker, dialog, select, items, open, attach, rangeToggle, preview, selectRange};
 }
 
 test('Add Context opens a floating picker without taking sidebar space or opening link input', async t => {
@@ -195,4 +217,97 @@ test('restored history chips do not become attachments on the next draft', async
     prompt.renderChips();
   });
   await h.page.waitForFunction(() => originalPanel.shadowRoot.querySelector('prompt-box').items.length === 0);
+});
+
+test('selecting text in the preview attaches its inclusive lines and restores them when reopened', async t => {
+  const h = await harness(t);
+  await h.selectRange();
+  assert.equal(await h.preview.inputValue(), fixture.content);
+  const previewBox = await h.preview.boundingBox();
+  await h.page.mouse.move(previewBox.x + 16, previewBox.y + 6 + 18 * (ranges.start_line - 0.5));
+  await h.page.mouse.down();
+  await h.page.mouse.move(previewBox.x + 70, previewBox.y + 6 + 18 * (ranges.end_line - 0.5));
+  await h.page.mouse.up();
+  assert.equal(await h.dialog.getByRole('spinbutton', {name: 'Start line'}).inputValue(), String(ranges.start_line));
+  assert.equal(await h.dialog.getByRole('spinbutton', {name: 'End line'}).inputValue(), String(ranges.end_line));
+  await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).click();
+  const expected = {revision: fixture.revision, path: fixture.path,
+    start_line: ranges.start_line, end_line: ranges.end_line};
+  assert.deepEqual(await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
+  }), expected);
+  assert.ok((await h.items())[0].title.includes(`:${ranges.start_line}–${ranges.end_line}`));
+  await h.open();
+  await h.preview.waitFor({state: 'visible'});
+  assert.equal(await h.rangeToggle.isChecked(), true);
+  assert.equal(await h.dialog.getByRole('spinbutton', {name: 'Start line'}).inputValue(), String(ranges.start_line));
+  assert.equal(await h.dialog.getByRole('spinbutton', {name: 'End line'}).inputValue(), String(ranges.end_line));
+  const box = await h.dialog.boundingBox();
+  assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= 440 && box.y + box.height <= 740);
+});
+
+test('line controls validate ranges and keep the preview selection in sync', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(() => { window.previewJson = true; });
+  await h.selectRange();
+  const attach = h.dialog.getByRole('button', {name: 'Attach selection', exact: true});
+  for (const range of ranges.invalid_ranges) {
+    await h.dialog.getByRole('spinbutton', {name: 'Start line'}).fill(String(range.start_line ?? ''));
+    await h.dialog.getByRole('spinbutton', {name: 'End line'}).fill(String(range.end_line ?? ''));
+    assert.equal(await attach.isDisabled(), true);
+  }
+  await h.dialog.getByRole('spinbutton', {name: 'Start line'}).fill(String(ranges.start_line));
+  await h.dialog.getByRole('spinbutton', {name: 'End line'}).fill(String(ranges.end_line));
+  assert.equal(await attach.isDisabled(), false);
+  const selectedText = await h.preview.evaluate(element => element.value.slice(element.selectionStart, element.selectionEnd));
+  assert.equal(selectedText.trimEnd(), ranges.content.trimEnd());
+});
+
+test('switching back to whole-file mode removes the range from the attachment', async t => {
+  const h = await harness(t);
+  await h.selectRange();
+  await h.rangeToggle.uncheck();
+  assert.equal(await h.preview.isVisible(), false);
+  await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).click();
+  assert.deepEqual(await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
+  }), {revision: fixture.revision, path: fixture.path});
+});
+
+test('preview failures block range attachments while whole-file mode remains usable', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(() => { window.failPreview = true; });
+  await h.open();
+  await h.select.selectOption(fixture.path);
+  await h.rangeToggle.check();
+  await h.page.getByText('Could not read file preview', {exact: true}).waitFor();
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).isDisabled(), true);
+  await h.rangeToggle.uncheck();
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), false);
+});
+
+test('changing files discards an in-flight preview and its range', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(() => { window.delayPreview = true; });
+  await h.open();
+  await h.select.selectOption(fixture.path);
+  await h.rangeToggle.check();
+  await h.page.waitForFunction(() => typeof window.resolvePreview === 'function');
+  await h.select.selectOption('src/Other.java');
+  await h.page.evaluate(() => window.resolvePreview());
+  assert.equal(await h.rangeToggle.isChecked(), false);
+  assert.equal(await h.picker.locator('#preview').inputValue(), '');
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), false);
+});
+
+test('empty files have no selectable lines', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(value => { window.previewContent = value; }, ranges.empty_content);
+  await h.open();
+  await h.select.selectOption(fixture.path);
+  await h.rangeToggle.check();
+  await h.page.getByText('This file has no lines to select.', {exact: true}).waitFor();
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).isDisabled(), true);
 });
