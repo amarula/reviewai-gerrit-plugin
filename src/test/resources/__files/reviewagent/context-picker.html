@@ -14,13 +14,45 @@
     set open(value) { this.hidden = !value; }
     get open() { return !this.hidden; }
   });
+  customElements.define('md-filter-chip', class extends HTMLElement {
+    connectedCallback() {
+      if (this.shadowRoot) return;
+      const root = this.attachShadow({mode: 'open'});
+      // Relevant Material 2.5 chip layout: a shrinking primary action and a trailing remove action.
+      root.innerHTML = `
+        <style>
+          :host { display: inline-flex; }
+          .container { display: flex; width: 100%; box-sizing: border-box; }
+          .action { display: flex; align-items: center; border: 0; padding: 2px 6px; background: none; }
+          .primary.action { min-width: 0; }
+          .label { display: flex; overflow: hidden; }
+          .label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .leading { width: 12px; flex-shrink: 0; margin-right: 4px; }
+          .trailing { min-width: 24px; }
+        </style>
+        <div class="container">
+          <button class="primary action"><span class="leading">▤</span><span class="label"><span class="label-text"><slot></slot></span></span></button>
+          <button class="trailing action" aria-label="Remove context">×</button>
+        </div>`;
+      root.querySelector('.trailing').addEventListener('click', () => this.dispatchEvent(
+        new CustomEvent('remove', {bubbles: true, composed: true})
+      ));
+    }
+  });
   customElements.define('context-chip', class extends HTMLElement {
     connectedCallback() {
       if (this.shadowRoot) return;
       const root = this.attachShadow({mode: 'open'});
-      root.innerHTML = '<style>:host{display:inline-flex;padding:4px;border:1px solid #ccc;border-radius:12px;gap:6px}</style><span></span><button aria-label="Remove context">×</button>';
-      root.querySelector('span').textContent = this.contextItem.title;
-      root.querySelector('button').addEventListener('click', () => this.dispatchEvent(
+      root.innerHTML = `
+        <style>
+          :host { overflow: hidden; max-width: 300px; }
+          md-filter-chip { overflow: hidden; border: 1px solid #ccc; border-radius: 8px; }
+          .context-chip-container { display: flex; flex-wrap: nowrap; align-items: center; }
+          .context-chip-title { padding-top: 2px; }
+        </style>
+        <md-filter-chip class="context-chip"><div class="context-chip-container"><span class="context-chip-title"></span></div></md-filter-chip>`;
+      root.querySelector('.context-chip-title').textContent = this.contextItem.title;
+      root.querySelector('md-filter-chip').addEventListener('remove', () => this.dispatchEvent(
         new CustomEvent('remove-context-chip', {bubbles: true, composed: true})
       ));
     }
@@ -82,7 +114,7 @@
       root.innerHTML = `
         <style>:host { display: block; border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
           textarea { width: 100%; box-sizing: border-box; resize: none; border: none; padding: 6px; }
-          #attachments { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }</style>
+          #attachments { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }</style>
         <textarea aria-label="Chat prompt" placeholder="Enter a prompt here…"></textarea>
         <div><context-input-chip></context-input-chip><span>This Change</span></div>
         <span id="attachments"></span>`;
