@@ -8,16 +8,16 @@
     },
 
     createSendMessage(plugin, pluginName) {
-      return (change, message, modelId, reviewAgent, requestId, codeContext) =>
+      return (change, message, modelId, reviewAgent, requestId, codeContexts) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
           model_id: modelId,
           model_name: modelId,
           review_agent: Boolean(reviewAgent),
           request_id: requestId,
-          code_context: codeContext
-            ? {revision: codeContext.revision, path: codeContext.path,
-              start_line: codeContext.start_line, end_line: codeContext.end_line} : undefined,
+          code_contexts: codeContexts?.length
+            ? codeContexts.map(file => ({revision: file.revision, path: file.path,
+              start_line: file.start_line, end_line: file.end_line})) : undefined,
         });
     },
 

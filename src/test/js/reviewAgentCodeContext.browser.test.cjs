@@ -7,6 +7,7 @@ const {chromium} = require('playwright');
 const resources = path.join(__dirname, '../resources/__files/reviewagent');
 const fixture = JSON.parse(fs.readFileSync(path.join(resources, 'code-context.json'), 'utf8'));
 const ranges = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-ranges.json'), 'utf8'));
+const multiple = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-multiple.json'), 'utf8'));
 const files = JSON.parse(fs.readFileSync(path.join(resources, 'context-picker-files.json'), 'utf8'));
 const source = path.join(__dirname, '../../main/resources/static/reviewai/reviewAgent/reviewAgentCodeContext.js');
 let browser;
@@ -119,7 +120,7 @@ test('attaching uses native removable chips and consuming a request clears its d
     const file = ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
     ReviewAi.codeContext.consume(change, file);
     return file;
-  }), {revision: fixture.revision, path: fixture.path});
+  }), [{revision: fixture.revision, path: fixture.path}]);
   assert.deepEqual(await h.items(), []);
   await h.attach(fixture.path);
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).click();
@@ -144,7 +145,7 @@ test('Cancel, Escape and outside clicks dismiss the panel without changing attac
   assert.deepEqual(await h.items(), original);
 });
 
-test('a new file replaces the previous one and an older request cannot consume a newer selection', async t => {
+test('a new file preserves existing chips and an older request cannot consume a newer selection', async t => {
   const h = await harness(t);
   await h.attach(fixture.path);
   await h.page.evaluate(() => {
@@ -152,6 +153,7 @@ test('a new file replaces the previous one and an older request cannot consume a
     window.previousSnapshot = ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
   });
   await h.attach('src/Other.java');
+  assert.equal((await h.items()).length, 2);
   await h.page.evaluate(() => ReviewAi.codeContext.consume(change, previousSnapshot));
   assert.equal((await h.items()).length, 1);
   assert.ok((await h.items())[0].title.startsWith('src/Other.java'));
@@ -236,7 +238,7 @@ test('selecting text in the preview attaches its inclusive lines and restores th
   assert.deepEqual(await h.page.evaluate(() => {
     const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
     return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
-  }), expected);
+  }), [expected]);
   assert.ok((await h.items())[0].title.includes(`:${ranges.start_line}–${ranges.end_line}`));
   await h.open();
   await h.preview.waitFor({state: 'visible'});
@@ -273,7 +275,7 @@ test('switching back to whole-file mode removes the range from the attachment', 
   assert.deepEqual(await h.page.evaluate(() => {
     const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
     return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
-  }), {revision: fixture.revision, path: fixture.path});
+  }), [{revision: fixture.revision, path: fixture.path}]);
 });
 
 test('preview failures block range attachments while whole-file mode remains usable', async t => {
@@ -310,4 +312,64 @@ test('empty files have no selectable lines', async t => {
   await h.rangeToggle.check();
   await h.page.getByText('This file has no lines to select.', {exact: true}).waitFor();
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).isDisabled(), true);
+});
+
+test('multiple ranges from one file and another whole file have independently removable chips', async t => {
+  const h = await harness(t);
+  const expected = multiple.attachments.map(file => ({revision: fixture.revision, ...file}));
+  for (const file of multiple.attachments) {
+    if (file.start_line) {
+      await h.selectRange();
+      await h.dialog.getByRole('spinbutton', {name: 'Start line'}).fill(String(file.start_line));
+      await h.dialog.getByRole('spinbutton', {name: 'End line'}).fill(String(file.end_line));
+      await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).click();
+    } else await h.attach(file.path);
+  }
+  assert.equal((await h.items()).length, expected.length);
+  assert.deepEqual(await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
+  }), expected);
+  await h.page.getByRole('button', {name: 'Remove context', exact: true}).nth(1).click();
+  assert.deepEqual(await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    const selected = ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
+    ReviewAi.codeContext.consume(change, selected);
+    return selected;
+  }), [expected[0], expected[2]]);
+  assert.deepEqual(await h.items(), []);
+});
+
+test('attaching an identical file twice keeps one chip', async t => {
+  const h = await harness(t);
+  await h.attach(fixture.path);
+  const original = await h.items();
+  await h.attach(fixture.path);
+  assert.deepEqual(await h.items(), original);
+});
+
+test('the attachment limit blocks new chips until one is removed', async t => {
+  const h = await harness(t);
+  const limit = await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    const parse = ReviewAi.codeContext.types()[0].parse;
+    const count = fixture.content.trimEnd().split('\n').length;
+    const items = [];
+    for (let start = 1; start <= count; start++) {
+      for (let end = start; end <= count && items.length < ReviewAi.codeContext.maxAttachments; end++) {
+        items.push(parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}#L${start}-L${end}`));
+      }
+    }
+    prompt.items = items;
+    prompt.renderChips();
+    return ReviewAi.codeContext.maxAttachments;
+  });
+  await h.open();
+  await h.select.selectOption('src/Other.java');
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), true);
+  assert.match(await h.picker.locator('#attachment-count').textContent(), /Remove a chip/);
+  await h.dialog.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await h.page.getByRole('button', {name: 'Remove context', exact: true}).first().click();
+  await h.attach('src/Other.java');
+  assert.equal((await h.items()).length, limit);
 });
