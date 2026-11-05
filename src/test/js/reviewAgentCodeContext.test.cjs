@@ -13,6 +13,9 @@ const versions = JSON.parse(fs.readFileSync(
 const ranges = JSON.parse(fs.readFileSync(
   path.join(__dirname, '../resources/__files/reviewagent/code-context-ranges.json'), 'utf8'
 ));
+const multiple = JSON.parse(fs.readFileSync(
+  path.join(__dirname, '../resources/__files/reviewagent/code-context-multiple.json'), 'utf8'
+));
 const scriptsRoot = path.join(__dirname, '../../main/resources/static/reviewai');
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -57,9 +60,9 @@ function harness(conversations = new Map(), serverVersion = versions.supported[0
     aiCodeReview: () => ({register: value => { provider = value; }}),
   };
   sandbox.ReviewAi.codeContext.selected = change =>
-    selection && selection.change === change._number ? selection : null;
-  sandbox.ReviewAi.codeContext.consume = (change, file) => {
-    if (file && selection === file && selection.change === change._number) selection = null;
+    selection && selection.change === change._number ? [selection] : [];
+  sandbox.ReviewAi.codeContext.consume = (change, files) => {
+    if (selection && files.includes(selection) && selection.change === change._number) selection = null;
   };
   sandbox.ReviewAi.agent.register(plugin, 'reviewai', serverVersion);
   const request = {
@@ -92,13 +95,13 @@ test('sends and persists the pinned attachment, then consumes the pending select
   const h = harness();
   const response = await h.send();
   const expected = {revision: fixture.revision, path: fixture.path};
-  assert.deepEqual(h.sent[0].code_context, expected);
-  assert.deepEqual(h.conversations.get('conversation-1').turns[0].code_context, expected);
+  assert.deepEqual(h.sent[0].code_contexts, [expected]);
+  assert.deepEqual(h.conversations.get('conversation-1').turns[0].code_contexts, [expected]);
   assert.ok(response.includes(fixture.path));
   assert.ok(response.includes(fixture.content));
   assert.equal(h.selection, null);
   await h.send({turn_index: 1});
-  assert.equal(h.sent[1].code_context, undefined);
+  assert.equal(h.sent[1].code_contexts, undefined);
 });
 
 test('snapshots selection before asynchronous model lookup', async () => {
@@ -111,7 +114,7 @@ test('snapshots selection before asynchronous model lookup', async () => {
   h.selection = null;
   resolveModels({can_ai_review: true});
   await sending;
-  assert.equal(h.sent[0].code_context.revision, fixture.revision);
+  assert.equal(h.sent[0].code_contexts[0].revision, fixture.revision);
 });
 
 test('regeneration after reload restores saved context, not a newly selected file', async () => {
@@ -121,7 +124,7 @@ test('regeneration after reload restores saved context, not a newly selected fil
   const newSelection = {...restored.selection, revision: fixture.revision.split('').reverse().join('')};
   restored.selection = newSelection;
   await restored.send({regeneration_index: 1});
-  assert.equal(restored.sent[0].code_context.revision, fixture.revision);
+  assert.equal(restored.sent[0].code_contexts[0].revision, fixture.revision);
   assert.equal(restored.selection, newSelection);
 });
 
@@ -131,7 +134,7 @@ test('regeneration of an unattached turn does not pick up pending context', asyn
   await original.send();
   const restored = harness(original.conversations);
   await restored.send({regeneration_index: 1});
-  assert.equal(restored.sent[0].code_context, undefined);
+  assert.equal(restored.sent[0].code_contexts, undefined);
   assert.ok(restored.selection);
 });
 
@@ -141,7 +144,7 @@ test('regeneration normalizes plain-text prompts from older conversation history
   }]}]]));
   await h.send({regeneration_index: 1});
   assert.equal(h.sent[0].message, fixture.message);
-  assert.equal(h.sent[0].code_context, undefined);
+  assert.equal(h.sent[0].code_contexts, undefined);
 });
 
 test('failed sends retain the attachment for retry', async () => {
@@ -154,13 +157,13 @@ test('failed sends retain the attachment for retry', async () => {
   assert.equal(h.conversations.size, 0);
   h.api.post = post;
   await h.send({regeneration_index: 1});
-  assert.equal(h.sent[0].code_context.revision, fixture.revision);
+  assert.equal(h.sent[0].code_contexts[0].revision, fixture.revision);
   assert.equal(h.selection, null);
 });
 
 test('review commands reject attachments without consuming or posting them', async () => {
   const h = harness();
-  assert.match(await h.send({prompt: '/review'}), /Remove the file to run a command/);
+  assert.match(await h.send({prompt: '/review'}), /Remove the attachments to run a command/);
   assert.equal(h.sent.length, 0);
   assert.ok(h.selection);
 });
@@ -168,7 +171,7 @@ test('review commands reject attachments without consuming or posting them', asy
 test('context selected for another change is not sent', async () => {
   const h = harness();
   await h.send({change: {_number: 43}});
-  assert.equal(h.sent[0].code_context, undefined);
+  assert.equal(h.sent[0].code_contexts, undefined);
   assert.ok(h.selection);
 });
 
@@ -242,12 +245,12 @@ test('native context chips are forwarded and persisted as pinned code attachment
   const type = (await h.provider.getContextItemTypes())[0];
   const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}`);
   await h.send({external_contexts: [item]});
-  assert.deepEqual(h.sent[0].code_context, {revision: fixture.revision, path: fixture.path});
-  assert.deepEqual(h.conversations.get('conversation-1').turns[0].code_context, h.sent[0].code_context);
+  assert.deepEqual(h.sent[0].code_contexts, [{revision: fixture.revision, path: fixture.path}]);
+  assert.deepEqual(h.conversations.get('conversation-1').turns[0].code_contexts, h.sent[0].code_contexts);
   const first = JSON.parse(h.conversations.get('conversation-1').turns[0].user_input.client_data);
   assert.equal(first.contextItems[0].identifier, item.identifier);
   assert.equal(first.contextItems[0].reviewai_consumed, true);
-  assert.equal(h.nativeContext.selected(h.request.change, {external_contexts: first.contextItems}), null);
+  assert.deepEqual(plain(h.nativeContext.selected(h.request.change, {external_contexts: first.contextItems})), []);
   await h.send({turn_index: 1, external_contexts: []});
   const following = JSON.parse(h.conversations.get('conversation-1').turns[1].user_input.client_data);
   assert.equal(following.overridesPreviousTurn, true);
@@ -265,12 +268,13 @@ test('invalid or cross-change context references cannot become attachments', asy
     /does not belong to this change/);
 });
 
-test('more than one native file chip is rejected before sending', async () => {
+test('too many native file chips are rejected before sending', async () => {
   const h = harness();
   h.context.selected = h.nativeContext.selected;
   const type = (await h.provider.getContextItemTypes())[0];
   const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}`);
-  assert.match(await h.send({external_contexts: [item, {...item}]}), /Attach one changed file/);
+  assert.match(await h.send({external_contexts: Array(h.nativeContext.maxAttachments + 1).fill(item)}),
+    /Remove the extra attachments/);
   assert.equal(h.sent.length, 0);
 });
 
@@ -283,15 +287,15 @@ test('a selected line range survives sending, saving and regeneration after relo
   const response = await h.send({external_contexts: [item]});
   const expected = {revision: fixture.revision, path: fixture.path,
     start_line: ranges.start_line, end_line: ranges.end_line};
-  assert.deepEqual(h.sent[0].code_context, expected);
+  assert.deepEqual(h.sent[0].code_contexts, [expected]);
   const saved = h.conversations.get('conversation-1').turns[0];
-  assert.deepEqual(saved.code_context, expected);
+  assert.deepEqual(saved.code_contexts, [expected]);
   assert.equal(JSON.parse(saved.user_input.client_data).contextItems[0].identifier, item.identifier);
   assert.ok(response.includes(`lines ${ranges.start_line}–${ranges.end_line}`));
   const restored = harness(h.conversations);
   await restored.send({regeneration_index: 1});
-  assert.deepEqual(restored.sent[0].code_context, expected);
-  assert.deepEqual(restored.conversations.get('conversation-1').turns[0].code_context, expected);
+  assert.deepEqual(restored.sent[0].code_contexts, [expected]);
+  assert.deepEqual(restored.conversations.get('conversation-1').turns[0].code_contexts, [expected]);
 });
 
 test('invalid ranges cannot become native attachments', () => {
@@ -304,5 +308,69 @@ test('invalid ranges cannot become native attachments', () => {
   }
   const pathWithHash = `${fixture.path}#L1-L2`;
   const item = type.parse(`reviewai-file:42:${fixture.revision}:${encodeURIComponent(pathWithHash)}`);
-  assert.equal(h.nativeContext.selected(h.request.change, {external_contexts: [item]}).path, pathWithHash);
+  assert.equal(h.nativeContext.selected(h.request.change, {external_contexts: [item]})[0].path, pathWithHash);
+});
+
+test('multiple files and ranges survive sending, saving and regeneration as one set', async () => {
+  const h = harness();
+  h.context.selected = h.nativeContext.selected;
+  const type = h.nativeContext.types()[0];
+  const expected = multiple.attachments.map(file => ({revision: fixture.revision, ...file}));
+  const items = expected.map(file => type.parse(
+    `reviewai-file:42:${file.revision}:${encodeURIComponent(file.path)}` +
+    (file.start_line ? `#L${file.start_line}-L${file.end_line}` : '')
+  ));
+  const response = await h.send({external_contexts: [...items, items[0]]});
+  assert.deepEqual(h.sent[0].code_contexts, expected);
+  assert.deepEqual(h.conversations.get('conversation-1').turns[0].code_contexts, expected);
+  for (const file of expected) assert.ok(response.includes(file.path));
+  const restored = harness(h.conversations);
+  const pending = restored.selection;
+  await restored.send({regeneration_index: 1});
+  assert.deepEqual(restored.sent[0].code_contexts, expected);
+  assert.equal(restored.selection, pending);
+});
+
+test('legacy single-file history can still be regenerated', async () => {
+  const attachment = {revision: fixture.revision, path: fixture.path,
+    start_line: ranges.start_line, end_line: ranges.end_line};
+  const h = harness(new Map([['conversation-1', {turns: [{
+    user_input: {user_question: fixture.message}, code_context: attachment,
+  }]}]]));
+  await h.send({regeneration_index: 1});
+  assert.deepEqual(h.sent[0].code_contexts, [attachment]);
+});
+
+test('one invalid attachment rejects the entire set', async () => {
+  const h = harness();
+  h.context.selected = h.nativeContext.selected;
+  const type = h.nativeContext.types()[0];
+  const reference = `reviewai-file:42:${fixture.revision}:${encodeURIComponent(fixture.path)}`;
+  const wrongChange = reference.replace('file:42:', 'file:43:');
+  assert.match(await h.send({external_contexts: [type.parse(reference), type.parse(wrongChange)]}),
+    /does not belong to this change/);
+  assert.equal(h.sent.length, 0);
+  assert.equal(h.conversations.size, 0);
+});
+
+test('failed multi-attachment sends preserve the original set for retry', async () => {
+  const h = harness();
+  h.context.selected = h.nativeContext.selected;
+  const type = h.nativeContext.types()[0];
+  const expected = multiple.attachments.map(file => ({revision: fixture.revision, ...file}));
+  const items = expected.map(file => type.parse(
+    `reviewai-file:42:${file.revision}:${encodeURIComponent(file.path)}` +
+    (file.start_line ? `#L${file.start_line}-L${file.end_line}` : '')
+  ));
+  const consumed = [];
+  h.context.consume = (change, attachments) => consumed.push(plain(attachments));
+  const post = h.api.post;
+  h.api.post = async () => { throw new Error('File is no longer accessible'); };
+  assert.match(await h.send({external_contexts: items}), /File is no longer accessible/);
+  assert.deepEqual(consumed, []);
+  assert.equal(h.conversations.size, 0);
+  h.api.post = post;
+  await h.send({regeneration_index: 1, external_contexts: []});
+  assert.deepEqual(h.sent[0].code_contexts, expected);
+  assert.deepEqual(consumed, [expected]);
 });
