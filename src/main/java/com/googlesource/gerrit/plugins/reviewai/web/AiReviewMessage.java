@@ -53,6 +53,7 @@ import com.googlesource.gerrit.plugins.reviewai.localization.SystemMessageFormat
 import com.googlesource.gerrit.plugins.reviewai.permissions.AiRoleResolver;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -142,14 +143,25 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     ReviewAgentRequestStatusStore statusStore = getStatusStore(resource);
     aiReviewPermission.checkCanAiReview(resource);
     String codeContextTag = null;
-    if (input != null && input.codeContext != null) {
+    if (input != null && input.codeContext != null && input.codeContexts != null) {
+      throw new BadRequestException("Use code_contexts or code_context, not both");
+    }
+    List<GerritCodeContext.Attachment> codeContexts =
+        input == null
+            ? List.of()
+            : input.codeContexts != null
+                ? GerritCodeContext.validateAttachments(input.codeContexts)
+                : input.codeContext != null ? List.of(input.codeContext) : List.of();
+    if (!codeContexts.isEmpty()) {
       if (!reviewAgent || !message.matches("(?s)^/message\\s+.+")) {
         throw new BadRequestException("Code attachments are supported for chat messages only");
       }
       ChangeApi contextChange =
           gerritApi.changes().id(resource.getProject().get(), resource.getChange().getChangeId());
-      GerritCodeContext.read(contextChange, input.codeContext);
-      codeContextTag = GerritCodeContext.toTag(input.codeContext);
+      for (var attachment : codeContexts) {
+        GerritCodeContext.read(contextChange, attachment);
+      }
+      codeContextTag = GerritCodeContext.toTag(codeContexts);
     }
     storeSelectedModel(resource, input, config);
     if (ClientCommandBase.shouldSkipGerritMessage(message)) {
@@ -233,6 +245,11 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
         value = "code_context",
         alternate = {"codeContext"})
     public GerritCodeContext.Attachment codeContext;
+
+    @SerializedName(
+        value = "code_contexts",
+        alternate = {"codeContexts"})
+    public List<GerritCodeContext.Attachment> codeContexts;
 
     @SerializedName(
         value = "model_id",
