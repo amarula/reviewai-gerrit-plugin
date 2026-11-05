@@ -18,15 +18,24 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.op
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.ModelCompatibility;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.OpenAiCompatibleLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
+import java.net.URI;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class OpenAiLangChainProvider implements ILangChainProvider {
+public class OpenAiLangChainProvider extends OpenAiCompatibleLangChainProvider {
+
+  public static boolean shouldUseResponsesApi(Configuration config) {
+    String domain = config == null ? null : config.getAiDomain();
+    if (domain == null || domain.isBlank()) {
+      domain = Configuration.OPENAI_DOMAIN;
+    }
+    return "api.openai.com".equalsIgnoreCase(URI.create(domain).getHost());
+  }
 
   @Override
   public LangChainProvider buildChatModel(Configuration config, double temperature) {
@@ -42,6 +51,10 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
   @Override
   public LangChainProvider buildChatModel(
       Configuration config, double temperature, String conversationId, String instructions) {
+    if (!shouldUseResponsesApi(config)) {
+      return super.buildChatModel(config, temperature);
+    }
+
     String baseUrl = config.getAiDomain();
     if (Configuration.OPENAI_DOMAIN.equals(baseUrl)) {
       baseUrl = baseUrl.endsWith("/v1") ? baseUrl : baseUrl + "/v1";
@@ -61,6 +74,11 @@ public class OpenAiLangChainProvider implements ILangChainProvider {
             .build();
 
     return new LangChainProvider(model, baseUrl);
+  }
+
+  @Override
+  protected String defaultBaseUrl() {
+    return Configuration.OPENAI_DOMAIN;
   }
 
   @Override

@@ -36,6 +36,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.ReviewTestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
@@ -43,7 +44,9 @@ import java.io.ByteArrayInputStream;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.entity.ContentType;
+import org.junit.After;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
@@ -56,6 +59,7 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
   protected IAiPrompt openAiPrompt;
   protected String requestContent;
   protected PluginDataHandler projectHandler;
+  private MockedStatic<OpenAiSdkClientFactory> sdkClients;
 
   public OpenAiLangChainReviewTestBase() {
     MockitoAnnotations.openMocks(this);
@@ -63,6 +67,8 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
 
   protected void initGlobalAndProjectConfig() {
     super.initGlobalAndProjectConfig();
+    when(globalConfig.getString(Mockito.eq("aiDomain"), Mockito.anyString()))
+        .thenReturn(Configuration.OPENAI_DOMAIN);
 
     setupPluginData();
     PluginDataHandlerProvider provider =
@@ -72,6 +78,23 @@ public class OpenAiLangChainReviewTestBase extends ReviewTestBase {
     Mockito.lenient()
         .when(pluginDataHandlerProvider.getAssistantsWorkspace())
         .thenReturn(projectHandler);
+  }
+
+  @Override
+  protected void initConfig() {
+    super.initConfig();
+    // Exercise official OpenAI routing while keeping SDK requests on WireMock.
+    sdkClients = Mockito.mockStatic(OpenAiSdkClientFactory.class, Mockito.CALLS_REAL_METHODS);
+    sdkClients
+        .when(() -> OpenAiSdkClientFactory.getResolvedBaseUrl(config))
+        .thenReturn(AI_DOMAIN + "/v1");
+  }
+
+  @After
+  public void closeSdkClients() {
+    if (sdkClients != null) {
+      sdkClients.close();
+    }
   }
 
   protected void initTest() {
