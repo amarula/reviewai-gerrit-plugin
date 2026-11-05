@@ -331,7 +331,10 @@ Patch Set or label-vote event rather than immediately.
   `https://api.openai.com` (OpenAI), `https://generativelanguage.googleapis.com` (Gemini),
   `https://api.deepseek.com` (DeepSeek), `https://api.moonshot.ai` (Moonshot), or `http://localhost:11434` (Ollama).
   Override only when you need a custom endpoint; leaving it unset lets the plugin pick the provider default
-  automatically.
+  automatically. For the OpenAI provider, endpoints whose hostname is `api.openai.com` use the Responses API.
+  Custom hosts use OpenAI-compatible Chat Completions through LangChain, regardless of `aiProviderZdr`.
+  This also applies to custom proxies that support the Responses API. Paths such as `/v1` and trailing slashes
+  do not affect API selection. Custom hosts use local conversation history and do not call OpenAI Conversations.
 - `mockAiAddress`: Configures a custom address for a mock AI server. When set, a `mock-ai` model is added for each
   configured provider route, such as `OpenAI/mock-ai`, `MoonShot/mock-ai`, or `Ollama/mock-ai`. Selecting one of these
   models keeps the same provider and token behavior as the corresponding live model route, but sends AI requests to the
@@ -452,9 +455,11 @@ costs.
 
 ### Optional Parameters Specific to OpenAI Provider
 
-- `aiProviderZdr`: Enables Zero Data Retention (ZDR) mode for the OpenAI provider. When set to `true`, the plugin uses
-  the Responses API with `store: false`, keeps conversation state in local plugin memory, and replays encrypted
-  reasoning items between tool-call rounds. OpenAI Conversations are not used. This applies to every OpenAI model.
+- `aiProviderZdr`: Enables Zero Data Retention (ZDR) mode for the OpenAI provider at `api.openai.com`. When set to
+  `true`, the plugin uses the Responses API with `store: false`, keeps conversation state in local plugin memory,
+  and replays encrypted reasoning items between tool-call rounds. OpenAI Conversations are not used.
+  This applies to every OpenAI model.
+  Custom OpenAI hosts always use Chat Completions, with conversation history kept locally.
   The default value is `false`.
 
 ### Optional Parameters Specific to Ollama

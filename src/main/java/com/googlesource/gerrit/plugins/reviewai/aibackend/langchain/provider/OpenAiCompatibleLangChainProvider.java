@@ -50,8 +50,11 @@ public abstract class OpenAiCompatibleLangChainProvider implements ILangChainPro
     if (baseUrl == null || baseUrl.isBlank() || Configuration.OPENAI_DOMAIN.equals(baseUrl)) {
       baseUrl = defaultBaseUrl();
     }
+    if (baseUrl.endsWith("/")) {
+      baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+    }
     if (!baseUrl.endsWith("/v1")) {
-      baseUrl = baseUrl.endsWith("/") ? baseUrl + "v1" : baseUrl + "/v1";
+      baseUrl += "/v1";
     }
     return baseUrl;
   }
