@@ -31,7 +31,7 @@
           throw new Error('ReviewAI needs a loaded Gerrit change to answer.');
         }
         const selectedContext = req.regeneration_index > 0
-          ? null : reviewAi.codeContext.selected(change, req);
+          ? [] : reviewAi.codeContext.selected(change, req);
 
         let prompt = this._normalizePrompt(req);
         if (!prompt) {
@@ -40,24 +40,25 @@
 
         const conversationId = this._getRequestConversationId(req, change);
         const turnKey = `${change._number}:${conversationId}:${req.turn_index}`;
-        let codeContext;
+        let codeContexts;
         if (req.regeneration_index > 0) {
           let original = this._chatTurns.get(turnKey);
           if (!original) {
             const conversation = await this._getStoredConversation(change, conversationId);
             const turn = conversation && conversation.turns && conversation.turns[req.turn_index];
             if (!turn) throw new Error('Could not restore the original chat turn. Reload its history.');
-            original = {prompt: turn.user_input.user_question, codeContext: turn.code_context || null};
+            original = {prompt: turn.user_input.user_question,
+              codeContexts: turn.code_contexts || (turn.code_context ? [turn.code_context] : [])};
           }
-          ({prompt, codeContext} = original);
+          ({prompt, codeContexts} = original);
           prompt = this._normalizePrompt({...req, prompt});
         } else {
-          codeContext = selectedContext;
-          // Preserve the original attachment even if sending fails before the turn can be saved.
-          this._chatTurns.set(turnKey, {prompt, codeContext});
+          codeContexts = selectedContext;
+          // Preserve original attachments even if sending fails before the turn can be saved.
+          this._chatTurns.set(turnKey, {prompt, codeContexts});
         }
-        if (codeContext && !/^\/message\s+\S/.test(prompt)) {
-          throw new Error('Code attachments apply to chat messages. Remove the file to run a command.');
+        if (codeContexts.length && !/^\/message\s+\S/.test(prompt)) {
+          throw new Error('Code attachments apply to chat messages. Remove the attachments to run a command.');
         }
         const modelInfo = await this._fetchModelInfo(change);
         if (!agentUtils.canAiReview(modelInfo)) {
@@ -73,9 +74,9 @@
           prompt,
           this._getRequestModelId(req),
           requestId,
-          codeContext
+          codeContexts
         );
-        reviewAi.codeContext.consume(change, codeContext);
+        reviewAi.codeContext.consume(change, codeContexts);
         const directResponse =
           sendResult && (sendResult.response_text || sendResult.responseText);
         const sentRequestId =
@@ -95,7 +96,7 @@
                 excludeDynamicConfiguration: Boolean(directResponse),
               })
             );
-        responseText = reviewAi.codeContext.describe(codeContext, responseText);
+        responseText = reviewAi.codeContext.describe(codeContexts, responseText);
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
         try {
@@ -105,7 +106,7 @@
             conversationId,
             prompt,
             responseText,
-            codeContext
+            codeContexts
           );
         } catch (error) {
           console.error('ReviewAI could not save the completed conversation turn.', error);
@@ -217,14 +218,14 @@
       return reviewAi.api.createFetchHistory(this.plugin, this.pluginName)(change);
     }
 
-    _sendMessage(change, message, modelId, requestId, codeContext) {
+    _sendMessage(change, message, modelId, requestId, codeContexts) {
       return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(
         change,
         message,
         modelId,
         true,
         requestId,
-        codeContext
+        codeContexts
       );
     }
 

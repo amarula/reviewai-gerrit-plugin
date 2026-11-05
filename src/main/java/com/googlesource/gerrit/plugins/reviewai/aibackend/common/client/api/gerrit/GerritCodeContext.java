@@ -25,6 +25,7 @@ import com.google.gerrit.extensions.common.FileInfo;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.BinaryResult;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,13 +35,15 @@ import java.nio.charset.CharacterCodingException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.eclipse.jgit.lib.FileMode;
 
 /** Resolves a changed file or line range pinned to an immutable patch-set revision. */
 public final class GerritCodeContext {
   public static final int MAX_FILE_BYTES = 64 * 1024;
+  public static final int MAX_ATTACHMENTS = 8;
   private static final String TAG_PREFIX = "reviewai:code-context:";
 
   private GerritCodeContext() {}
@@ -64,25 +67,48 @@ public final class GerritCodeContext {
 
   public static String toTag(Attachment attachment) throws BadRequestException {
     validateReference(attachment);
+    return encodeTag(attachment);
+  }
+
+  public static String toTag(List<Attachment> attachments) throws BadRequestException {
+    List<Attachment> validated = validateAttachments(attachments);
+    return encodeTag(validated.size() == 1 ? validated.getFirst() : validated);
+  }
+
+  public static List<Attachment> validateAttachments(List<Attachment> attachments)
+      throws BadRequestException {
+    if (attachments == null || attachments.size() > MAX_ATTACHMENTS) {
+      throw new BadRequestException(
+          "Attach up to " + MAX_ATTACHMENTS + " files or ranges per message");
+    }
+    for (Attachment attachment : attachments) {
+      validateReference(attachment);
+    }
+    return List.copyOf(new LinkedHashSet<>(attachments));
+  }
+
+  private static String encodeTag(Object attachments) {
     return TAG_PREFIX
         + Base64.getUrlEncoder()
             .withoutPadding()
-            .encodeToString(getGson().toJson(attachment).getBytes(UTF_8));
+            .encodeToString(getGson().toJson(attachments).getBytes(UTF_8));
   }
 
-  public static Optional<Attachment> fromTag(String tag) throws BadRequestException {
+  public static List<Attachment> fromTag(String tag) throws BadRequestException {
     if (tag == null || !tag.startsWith(TAG_PREFIX)) {
-      return Optional.empty();
+      return List.of();
     }
     try {
-      Attachment attachment =
-          getGson()
-              .fromJson(
-                  new String(
-                      Base64.getUrlDecoder().decode(tag.substring(TAG_PREFIX.length())), UTF_8),
-                  Attachment.class);
-      validateReference(attachment);
-      return Optional.of(attachment);
+      var json =
+          JsonParser.parseString(
+              new String(Base64.getUrlDecoder().decode(tag.substring(TAG_PREFIX.length())), UTF_8));
+      if (json.isJsonArray()) {
+        return validateAttachments(Arrays.asList(getGson().fromJson(json, Attachment[].class)));
+      }
+      if (json.isJsonObject()) {
+        return validateAttachments(List.of(getGson().fromJson(json, Attachment.class)));
+      }
+      throw new BadRequestException("Invalid code context attachment");
     } catch (IllegalArgumentException | JsonParseException e) {
       throw new BadRequestException("Invalid code context attachment", e);
     }

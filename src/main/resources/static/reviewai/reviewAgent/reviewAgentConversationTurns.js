@@ -7,7 +7,7 @@
       this.provider = provider;
     }
 
-    async storeConversationTurn(change, req, conversationId, prompt, responseText, codeContext) {
+    async storeConversationTurn(change, req, conversationId, prompt, responseText, codeContexts) {
       const now = Date.now();
       const normalizedResponseText = agentUtils.normalizeResponseEntrySeparators(responseText);
       let clientData =
@@ -26,9 +26,9 @@
         });
       }
       const turn = {
-        code_context: codeContext
-          ? {revision: codeContext.revision, path: codeContext.path,
-            start_line: codeContext.start_line, end_line: codeContext.end_line} : undefined,
+        code_contexts: codeContexts?.length
+          ? codeContexts.map(file => ({revision: file.revision, path: file.path,
+            start_line: file.start_line, end_line: file.end_line})) : undefined,
         user_input: {
           user_question: prompt,
           client_data: clientData,

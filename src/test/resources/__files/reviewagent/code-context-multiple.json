@@ -1,0 +1,13 @@
+{
+  "attachments": [
+    {"path": "src/Service.java", "start_line": 2, "end_line": 3},
+    {"path": "src/Service.java", "start_line": 5, "end_line": 5},
+    {"path": "src/Other.java"}
+  ],
+  "other_content": "class Other {\n  Service service;\n}\n",
+  "contents": [
+    "  String normalize(String value) {\n    return value == null ? \"default\" : value.trim();",
+    "}",
+    "class Other {\n  Service service;\n}\n"
+  ]
+}

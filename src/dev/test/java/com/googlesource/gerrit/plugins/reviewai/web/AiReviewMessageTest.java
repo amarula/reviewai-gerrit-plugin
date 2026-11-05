@@ -245,7 +245,7 @@ public class AiReviewMessageTest extends TestBase {
     ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
     verify(revisionApi).review(captor.capture());
     ReviewInput posted = captor.getValue();
-    assertEquals(attachment, GerritCodeContext.fromTag(posted.tag).orElseThrow());
+    assertEquals(List.of(attachment), GerritCodeContext.fromTag(posted.tag));
     assertEquals("@gpt " + input.message, posted.comments.get("/PATCHSET_LEVEL").getFirst().message);
     assertFalse(posted.comments.get("/PATCHSET_LEVEL").getFirst().message.contains(
         fixture.get("content").getAsString()));
@@ -274,6 +274,87 @@ public class AiReviewMessageTest extends TestBase {
     assertThrows(BadRequestException.class, () -> view.apply(changeResource, input));
     verify(revisionApi, never()).review(any());
     verify(pluginDataHandler, never()).setJsonValue(eq(KEY_DYNAMIC_CONFIG), any());
+  }
+
+  @Test
+  public void multipleAttachmentsArePersistedOnTheExactGerritComment() throws Exception {
+    var input = multipleCodeContextInput();
+    var first = input.codeContexts.getFirst();
+    var other = input.codeContexts.getLast();
+    var gson = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson();
+    var fixture = gson.fromJson(readTestFile("__files/reviewagent/code-context.json"),
+        com.google.gson.JsonObject.class);
+    var multiple = gson.fromJson(readTestFile("__files/reviewagent/code-context-multiple.json"),
+        com.google.gson.JsonObject.class);
+    FileInfo file = new FileInfo();
+    file.newMode = 0100644;
+    var otherApi = org.mockito.Mockito.mock(FileApi.class);
+    when(changeApi.revision(first.revision())).thenReturn(revisionApi);
+    when(revisionApi.files()).thenReturn(Map.of(first.path(), file, other.path(), file));
+    when(revisionApi.file(first.path())).thenReturn(fileApi);
+    when(revisionApi.file(other.path())).thenReturn(otherApi);
+    when(fileApi.content()).thenAnswer(ignored -> BinaryResult.create(fixture.get("content").getAsString()));
+    when(otherApi.content()).thenAnswer(ignored -> BinaryResult.create(multiple.get("other_content").getAsString()));
+    CommentInfo matching = new CommentInfo();
+    matching.message = "@gpt " + input.message;
+    matching.tag = GerritCodeContext.toTag(input.codeContexts);
+    matching.changeMessageId = "multiple-context-message";
+    CommentInfo otherComment = new CommentInfo();
+    otherComment.message = matching.message;
+    otherComment.tag = GerritCodeContext.toTag(first);
+    otherComment.changeMessageId = "single-context-message";
+    when(commentsRequest.get()).thenReturn(Map.of("/PATCHSET_LEVEL", List.of(matching, otherComment)));
+
+    var output = view.apply(changeResource, input).value();
+
+    assertEquals(matching.changeMessageId, output.requestId);
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(captor.capture());
+    assertEquals(input.codeContexts, GerritCodeContext.fromTag(captor.getValue().tag));
+    assertEquals(matching.message,
+        captor.getValue().comments.get("/PATCHSET_LEVEL").getFirst().message);
+  }
+
+  @Test
+  public void attachmentLimitsAndConflictingFormatsFailBeforePublishing() throws Exception {
+    var input = multipleCodeContextInput();
+    var attachment = input.codeContexts.getFirst();
+    input.codeContexts = java.util.Collections.nCopies(GerritCodeContext.MAX_ATTACHMENTS + 1, attachment);
+    assertThrows(BadRequestException.class, () -> view.apply(changeResource, input));
+    input.codeContexts = List.of(attachment);
+    input.codeContext = attachment;
+    assertThrows(BadRequestException.class, () -> view.apply(changeResource, input));
+    verify(changeApi, never()).revision(any(String.class));
+    verify(revisionApi, never()).review(any());
+    verify(pluginDataHandler, never()).setJsonValue(eq(KEY_DYNAMIC_CONFIG), any());
+  }
+
+  @Test
+  public void oneInvalidReferenceRejectsTheEntireAttachmentSet() throws Exception {
+    var input = multipleCodeContextInput();
+    var attachments = new java.util.ArrayList<>(input.codeContexts);
+    attachments.set(attachments.size() - 1, new GerritCodeContext.Attachment("current", "secret"));
+    input.codeContexts = attachments;
+    assertThrows(BadRequestException.class, () -> view.apply(changeResource, input));
+    verify(changeApi, never()).revision(any(String.class));
+    verify(revisionApi, never()).review(any());
+    verify(pluginDataHandler, never()).setJsonValue(eq(KEY_DYNAMIC_CONFIG), any());
+  }
+
+  private AiReviewMessage.Input multipleCodeContextInput() throws Exception {
+    var gson = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson();
+    var fixture = gson.fromJson(readTestFile("__files/reviewagent/code-context.json"),
+        com.google.gson.JsonObject.class);
+    var multiple = gson.fromJson(readTestFile("__files/reviewagent/code-context-multiple.json"),
+        com.google.gson.JsonObject.class);
+    var input = new AiReviewMessage.Input();
+    input.message = fixture.get("message").getAsString();
+    input.reviewAgent = true;
+    input.requestId = "multiple-context-request";
+    input.codeContexts = java.util.Arrays.stream(gson.fromJson(multiple.get("attachments"),
+        GerritCodeContext.Attachment[].class)).map(file -> new GerritCodeContext.Attachment(
+            fixture.get("revision").getAsString(), file.path(), file.startLine(), file.endLine())).toList();
+    return input;
   }
 
   private void grantConfiguredAiAdministratorGroupPrivileges() {

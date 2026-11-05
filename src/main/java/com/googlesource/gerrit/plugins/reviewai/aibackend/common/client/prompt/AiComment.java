@@ -62,9 +62,7 @@ public class AiComment extends ClientBase {
     String cleanedMessage = messageCleaner.removeHeadings().getMessage();
     if (!isFromAssistant(commentProperty)) {
       try {
-        var attachment = GerritCodeContext.fromTag(commentProperty.getTag());
-        if (attachment.isPresent()) {
-          var file = attachment.get();
+        for (var file : GerritCodeContext.fromTag(commentProperty.getTag())) {
           if (!codeContexts.containsKey(file)) {
             try (ManualRequestContext ignored = config.openRequestContext()) {
               String content = GerritCodeContext.read(change.getChangeApi(config), file);

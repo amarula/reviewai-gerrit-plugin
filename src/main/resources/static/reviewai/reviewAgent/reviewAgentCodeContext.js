@@ -1,6 +1,7 @@
 (function(global) {
   const reviewAi = global.ReviewAi;
   const maxFileBytes = 64 * 1024;
+  const maxAttachments = 8;
   const fileType = 'reviewai-changed-file';
   const menuTitle = 'Changed file';
   const snapshots = new WeakMap();
@@ -67,7 +68,7 @@
           button { cursor: pointer; padding: 5px 10px; }
           button:disabled { cursor: default; }
           #actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-          #status { margin-top: 8px; font-size: var(--font-size-small, 12px); }
+          #status, #attachment-count { margin-top: 8px; font-size: var(--font-size-small, 12px); }
           #range-option { margin-top: 12px; }
           #range-fields { border: 0; margin: 12px 0 0; padding: 0; }
           #range-fields[hidden] { display: none; }
@@ -89,6 +90,7 @@
           <label for="files">Changed file</label>
           <select id="files" aria-label="Changed file for code context" disabled></select>
           <div id="status" role="status"></div>
+          <div id="attachment-count" role="status"></div>
           <label id="range-option"><input id="range-toggle" type="checkbox" disabled> Select lines</label>
           <fieldset id="range-fields" hidden disabled>
             <legend>Code selection</legend>
@@ -233,6 +235,7 @@
       // Restored turns retain their chips for history, but attachments are one-shot drafts.
       this._contextChips().filter(chip => chip.contextItem.reviewai_consumed)
         .forEach(chip => this._removeItem(chip.contextItem));
+      if (this._popover.matches(':popover-open')) this._updateRange();
     }
 
     _handleMenuClick(event) {
@@ -281,17 +284,23 @@
       chip?.dispatchEvent(new CustomEvent('remove-context-chip', {bubbles: true, composed: true}));
     }
 
-    _attach() {
-      if (this._attachButton.disabled || !this._input?.isConnected) return;
+    _reference() {
       const range = this._rangeToggle.checked
         ? `#L${this._startLine.valueAsNumber}-L${this._endLine.valueAsNumber}` : '';
-      const reference = `reviewai-file:${this._change._number}:${this._sha}:${encodeURIComponent(this._select.value)}${range}`;
-      const item = toContextItem(reference);
+      return `reviewai-file:${this._change?._number}:${this._sha}:${encodeURIComponent(this._select.value)}${range}`;
+    }
+
+    _attach() {
+      if (this._attachButton.disabled || !this._input?.isConnected) return;
+      const item = toContextItem(this._reference());
       if (!item) return;
-      this._contextChips().forEach(chip => this._removeItem(chip.contextItem));
-      this._input.dispatchEvent(new CustomEvent('context-item-added', {
-        detail: item, bubbles: true, composed: true,
-      }));
+      const chips = this._contextChips();
+      if (!chips.some(chip => chip.contextItem.identifier === item.identifier)) {
+        if (chips.length >= maxAttachments) return;
+        this._input.dispatchEvent(new CustomEvent('context-item-added', {
+          detail: item, bubbles: true, composed: true,
+        }));
+      }
       this._close();
       this._anchor?.focus();
     }
@@ -371,7 +380,13 @@
       const end = this._endLine.valueAsNumber;
       const valid = count > 0 && Number.isInteger(start) && Number.isInteger(end) &&
         start >= 1 && end >= start && end <= count;
-      this._attachButton.disabled = this._select.disabled || !this._select.value || (ranged && !valid);
+      const chips = this._contextChips();
+      const full = chips.length >= maxAttachments;
+      const duplicate = chips.some(chip => chip.contextItem.identifier === this._reference());
+      this.shadowRoot.querySelector('#attachment-count').textContent =
+        `${chips.length} of ${maxAttachments} attachments.${full ? ' Remove a chip to add another.' : ''}`;
+      this._attachButton.disabled = this._select.disabled || !this._select.value ||
+        (ranged && !valid) || (full && !duplicate);
       if (!ranged || !this._lineStarts) return;
       this._rangeStatus.textContent = !count ? 'This file has no lines to select.' : valid
         ? `Lines ${start}–${end} of ${count}. Select text in the preview or enter line numbers.`
@@ -447,6 +462,7 @@
 
   reviewAi.codeContext = {
     typeId: fileType,
+    maxAttachments,
 
     register(plugin) {
       if (!customElements.get('reviewai-code-context')) {
@@ -469,34 +485,43 @@
     selected(change, request) {
       const items = (request?.external_contexts || [])
         .filter(item => item.type_id === fileType && !item.reviewai_consumed);
-      if (!items.length) return null;
-      if (items.length > 1) throw new Error('Attach one changed file per message. Remove the extra files.');
-      const file = parseReference(items[0].identifier);
-      if (!file || file.change !== change._number) {
-        throw new Error('The attached file does not belong to this change. Remove it and select it again.');
+      if (items.length > maxAttachments) {
+        throw new Error(`Attach up to ${maxAttachments} files or ranges per message. Remove the extra attachments.`);
       }
-      const attachment = {revision: file.revision, path: file.path};
-      if (file.start_line) {
-        attachment.start_line = file.start_line;
-        attachment.end_line = file.end_line;
+      const unique = new Map();
+      for (const item of items) {
+        const file = parseReference(item.identifier);
+        if (!file || file.change !== change._number) {
+          throw new Error('The attached file does not belong to this change. Remove it and select it again.');
+        }
+        const attachment = {revision: file.revision, path: file.path};
+        if (file.start_line) {
+          attachment.start_line = file.start_line;
+          attachment.end_line = file.end_line;
+        }
+        unique.set(JSON.stringify(attachment), attachment);
       }
-      snapshots.set(attachment, items[0]);
-      return attachment;
+      const attachments = Array.from(unique.values());
+      snapshots.set(attachments, items);
+      return attachments;
     },
 
-    consume(change, file) {
-      const item = file && snapshots.get(file);
-      if (!item) return;
+    consume(change, attachments) {
+      const items = attachments && snapshots.get(attachments);
+      if (!items) return;
       views.forEach(view => {
-        if (view._change?._number === change._number) view._removeItem(item);
+        if (view._change?._number === change._number) items.forEach(item => view._removeItem(item));
       });
     },
 
-    describe(file, response) {
-      if (!file) return response;
-      const path = file.path.replace(/([\\`*_{}[\]()<>])/g, '\\$1');
-      const range = file.start_line ? `, lines ${file.start_line}–${file.end_line}` : '';
-      return `**Code context:** ${path} (${file.revision.slice(0, 8)}${range})\n\n${response || ''}`;
+    describe(attachments, response) {
+      if (!attachments?.length) return response;
+      const descriptions = attachments.map(file => {
+        const path = file.path.replace(/([\\`*_{}[\]()<>])/g, '\\$1');
+        const range = file.start_line ? `, lines ${file.start_line}–${file.end_line}` : '';
+        return `${path} (${file.revision.slice(0, 8)}${range})`;
+      });
+      return `**Code context:** ${descriptions.join('; ')}\n\n${response || ''}`;
     },
   };
 })(window);

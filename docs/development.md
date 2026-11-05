@@ -101,6 +101,14 @@ feedback-classification pipeline.
 operations in the table are read-only. Endpoints that expose review data enforce the plugin's change-level ReviewAI
 permissions.
 
+For chat messages, `ai-review-message` accepts an optional `code_contexts` array with up to eight
+attachments. Each attachment contains a revision SHA, a repository `path`, and optional inclusive,
+one-based `start_line` and `end_line` values. The existing `code_context` object is still accepted
+for single-attachment requests; supply only one of these fields. All attachments are validated
+before publishing the message. Exact duplicates are ignored, and each source file must be a
+changed UTF-8 text file up to 64 KiB. Conversation turns save the complete set in `code_contexts`;
+regeneration also understands older turns containing `code_context`.
+
 ### Using the Review Debug Command
 
 Users in the ReviewAI Administrator group can obtain additional useful debug information in each AI reply, such as
