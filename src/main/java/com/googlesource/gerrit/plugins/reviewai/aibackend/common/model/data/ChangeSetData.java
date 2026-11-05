@@ -171,6 +171,7 @@ public final class ChangeSetData {
     copy.setReviewFeedbackControlAuthorizedCommentIds(reviewFeedbackControlAuthorizedCommentIds);
     copy.setModeratorFeaturesAllowed(moderatorFeaturesAllowed);
     copy.setReviewFeedbackClassified(reviewFeedbackClassified);
+    copy.setReviewChange(reviewChange);
     copy.setAiRequestCancellation(aiRequestCancellation);
     copy.setForcedReview(forcedReview);
     copy.setForcedTopicReview(forcedTopicReview);
