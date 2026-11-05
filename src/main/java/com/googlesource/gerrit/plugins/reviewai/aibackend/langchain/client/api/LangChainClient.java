@@ -44,6 +44,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiLangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiSdkClientFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -799,7 +800,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
   }
 
   protected boolean shouldUseOpenAiResponses(AiProviderType providerType) {
-    return providerType == AiProviderType.OPENAI;
+    return providerType == AiProviderType.OPENAI
+        && OpenAiLangChainProvider.shouldUseResponsesApi(config);
   }
 
   protected boolean shouldUseOpenAiConversation(AiProviderType providerType) {

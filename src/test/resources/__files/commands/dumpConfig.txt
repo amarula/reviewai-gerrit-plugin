@@ -9,7 +9,7 @@ aiAgentModels:
 aiCommentTemperature: 1.0
 aiConnectionMaxRetryAttempts: 1
 aiConnectionTimeout: 180
-aiDomain: http://localhost:9527
+aiDomain: https://api.openai.com
 aiFullFileReview: true
 aiMaxConcurrentRequests: 0
 aiMaxMemoryTokens: 16384

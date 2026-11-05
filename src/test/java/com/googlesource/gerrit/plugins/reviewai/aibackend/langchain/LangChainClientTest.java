@@ -296,6 +296,7 @@ public class LangChainClientTest {
   @Test
   public void keepsStructuredResponseFormatForOpenAiOnDemandTools() throws Exception {
     Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
 
@@ -308,6 +309,7 @@ public class LangChainClientTest {
   @Test
   public void openAiZdrRequiresInitialOnDemandToolUseWithResponses() throws Exception {
     Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
     when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
     when(config.getAiProviderZdr()).thenReturn(true);
@@ -320,6 +322,7 @@ public class LangChainClientTest {
   @Test
   public void openAiZdrUsesLocalMemoryForStatelessResponses() {
     Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getAiProviderZdr()).thenReturn(true);
 
     TestableLangChainClient client = new TestableLangChainClient(config);
@@ -330,11 +333,29 @@ public class LangChainClientTest {
   @Test
   public void openAiNonZdrUsesServerConversationInsteadOfLocalMemory() {
     Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getAiProviderZdr()).thenReturn(false);
 
     TestableLangChainClient client = new TestableLangChainClient(config);
 
     assertTrue(client.useOpenAiConversation(AiProviderType.OPENAI));
+  }
+
+  @Test
+  public void customOpenAiEndpointSkipsResponsesAndServerConversations() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAiDomain()).thenReturn("https://apihub.agnes-ai.com/v1");
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OPENAI);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.ON_DEMAND);
+
+    for (boolean zdr : List.of(false, true)) {
+      when(config.getAiProviderZdr()).thenReturn(zdr);
+      TestableLangChainClient client = new TestableLangChainClient(config);
+
+      assertFalse(client.shouldUseOpenAiResponses(AiProviderType.OPENAI));
+      assertFalse(client.useOpenAiConversation(AiProviderType.OPENAI));
+      assertEquals(false, getToolExecutorRequireInitialToolUse(client));
+    }
   }
 
   @Test
@@ -1077,6 +1098,11 @@ public class LangChainClientTest {
 
     private boolean useOpenAiConversation(AiProviderType providerType) {
       return shouldUseOpenAiConversation(providerType);
+    }
+
+    @Override
+    public boolean shouldUseOpenAiResponses(AiProviderType providerType) {
+      return super.shouldUseOpenAiResponses(providerType);
     }
 
     private boolean prepareMemory(

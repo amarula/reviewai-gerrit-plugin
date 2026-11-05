@@ -34,6 +34,7 @@ import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,13 +42,18 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class OpenAiLangChainProviderTest {
   private static final String OPENAI_RESPONSES_SUCCESS_RESOURCE =
       "__files/langchain/openAiResponsesSuccess.json";
+  private static final String OPENAI_CHAT_COMPLETIONS_SUCCESS_RESOURCE =
+      "__files/langchain/openAiChatCompletionsSuccess.json";
   private static final String OPENAI_RESPONSES_USAGE_WITHOUT_DETAILS_RESOURCE =
       "__files/langchain/openAiResponsesUsageWithoutDetails.json";
   private static final String OPENAI_RESPONSES_TOOL_CALL_WITH_REASONING_RESOURCE =
@@ -60,15 +66,94 @@ public class OpenAiLangChainProviderTest {
   @Rule public WireMockRule wireMockRule = new WireMockRule(0);
 
   private final OpenAiLangChainProvider provider = new OpenAiLangChainProvider();
+  private MockedStatic<OpenAiSdkClientFactory> sdkClients;
+
+  @Before
+  public void setupSdkClients() {
+    sdkClients = Mockito.mockStatic(OpenAiSdkClientFactory.class, Mockito.CALLS_REAL_METHODS);
+  }
+
+  @After
+  public void closeSdkClients() {
+    sdkClients.close();
+  }
+
+  @Test
+  public void usesResponsesForOfficialOpenAiHostWithOrWithoutZdr() {
+    Configuration config = responsesApiConfig();
+    for (String domain :
+        List.of(
+            "https://api.openai.com",
+            "https://api.openai.com/",
+            "https://api.openai.com/v1",
+            "https://API.OPENAI.COM/v1/")) {
+      when(config.getAiDomain()).thenReturn(domain);
+      for (boolean zdr : List.of(false, true)) {
+        when(config.getAiProviderZdr()).thenReturn(zdr);
+        assertTrue(
+            provider.buildChatModel(config, 0.0).getModel() instanceof OpenAiResponsesChatModel);
+      }
+    }
+  }
+
+  @Test
+  public void usesChatCompletionsForCustomHosts() {
+    Configuration config = responsesApiConfig();
+    for (String domain :
+        List.of(
+            "https://apihub.agnes-ai.com/v1",
+            "http://localhost:" + wireMockRule.port(),
+            "https://api.openai.com.relay.example/v1",
+            "https://relay.example/api.openai.com/v1",
+            "https://api.openai.com@relay.example/v1")) {
+      when(config.getAiDomain()).thenReturn(domain);
+      assertTrue(provider.buildChatModel(config, 0.0).getModel() instanceof OpenAiChatModel);
+    }
+  }
+
+  @Test
+  public void callsChatCompletionsForCustomEndpointWithOrWithoutZdr() {
+    Configuration config = responsesApiConfig();
+    when(config.getAiModel()).thenReturn("agnes-2.5-flash");
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/chat/completions"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(responseBody(OPENAI_CHAT_COMPLETIONS_SUCCESS_RESOURCE))));
+
+    for (String suffix : List.of("", "/", "/v1", "/v1/")) {
+      when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port() + suffix);
+      for (boolean zdr : List.of(false, true)) {
+        WireMock.resetAllRequests();
+        when(config.getAiProviderZdr()).thenReturn(zdr);
+
+        ChatResponse response =
+            provider
+                .buildChatModel(config, 0.0, "conv_unused", "review instructions")
+                .getModel()
+                .chat(
+                    ChatRequest.builder()
+                        .messages(
+                            SystemMessage.from("review instructions"), UserMessage.from("Say ok"))
+                        .build());
+
+        assertEquals("ok", response.aiMessage().text());
+        WireMock.verify(
+            1,
+            postRequestedFor(urlEqualTo("/v1/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.model", equalTo("agnes-2.5-flash")))
+                .withRequestBody(matchingJsonPath("$.messages[0].role", equalTo("system")))
+                .withRequestBody(matchingJsonPath("$.messages[1].role", equalTo("user"))));
+        WireMock.verify(0, postRequestedFor(urlEqualTo("/v1/responses")));
+        WireMock.verify(0, postRequestedFor(urlEqualTo("/v1/conversations")));
+      }
+    }
+  }
 
   @Test
   public void usesResponsesApiAndConversationId() {
-    Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
-    when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(5);
-    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    Configuration config = responsesApiConfig();
     WireMock.stubFor(
         post(urlEqualTo("/v1/responses"))
             .willReturn(
@@ -104,12 +189,7 @@ public class OpenAiLangChainProviderTest {
 
   @Test
   public void acceptsUsageWithoutOptionalInputTokenDetails() {
-    Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
-    when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(5);
-    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    Configuration config = responsesApiConfig();
     WireMock.stubFor(
         post(urlEqualTo("/v1/responses"))
             .willReturn(
@@ -171,10 +251,7 @@ public class OpenAiLangChainProviderTest {
 
   @Test
   public void doesNotRetryTimedOutResponseUsingConversation() {
-    Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
-    when(config.getAiModel()).thenReturn("gpt-4.1");
+    Configuration config = responsesApiConfig();
     when(config.getAiConnectionTimeout()).thenReturn(1);
     when(config.getAiConnectionMaxRetryAttempts()).thenReturn(2);
     WireMock.stubFor(
@@ -200,12 +277,7 @@ public class OpenAiLangChainProviderTest {
 
   @Test
   public void serializesToolParametersAsJsonObjectSchema() {
-    Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
-    when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(5);
-    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    Configuration config = responsesApiConfig();
     WireMock.stubFor(
         post(urlEqualTo("/v1/responses"))
             .willReturn(
@@ -274,13 +346,8 @@ public class OpenAiLangChainProviderTest {
 
   @Test
   public void usesStatelessResponsesForZdrWithAnyOpenAiModel() {
-    Configuration config = Mockito.mock(Configuration.class);
+    Configuration config = responsesApiConfig();
     when(config.getAiProviderZdr()).thenReturn(true);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
-    when(config.getAiModel()).thenReturn("gpt-4.1");
-    when(config.getAiConnectionTimeout()).thenReturn(5);
-    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
     WireMock.stubFor(
         post(urlEqualTo("/v1/responses"))
             .willReturn(
@@ -310,13 +377,9 @@ public class OpenAiLangChainProviderTest {
 
   @Test
   public void replaysEncryptedReasoningForZdrToolContinuation() {
-    Configuration config = Mockito.mock(Configuration.class);
+    Configuration config = responsesApiConfig();
     when(config.getAiProviderZdr()).thenReturn(true);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
-    when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("gpt-5.6-sol");
-    when(config.getAiConnectionTimeout()).thenReturn(5);
-    when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
     WireMock.stubFor(
         post(urlEqualTo("/v1/responses"))
             .inScenario("zdr-tool-continuation")
@@ -409,11 +472,15 @@ public class OpenAiLangChainProviderTest {
 
   private Configuration responsesApiConfig() {
     Configuration config = Mockito.mock(Configuration.class);
-    when(config.getAiDomain()).thenReturn("http://localhost:" + wireMockRule.port());
+    when(config.getAiDomain()).thenReturn(Configuration.OPENAI_DOMAIN);
     when(config.getAiToken()).thenReturn("dummy-token");
     when(config.getAiModel()).thenReturn("gpt-4.1");
     when(config.getAiConnectionTimeout()).thenReturn(5);
     when(config.getAiConnectionMaxRetryAttempts()).thenReturn(1);
+    // Keep the official hostname for routing, but send SDK traffic to WireMock.
+    sdkClients
+        .when(() -> OpenAiSdkClientFactory.getResolvedBaseUrl(config))
+        .thenReturn("http://localhost:" + wireMockRule.port() + "/v1");
     return config;
   }
 
