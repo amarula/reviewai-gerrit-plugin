@@ -590,7 +590,8 @@ public class LangChainClient extends AiClientBase implements IAiClient {
 
       if (!hasStoredMemory && shouldIncludeInitialHistory(changeSetData, change)) {
         GerritClientData gerritClientData = gerritClient.getClientData(change);
-        AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+        AiHistory aiHistory =
+            new AiHistory(config, changeSetData, change, gerritClientData, localizer);
         List<ChatMessage> history =
             useOpenAiResponses
                 ? LangChainChatMessages.buildNonAiDiscussion(aiHistory, gerritClientData, change)

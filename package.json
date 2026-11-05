@@ -3,9 +3,12 @@
   "version": "4.2.2",
   "description": "AI Code Review Gerrit Plugin",
   "scripts": {
-    "lint": "eslint src/main/resources/static/**/*.js"
+    "lint": "eslint src/main/resources/static/**/*.js",
+    "test:code-context": "node --test src/test/js/reviewAgentCodeContext.test.cjs",
+    "test:code-context:browser": "node --test src/test/js/reviewAgentCodeContext.browser.test.cjs"
   },
   "devDependencies": {
-    "eslint": "^9.0.0"
+    "eslint": "^9.0.0",
+    "playwright": "1.55.0"
   }
 }

@@ -3,11 +3,14 @@
   const agentUtils = reviewAi.agentUtils;
 
   class ReviewAiCodeReviewProvider {
-    constructor(plugin, pluginName) {
+    constructor(plugin, pluginName, serverVersion) {
       this.plugin = plugin;
       this.pluginName = pluginName;
       this.conversationTurns = new reviewAi.ReviewAgentConversationTurns(this);
-      this.supports_add_context = false;
+      this._chatTurns = new Map();
+      const version = /^(\d+)\.(\d+)(?:\.|-|$)/.exec(serverVersion || '');
+      this.supports_add_context = Boolean(version &&
+        (Number(version[1]) > 3 || (Number(version[1]) === 3 && Number(version[2]) >= 15)));
       this.supports_history = true;
       this.supports_more_menu = false;
       this.supports_this_change = true;
@@ -17,34 +20,62 @@
       this._chatAsync(req, listener);
     }
 
+    async getContextItemTypes() {
+      return reviewAi.codeContext.types();
+    }
+
     async _chatAsync(req, listener) {
       try {
         const change = req.change;
         if (!agentUtils.getChangeNumber(change)) {
           throw new Error('ReviewAI needs a loaded Gerrit change to answer.');
         }
+        const selectedContext = req.regeneration_index > 0
+          ? null : reviewAi.codeContext.selected(change, req);
 
+        let prompt = this._normalizePrompt(req);
+        if (!prompt) {
+          throw new Error('Enter a message for ReviewAI.');
+        }
+
+        const conversationId = this._getRequestConversationId(req, change);
+        const turnKey = `${change._number}:${conversationId}:${req.turn_index}`;
+        let codeContext;
+        if (req.regeneration_index > 0) {
+          let original = this._chatTurns.get(turnKey);
+          if (!original) {
+            const conversation = await this._getStoredConversation(change, conversationId);
+            const turn = conversation && conversation.turns && conversation.turns[req.turn_index];
+            if (!turn) throw new Error('Could not restore the original chat turn. Reload its history.');
+            original = {prompt: turn.user_input.user_question, codeContext: turn.code_context || null};
+          }
+          ({prompt, codeContext} = original);
+          prompt = this._normalizePrompt({...req, prompt});
+        } else {
+          codeContext = selectedContext;
+          // Preserve the original attachment even if sending fails before the turn can be saved.
+          this._chatTurns.set(turnKey, {prompt, codeContext});
+        }
+        if (codeContext && !/^\/message\s+\S/.test(prompt)) {
+          throw new Error('Code attachments apply to chat messages. Remove the file to run a command.');
+        }
         const modelInfo = await this._fetchModelInfo(change);
         if (!agentUtils.canAiReview(modelInfo)) {
           throw new Error('ReviewAI is not allowed for this change.');
         }
 
-        const prompt = this._normalizePrompt(req);
-        if (!prompt) {
-          throw new Error('Enter a message for ReviewAI.');
-        }
-
         const baselineEntries = await this._fetchEntries(change);
         const baselineKeys = new Set(baselineEntries.map(agentUtils.entryKey));
-        const conversationId = this._getRequestConversationId(req, change);
         const requestId = this._newRequestId(change);
 
         const sendResult = await this._sendMessage(
           change,
           prompt,
           this._getRequestModelId(req),
-          requestId
+          requestId,
+          codeContext
         );
+        reviewAi.codeContext.consume(change, codeContext);
         const directResponse =
           sendResult && (sendResult.response_text || sendResult.responseText);
         const sentRequestId =
@@ -56,7 +87,7 @@
             (sendResult.wait_for_assistant_reply === false ||
               sendResult.waitForAssistantReply === false)
           );
-        const responseText = !shouldWaitForAssistantReply
+        let responseText = !shouldWaitForAssistantReply
           ? directResponse
           : agentUtils.joinAgentResponses(
               directResponse,
@@ -64,6 +95,7 @@
                 excludeDynamicConfiguration: Boolean(directResponse),
               })
             );
+        responseText = reviewAi.codeContext.describe(codeContext, responseText);
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
         try {
@@ -72,7 +104,8 @@
             req,
             conversationId,
             prompt,
-            responseText
+            responseText,
+            codeContext
           );
         } catch (error) {
           console.error('ReviewAI could not save the completed conversation turn.', error);
@@ -184,13 +217,14 @@
       return reviewAi.api.createFetchHistory(this.plugin, this.pluginName)(change);
     }
 
-    _sendMessage(change, message, modelId, requestId) {
+    _sendMessage(change, message, modelId, requestId, codeContext) {
       return reviewAi.api.createSendMessage(this.plugin, this.pluginName)(
         change,
         message,
         modelId,
         true,
-        requestId
+        requestId,
+        codeContext
       );
     }
 
@@ -226,7 +260,7 @@
   reviewAi.agent = {
     _registered: false,
 
-    register(plugin, pluginName) {
+    register(plugin, pluginName, serverVersion) {
       if (this._registered || !plugin.aiCodeReview) {
         return false;
       }
@@ -236,7 +270,7 @@
         return false;
       }
 
-      aiCodeReviewApi.register(new ReviewAiCodeReviewProvider(plugin, pluginName));
+      aiCodeReviewApi.register(new ReviewAiCodeReviewProvider(plugin, pluginName, serverVersion));
       this._registered = true;
       return true;
     },

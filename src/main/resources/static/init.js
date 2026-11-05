@@ -46,6 +46,7 @@ const reviewAiLoader = (() => {
           'api.js',
           'entries.js',
           'reviewAgent/reviewAgentUtils.js',
+          'reviewAgent/reviewAgentCodeContext.js',
           'reviewAgent/reviewAgentModels.js',
           'reviewAgent/reviewAgentConversationStore.js',
           'reviewAgent/reviewAgentConversationTurns.js',
@@ -70,10 +71,17 @@ const reviewAiLoader = (() => {
 })();
 
 function initializeReviewAi(plugin, pluginName) {
-  reviewAiLoader
+  return reviewAiLoader
     .load(plugin)
-    .then(() => {
-      window.ReviewAi.agent.register(plugin, pluginName);
+    .then(async () => {
+      let serverVersion;
+      try {
+        serverVersion = await plugin.restApi().getVersion();
+      } catch (error) {
+        console.error('ReviewAI could not determine the Gerrit version.', error);
+      }
+      window.ReviewAi.codeContext.register(plugin);
+      window.ReviewAi.agent.register(plugin, pluginName, serverVersion);
     })
     .catch(error => {
       console.error('ReviewAI frontend failed to initialize.', error);
