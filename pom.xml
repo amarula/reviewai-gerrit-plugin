@@ -11,7 +11,7 @@
 
     <properties>
         <Gerrit-ApiType>plugin</Gerrit-ApiType>
-        <Gerrit-ApiVersion>3.15.0-rc1</Gerrit-ApiVersion>
+        <Gerrit-ApiVersion>3.15.0-rc4</Gerrit-ApiVersion>
         <maven.test.skip>false</maven.test.skip>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
