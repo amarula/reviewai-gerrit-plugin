@@ -198,10 +198,25 @@ public class AiReviewMessageTest extends TestBase {
 
   @Test
   public void codeAttachmentIsPersistedOnTheExactGerritComment() throws Exception {
+    assertCodeAttachmentIsPersisted(false);
+  }
+
+  @Test
+  public void codeRangeIsPersistedOnTheExactGerritComment() throws Exception {
+    assertCodeAttachmentIsPersisted(true);
+  }
+
+  private void assertCodeAttachmentIsPersisted(boolean ranged) throws Exception {
     var fixture = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson().fromJson(
         readTestFile("__files/reviewagent/code-context.json"), com.google.gson.JsonObject.class);
     var attachment = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson().fromJson(
         fixture, GerritCodeContext.Attachment.class);
+    if (ranged) {
+      var range = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson().fromJson(
+          readTestFile("__files/reviewagent/code-context-ranges.json"), com.google.gson.JsonObject.class);
+      attachment = new GerritCodeContext.Attachment(attachment.revision(), attachment.path(),
+          range.get("start_line").getAsInt(), range.get("end_line").getAsInt());
+    }
     FileInfo file = new FileInfo();
     file.newMode = 0100644;
     when(changeApi.revision(attachment.revision())).thenReturn(revisionApi);

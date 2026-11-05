@@ -1,0 +1,22 @@
+{
+  "start_line": 2,
+  "end_line": 3,
+  "content": "  String normalize(String value) {\n    return value == null ? \"default\" : value.trim();",
+  "invalid_ranges": [
+    {"start_line": 0, "end_line": 2},
+    {"start_line": -1, "end_line": 2},
+    {"start_line": 3, "end_line": 2},
+    {"start_line": 1},
+    {"end_line": 2},
+    {"start_line": 2, "end_line": 6},
+    {"start_line": 6, "end_line": 6}
+  ],
+  "line_endings": [
+    {"content": "first\nsecond\n", "last_line": "second"},
+    {"content": "first\r\nsecond\r\n", "last_line": "second"},
+    {"content": "first\rsecond\r", "last_line": "second"},
+    {"content": "first\nsecond", "last_line": "second"},
+    {"content": "\n\n", "last_line": ""}
+  ],
+  "empty_content": ""
+}

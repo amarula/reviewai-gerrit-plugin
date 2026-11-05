@@ -61,6 +61,7 @@ public class GerritCodeContextTest extends TestBase {
   private GerritCodeContext.Attachment attachment;
   private String content;
   private String message;
+  private JsonObject ranges;
 
   @Before
   public void setUp() throws Exception {
@@ -74,6 +75,13 @@ public class GerritCodeContextTest extends TestBase {
     attachment = getGson().fromJson(fixture, GerritCodeContext.Attachment.class);
     content = fixture.get("content").getAsString();
     message = fixture.get("message").getAsString();
+    ranges =
+        getGson()
+            .fromJson(
+                Files.readString(
+                    TestResourceLoader.getTestResourcePath()
+                        .resolve("__files/reviewagent/code-context-ranges.json")),
+                JsonObject.class);
     change = mock(ChangeApi.class);
     revision = mock(RevisionApi.class);
     fileApi = mock(FileApi.class);
@@ -90,6 +98,56 @@ public class GerritCodeContextTest extends TestBase {
   public void readsWholeFileFromPinnedRevision() throws Exception {
     assertEquals(content, GerritCodeContext.read(change, attachment));
     verify(change, never()).current();
+  }
+
+  @Test
+  public void readsOnlyTheInclusiveRangeAndPreservesItInTheCommentTag() throws Exception {
+    attachment = rangeAttachment();
+    String selected = GerritCodeContext.read(change, attachment);
+    assertEquals(ranges.get("content").getAsString(), selected);
+    assertEquals(
+        attachment, GerritCodeContext.fromTag(GerritCodeContext.toTag(attachment)).orElseThrow());
+    JsonObject formatted =
+        getGson()
+            .fromJson(
+                GerritCodeContext.format(attachment, selected).split("\n", 4)[3], JsonObject.class);
+    assertEquals(attachment.startLine().intValue(), formatted.get("start_line").getAsInt());
+    assertEquals(attachment.endLine().intValue(), formatted.get("end_line").getAsInt());
+    assertEquals(selected, formatted.get("content").getAsString());
+    verify(change, never()).current();
+  }
+
+  @Test
+  public void rejectsInvalidAndOutOfBoundsRanges() {
+    for (var invalid : ranges.getAsJsonArray("invalid_ranges")) {
+      JsonObject reference = invalid.getAsJsonObject().deepCopy();
+      reference.addProperty("revision", attachment.revision());
+      reference.addProperty("path", attachment.path());
+      var invalidAttachment = getGson().fromJson(reference, GerritCodeContext.Attachment.class);
+      assertThrows(
+          BadRequestException.class, () -> GerritCodeContext.read(change, invalidAttachment));
+    }
+  }
+
+  @Test
+  public void countsRealLinesWithOrWithoutAFinalNewline() throws Exception {
+    var lastLine = new GerritCodeContext.Attachment(attachment.revision(), attachment.path(), 2, 2);
+    var beyondEnd =
+        new GerritCodeContext.Attachment(attachment.revision(), attachment.path(), 3, 3);
+    for (var example : ranges.getAsJsonArray("line_endings")) {
+      var value = example.getAsJsonObject();
+      content = value.get("content").getAsString();
+      assertEquals(value.get("last_line").getAsString(), GerritCodeContext.read(change, lastLine));
+      assertThrows(BadRequestException.class, () -> GerritCodeContext.read(change, beyondEnd));
+    }
+  }
+
+  @Test
+  public void emptyFilesSupportWholeFileContextButHaveNoSelectableLines() throws Exception {
+    content = ranges.get("empty_content").getAsString();
+    assertEquals(content, GerritCodeContext.read(change, attachment));
+    var range = new GerritCodeContext.Attachment(attachment.revision(), attachment.path(), 1, 1);
+    assertThrows(BadRequestException.class, () -> GerritCodeContext.read(change, range));
   }
 
   @Test
@@ -178,6 +236,22 @@ public class GerritCodeContextTest extends TestBase {
 
   @Test
   public void persistedCommentMetadataIsResolvedWithoutReviewChange() throws Exception {
+    assertPersistedContextInPrompt(content);
+  }
+
+  @Test
+  public void persistedRangeIncludesOnlySelectedLinesInTheAiRequest() throws Exception {
+    attachment = rangeAttachment();
+    assertPersistedContextInPrompt(ranges.get("content").getAsString());
+  }
+
+  private GerritCodeContext.Attachment rangeAttachment() {
+    return new GerritCodeContext.Attachment(
+        attachment.revision(), attachment.path(),
+        ranges.get("start_line").getAsInt(), ranges.get("end_line").getAsInt());
+  }
+
+  private void assertPersistedContextInPrompt(String expectedContent) throws Exception {
     Configuration config = mock(Configuration.class);
     when(config.getGerritUserName()).thenReturn("gpt");
     when(config.getGerritUserEmail()).thenReturn("");
@@ -201,7 +275,7 @@ public class GerritCodeContextTest extends TestBase {
     assertTrue(prompt.contains(attachment.revision()));
     JsonObject attached =
         getGson().fromJson(prompt.substring(prompt.indexOf("{\"")), JsonObject.class);
-    assertEquals(content, attached.get("content").getAsString());
+    assertEquals(expectedContent, attached.get("content").getAsString());
     assertTrue(prompt.stripLeading().startsWith(message.substring("/message ".length())));
   }
 

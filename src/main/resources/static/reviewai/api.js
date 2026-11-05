@@ -16,7 +16,8 @@
           review_agent: Boolean(reviewAgent),
           request_id: requestId,
           code_context: codeContext
-            ? {revision: codeContext.revision, path: codeContext.path} : undefined,
+            ? {revision: codeContext.revision, path: codeContext.path,
+              start_line: codeContext.start_line, end_line: codeContext.end_line} : undefined,
         });
     },
 
