@@ -16,13 +16,17 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.google.gerrit.server.util.ManualRequestContext;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.ClientBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.account.ReviewAiUser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCodeContext;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.messages.ClientMessageCleaner;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -31,6 +35,7 @@ public class AiComment extends ClientBase {
 
   private final ChangeSetData changeSetData;
   private final Localizer localizer;
+  private final Map<GerritCodeContext.Attachment, String> codeContexts = new HashMap<>();
 
   public AiComment(Configuration config, ChangeSetData changeSetData, Localizer localizer) {
     super(config);
@@ -50,6 +55,28 @@ public class AiComment extends ClientBase {
       messageCleaner.removeMentions().removeCommands();
     }
     String cleanedMessage = messageCleaner.removeHeadings().getMessage();
+    if (!isFromAssistant(commentProperty)) {
+      try {
+        var attachment = GerritCodeContext.fromTag(commentProperty.getTag());
+        if (attachment.isPresent()) {
+          var file = attachment.get();
+          if (!codeContexts.containsKey(file)) {
+            if (changeSetData.getReviewChange() == null) {
+              throw new IllegalStateException("Change is required to resolve code context");
+            }
+            try (ManualRequestContext ignored = config.openRequestContext()) {
+              String content =
+                  GerritCodeContext.read(
+                      changeSetData.getReviewChange().getChangeApi(config), file);
+              codeContexts.put(file, GerritCodeContext.format(file, content));
+            }
+          }
+          cleanedMessage += codeContexts.get(file);
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException("Could not load attached code context", e);
+      }
+    }
     log.debug("Cleaned message: {}", cleanedMessage);
     return cleanedMessage;
   }

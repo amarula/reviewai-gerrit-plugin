@@ -1,0 +1,121 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; font: 13px Arial; color: #222;
+    --primary-text-color: #222; --dialog-background-color: #fff; --border-color: #ccc; }
+  gr-endpoint-decorator { display: block; height: 100vh; }
+  gr-endpoint-decorator > :not(gr-endpoint-param) { height: 100%; }
+</style>
+<gr-endpoint-decorator><chat-panel></chat-panel></gr-endpoint-decorator>
+<script>
+  // Exercise the Gerrit 3.15 shadow-DOM/menu/chip event contract without a live Gerrit server.
+  window.nativeTextDialogOpenCount = 0;
+  customElements.define('md-menu', class extends HTMLElement {
+    set open(value) { this.hidden = !value; }
+    get open() { return !this.hidden; }
+  });
+  customElements.define('context-chip', class extends HTMLElement {
+    connectedCallback() {
+      if (this.shadowRoot) return;
+      const root = this.attachShadow({mode: 'open'});
+      root.innerHTML = '<style>:host{display:inline-flex;padding:4px;border:1px solid #ccc;border-radius:12px;gap:6px}</style><span></span><button aria-label="Remove context">×</button>';
+      root.querySelector('span').textContent = this.contextItem.title;
+      root.querySelector('button').addEventListener('click', () => this.dispatchEvent(
+        new CustomEvent('remove-context-chip', {bubbles: true, composed: true})
+      ));
+    }
+  });
+  customElements.define('context-input-chip', class extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({mode: 'open'});
+      root.innerHTML = `
+        <style>
+          :host { position: relative; display: inline-block; }
+          button { border: 1px solid #bbb; border-radius: 12px; background: white; padding: 4px 10px; }
+          md-menu { position: absolute; bottom: 30px; left: 0; background: white;
+            border: 1px solid #ccc; border-radius: 6px; min-width: 150px; box-shadow: 0 3px 10px #0002; }
+          md-menu-item { display: block; padding: 8px; cursor: pointer; }
+          md-menu-item:focus { background: #eef; }
+          [hidden] { display: none; }
+        </style>
+        <button id="addContextChip" aria-label="Add Context">＋ Add Context</button>
+        <md-menu id="contextMenu" hidden></md-menu>
+        <input id="nativeLinkInput" hidden aria-label="Add external link">`;
+      root.querySelector('#addContextChip').addEventListener('click', () => {
+        root.querySelector('#contextMenu').open = true;
+      });
+    }
+
+    set types(types) {
+      this.contextMenuItems = types;
+      const menu = this.shadowRoot.querySelector('#contextMenu');
+      menu.replaceChildren();
+      types.forEach(type => {
+        const item = document.createElement('md-menu-item');
+        item.setAttribute('role', 'menuitem');
+        item.tabIndex = 0;
+        const label = document.createElement('span');
+        label.slot = 'headline';
+        label.textContent = type.name;
+        item.append(label);
+        item.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            item.click();
+          }
+        });
+        item.addEventListener('click', () => {
+          window.nativeTextDialogOpenCount++;
+          this.shadowRoot.querySelector('#nativeLinkInput').hidden = false;
+          menu.open = false;
+        });
+        menu.append(item);
+      });
+    }
+  });
+  customElements.define('prompt-box', class extends HTMLElement {
+    constructor() {
+      super();
+      this.items = [];
+      const root = this.attachShadow({mode: 'open'});
+      root.innerHTML = `
+        <style>:host { display: block; border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
+          textarea { width: 100%; box-sizing: border-box; resize: none; border: none; padding: 6px; }
+          #attachments { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }</style>
+        <textarea aria-label="Chat prompt" placeholder="Enter a prompt here…"></textarea>
+        <div><context-input-chip></context-input-chip><span>This Change</span></div>
+        <span id="attachments"></span>`;
+      root.querySelector('context-input-chip').addEventListener('context-item-added', event => {
+        this.items = [...this.items, event.detail];
+        this.renderChips();
+      });
+    }
+
+    set types(value) { this.shadowRoot.querySelector('context-input-chip').types = value; }
+
+    renderChips() {
+      const container = this.shadowRoot.querySelector('#attachments');
+      container.replaceChildren();
+      this.items.forEach(item => {
+        const chip = document.createElement('context-chip');
+        chip.className = 'external-context';
+        chip.contextItem = item;
+        chip.addEventListener('remove-context-chip', () => {
+          this.items = this.items.filter(candidate => candidate !== item);
+          this.renderChips();
+        });
+        container.append(chip);
+      });
+    }
+  });
+  customElements.define('chat-panel', class extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({mode: 'open'}).innerHTML = `
+        <style>:host { display: flex; flex-direction: column; height: 100%; padding: 12px;
+          box-sizing: border-box; border: 1px solid #ddd; } .conversation { flex: 1; }</style>
+        <strong>Agent Chat</strong><div class="conversation"></div><prompt-box></prompt-box>`;
+    }
+  });
+</script>
