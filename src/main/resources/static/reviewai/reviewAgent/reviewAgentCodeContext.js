@@ -7,13 +7,20 @@
   const views = new Set();
 
   function parseReference(reference) {
-    const match = /^reviewai-file:([1-9]\d*):([0-9a-f]{40}):(\S+)$/.exec(reference || '');
+    const match = /^reviewai-file:([1-9]\d*):([0-9a-f]{40}):([^\s#]+)(?:#L([1-9]\d*)-L([1-9]\d*))?$/.exec(reference || '');
     if (!match) return null;
     try {
       const path = decodeURIComponent(match[3]);
       if (!path || path.startsWith('/') || path.includes('\0') ||
           path.split('/').some(part => !part || part === '.' || part === '..')) return null;
-      return {change: Number(match[1]), revision: match[2], path};
+      const file = {change: Number(match[1]), revision: match[2], path};
+      if (match[4]) {
+        file.start_line = Number(match[4]);
+        file.end_line = Number(match[5]);
+        if (!Number.isSafeInteger(file.start_line) || !Number.isSafeInteger(file.end_line) ||
+            file.end_line < file.start_line) return null;
+      }
+      return file;
     } catch {
       return null;
     }
@@ -21,12 +28,13 @@
 
   function toContextItem(reference) {
     const file = parseReference(reference);
+    const range = file?.start_line ? `:${file.start_line}–${file.end_line}` : '';
     return file ? {
       type_id: fileType,
       identifier: reference,
       link: '',
-      title: `${file.path} @ ${file.revision.slice(0, 8)}`,
-      tooltip: `Whole file at revision ${file.revision}`,
+      title: `${file.path}${range} @ ${file.revision.slice(0, 8)}`,
+      tooltip: `${range ? `Lines ${file.start_line}–${file.end_line}` : 'Whole file'} at revision ${file.revision}`,
     } : undefined;
   }
 
@@ -60,12 +68,40 @@
           button:disabled { cursor: default; }
           #actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
           #status { margin-top: 8px; font-size: var(--font-size-small, 12px); }
+          #range-option { margin-top: 12px; }
+          #range-fields { border: 0; margin: 12px 0 0; padding: 0; }
+          #range-fields[hidden] { display: none; }
+          #line-inputs { display: flex; gap: 16px; margin-bottom: 8px; }
+          #line-inputs label { flex: 1; }
+          input[type=number] { box-sizing: border-box; width: 100%; padding: 5px;
+            color: var(--primary-text-color, #222);
+            background: var(--background-color-primary, #fff); }
+          #preview-container { display: flex; height: 200px; border: 1px solid var(--border-color, #ccc); }
+          #line-numbers, #preview { margin: 0; padding: 6px; font: 12px/18px monospace;
+            color: var(--primary-text-color, #222);
+            background: var(--background-color-primary, #fff); tab-size: 4; }
+          #line-numbers { overflow: hidden; text-align: right; user-select: none; flex-shrink: 0; }
+          #preview { min-width: 0; flex: 1; border: 0; resize: none; white-space: pre; }
+          #range-status { margin-top: 8px; font-size: var(--font-size-small, 12px); }
         </style>
         <section id="picker" popover="auto" role="dialog" aria-labelledby="title">
           <h3 id="title">Attach code</h3>
           <label for="files">Changed file</label>
           <select id="files" aria-label="Changed file for code context" disabled></select>
           <div id="status" role="status"></div>
+          <label id="range-option"><input id="range-toggle" type="checkbox" disabled> Select lines</label>
+          <fieldset id="range-fields" hidden disabled>
+            <legend>Code selection</legend>
+            <div id="line-inputs">
+              <label>Start line<input id="start-line" type="number" min="1" step="1"></label>
+              <label>End line<input id="end-line" type="number" min="1" step="1"></label>
+            </div>
+            <div id="preview-container">
+              <pre id="line-numbers" aria-hidden="true"></pre>
+              <textarea id="preview" readonly wrap="off" spellcheck="false" aria-label="File preview"></textarea>
+            </div>
+          </fieldset>
+          <div id="range-status" role="status" hidden></div>
           <div id="actions">
             <button id="cancel" type="button">Cancel</button>
             <button id="attach" type="button" disabled>Attach file</button>
@@ -74,8 +110,23 @@
       this._popover = this.shadowRoot.querySelector('#picker');
       this._select = this.shadowRoot.querySelector('#files');
       this._attachButton = this.shadowRoot.querySelector('#attach');
-      this._select.addEventListener('change', () => {
-        this._attachButton.disabled = this._select.disabled || !this._select.value;
+      this._rangeToggle = this.shadowRoot.querySelector('#range-toggle');
+      this._rangeFields = this.shadowRoot.querySelector('#range-fields');
+      this._rangeStatus = this.shadowRoot.querySelector('#range-status');
+      this._startLine = this.shadowRoot.querySelector('#start-line');
+      this._endLine = this.shadowRoot.querySelector('#end-line');
+      this._preview = this.shadowRoot.querySelector('#preview');
+      this._lineNumbers = this.shadowRoot.querySelector('#line-numbers');
+      this._previewGeneration = 0;
+      this._select.addEventListener('change', () => this._fileChanged());
+      this._rangeToggle.addEventListener('change', () => this._toggleRange());
+      this._startLine.addEventListener('input', () => this._updateRange(true));
+      this._endLine.addEventListener('input', () => this._updateRange(true));
+      this._preview.addEventListener('select', () => {
+        if (this.shadowRoot.activeElement === this._preview) this._selectCode();
+      });
+      this._preview.addEventListener('scroll', () => {
+        this._lineNumbers.scrollTop = this._preview.scrollTop;
       });
       this._attachButton.addEventListener('click', () => this._attach());
       this.shadowRoot.querySelector('#cancel').addEventListener('click', () => this._close());
@@ -124,6 +175,7 @@
       this._nativeRoot = null;
       this._input = null;
       this._generation++;
+      this._previewGeneration++;
       global.removeEventListener('resize', this._positionPopover);
       global.removeEventListener('scroll', this._positionPopover, true);
       this._key = null;
@@ -145,6 +197,7 @@
       if (key === this._key) return;
       this._close();
       this._generation++;
+      this._previewGeneration++;
       this._key = key;
       this._sha = sha;
       for (const chip of this._contextChips()) {
@@ -209,7 +262,7 @@
         return;
       }
       const anchor = this._anchor.getBoundingClientRect();
-      const width = Math.min(360, global.innerWidth - 24);
+      const width = Math.min(this._rangeToggle.checked ? 640 : 360, global.innerWidth - 24);
       this._popover.style.width = `${width}px`;
       const height = this._popover.getBoundingClientRect().height;
       const above = anchor.top - height - 8;
@@ -230,7 +283,9 @@
 
     _attach() {
       if (this._attachButton.disabled || !this._input?.isConnected) return;
-      const reference = `reviewai-file:${this._change._number}:${this._sha}:${encodeURIComponent(this._select.value)}`;
+      const range = this._rangeToggle.checked
+        ? `#L${this._startLine.valueAsNumber}-L${this._endLine.valueAsNumber}` : '';
+      const reference = `reviewai-file:${this._change._number}:${this._sha}:${encodeURIComponent(this._select.value)}${range}`;
       const item = toContextItem(reference);
       if (!item) return;
       this._contextChips().forEach(chip => this._removeItem(chip.contextItem));
@@ -241,6 +296,102 @@
       this._anchor?.focus();
     }
 
+    _fileChanged(existing) {
+      this._previewGeneration++;
+      this._lineStarts = null;
+      this._preview.value = '';
+      this._lineNumbers.textContent = '';
+      this._rangeToggle.checked = Boolean(existing?.start_line && this._select.value);
+      this._rangeToggle.disabled = this._select.disabled || !this._select.value;
+      this._startLine.value = existing?.start_line || '';
+      this._endLine.value = existing?.end_line || '';
+      this._toggleRange();
+    }
+
+    _toggleRange() {
+      const ranged = this._rangeToggle.checked;
+      this._rangeFields.hidden = !ranged;
+      this._rangeStatus.hidden = !ranged;
+      this._attachButton.textContent = ranged ? 'Attach selection' : 'Attach file';
+      if (ranged && !this._lineStarts) this._loadPreview();
+      else this._updateRange();
+      this._position();
+    }
+
+    async _loadPreview() {
+      const generation = ++this._previewGeneration;
+      const path = this._select.value;
+      this._rangeFields.disabled = true;
+      this._attachButton.disabled = true;
+      this._rangeStatus.textContent = 'Loading file preview…';
+      try {
+        const response = await this.plugin.restApi().fetch('GET',
+          `/changes/${this._change._number}/revisions/${this._sha}/files/${encodeURIComponent(path)}/content`
+        );
+        if (!response?.ok) throw new Error('Could not load file preview.');
+        let encoded = await response.text();
+        if (!this.isConnected || generation !== this._previewGeneration) return;
+        if (response.headers.get('Content-Type')?.includes('application/json')) {
+          encoded = JSON.parse(encoded.replace(/^\)\]\}'\s*/, ''));
+        }
+        if (typeof encoded !== 'string' || encoded.length > Math.ceil(maxFileBytes / 3) * 4) {
+          throw new Error('File preview exceeds 64 KiB.');
+        }
+        const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
+        if (bytes.length > maxFileBytes || bytes.includes(0)) {
+          throw new Error('Select a UTF-8 text file up to 64 KiB.');
+        }
+        const content = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes)
+          .replace(/\r\n?/g, '\n');
+        this._preview.value = content;
+        this._lineStarts = [];
+        for (let index = 0; index < content.length; index++) {
+          if (index === 0 || content[index - 1] === '\n') this._lineStarts.push(index);
+        }
+        const count = this._lineStarts.length;
+        this._lineNumbers.textContent = this._lineStarts.map((_, index) => index + 1).join('\n');
+        this._startLine.max = this._endLine.max = count;
+        this._startLine.value ||= count ? 1 : '';
+        this._endLine.value ||= count || '';
+        this._rangeFields.disabled = count === 0;
+        this._updateRange(true);
+      } catch (error) {
+        if (this.isConnected && generation === this._previewGeneration) {
+          this._rangeStatus.textContent = error instanceof Error ? error.message : 'Could not load file preview.';
+          this._updateRange();
+        }
+      }
+      this._position();
+    }
+
+    _updateRange(highlight = false) {
+      const ranged = this._rangeToggle.checked;
+      const count = this._lineStarts?.length || 0;
+      const start = this._startLine.valueAsNumber;
+      const end = this._endLine.valueAsNumber;
+      const valid = count > 0 && Number.isInteger(start) && Number.isInteger(end) &&
+        start >= 1 && end >= start && end <= count;
+      this._attachButton.disabled = this._select.disabled || !this._select.value || (ranged && !valid);
+      if (!ranged || !this._lineStarts) return;
+      this._rangeStatus.textContent = !count ? 'This file has no lines to select.' : valid
+        ? `Lines ${start}–${end} of ${count}. Select text in the preview or enter line numbers.`
+        : `Enter a start and end line between 1 and ${count}, with the end at or after the start.`;
+      if (valid && highlight) {
+        this._preview.setSelectionRange(this._lineStarts[start - 1],
+          this._lineStarts[end] ?? this._preview.value.length);
+      }
+    }
+
+    _selectCode() {
+      if (!this._lineStarts?.length) return;
+      const {selectionStart: start, selectionEnd: end, value} = this._preview;
+      const last = end > start && value[end - 1] === '\n' ? end - 1 : end;
+      const lineAt = offset => Math.min(this._lineStarts.length, value.slice(0, offset).split('\n').length);
+      this._startLine.value = lineAt(start);
+      this._endLine.value = lineAt(last);
+      this._updateRange();
+    }
+
     async _load() {
       const { _sha: sha, _key: key } = this;
       const changeNumber = this._change?._number;
@@ -248,6 +399,7 @@
       this._select.replaceChildren(new Option('Choose a changed file…', ''));
       this._select.disabled = true;
       this._attachButton.disabled = true;
+      this._fileChanged();
       const status = this.shadowRoot.querySelector('#status');
       if (!changeNumber || !sha) {
         status.textContent = 'Load a patch set to attach code.';
@@ -278,9 +430,9 @@
         const existing = this._contextChips().map(chip => parseReference(chip.contextItem.identifier))
           .find(file => file?.change === changeNumber && file.revision === sha);
         this._select.value = existing?.path || '';
-        this._attachButton.disabled = !this._select.value;
+        this._fileChanged(existing);
         status.textContent = count
-          ? 'Whole text files up to 64 KiB. Deleted and binary files are unavailable.'
+          ? 'Text files up to 64 KiB. Deleted and binary files are unavailable.'
           : 'No eligible changed text files in this patch set.';
         this._position();
         if (this._popover.matches(':popover-open')) this._select.focus();
@@ -308,7 +460,7 @@
         id: fileType,
         name: menuTitle,
         icon: 'description',
-        regex: /reviewai-file:[1-9]\d*:[0-9a-f]{40}:\S+/g,
+        regex: /reviewai-file:[1-9]\d*:[0-9a-f]{40}:[^\s#]+(?:#L[1-9]\d*-L[1-9]\d*)?/g,
         placeholder: 'reviewai-file:change:revision:path',
         parse: toContextItem,
       }];
@@ -324,6 +476,10 @@
         throw new Error('The attached file does not belong to this change. Remove it and select it again.');
       }
       const attachment = {revision: file.revision, path: file.path};
+      if (file.start_line) {
+        attachment.start_line = file.start_line;
+        attachment.end_line = file.end_line;
+      }
       snapshots.set(attachment, items[0]);
       return attachment;
     },
@@ -339,7 +495,8 @@
     describe(file, response) {
       if (!file) return response;
       const path = file.path.replace(/([\\`*_{}[\]()<>])/g, '\\$1');
-      return `**Code context:** ${path} (${file.revision.slice(0, 8)})\n\n${response || ''}`;
+      const range = file.start_line ? `, lines ${file.start_line}–${file.end_line}` : '';
+      return `**Code context:** ${path} (${file.revision.slice(0, 8)}${range})\n\n${response || ''}`;
     },
   };
 })(window);
