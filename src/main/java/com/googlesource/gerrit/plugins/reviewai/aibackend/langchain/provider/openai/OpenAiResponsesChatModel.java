@@ -27,6 +27,7 @@ import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.core.ObjectMappers;
 import com.openai.core.http.HttpResponseFor;
+import com.openai.errors.OpenAIInvalidDataException;
 import com.openai.models.ResponseFormatJsonObject;
 import com.openai.models.responses.EasyInputMessage;
 import com.openai.models.responses.FunctionTool;
@@ -438,14 +439,22 @@ public class OpenAiResponsesChatModel implements ChatModel {
   }
 
   private TokenUsage toTokenUsage(ResponseUsage usage) {
-    ResponseUsage.InputTokensDetails inputDetails =
-        usage._inputTokensDetails().asKnown().orElse(null);
-    return new DetailedTokenUsage(
-        toInteger(usage.inputTokens()),
-        toInteger(usage.outputTokens()),
-        toInteger(usage.totalTokens()),
-        cachedTokenCount(inputDetails),
-        additionalTokenCount(inputDetails, "cache_write_tokens"));
+    try {
+      ResponseUsage.InputTokensDetails inputDetails =
+          usage._inputTokensDetails().asKnown().orElse(null);
+      return new DetailedTokenUsage(
+          toInteger(usage.inputTokens()),
+          toInteger(usage.outputTokens()),
+          toInteger(usage.totalTokens()),
+          cachedTokenCount(inputDetails),
+          additionalTokenCount(inputDetails, "cache_write_tokens"));
+    } catch (OpenAIInvalidDataException e) {
+      log.warn(
+          "Ignoring invalid OpenAI Responses token usage for model {}: {}",
+          modelName,
+          e.getMessage());
+      return null;
+    }
   }
 
   private Integer cachedTokenCount(ResponseUsage.InputTokensDetails inputDetails) {

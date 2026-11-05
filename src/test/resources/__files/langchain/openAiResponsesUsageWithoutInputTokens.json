@@ -1,0 +1,26 @@
+{
+  "id": "resp_usage_without_input_tokens",
+  "object": "response",
+  "created_at": 1741900001,
+  "status": "completed",
+  "model": "agnes-2.5-flash",
+  "output": [
+    {
+      "id": "msg_usage_without_input_tokens",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "ok",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "output_tokens": 1,
+    "total_tokens": 5
+  }
+}

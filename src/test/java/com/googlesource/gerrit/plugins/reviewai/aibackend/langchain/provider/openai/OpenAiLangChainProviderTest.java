@@ -56,6 +56,8 @@ public class OpenAiLangChainProviderTest {
       "__files/langchain/openAiChatCompletionsSuccess.json";
   private static final String OPENAI_RESPONSES_USAGE_WITHOUT_DETAILS_RESOURCE =
       "__files/langchain/openAiResponsesUsageWithoutDetails.json";
+  private static final String OPENAI_RESPONSES_USAGE_WITHOUT_INPUT_TOKENS_RESOURCE =
+      "__files/langchain/openAiResponsesUsageWithoutInputTokens.json";
   private static final String OPENAI_RESPONSES_TOOL_CALL_WITH_REASONING_RESOURCE =
       "__files/langchain/openAiResponsesToolCallWithReasoning.json";
   private static final String OPENAI_RESPONSES_STRUCTURED_CONTENT_BLOCKS_RESOURCE =
@@ -209,6 +211,33 @@ public class OpenAiLangChainProviderTest {
     assertEquals(Integer.valueOf(4), tokenUsage.inputTokenCount());
     assertNull(tokenUsage.cachedInputTokenCount());
     assertNull(tokenUsage.cacheWriteTokenCount());
+  }
+
+  @Test
+  public void acceptsZdrResponseWithoutInputTokens() {
+    Configuration config = responsesApiConfig();
+    when(config.getAiProviderZdr()).thenReturn(true);
+    when(config.getAiModel()).thenReturn("agnes-2.5-flash");
+    WireMock.stubFor(
+        post(urlEqualTo("/v1/responses"))
+            .willReturn(
+                WireMock.aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(responseBody(OPENAI_RESPONSES_USAGE_WITHOUT_INPUT_TOKENS_RESOURCE))));
+
+    ChatResponse response =
+        provider
+            .buildChatModel(config, 0.0, "conv_test", "review instructions")
+            .getModel()
+            .chat(ChatRequest.builder().messages(UserMessage.from("Say ok")).build());
+
+    assertEquals("ok", response.aiMessage().text());
+    assertNull(response.tokenUsage());
+    WireMock.verify(
+        1,
+        postRequestedFor(urlEqualTo("/v1/responses"))
+            .withRequestBody(matchingJsonPath("$.store", equalTo("false"))));
+    WireMock.verify(0, postRequestedFor(urlEqualTo("/v1/chat/completions")));
   }
 
   @Test
