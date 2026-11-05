@@ -57,9 +57,7 @@ public class AiComment extends ClientBase {
     String cleanedMessage = messageCleaner.removeHeadings().getMessage();
     if (!isFromAssistant(commentProperty)) {
       try {
-        var attachment = GerritCodeContext.fromTag(commentProperty.getTag());
-        if (attachment.isPresent()) {
-          var file = attachment.get();
+        for (var file : GerritCodeContext.fromTag(commentProperty.getTag())) {
           if (!codeContexts.containsKey(file)) {
             if (changeSetData.getReviewChange() == null) {
               throw new IllegalStateException("Change is required to resolve code context");
