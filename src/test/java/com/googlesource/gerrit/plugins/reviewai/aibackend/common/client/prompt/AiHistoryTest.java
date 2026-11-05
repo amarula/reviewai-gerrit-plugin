@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -85,6 +86,7 @@ public class AiHistoryTest {
         new AiHistory(
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 null,
                 List.of(),
@@ -128,6 +130,7 @@ public class AiHistoryTest {
         new AiHistory(
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 null, List.of(), new CommentData(List.of(), commentMap, patchSetCommentMap), 0),
             localizer());
@@ -148,6 +151,7 @@ public class AiHistoryTest {
         new AiHistory(
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 null, List.of(), new CommentData(List.of(), commentMap, new HashMap<>()), 1),
             localizer());
@@ -169,6 +173,7 @@ public class AiHistoryTest {
         new AiHistory(
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 null, List.of(), new CommentData(List.of(), commentMap, new HashMap<>()), 0),
             localizer());
@@ -195,6 +200,7 @@ public class AiHistoryTest {
         new AiHistory(
             config(),
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 null,
                 List.of(),
@@ -225,6 +231,7 @@ public class AiHistoryTest {
         new AiDataPromptRequests(
             config,
             new ChangeSetData(AI_ACCOUNT_ID),
+            mock(GerritChange.class),
             new GerritClientData(
                 patchSet,
                 List.of(),

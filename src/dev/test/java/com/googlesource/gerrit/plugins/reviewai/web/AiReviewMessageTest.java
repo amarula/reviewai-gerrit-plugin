@@ -30,6 +30,7 @@ import com.google.gerrit.extensions.api.changes.ReviewInput;
 import com.google.gerrit.extensions.api.changes.RevisionApi;
 import com.google.gerrit.extensions.common.CommentInfo;
 import com.google.gerrit.extensions.common.DiffInfo;
+import com.google.gerrit.extensions.common.FileInfo;
 import com.google.gerrit.extensions.restapi.AuthException;
 import com.google.gerrit.extensions.restapi.BadRequestException;
 import com.google.gerrit.extensions.restapi.BinaryResult;
@@ -44,6 +45,7 @@ import com.google.gerrit.server.permissions.PermissionBackend;
 import com.google.gerrit.server.query.change.ChangeData;
 import com.googlesource.gerrit.plugins.reviewai.TestBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCodeContext;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.DevClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.memory.PluginChatMemoryStore;
@@ -81,6 +83,7 @@ import static com.googlesource.gerrit.plugins.reviewai.config.dynamic.DynamicCon
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -191,6 +194,71 @@ public class AiReviewMessageTest extends TestBase {
         org.mockito.Mockito.mock(PermissionBackend.WithUser.class);
     when(permissionBackend.user(currentUser)).thenReturn(permissionBackendWithUser);
     when(permissionBackendWithUser.test(GlobalPermission.ADMINISTRATE_SERVER)).thenReturn(true);
+  }
+
+  @Test
+  public void codeAttachmentIsPersistedOnTheExactGerritComment() throws Exception {
+    var fixture = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson().fromJson(
+        readTestFile("__files/reviewagent/code-context.json"), com.google.gson.JsonObject.class);
+    var attachment = com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson().fromJson(
+        fixture, GerritCodeContext.Attachment.class);
+    FileInfo file = new FileInfo();
+    file.newMode = 0100644;
+    when(changeApi.revision(attachment.revision())).thenReturn(revisionApi);
+    when(revisionApi.files()).thenReturn(Map.of(attachment.path(), file));
+    when(revisionApi.file(attachment.path())).thenReturn(fileApi);
+    when(fileApi.content()).thenReturn(BinaryResult.create(fixture.get("content").getAsString()));
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = fixture.get("message").getAsString();
+    input.reviewAgent = true;
+    input.requestId = "code-context-request";
+    input.codeContext = attachment;
+    CommentInfo matching = new CommentInfo();
+    matching.message = "@gpt " + input.message;
+    matching.tag = GerritCodeContext.toTag(attachment);
+    matching.changeMessageId = "attached-file-message";
+    CommentInfo other = new CommentInfo();
+    other.message = matching.message;
+    other.id = "newer-comment-with-different-attachment";
+    other.tag = "another-attachment";
+    other.changeMessageId = "another-message";
+    when(commentsRequest.get()).thenReturn(Map.of("/PATCHSET_LEVEL", List.of(matching, other)));
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(matching.changeMessageId, output.requestId);
+    ArgumentCaptor<ReviewInput> captor = ArgumentCaptor.forClass(ReviewInput.class);
+    verify(revisionApi).review(captor.capture());
+    ReviewInput posted = captor.getValue();
+    assertEquals(attachment, GerritCodeContext.fromTag(posted.tag).orElseThrow());
+    assertEquals("@gpt " + input.message, posted.comments.get("/PATCHSET_LEVEL").getFirst().message);
+    assertFalse(posted.comments.get("/PATCHSET_LEVEL").getFirst().message.contains(
+        fixture.get("content").getAsString()));
+  }
+
+  @Test
+  public void codeAttachmentCannotBypassAiReviewPermission() throws Exception {
+    doThrow(new AuthException("denied")).when(aiReviewPermission).checkCanAiReview(changeResource);
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = readTestFile("__files/reviewagent/code-context.json");
+    input.reviewAgent = true;
+    input.codeContext = new GerritCodeContext.Attachment("current", "secret");
+
+    assertThrows(AuthException.class, () -> view.apply(changeResource, input));
+    verify(revisionApi, never()).review(any());
+    verify(changeApi, never()).revision(any(String.class));
+  }
+
+  @Test
+  public void codeAttachmentRejectsCommandsBeforePublishingOrChangingModel() throws Exception {
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = "/review";
+    input.reviewAgent = true;
+    input.codeContext = new GerritCodeContext.Attachment("current", "secret");
+
+    assertThrows(BadRequestException.class, () -> view.apply(changeResource, input));
+    verify(revisionApi, never()).review(any());
+    verify(pluginDataHandler, never()).setJsonValue(eq(KEY_DYNAMIC_CONFIG), any());
   }
 
   private void grantConfiguredAiAdministratorGroupPrivileges() {
