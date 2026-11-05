@@ -238,6 +238,22 @@
       // Restored turns retain their chips for history, but attachments are one-shot drafts.
       this._contextChips().filter(chip => chip.contextItem.reviewai_consumed)
         .forEach(chip => this._removeItem(chip.contextItem));
+      this._contextChips().forEach(chip => {
+        chip.style.maxWidth = '100%';
+        chip.style.minWidth = '0';
+        const root = chip.shadowRoot;
+        if (!root || root.querySelector('style[data-reviewai-chip-size]')) return;
+        // Gerrit's host clips at 300px; constrain the inner chip so its remove action fits.
+        const style = document.createElement('style');
+        style.dataset.reviewaiChipSize = '';
+        style.textContent = `
+          md-filter-chip.context-chip { min-width: 0; max-width: 100%; box-sizing: border-box; }
+          .context-chip-container { min-width: 0; }
+          .context-chip-title { min-width: 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+        `;
+        root.append(style);
+      });
       if (this._popover.matches(':popover-open')) {
         this._updateRange();
         this._position();
