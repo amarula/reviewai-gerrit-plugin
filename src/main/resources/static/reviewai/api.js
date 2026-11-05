@@ -8,13 +8,15 @@
     },
 
     createSendMessage(plugin, pluginName) {
-      return (change, message, modelId, reviewAgent, requestId) =>
+      return (change, message, modelId, reviewAgent, requestId, codeContext) =>
         plugin.restApi().post(`/changes/${change._number}/${pluginName}~ai-review-message`, {
           message,
           model_id: modelId,
           model_name: modelId,
           review_agent: Boolean(reviewAgent),
           request_id: requestId,
+          code_context: codeContext
+            ? {revision: codeContext.revision, path: codeContext.path} : undefined,
         });
     },
 

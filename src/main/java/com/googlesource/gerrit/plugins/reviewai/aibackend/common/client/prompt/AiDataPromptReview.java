@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiRequestMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -32,9 +33,10 @@ public class AiDataPromptReview extends AiDataPromptBase implements IAiDataPromp
   public AiDataPromptReview(
       Configuration config,
       ChangeSetData changeSetData,
+      GerritChange change,
       GerritClientData gerritClientData,
       Localizer localizer) {
-    super(config, changeSetData, gerritClientData, localizer);
+    super(config, changeSetData, change, gerritClientData, localizer);
     commentProperties = new ArrayList<>(commentData.getCommentMap().values());
     log.debug("AiDataPromptReview initialized with comment properties.");
   }

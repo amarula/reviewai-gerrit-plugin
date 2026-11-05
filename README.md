@@ -78,6 +78,18 @@ as scoped Patch Set and Commit Message reviews.
 
 <kbd><img src="images/reviewai-sidebar.png?raw=true" alt="Review Agent sidebar"></kbd>
 
+### Code Context
+
+On Gerrit 3.15, choose **Add Context → Changed file** in the change-page chat sidebar to open a
+floating picker. Select one file and click **Attach file**, then send a chat message to include
+that file's whole contents as additional context. The native removable context chip shows its
+pinned revision and is consumed when the message is accepted. Cancel, Escape, or clicking outside
+the picker closes it without changing the attachment. Conversation
+history records the attachment, and regenerating the answer reuses the original file and revision.
+Only changed, regular UTF-8 text files up to 64 KiB are supported; deleted and binary files are
+excluded. Attachments apply to chat messages, not review or configuration commands. Line-range
+selection and repository-wide browsing are not available yet.
+
 ### Model Selection
 
 The sidebar allows users to select the AI provider and model used for the review.

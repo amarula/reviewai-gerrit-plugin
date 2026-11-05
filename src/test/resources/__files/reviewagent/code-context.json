@@ -1,0 +1,6 @@
+{
+  "revision": "1234567890123456789012345678901234567890",
+  "path": "src/Service.java",
+  "message": "/message Explain how this service handles missing input.",
+  "content": "class Service {\n  String normalize(String value) {\n    return value == null ? \"default\" : value.trim();\n  }\n}\n"
+}

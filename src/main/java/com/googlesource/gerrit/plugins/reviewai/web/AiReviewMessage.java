@@ -35,6 +35,7 @@ import com.google.gerrit.server.git.GitRepositoryManager;
 import com.google.gson.annotations.SerializedName;
 import com.google.inject.Inject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCodeContext;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandExtension;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritChangeRef;
@@ -140,6 +141,16 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     ReviewAgentRequestStatusStore statusStore = getStatusStore(resource);
     aiReviewPermission.checkCanAiReview(resource);
+    String codeContextTag = null;
+    if (input != null && input.codeContext != null) {
+      if (!reviewAgent || !message.matches("(?s)^/message\\s+.+")) {
+        throw new BadRequestException("Code attachments are supported for chat messages only");
+      }
+      ChangeApi contextChange =
+          gerritApi.changes().id(resource.getProject().get(), resource.getChange().getChangeId());
+      GerritCodeContext.read(contextChange, input.codeContext);
+      codeContextTag = GerritCodeContext.toTag(input.codeContext);
+    }
     storeSelectedModel(resource, input, config);
     if (ClientCommandBase.shouldSkipGerritMessage(message)) {
       supersedeActiveReviewForDirectStateChange(
@@ -182,6 +193,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     String postedMessage = "@" + config.getGerritUserName() + " " + message;
     ReviewInput reviewInput = ReviewInput.create().patchSetLevelComment(postedMessage);
+    reviewInput.tag = codeContextTag;
     String outputRequestId = requestId;
     ChangeApi changeApi = gerritApi.changes().id(projectName, resource.getChange().getChangeId());
     ReviewResult reviewResult;
@@ -199,7 +211,7 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
             gerritApi.changes().id(projectName, resource.getChange().getChangeId());
         Optional<String> gerritMessageId =
             gerritMessageIdFinder.findPostedChangeMessageId(
-                refreshedChangeApi, reviewResult, postedMessage);
+                refreshedChangeApi, reviewResult, postedMessage, codeContextTag);
         if (gerritMessageId.isPresent()) {
           outputRequestId = gerritMessageId.get();
           statusStore.move(requestId, outputRequestId);
@@ -216,6 +228,11 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
 
   public static class Input {
     public String message;
+
+    @SerializedName(
+        value = "code_context",
+        alternate = {"codeContext"})
+    public GerritCodeContext.Attachment codeContext;
 
     @SerializedName(
         value = "model_id",

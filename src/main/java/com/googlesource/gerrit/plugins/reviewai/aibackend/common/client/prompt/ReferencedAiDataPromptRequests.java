@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -33,9 +34,10 @@ public class ReferencedAiDataPromptRequests extends AiDataPromptRequests impleme
   public ReferencedAiDataPromptRequests(
       Configuration config,
       ChangeSetData changeSetData,
+      GerritChange change,
       GerritClientData gerritClientData,
       Localizer localizer) {
-    super(config, changeSetData, gerritClientData, localizer);
+    super(config, changeSetData, change, gerritClientData, localizer);
     log.debug("ReferencedAiDataPromptRequests initialized");
   }
 

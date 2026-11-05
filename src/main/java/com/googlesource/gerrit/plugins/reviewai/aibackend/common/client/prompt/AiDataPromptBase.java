@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.patch.InlineCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.patch.diff.FileDiffProcessed;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiMessageItem;
@@ -47,12 +48,13 @@ public abstract class AiDataPromptBase implements IAiDataPrompt {
   public AiDataPromptBase(
       Configuration config,
       ChangeSetData changeSetData,
+      GerritChange change,
       GerritClientData gerritClientData,
       Localizer localizer) {
     this.config = config;
     fileDiffsProcessed = gerritClientData.getGerritClientPatchSet().getFileDiffsProcessed();
     commentData = gerritClientData.getCommentData();
-    aiMessageHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+    aiMessageHistory = new AiHistory(config, changeSetData, change, gerritClientData, localizer);
     messageItems = new ArrayList<>();
     log.debug("Initialized AiDataPromptBase with file diffs and comment data.");
   }

@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritCommentThreadIndex;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands.ClientCommandBase.CommandSet;
@@ -53,9 +54,10 @@ public class AiHistory extends AiComment {
   public AiHistory(
       Configuration config,
       ChangeSetData changeSetData,
+      GerritChange change,
       GerritClientData gerritClientData,
       Localizer localizer) {
-    super(config, changeSetData, localizer);
+    super(config, changeSetData, change, localizer);
     this.localizer = localizer;
     CommentData commentData = gerritClientData.getCommentData();
     messagesExcludedFromHistory =

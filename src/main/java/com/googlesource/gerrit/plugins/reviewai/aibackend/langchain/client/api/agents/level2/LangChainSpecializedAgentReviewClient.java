@@ -843,7 +843,8 @@ public class LangChainSpecializedAgentReviewClient extends LangChainMultiAgentRe
       if (gerritClientData == null) {
         return "";
       }
-      AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+      AiHistory aiHistory =
+          new AiHistory(config, changeSetData, change, gerritClientData, localizer);
       return LangChainChatMessages.build(aiHistory, gerritClientData, change).stream()
           .map(LangChainChatMessages::trimmed)
           .map(message -> formatThreadMessage(message))

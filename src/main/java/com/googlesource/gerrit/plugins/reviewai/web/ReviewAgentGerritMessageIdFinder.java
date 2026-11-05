@@ -27,12 +27,14 @@ import java.util.Optional;
 
 class ReviewAgentGerritMessageIdFinder {
   Optional<String> findPostedChangeMessageId(
-      ChangeApi changeApi, ReviewResult reviewResult, String postedMessage) throws Exception {
+      ChangeApi changeApi, ReviewResult reviewResult, String postedMessage, String postedTag)
+      throws Exception {
     Optional<String> commentMessageId =
         Optional.ofNullable(changeApi.commentsRequest().get()).stream()
             .flatMap(comments -> comments.values().stream())
             .flatMap(List::stream)
             .filter(comment -> postedMessage.equals(comment.message))
+            .filter(comment -> postedTag == null || postedTag.equals(comment.tag))
             .filter(
                 comment -> comment.changeMessageId != null && !comment.changeMessageId.isBlank())
             .max(
@@ -44,11 +46,12 @@ class ReviewAgentGerritMessageIdFinder {
     if (commentMessageId.isPresent()) {
       return commentMessageId;
     }
-    return findPostedChangeMessageId(reviewResult, changeApi, postedMessage);
+    return findPostedChangeMessageId(reviewResult, changeApi, postedMessage, postedTag);
   }
 
   private Optional<String> findPostedChangeMessageId(
-      ReviewResult reviewResult, ChangeApi changeApi, String postedMessage) throws Exception {
+      ReviewResult reviewResult, ChangeApi changeApi, String postedMessage, String postedTag)
+      throws Exception {
     Collection<ChangeMessageInfo> messages =
         Optional.ofNullable(reviewResult)
             .map(result -> result.changeInfo)
@@ -62,6 +65,7 @@ class ReviewAgentGerritMessageIdFinder {
     }
     return messages.stream()
         .filter(message -> postedMessage.equals(stripPatchSetPrefix(message.message)))
+        .filter(message -> postedTag == null || postedTag.equals(message.tag))
         .filter(message -> message.id != null && !message.id.isBlank())
         .max(
             Comparator.comparing(

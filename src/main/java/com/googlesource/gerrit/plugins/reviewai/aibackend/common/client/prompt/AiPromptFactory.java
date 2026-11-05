@@ -146,10 +146,11 @@ public class AiPromptFactory {
       Localizer localizer) {
     if (change.getIsCommentEvent()) {
       log.debug("AiPromptFactory: Return ReferencedAiDataPromptRequests");
-      return new ReferencedAiDataPromptRequests(config, changeSetData, gerritClientData, localizer);
+      return new ReferencedAiDataPromptRequests(
+          config, changeSetData, change, gerritClientData, localizer);
     } else {
       log.debug("AiPromptFactory: Return AiDataPromptReview");
-      return new AiDataPromptReview(config, changeSetData, gerritClientData, localizer);
+      return new AiDataPromptReview(config, changeSetData, change, gerritClientData, localizer);
     }
   }
 }
