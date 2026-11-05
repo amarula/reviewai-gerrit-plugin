@@ -69,17 +69,22 @@ async function harness(t) {
   const items = () => page.evaluate(() =>
     originalPanel.shadowRoot.querySelector('prompt-box').items);
   const open = async (keyboard = false) => {
+    if (await dialog.isVisible()) return;
     await page.getByRole('button', {name: 'Add Context', exact: true}).click();
     const item = page.getByRole('menuitem', {name: 'Changed file', exact: true});
     if (keyboard) await item.press('Enter');
     else await item.click();
     await dialog.waitFor({state: 'visible'});
   };
+  const finish = async () => {
+    await dialog.getByRole('button', {name: 'Finish', exact: true}).click();
+    await dialog.waitFor({state: 'hidden'});
+  };
   const attach = async file => {
     await open();
     await select.selectOption(file);
     await dialog.getByRole('button', {name: 'Attach file', exact: true}).click();
-    await dialog.waitFor({state: 'hidden'});
+    assert.equal(await dialog.isVisible(), true);
   };
   const rangeToggle = dialog.getByRole('checkbox', {name: 'Select lines', exact: true});
   const preview = dialog.getByRole('textbox', {name: 'File preview', exact: true});
@@ -91,7 +96,7 @@ async function harness(t) {
     await dialog.getByRole('spinbutton', {name: 'Start line'}).waitFor();
     await page.waitForFunction(() => !document.querySelector('reviewai-code-context').shadowRoot.querySelector('#range-fields').disabled);
   };
-  return {page, picker, dialog, select, items, open, attach, rangeToggle, preview, selectRange};
+  return {page, picker, dialog, select, items, open, finish, attach, rangeToggle, preview, selectRange};
 }
 
 test('Add Context opens a floating picker without taking sidebar space or opening link input', async t => {
@@ -123,17 +128,18 @@ test('attaching uses native removable chips and consuming a request clears its d
   }), [{revision: fixture.revision, path: fixture.path}]);
   assert.deepEqual(await h.items(), []);
   await h.attach(fixture.path);
+  await h.finish();
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).click();
   assert.deepEqual(await h.items(), []);
 });
 
-test('Cancel, Escape and outside clicks dismiss the panel without changing attachments', async t => {
+test('Finish, Escape and outside clicks dismiss the panel without changing attachments', async t => {
   const h = await harness(t);
   await h.attach(fixture.path);
   const original = await h.items();
   await h.open();
   await h.select.selectOption('src/Other.java');
-  await h.dialog.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await h.finish();
   assert.deepEqual(await h.items(), original);
   await h.open(true);
   await h.select.press('Escape');
@@ -181,7 +187,7 @@ test('native prompt replacement reconnects the menu adapter and other context ty
     originalPanel.shadowRoot.querySelector('prompt-box').replaceWith(replacement);
   });
   await h.open();
-  await h.dialog.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await h.finish();
   await h.page.getByRole('button', {name: 'Add Context', exact: true}).click();
   await h.page.getByRole('menuitem', {name: 'URL', exact: true}).click();
   assert.equal(await h.page.evaluate(() => nativeTextDialogOpenCount), 1);
@@ -194,7 +200,7 @@ test('loading failures and denied permissions keep Attach disabled', async t => 
   await h.open();
   await h.page.getByText('Could not read changed files', {exact: true}).waitFor();
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), true);
-  await h.dialog.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await h.finish();
   await h.page.evaluate(() => { window.failFiles = false; window.models.can_ai_review = false; });
   await h.open();
   await h.page.getByText('ReviewAI is not allowed for this change.', {exact: true}).waitFor();
@@ -233,6 +239,7 @@ test('selecting text in the preview attaches its inclusive lines and restores th
   assert.equal(await h.dialog.getByRole('spinbutton', {name: 'Start line'}).inputValue(), String(ranges.start_line));
   assert.equal(await h.dialog.getByRole('spinbutton', {name: 'End line'}).inputValue(), String(ranges.end_line));
   await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).click();
+  assert.equal(await h.dialog.isVisible(), true);
   const expected = {revision: fixture.revision, path: fixture.path,
     start_line: ranges.start_line, end_line: ranges.end_line};
   assert.deepEqual(await h.page.evaluate(() => {
@@ -240,6 +247,7 @@ test('selecting text in the preview attaches its inclusive lines and restores th
     return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
   }), [expected]);
   assert.ok((await h.items())[0].title.includes(`:${ranges.start_line}–${ranges.end_line}`));
+  await h.finish();
   await h.open();
   await h.preview.waitFor({state: 'visible'});
   assert.equal(await h.rangeToggle.isChecked(), true);
@@ -330,6 +338,7 @@ test('multiple ranges from one file and another whole file have independently re
     const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
     return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
   }), expected);
+  await h.finish();
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).nth(1).click();
   assert.deepEqual(await h.page.evaluate(() => {
     const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
@@ -368,7 +377,7 @@ test('the attachment limit blocks new chips until one is removed', async t => {
   await h.select.selectOption('src/Other.java');
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), true);
   assert.match(await h.picker.locator('#attachment-count').textContent(), /Remove a chip/);
-  await h.dialog.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await h.finish();
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).first().click();
   await h.attach('src/Other.java');
   assert.equal((await h.items()).length, limit);
