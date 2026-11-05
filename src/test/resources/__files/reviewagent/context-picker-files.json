@@ -1,0 +1,9 @@
+{
+  "src/Service.java": {"size": 100, "new_mode": 33188},
+  "src/Other.java": {"size": 200, "new_mode": 33188},
+  "deleted.txt": {"status": "D"},
+  "binary.png": {"binary": true},
+  "oversized.txt": {"size": 65537},
+  "/COMMIT_MSG": {},
+  "symlink": {"new_mode": 40960}
+}

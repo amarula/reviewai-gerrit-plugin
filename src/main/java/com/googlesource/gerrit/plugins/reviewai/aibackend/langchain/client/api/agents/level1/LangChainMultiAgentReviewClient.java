@@ -524,7 +524,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
       if (gerritClientData == null) {
         return List.of();
       }
-      AiHistory aiHistory = new AiHistory(config, changeSetData, gerritClientData, localizer);
+      AiHistory aiHistory = new AiHistory(config, changeSetData, change, gerritClientData, localizer);
       return LangChainChatMessages.build(aiHistory, gerritClientData, change).stream()
           .map(LangChainChatMessages::trimmed)
           .toList();
