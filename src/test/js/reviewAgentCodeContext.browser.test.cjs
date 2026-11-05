@@ -9,6 +9,7 @@ const fixture = JSON.parse(fs.readFileSync(path.join(resources, 'code-context.js
 const ranges = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-ranges.json'), 'utf8'));
 const multiple = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-multiple.json'), 'utf8'));
 const files = JSON.parse(fs.readFileSync(path.join(resources, 'context-picker-files.json'), 'utf8'));
+const chipLayout = JSON.parse(fs.readFileSync(path.join(resources, 'context-chip-layout.json'), 'utf8'));
 const source = path.join(__dirname, '../../main/resources/static/reviewai/reviewAgent/reviewAgentCodeContext.js');
 let browser;
 before(async () => { browser = await chromium.launch({headless: true}); });
@@ -381,4 +382,33 @@ test('the attachment limit blocks new chips until one is removed', async t => {
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).first().click();
   await h.attach('src/Other.java');
   assert.equal((await h.items()).length, limit);
+});
+
+test('long attachment chips resize with the sidebar and keep Remove visible', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(path => { files[path] = {size: 100, new_mode: 33188}; }, chipLayout.path);
+  await h.attach(chipLayout.path);
+  await h.finish();
+  const chip = h.page.locator('context-chip.external-context').first();
+  const remove = chip.getByRole('button', {name: 'Remove context', exact: true});
+  const widths = [];
+  for (const width of chipLayout.widths) {
+    await h.page.setViewportSize({width, height: 740});
+    const badge = await chip.boundingBox();
+    const button = await remove.boundingBox();
+    const prompt = await h.page.locator('prompt-box').boundingBox();
+    assert.ok(badge.width <= prompt.width);
+    assert.ok(button.x >= badge.x && button.x + button.width <= badge.x + badge.width,
+      JSON.stringify({width, badge, button}));
+    assert.ok(button.width >= 16);
+    await remove.click({trial: true});
+    assert.equal(await chip.locator('.context-chip-title').evaluate(element =>
+      getComputedStyle(element).textOverflow), 'ellipsis');
+    widths.push(badge.width);
+  }
+  assert.ok(widths[0] > 300);
+  assert.ok(widths[1] < widths[0]);
+  assert.ok(widths[2] > widths[1]);
+  await remove.click();
+  assert.deepEqual(await h.items(), []);
 });
