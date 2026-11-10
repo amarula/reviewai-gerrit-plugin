@@ -79,7 +79,8 @@
         <style>
           :host { display: contents; }
           #picker { position: fixed; inset: auto; margin: 0; padding: 16px;
-            box-sizing: border-box; max-height: calc(100dvh - 24px); overflow: auto;
+            box-sizing: border-box; max-width: calc(100vw - 24px);
+            max-height: calc(100dvh - 24px); overflow: auto;
             color: var(--primary-text-color, #222);
             font: inherit; background: var(--dialog-background-color, #fff);
             border: 1px solid var(--border-color, #ccc); border-radius: 12px;
@@ -295,6 +296,8 @@
       menu.open = false;
       this._anchor = this._nativeRoot.querySelector('#addContextChip');
       this._syncScope();
+      const sidebarWidth = this.parentElement.querySelector('chat-panel').getBoundingClientRect().width;
+      this._popover.style.width = `${sidebarWidth}px`;
       this._popover.showPopover();
       this._position();
       this._load();
@@ -311,10 +314,8 @@
         return;
       }
       const anchor = this._anchor.getBoundingClientRect();
-      const width = Math.min(this._rangeToggle.checked ? 640 : 360, global.innerWidth - 24);
-      this._popover.style.width = `${width}px`;
       this._fitFileOptions();
-      const height = this._popover.getBoundingClientRect().height;
+      const {width, height} = this._popover.getBoundingClientRect();
       const above = anchor.top - height - 8;
       const top = above >= 12 ? above : Math.min(anchor.bottom + 8, global.innerHeight - height - 12);
       this._popover.style.left = `${Math.max(12, Math.min(anchor.left, global.innerWidth - width - 12))}px`;

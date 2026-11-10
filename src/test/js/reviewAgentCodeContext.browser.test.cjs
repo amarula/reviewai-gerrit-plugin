@@ -117,6 +117,24 @@ test('Add Context opens a floating picker without taking sidebar space or openin
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), true);
 });
 
+test('picker captures sidebar width on open and refreshes it only when reopened', async t => {
+  const h = await harness(t);
+  const sidebar = h.page.locator('chat-panel');
+  await sidebar.evaluate(element => { element.style.width = '320px'; });
+  await h.open();
+  assert.equal((await h.dialog.boundingBox()).width, 320);
+  await sidebar.evaluate(element => { element.style.width = '380px'; });
+  await h.page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  assert.equal((await h.dialog.boundingBox()).width, 320);
+  await h.select.selectOption(fixture.path);
+  await h.rangeToggle.check();
+  await h.preview.waitFor({state: 'visible'});
+  assert.equal((await h.dialog.boundingBox()).width, 320);
+  await h.finish();
+  await h.open();
+  assert.equal((await h.dialog.boundingBox()).width, 380);
+});
+
 test('attaching uses native removable chips and consuming a request clears its draft attachment', async t => {
   const h = await harness(t);
   await h.attach(fixture.path);
