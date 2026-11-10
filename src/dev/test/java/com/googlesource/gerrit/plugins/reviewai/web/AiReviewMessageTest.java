@@ -552,6 +552,45 @@ public class AiReviewMessageTest extends TestBase {
   }
 
   @Test
+  public void reviewAgentMessageLinksStatusUsingFreshChangeSnapshotAfterPosting() throws Exception {
+    var fixture = OutputFormat.JSON.newGson().fromJson(
+        readTestFile("__files/reviewagent/sidebar-request.json"), com.google.gson.JsonObject.class);
+    var handler = new PluginDataHandler(realChangeDataPath, getTestReviewAiDb());
+    when(pluginDataHandlerBaseProvider.get(CHANGE_ID.toString())).thenReturn(handler);
+    var refreshedChangeApi = org.mockito.Mockito.mock(ChangeApi.class);
+    var refreshedComments = org.mockito.Mockito.mock(ChangeApi.CommentsRequest.class);
+    when(refreshedChangeApi.commentsRequest()).thenReturn(refreshedComments);
+    CommentInfo postedComment = new CommentInfo();
+    postedComment.id = fixture.get("messageId").getAsString() + "-comment";
+    postedComment.message = "@gpt " + fixture.get("prompt").getAsString();
+    postedComment.changeMessageId = fixture.get("messageId").getAsString();
+    postedComment.setUpdated(Instant.now());
+    when(refreshedComments.get()).thenReturn(Map.of("/PATCHSET_LEVEL", List.of(postedComment)));
+    when(revisionApi.review(any())).thenAnswer(invocation -> {
+      // The original ChangeApi retains the notes from before the review was posted.
+      when(changes.id(PROJECT_NAME.get(), changeResource.getChange().getChangeId()))
+          .thenReturn(refreshedChangeApi);
+      return null;
+    });
+    AiReviewMessage.Input input = new AiReviewMessage.Input();
+    input.message = fixture.get("prompt").getAsString();
+    input.requestId = fixture.get("requestId").getAsString();
+    input.reviewAgent = true;
+
+    AiReviewMessage.Output output = view.apply(changeResource, input).value();
+
+    assertEquals(postedComment.changeMessageId, output.requestId);
+    var store = new ReviewAgentRequestStatusStore(handler);
+    store.completed(postedComment.changeMessageId, fixture.get("response").getAsString());
+    AiReviewMessageStatus.Input statusInput = new AiReviewMessageStatus.Input();
+    statusInput.requestId = output.requestId;
+    var status = new AiReviewMessageStatus(aiReviewPermission, pluginDataHandlerBaseProvider)
+        .apply(changeResource, statusInput).value();
+    assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, status.status);
+    assertEquals(fixture.get("response").getAsString(), status.responseText);
+  }
+
+  @Test
   public void reviewAgentPatchsetScopeReviewReturnsPartialReviewPreambleAndPostsGerritMessage()
       throws Exception {
     AiReviewMessage.Input input = new AiReviewMessage.Input();

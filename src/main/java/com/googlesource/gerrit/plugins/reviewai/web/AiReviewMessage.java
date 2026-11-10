@@ -193,14 +193,22 @@ public class AiReviewMessage implements RestModifyView<ChangeResource, AiReviewM
     }
     if (reviewAgent) {
       try {
+        // ChangeApi retains its ChangeResource/notes snapshot. Reload after posting so the
+        // comment lookup can see the new message and link its completion to the sidebar request.
+        ChangeApi refreshedChangeApi =
+            gerritApi.changes().id(projectName, resource.getChange().getChangeId());
         Optional<String> gerritMessageId =
-            gerritMessageIdFinder.findPostedChangeMessageId(changeApi, reviewResult, postedMessage);
+            gerritMessageIdFinder.findPostedChangeMessageId(
+                refreshedChangeApi, reviewResult, postedMessage);
         if (gerritMessageId.isPresent()) {
           outputRequestId = gerritMessageId.get();
           statusStore.move(requestId, outputRequestId);
+        } else {
+          log.warn("Could not find the Gerrit message for sidebar request {}", requestId);
         }
-      } catch (Exception ignored) {
+      } catch (Exception e) {
         // Keep the provisional id if Gerrit accepted the review but id lookup is unavailable.
+        log.warn("Could not link sidebar request {} to its Gerrit message", requestId, e);
       }
     }
     return Response.ok(new Output(true, reviewAgentPreamble).withRequestId(outputRequestId));
