@@ -59,7 +59,8 @@ For the floating picker, run `npx playwright install chromium --only-shell` once
 `npm run test:code-context:browser`. These browser tests exercise Gerrit 3.15's menu and context-chip
 DOM/event contract using a local fixture. The `chat-panel` decorator intercepts only ReviewAI's
 provider-supplied **Changed file** menu item; Gerrit has no public custom-picker callback. The
-adapter lives in `reviewAgentCodeContext.js` and uses the native `context-item-added` and
+adapter lives in `reviewAgentCodeContext.js`, captures ReviewAI chip clicks to reopen their file
+and range, and uses the native `context-item-added` and
 `remove-context-chip` events. Check this integration on a live Gerrit when upgrading its frontend.
 
 ### Test Logging
