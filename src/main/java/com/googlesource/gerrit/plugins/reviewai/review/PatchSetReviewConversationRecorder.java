@@ -16,6 +16,8 @@
 
 package com.googlesource.gerrit.plugins.reviewai.review;
 
+import static com.googlesource.gerrit.plugins.reviewai.settings.Settings.GERRIT_PATCH_SET_FILENAME;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.inject.Inject;
@@ -43,6 +45,14 @@ public class PatchSetReviewConversationRecorder {
   }
 
   void record(GerritChange change, List<ReviewBatch> reviewBatches, Integer reviewScore) {
+    // Sidebar requests need their actual reply even when Gerrit's comment history is unavailable.
+    String details = changeSetData.getReviewStatusMessage();
+    String responseText =
+        buildReviewResponseText(reviewBatches, reviewScore, details == null || details.isBlank());
+    if (!responseText.isBlank()) {
+      changeSetData.setReviewStatusMessage(
+          details == null || details.isBlank() ? responseText : responseText + "\n\n" + details);
+    }
     if (!"patchset-created".equals(change.getEventType())
         && !Boolean.TRUE.equals(changeSetData.getDeferredReview())) {
       return;
@@ -97,6 +107,11 @@ public class PatchSetReviewConversationRecorder {
   }
 
   private String buildReviewResponseText(List<ReviewBatch> reviewBatches, Integer reviewScore) {
+    return buildReviewResponseText(reviewBatches, reviewScore, true);
+  }
+
+  private String buildReviewResponseText(
+      List<ReviewBatch> reviewBatches, Integer reviewScore, boolean includeSystemMessage) {
     List<String> parts = new ArrayList<>();
     if (reviewScore != null) {
       parts.add("**Code-Review " + formatReviewScore(reviewScore) + "**");
@@ -109,7 +124,7 @@ public class PatchSetReviewConversationRecorder {
       String location = getReviewBatchLocation(reviewBatch);
       parts.add(location == null ? text : "**" + location + "**\n" + text);
     }
-    if (parts.isEmpty()) {
+    if (parts.isEmpty() && includeSystemMessage) {
       String systemMessage = changeSetData.getReviewSystemMessage();
       if (systemMessage != null && !systemMessage.isBlank()) {
         parts.add(systemMessage.trim());
@@ -120,7 +135,7 @@ public class PatchSetReviewConversationRecorder {
 
   private String getReviewBatchLocation(ReviewBatch reviewBatch) {
     String filename = reviewBatch.getFilename();
-    if (filename == null || filename.isBlank()) {
+    if (filename == null || filename.isBlank() || GERRIT_PATCH_SET_FILENAME.equals(filename)) {
       return null;
     }
     if (reviewBatch.getLine() == null) {

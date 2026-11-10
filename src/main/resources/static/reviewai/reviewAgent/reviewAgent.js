@@ -134,11 +134,17 @@
           continue;
         }
 
-        const historyResponse = await this._getNewAssistantHistoryResponse(
-          change,
-          baselineKeys,
-          config
-        );
+        let historyResponse;
+        try {
+          historyResponse = await this._getNewAssistantHistoryResponse(
+            change,
+            baselineKeys,
+            config
+          );
+        } catch (error) {
+          if (!statusResponse) throw error;
+          // History is used to enrich the reply with comment links, not to gate its delivery.
+        }
         if (historyResponse) {
           return agentUtils.mergePanelResponseWithHistory(historyResponse, statusResponse);
         }

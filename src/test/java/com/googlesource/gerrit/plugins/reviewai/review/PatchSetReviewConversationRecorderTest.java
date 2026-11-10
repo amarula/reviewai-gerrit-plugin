@@ -26,10 +26,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.gson.JsonObject;
+import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewBatch;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Before;
@@ -44,9 +46,17 @@ public class PatchSetReviewConversationRecorderTest {
   private ReviewAgentConversationStore conversationStore;
   private PatchSetReviewConversationRecorder recorder;
   private GerritChange change;
+  private JsonObject fixture;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
+    fixture =
+        new com.google.gson.Gson()
+            .fromJson(
+                Files.readString(
+                    TestResourceLoader.getTestResourcePath()
+                        .resolve("__files/review/failureFeedback.json")),
+                JsonObject.class);
     changeSetData = new ChangeSetData(1);
     conversationStore = mock(ReviewAgentConversationStore.class);
     recorder = new PatchSetReviewConversationRecorder(changeSetData, conversationStore);
@@ -81,9 +91,56 @@ public class PatchSetReviewConversationRecorderTest {
 
   @Test
   public void doesNotRecordOrdinaryCommentReviewAsPatchSetTriggeredReview() {
-    recorder.record(change, List.of(new ReviewBatch("Comment response")), null);
+    ReviewBatch batch = new ReviewBatch("Comment response");
+    recorder.record(change, List.of(batch), null);
 
     verify(conversationStore, never())
         .appendTurn(anyString(), anyString(), anyString(), any(), any());
+    assertEquals(batch.getContent(), changeSetData.getReviewStatusMessage());
+  }
+
+  @Test
+  public void preservesExistingSystemStatusWithoutRepeatingTheError() {
+    String error = fixture.get("connectionMessage").getAsString();
+    changeSetData.setReviewSystemMessage(error);
+    changeSetData.setReviewStatusMessage(error);
+
+    recorder.record(change, List.of(), null);
+
+    assertEquals(error, changeSetData.getReviewStatusMessage());
+  }
+
+  @Test
+  public void preservesDetailedSystemStatusWithoutPrependingThePublicError() {
+    String error = fixture.get("connectionMessage").getAsString();
+    String details = error + "\n\n" + fixture.get("failure").getAsString();
+    changeSetData.setReviewSystemMessage(error);
+    changeSetData.setReviewStatusMessage(details);
+
+    recorder.record(change, List.of(), null);
+
+    assertEquals(details, changeSetData.getReviewStatusMessage());
+    assertEquals(error, changeSetData.getReviewSystemMessage());
+  }
+
+  @Test
+  public void combinesPublishedReviewWithAdditionalStatusDetails() {
+    String response = fixture.get("finding").getAsString();
+    String details = fixture.get("failure").getAsString();
+    changeSetData.setReviewStatusMessage(details);
+
+    recorder.record(change, List.of(new ReviewBatch(response)), null);
+
+    assertEquals(response + "\n\n" + details, changeSetData.getReviewStatusMessage());
+  }
+
+  @Test
+  public void usesSystemMessageWhenThereIsNoExistingStatusOrReview() {
+    String error = fixture.get("connectionMessage").getAsString();
+    changeSetData.setReviewSystemMessage(error);
+
+    recorder.record(change, List.of(), null);
+
+    assertEquals(error, changeSetData.getReviewStatusMessage());
   }
 }
