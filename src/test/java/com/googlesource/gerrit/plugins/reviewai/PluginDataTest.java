@@ -211,6 +211,7 @@ public class PluginDataTest extends TestBase {
     statusStore.move("request-2", "message-2");
 
     statusStore.completedForEvent("message-1", "ReviewAI **WARNING**: Review superseded.");
+    statusStore.completedForEvent("message-1", "ReviewAI **WARNING**: Review superseded.");
 
     ReviewAgentRequestStatusStore.RequestStatus superseded = statusStore.get("message-1");
     assertEquals(ReviewAgentRequestStatusStore.STATUS_COMPLETED, superseded.status);
@@ -268,7 +269,7 @@ public class PluginDataTest extends TestBase {
                   start.await();
                   store.pending(requestId, fixture.get("prompt").getAsString());
                   store.move(requestId, messageId);
-                  store.completed(messageId, response);
+                  store.completed(requestId, response);
                   return null;
                 }));
       }
@@ -277,8 +278,9 @@ public class PluginDataTest extends TestBase {
         task.get(15, TimeUnit.SECONDS);
       }
       for (int i = 0; i < stores.size(); i++) {
+        String requestId = fixture.get("requestId").getAsString() + i;
         String messageId = fixture.get("messageId").getAsString() + i;
-        assertEquals(response, stores.getFirst().get(messageId).responseText);
+        assertEquals(response, stores.getFirst().get(requestId).responseText);
         assertEquals(
             ReviewAgentRequestStatusStore.STATUS_COMPLETED,
             stores.getFirst().get(messageId).status);

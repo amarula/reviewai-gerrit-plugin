@@ -68,7 +68,7 @@ class ReviewAgentEventRequestStatusUpdater {
     Optional<String> requestId =
         sourceEventId == null || sourceEventId.isBlank()
             ? statusStore.getLatestPendingRequestId()
-            : statusStore.getPendingRequestIdForEvent(sourceEventId);
+            : Optional.of(sourceEventId);
     return new PendingRequest(statusStore, requestId, localizer, changeSetData);
   }
 
@@ -139,7 +139,9 @@ class ReviewAgentEventRequestStatusUpdater {
     }
 
     private Optional<String> resolveRequestId() {
-      return requestId.flatMap(statusStore::getPendingRequestId);
+      // The REST handler can bind the provisional request id after event intake has run.
+      // Resolve at completion, so an initially missing association does not orphan the request.
+      return requestId.map(id -> statusStore.getPendingRequestIdForEvent(id).orElse(id));
     }
   }
 }

@@ -1,6 +1,9 @@
 {
   "prompt": "/message Explain this change",
   "response": "The change validates the input before updating the repository.",
+  "failure": "The AI provider could not complete this request.",
   "requestId": "sidebar-request-1",
-  "messageId": "gerrit-message-1"
+  "messageId": "gerrit-message-1",
+  "otherRequestId": "sidebar-request-2",
+  "otherMessageId": "gerrit-message-2"
 }

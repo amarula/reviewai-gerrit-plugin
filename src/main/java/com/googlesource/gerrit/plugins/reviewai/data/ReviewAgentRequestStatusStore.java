@@ -61,7 +61,8 @@ public class ReviewAgentRequestStatusStore {
     updateStatuses(
         statuses -> {
           Optional<String> requestId = getPendingRequestIdForEvent(statuses, sourceEventId);
-          if (requestId.isEmpty()) {
+          if (requestId.isEmpty()
+              && (sourceEventId == null || findRequest(statuses, sourceEventId).isEmpty())) {
             requestId = getLatestPendingReviewRequestId(statuses);
           }
           requestId.ifPresent(id -> update(statuses, id, STATUS_COMPLETED, responseText));
@@ -81,6 +82,10 @@ public class ReviewAgentRequestStatusStore {
           RequestStatus existing = statuses.remove(oldRequestId);
           RequestStatus target = statuses.get(newRequestId);
           if (target != null && !STATUS_PENDING.equals(target.status)) {
+            target.previousRequestId = oldRequestId;
+            if (existing != null) {
+              target.prompt = existing.prompt;
+            }
             return;
           }
           if (existing == null) {
@@ -97,7 +102,8 @@ public class ReviewAgentRequestStatusStore {
     if (requestId == null || requestId.isBlank()) {
       return new RequestStatus("", STATUS_FAILED, null, "request_id is required");
     }
-    return Optional.ofNullable(getStatuses().get(requestId))
+    Map<String, RequestStatus> statuses = getStatuses();
+    return findRequest(statuses, requestId)
         .orElse(new RequestStatus(requestId, STATUS_PENDING, null, null));
   }
 
@@ -120,6 +126,9 @@ public class ReviewAgentRequestStatusStore {
     Optional<String> preferred = getPreferredPendingRequestId(statuses, sourceEventId);
     if (preferred.isPresent()) {
       return preferred;
+    }
+    if (sourceEventId != null && findRequest(statuses, sourceEventId).isPresent()) {
+      return Optional.empty();
     }
     List<String> pendingIds =
         statuses.values().stream()
@@ -173,15 +182,30 @@ public class ReviewAgentRequestStatusStore {
 
   private void update(
       Map<String, RequestStatus> statuses, String requestId, String status, String responseText) {
-    RequestStatus existing = statuses.get(requestId);
-    statuses.put(
-        requestId,
-        new RequestStatus(
-            requestId, status, existing == null ? null : existing.prompt, responseText));
+    RequestStatus existing =
+        findRequest(statuses, requestId)
+            .orElseGet(() -> new RequestStatus(requestId, STATUS_PENDING, null, null));
+    if (!STATUS_PENDING.equals(existing.status)) {
+      return;
+    }
+    existing.status = status;
+    existing.responseText = responseText;
+    existing.updatedMillis = System.currentTimeMillis();
+    statuses.put(existing.requestId, existing);
+  }
+
+  private Optional<RequestStatus> findRequest(
+      Map<String, RequestStatus> statuses, String requestId) {
+    RequestStatus exact = statuses.get(requestId);
+    return exact != null
+        ? Optional.of(exact)
+        : statuses.values().stream()
+            .filter(value -> requestId.equals(value.previousRequestId))
+            .findFirst();
   }
 
   private void put(String requestId, RequestStatus requestStatus) {
-    updateStatuses(statuses -> statuses.put(requestId, requestStatus));
+    updateStatuses(statuses -> statuses.putIfAbsent(requestId, requestStatus));
   }
 
   private void updateStatuses(Consumer<Map<String, RequestStatus>> update) {
