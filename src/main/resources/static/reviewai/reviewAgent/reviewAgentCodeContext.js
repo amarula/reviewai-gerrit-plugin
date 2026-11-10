@@ -7,6 +7,30 @@
   const snapshots = new WeakMap();
   const views = new Set();
 
+  function shortenPath(path, width, measure) {
+    if (measure(path) <= width) return path;
+    const slash = path.lastIndexOf('/');
+    const filename = path.slice(slash + 1);
+    if (slash >= 0 && measure(`…/${filename}`) <= width) {
+      let suffix = path.slice(path.indexOf('/') + 1);
+      while (measure(`…/${suffix}`) > width) {
+        suffix = suffix.slice(suffix.indexOf('/') + 1);
+      }
+      return `…/${suffix}`;
+    }
+    if (measure(filename) <= width) return filename;
+    const letters = Array.from(filename);
+    const compact = count => '…' + letters.slice(letters.length - count).join('');
+    let low = 0;
+    let high = letters.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (measure(compact(middle)) <= width) low = middle;
+      else high = middle - 1;
+    }
+    return compact(low);
+  }
+
   function parseReference(reference) {
     const match = /^reviewai-file:([1-9]\d*):([0-9a-f]{40}):([^\s#]+)(?:#L([1-9]\d*)-L([1-9]\d*))?$/.exec(reference || '');
     if (!match) return null;
@@ -289,11 +313,30 @@
       const anchor = this._anchor.getBoundingClientRect();
       const width = Math.min(this._rangeToggle.checked ? 640 : 360, global.innerWidth - 24);
       this._popover.style.width = `${width}px`;
+      this._fitFileOptions();
       const height = this._popover.getBoundingClientRect().height;
       const above = anchor.top - height - 8;
       const top = above >= 12 ? above : Math.min(anchor.bottom + 8, global.innerHeight - height - 12);
       this._popover.style.left = `${Math.max(12, Math.min(anchor.left, global.innerWidth - width - 12))}px`;
       this._popover.style.top = `${Math.max(12, top)}px`;
+    }
+
+    _fitFileOptions() {
+      const style = global.getComputedStyle(this._select);
+      // Reserve padding and the native dropdown arrow before measuring its label.
+      const width = this._select.clientWidth - parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight) - 24;
+      const key = `${width}:${style.font}`;
+      if (width <= 0 || key === this._optionLabelKey) return;
+      this._optionLabelKey = key;
+      this._textMeasure ||= document.createElement('canvas').getContext('2d');
+      this._textMeasure.font = style.font;
+      for (const option of this._select.options) {
+        if (option.value) {
+          option.text = shortenPath(option.value, width,
+            text => this._textMeasure.measureText(text).width);
+        }
+      }
     }
 
     _contextChips() {
@@ -326,6 +369,7 @@
     }
 
     _fileChanged(existing) {
+      this._select.title = this._select.value;
       this._previewGeneration++;
       this._lineStarts = null;
       this._preview.value = '';
@@ -458,10 +502,14 @@
           if (path.startsWith('/') || file.status === 'D' || file.binary ||
               file.size > maxFileBytes ||
               (file.new_mode != null && (file.new_mode & 0o170000) !== 0o100000)) return;
-          this._select.add(new Option(path, path));
+          const option = new Option(path, path);
+          option.title = path;
+          option.setAttribute('aria-label', path);
+          this._select.add(option);
           count++;
         });
         this._select.disabled = count === 0;
+        this._optionLabelKey = null;
         const existing = this._contextChips().map(chip => parseReference(chip.contextItem.identifier))
           .find(file => file?.change === changeNumber && file.revision === sha);
         this._select.value = existing?.path || '';
