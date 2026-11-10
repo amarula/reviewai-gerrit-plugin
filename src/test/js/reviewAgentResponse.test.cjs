@@ -66,6 +66,35 @@ test('delivers a completed response when comment history is unavailable', async 
   assert.equal(h.completions, 1);
 });
 
+test('finishes the chat before saving conversation history completes', async () => {
+  const h = harness();
+  const post = h.api.post;
+  let finishSave;
+  h.api.post = (url, body) => url.endsWith('ai-review-agent-conversations')
+    ? new Promise(resolve => { finishSave = resolve; }) : post(url, body);
+  const sending = h.send();
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(h.responses, [fixture.response]);
+    assert.equal(h.completions, 1);
+  } finally {
+    finishSave({});
+    await sending;
+  }
+});
+
+test('a failed history save does not replace the answer or finish the listener twice', async () => {
+  const h = harness();
+  const post = h.api.post;
+  h.api.post = (url, body) => {
+    if (url.endsWith('ai-review-agent-conversations')) throw new Error(fixture.failure);
+    return post(url, body);
+  };
+  await h.send();
+  assert.deepEqual(h.responses, [fixture.response]);
+  assert.equal(h.completions, 1);
+});
+
 test('polls the returned request id through pending to completed', async () => {
   const h = harness();
   const post = h.api.post;

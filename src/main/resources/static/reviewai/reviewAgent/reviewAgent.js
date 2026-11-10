@@ -64,15 +64,19 @@
                 excludeDynamicConfiguration: Boolean(directResponse),
               })
             );
-        await this.conversationTurns.storeConversationTurn(
-          change,
-          req,
-          conversationId,
-          prompt,
-          responseText
-        );
         listener.emitResponse(agentUtils.buildChatResponse(responseText));
         listener.done();
+        try {
+          await this.conversationTurns.storeConversationTurn(
+            change,
+            req,
+            conversationId,
+            prompt,
+            responseText
+          );
+        } catch (error) {
+          console.error('ReviewAI could not save the completed conversation turn.', error);
+        }
       } catch (error) {
         listener.emitResponse(
           agentUtils.buildChatResponse(error instanceof Error ? error.message : String(error))
