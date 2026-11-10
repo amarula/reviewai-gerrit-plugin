@@ -33,6 +33,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 import lombok.extern.slf4j.Slf4j;
 
 @Singleton
@@ -97,6 +98,58 @@ public final class PluginDataHandler {
   public synchronized void setJsonValue(String key, Object value) {
     log.debug("Setting JSON value for key: {}", key);
     setValue(key, getGson().toJson(value));
+  }
+
+  /**
+   * Atomically reads, modifies and writes a value, serializing concurrent updates to the same
+   * database scope and key.
+   */
+  public void updateValue(String key, UnaryOperator<String> update) {
+    synchronized (fileLock) {
+      while (true) {
+        try (Connection c = db.getConnection()) {
+          c.setAutoCommit(false);
+          try {
+            String previous = null;
+            try (PreparedStatement ps =
+                c.prepareStatement(
+                    "SELECT data_value FROM plugin_data"
+                        + " WHERE scope = ? AND data_key = ? FOR UPDATE")) {
+              ps.setString(1, scope);
+              ps.setString(2, key);
+              try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                  previous = rs.getString(1);
+                }
+              }
+            }
+            String value = update.apply(previous);
+            String sql =
+                previous == null
+                    ? "INSERT INTO plugin_data (data_value, scope, data_key) VALUES (?, ?, ?)"
+                    : "UPDATE plugin_data SET data_value = ?, updated_at = CURRENT_TIMESTAMP"
+                        + " WHERE scope = ? AND data_key = ?";
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+              ps.setString(1, value);
+              ps.setString(2, scope);
+              ps.setString(3, key);
+              ps.executeUpdate();
+            }
+            c.commit();
+            return;
+          } catch (SQLException | RuntimeException e) {
+            c.rollback();
+            // Two instances can both observe an absent row. Retry with the inserted row locked.
+            if (e instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+              continue;
+            }
+            throw e;
+          }
+        } catch (SQLException e) {
+          throw new RuntimeException("Failed to update plugin data value for key " + key, e);
+        }
+      }
+    }
   }
 
   public String getValue(String key) {

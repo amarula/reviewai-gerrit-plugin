@@ -16,12 +16,15 @@
 
 package com.googlesource.gerrit.plugins.reviewai.data;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
+
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class ReviewAgentRequestStatusStore {
   public static final String STATUS_PENDING = "pending";
@@ -55,12 +58,14 @@ public class ReviewAgentRequestStatusStore {
 
   /** Completes the pending sidebar request associated with a Gerrit event. */
   public synchronized void completedForEvent(String sourceEventId, String responseText) {
-    Map<String, RequestStatus> statuses = getStatuses();
-    Optional<String> requestId = getPendingRequestIdForEvent(statuses, sourceEventId);
-    if (requestId.isEmpty()) {
-      requestId = getLatestPendingReviewRequestId(statuses);
-    }
-    requestId.ifPresent(id -> completed(id, responseText));
+    updateStatuses(
+        statuses -> {
+          Optional<String> requestId = getPendingRequestIdForEvent(statuses, sourceEventId);
+          if (requestId.isEmpty()) {
+            requestId = getLatestPendingReviewRequestId(statuses);
+          }
+          requestId.ifPresent(id -> update(statuses, id, STATUS_COMPLETED, responseText));
+        });
   }
 
   public synchronized void move(String oldRequestId, String newRequestId) {
@@ -71,21 +76,21 @@ public class ReviewAgentRequestStatusStore {
         || oldRequestId.equals(newRequestId)) {
       return;
     }
-    Map<String, RequestStatus> statuses = getStatuses();
-    RequestStatus existing = statuses.remove(oldRequestId);
-    RequestStatus target = statuses.get(newRequestId);
-    if (target != null && !STATUS_PENDING.equals(target.status)) {
-      pluginDataHandler.setJsonValue(KEY_REQUEST_STATUSES, statuses);
-      return;
-    }
-    if (existing == null) {
-      existing = new RequestStatus(newRequestId, STATUS_PENDING, null, null);
-    }
-    existing.requestId = newRequestId;
-    existing.previousRequestId = oldRequestId;
-    existing.updatedMillis = System.currentTimeMillis();
-    statuses.put(newRequestId, existing);
-    pluginDataHandler.setJsonValue(KEY_REQUEST_STATUSES, statuses);
+    updateStatuses(
+        statuses -> {
+          RequestStatus existing = statuses.remove(oldRequestId);
+          RequestStatus target = statuses.get(newRequestId);
+          if (target != null && !STATUS_PENDING.equals(target.status)) {
+            return;
+          }
+          if (existing == null) {
+            existing = new RequestStatus(newRequestId, STATUS_PENDING, null, null);
+          }
+          existing.requestId = newRequestId;
+          existing.previousRequestId = oldRequestId;
+          existing.updatedMillis = System.currentTimeMillis();
+          statuses.put(newRequestId, existing);
+        });
   }
 
   public synchronized RequestStatus get(String requestId) {
@@ -163,17 +168,33 @@ public class ReviewAgentRequestStatusStore {
     if (requestId == null || requestId.isBlank()) {
       return;
     }
-    RequestStatus existing = getStatuses().get(requestId);
-    put(
+    updateStatuses(statuses -> update(statuses, requestId, status, responseText));
+  }
+
+  private void update(
+      Map<String, RequestStatus> statuses, String requestId, String status, String responseText) {
+    RequestStatus existing = statuses.get(requestId);
+    statuses.put(
         requestId,
         new RequestStatus(
             requestId, status, existing == null ? null : existing.prompt, responseText));
   }
 
   private void put(String requestId, RequestStatus requestStatus) {
-    Map<String, RequestStatus> statuses = getStatuses();
-    statuses.put(requestId, requestStatus);
-    pluginDataHandler.setJsonValue(KEY_REQUEST_STATUSES, statuses);
+    updateStatuses(statuses -> statuses.put(requestId, requestStatus));
+  }
+
+  private void updateStatuses(Consumer<Map<String, RequestStatus>> update) {
+    pluginDataHandler.updateValue(
+        KEY_REQUEST_STATUSES,
+        json -> {
+          Map<String, RequestStatus> statuses = getGson().fromJson(json, STATUSES_TYPE);
+          if (statuses == null) {
+            statuses = new HashMap<>();
+          }
+          update.accept(statuses);
+          return getGson().toJson(statuses);
+        });
   }
 
   private Map<String, RequestStatus> getStatuses() {

@@ -171,6 +171,21 @@ public class AiReviewMessageTest extends TestBase {
             "gerrit-instance");
   }
 
+  private void mockStatusUpdates() {
+    doAnswer(invocation -> {
+      var gson = new com.google.gson.Gson();
+      var type = new com.google.gson.reflect.TypeToken<
+          Map<String, ReviewAgentRequestStatusStore.RequestStatus>>() {}.getType();
+      String key = invocation.getArgument(0);
+      java.util.function.UnaryOperator<String> update = invocation.getArgument(1);
+      Map<String, ReviewAgentRequestStatusStore.RequestStatus> previous =
+          pluginDataHandler.getJsonValue(key, type);
+      String updated = update.apply(gson.toJson(previous));
+      pluginDataHandler.setJsonValue(key, gson.fromJson(updated, type));
+      return null;
+    }).when(pluginDataHandler).updateValue(any(), any());
+  }
+
   private void grantAdministratorPrivileges() throws Exception {
     PermissionBackend.WithUser permissionBackendWithUser =
         org.mockito.Mockito.mock(PermissionBackend.WithUser.class);
@@ -525,6 +540,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   @SuppressWarnings("unchecked")
   public void reviewAgentReviewCommandUsesGerritMessageIdForRequestStatus() throws Exception {
+    mockStatusUpdates();
     AiReviewMessage.Input input = new AiReviewMessage.Input();
     input.message = "/review";
     input.reviewAgent = true;
@@ -649,6 +665,7 @@ public class AiReviewMessageTest extends TestBase {
   @Test
   public void reviewAgentConfigureCommandForAdminReturnsDirectResponseWithoutPostingGerritMessage()
       throws Exception {
+    mockStatusUpdates();
     grantAdministratorPrivileges();
     AiRequest supersededRequest = org.mockito.Mockito.mock(AiRequest.class);
     when(supersededRequest.sourceEventId()).thenReturn("message-1");

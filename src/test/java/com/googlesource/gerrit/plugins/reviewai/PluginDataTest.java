@@ -19,11 +19,17 @@ package com.googlesource.gerrit.plugins.reviewai;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
 import com.googlesource.gerrit.plugins.reviewai.data.ReviewAgentRequestStatusStore;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -228,5 +234,57 @@ public class PluginDataTest extends TestBase {
         ReviewAgentRequestStatusStore.STATUS_PENDING, statusStore.get("message-request").status);
     assertEquals(
         ReviewAgentRequestStatusStore.STATUS_COMPLETED, statusStore.get("review-request").status);
+  }
+
+  @Test
+  public void concurrentSidebarRequestsKeepEveryCompletionAcrossProviders() throws Exception {
+    JsonObject fixture =
+        new com.google.gson.Gson()
+            .fromJson(
+                Files.readString(
+                    TestResourceLoader.getTestResourcePath()
+                        .resolve("__files/reviewagent/sidebar-request.json")),
+                JsonObject.class);
+    String response = fixture.get("response").getAsString();
+    var stores = new ArrayList<ReviewAgentRequestStatusStore>();
+    for (int i = 0; i < 8; i++) {
+      stores.add(
+          new ReviewAgentRequestStatusStore(
+              new PluginDataHandler(
+                  tempFolder.getRoot().toPath().resolve("node-" + i).resolve(CHANGE_ID + ".data"),
+                  getTestReviewAiDb())));
+    }
+    var executor = Executors.newFixedThreadPool(stores.size());
+    var start = new CountDownLatch(1);
+    var tasks = new ArrayList<Future<?>>();
+    try {
+      for (int i = 0; i < stores.size(); i++) {
+        var store = stores.get(i);
+        String requestId = fixture.get("requestId").getAsString() + i;
+        String messageId = fixture.get("messageId").getAsString() + i;
+        tasks.add(
+            executor.submit(
+                () -> {
+                  start.await();
+                  store.pending(requestId, fixture.get("prompt").getAsString());
+                  store.move(requestId, messageId);
+                  store.completed(messageId, response);
+                  return null;
+                }));
+      }
+      start.countDown();
+      for (var task : tasks) {
+        task.get(15, TimeUnit.SECONDS);
+      }
+      for (int i = 0; i < stores.size(); i++) {
+        String messageId = fixture.get("messageId").getAsString() + i;
+        assertEquals(response, stores.getFirst().get(messageId).responseText);
+        assertEquals(
+            ReviewAgentRequestStatusStore.STATUS_COMPLETED,
+            stores.getFirst().get(messageId).status);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 }
