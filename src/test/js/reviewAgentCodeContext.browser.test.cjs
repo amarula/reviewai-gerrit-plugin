@@ -10,6 +10,7 @@ const ranges = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-ran
 const multiple = JSON.parse(fs.readFileSync(path.join(resources, 'code-context-multiple.json'), 'utf8'));
 const files = JSON.parse(fs.readFileSync(path.join(resources, 'context-picker-files.json'), 'utf8'));
 const chipLayout = JSON.parse(fs.readFileSync(path.join(resources, 'context-chip-layout.json'), 'utf8'));
+const dropdownPath = JSON.parse(fs.readFileSync(path.join(resources, 'context-dropdown-paths.json'), 'utf8'));
 const source = path.join(__dirname, '../../main/resources/static/reviewai/reviewAgent/reviewAgentCodeContext.js');
 let browser;
 before(async () => { browser = await chromium.launch({headless: true}); });
@@ -411,4 +412,42 @@ test('long attachment chips resize with the sidebar and keep Remove visible', as
   assert.ok(widths[2] > widths[1]);
   await remove.click();
   assert.deepEqual(await h.items(), []);
+});
+
+test('dropdown labels use left ellipsis, adapt to width, and attach the full path', async t => {
+  const h = await harness(t);
+  await h.page.evaluate(paths => {
+    for (const path of paths) files[path] = {size: 100, new_mode: 33188};
+  }, [dropdownPath.path, chipLayout.path]);
+  await h.open();
+  await h.select.selectOption(dropdownPath.path);
+  const label = await h.select.evaluate(select => select.selectedOptions[0].text);
+  assert.ok(label.startsWith('…/'));
+  assert.ok(label.endsWith(dropdownPath.filename));
+  assert.ok(label.endsWith(dropdownPath.path.split('/').slice(-2).join('/')));
+  assert.equal(await h.select.getAttribute('title'), dropdownPath.path);
+  assert.equal(await h.select.evaluate(select => select.selectedOptions[0].getAttribute('aria-label')), dropdownPath.path);
+  for (const width of chipLayout.widths) {
+    await h.page.setViewportSize({width, height: 740});
+    await h.page.waitForFunction(() => {
+      const select = document.querySelector('reviewai-code-context').shadowRoot.querySelector('#files');
+      const style = getComputedStyle(select);
+      const available = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 24;
+      const context = document.createElement('canvas').getContext('2d');
+      context.font = style.font;
+      return Array.from(select.options).filter(option => option.value)
+        .every(option => context.measureText(option.text).width <= available);
+    });
+    assert.equal(await h.select.inputValue(), dropdownPath.path);
+    assert.equal(await h.select.locator('option').filter({hasText: fixture.path}).count(), 1);
+    const longFilename = await h.select.evaluate((select, path) =>
+      Array.from(select.options).find(option => option.value === path).text, chipLayout.path);
+    assert.ok(longFilename.startsWith('…'));
+    assert.ok(longFilename.endsWith('.java'));
+  }
+  await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).click();
+  assert.deepEqual(await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
+  }), [{revision: fixture.revision, path: dropdownPath.path}]);
 });
