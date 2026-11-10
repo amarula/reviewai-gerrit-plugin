@@ -248,6 +248,13 @@
       const panel = endpoint?.querySelector('chat-panel');
       const panelRoot = panel?.shadowRoot;
       const promptRoot = panelRoot?.querySelector('prompt-box')?.shadowRoot;
+      if (promptRoot && !promptRoot.querySelector('style[data-reviewai-prompt]')) {
+        // Hide the inert context indicator without changing the implicit change context.
+        const style = document.createElement('style');
+        style.dataset.reviewaiPrompt = '';
+        style.textContent = '.this-change-context { display: none; }';
+        promptRoot.append(style);
+      }
       const input = promptRoot?.querySelector('context-input-chip');
       const roots = [endpoint, panelRoot, promptRoot, input?.shadowRoot].filter(Boolean);
       if (roots.length !== this._watched.size || roots.some(root => !this._watched.has(root))) {
