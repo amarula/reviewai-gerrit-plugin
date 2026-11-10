@@ -161,6 +161,7 @@
         this._anchor?.focus();
       });
       this._onMenuClick = event => this._handleMenuClick(event);
+      this._onChipClick = event => this._handleChipClick(event);
       this._positionPopover = () => this._position();
       this._observer = new MutationObserver(() => this._connectNativeMenu());
       this._watched = new Set();
@@ -202,7 +203,9 @@
       this._observer.disconnect();
       this._watched.clear();
       this._nativeRoot?.removeEventListener('click', this._onMenuClick, true);
+      this._promptRoot?.removeEventListener('click', this._onChipClick, true);
       this._nativeRoot = null;
+      this._promptRoot = null;
       this._input = null;
       this._generation++;
       this._previewGeneration++;
@@ -239,7 +242,7 @@
     }
 
     // Gerrit 3.15 has no public picker callback. Keep the native menu adaptation here:
-    // intercept only our provider-supplied item, then use its normal chip events.
+    // adapt our menu item and chip primary actions, using its normal chip events.
     _connectNativeMenu() {
       const endpoint = this.parentElement;
       const panel = endpoint?.querySelector('chat-panel');
@@ -255,10 +258,12 @@
       if (input?.shadowRoot !== this._nativeRoot) {
         this._close();
         this._nativeRoot?.removeEventListener('click', this._onMenuClick, true);
+        this._promptRoot?.removeEventListener('click', this._onChipClick, true);
         this._input = input;
         this._nativeRoot = input?.shadowRoot;
         this._promptRoot = promptRoot;
         this._nativeRoot?.addEventListener('click', this._onMenuClick, true);
+        this._promptRoot?.addEventListener('click', this._onChipClick, true);
       }
       // Restored turns retain their chips for history, but attachments are one-shot drafts.
       this._contextChips().filter(chip => chip.contextItem.reviewai_consumed)
@@ -294,13 +299,31 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       menu.open = false;
+      this._openPicker();
+    }
+
+    _handleChipClick(event) {
+      const path = event.composedPath();
+      const chip = path.find(node => node.localName === 'context-chip' &&
+        node.contextItem?.type_id === fileType);
+      if (!chip || !path.some(node => node.classList?.contains('primary') &&
+          node.classList.contains('action'))) return;
+      const file = parseReference(chip.contextItem.identifier);
+      if (!file || file.change !== this._change?._number ||
+          file.revision !== revisionId(this._change, this._revision)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this._openPicker(file);
+    }
+
+    _openPicker(file) {
       this._anchor = this._nativeRoot.querySelector('#addContextChip');
       this._syncScope();
       const sidebarWidth = this.parentElement.querySelector('chat-panel').getBoundingClientRect().width;
       this._popover.style.width = `${sidebarWidth}px`;
       this._popover.showPopover();
       this._position();
-      this._load();
+      this._load(file);
     }
 
     _close() {
@@ -379,20 +402,20 @@
       this._rangeToggle.disabled = this._select.disabled || !this._select.value;
       this._startLine.value = existing?.start_line || '';
       this._endLine.value = existing?.end_line || '';
-      this._toggleRange();
+      this._toggleRange(Boolean(existing?.start_line));
     }
 
-    _toggleRange() {
+    _toggleRange(focusPreview = false) {
       const ranged = this._rangeToggle.checked;
       this._rangeFields.hidden = !ranged;
       this._rangeStatus.hidden = !ranged;
       this._attachButton.textContent = ranged ? 'Attach selection' : 'Attach file';
-      if (ranged && !this._lineStarts) this._loadPreview();
+      if (ranged && !this._lineStarts) this._loadPreview(focusPreview);
       else this._updateRange();
       this._position();
     }
 
-    async _loadPreview() {
+    async _loadPreview(focusPreview = false) {
       const generation = ++this._previewGeneration;
       const path = this._select.value;
       this._rangeFields.disabled = true;
@@ -429,6 +452,11 @@
         this._endLine.value ||= count || '';
         this._rangeFields.disabled = count === 0;
         this._updateRange(true);
+        if (focusPreview && count && this._rangeToggle.checked && this._popover.matches(':popover-open')) {
+          this._preview.focus();
+          this._preview.scrollTop = (this._startLine.valueAsNumber - 1) *
+            parseFloat(global.getComputedStyle(this._preview).lineHeight);
+        }
       } catch (error) {
         if (this.isConnected && generation === this._previewGeneration) {
           this._rangeStatus.textContent = error instanceof Error ? error.message : 'Could not load file preview.';
@@ -472,7 +500,7 @@
       this._updateRange();
     }
 
-    async _load() {
+    async _load(selectedFile) {
       const { _sha: sha, _key: key } = this;
       const changeNumber = this._change?._number;
       const generation = ++this._generation;
@@ -511,7 +539,8 @@
         });
         this._select.disabled = count === 0;
         this._optionLabelKey = null;
-        const existing = this._contextChips().map(chip => parseReference(chip.contextItem.identifier))
+        const existing = selectedFile || this._contextChips()
+          .map(chip => parseReference(chip.contextItem.identifier))
           .find(file => file?.change === changeNumber && file.revision === sha);
         this._select.value = existing?.path || '';
         this._fileChanged(existing);

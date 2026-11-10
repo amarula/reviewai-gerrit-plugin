@@ -151,6 +151,7 @@ test('attaching uses native removable chips and consuming a request clears its d
   await h.finish();
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).click();
   assert.deepEqual(await h.items(), []);
+  assert.equal(await h.dialog.isVisible(), false);
 });
 
 test('Finish, Escape and outside clicks dismiss the panel without changing attachments', async t => {
@@ -207,6 +208,11 @@ test('native prompt replacement reconnects the menu adapter and other context ty
     originalPanel.shadowRoot.querySelector('prompt-box').replaceWith(replacement);
   });
   await h.open();
+  await h.finish();
+  await h.attach(fixture.path);
+  await h.finish();
+  await h.page.locator('context-chip.external-context').locator('.context-chip-title').click();
+  await h.dialog.waitFor({state: 'visible'});
   await h.finish();
   await h.page.getByRole('button', {name: 'Add Context', exact: true}).click();
   await h.page.getByRole('menuitem', {name: 'URL', exact: true}).click();
@@ -359,7 +365,31 @@ test('multiple ranges from one file and another whole file have independently re
     return ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
   }), expected);
   await h.finish();
+  const original = await h.items();
+  for (let index = 0; index < expected.length; index++) {
+    const chip = h.page.locator('context-chip.external-context').nth(index);
+    if (index === 0) await chip.locator('button.primary.action').press('Enter');
+    else await chip.locator('.context-chip-title').click();
+    await h.dialog.waitFor({state: 'visible'});
+    await h.page.waitForFunction(path =>
+      document.querySelector('reviewai-code-context').shadowRoot.querySelector('#files').value === path,
+    expected[index].path);
+    assert.equal(await h.rangeToggle.isChecked(), Boolean(expected[index].start_line));
+    if (expected[index].start_line) {
+      await h.page.waitForFunction(() =>
+        !document.querySelector('reviewai-code-context').shadowRoot.querySelector('#range-fields').disabled);
+      assert.equal(await h.dialog.getByRole('spinbutton', {name: 'Start line'}).inputValue(), String(expected[index].start_line));
+      assert.equal(await h.dialog.getByRole('spinbutton', {name: 'End line'}).inputValue(), String(expected[index].end_line));
+      assert.equal(await h.preview.evaluate(element =>
+        element.value.slice(element.selectionStart, element.selectionEnd).trimEnd()), multiple.contents[index].trimEnd());
+      assert.equal(await h.preview.evaluate(element => element.getRootNode().activeElement === element), true);
+    } else assert.equal(await h.preview.isVisible(), false);
+    await h.finish();
+    assert.deepEqual(await h.items(), original);
+  }
+  assert.equal(await h.page.evaluate(() => nativeChipClickCount), 0);
   await h.page.getByRole('button', {name: 'Remove context', exact: true}).nth(1).click();
+  assert.equal(await h.dialog.isVisible(), false);
   assert.deepEqual(await h.page.evaluate(() => {
     const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
     const selected = ReviewAi.codeContext.selected(change, {external_contexts: prompt.items});
@@ -375,6 +405,20 @@ test('attaching an identical file twice keeps one chip', async t => {
   const original = await h.items();
   await h.attach(fixture.path);
   assert.deepEqual(await h.items(), original);
+});
+
+test('clicking another context type retains its native behavior', async t => {
+  const h = await harness(t);
+  await h.attach(fixture.path);
+  await h.finish();
+  await h.page.evaluate(() => {
+    const prompt = originalPanel.shadowRoot.querySelector('prompt-box');
+    prompt.items.push({type_id: 'url', identifier: fixture.path, title: fixture.path, link: ''});
+    prompt.renderChips();
+  });
+  await h.page.locator('context-chip.external-context').last().locator('.context-chip-title').click();
+  assert.equal(await h.dialog.isVisible(), false);
+  assert.equal(await h.page.evaluate(() => nativeChipClickCount), 1);
 });
 
 test('the attachment limit blocks new chips until one is removed', async t => {

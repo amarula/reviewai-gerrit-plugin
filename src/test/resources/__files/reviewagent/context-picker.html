@@ -10,6 +10,7 @@
 <script>
   // Exercise the Gerrit 3.15 shadow-DOM/menu/chip event contract without a live Gerrit server.
   window.nativeTextDialogOpenCount = 0;
+  window.nativeChipClickCount = 0;
   customElements.define('md-menu', class extends HTMLElement {
     set open(value) { this.hidden = !value; }
     get open() { return !this.hidden; }
@@ -55,6 +56,11 @@
       root.querySelector('md-filter-chip').addEventListener('remove', () => this.dispatchEvent(
         new CustomEvent('remove-context-chip', {bubbles: true, composed: true})
       ));
+      root.querySelector('md-filter-chip').addEventListener('click', event => {
+        window.nativeChipClickCount++;
+        event.preventDefault();
+        event.stopPropagation();
+      });
     }
   });
   customElements.define('context-input-chip', class extends HTMLElement {

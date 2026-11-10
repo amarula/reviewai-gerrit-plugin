@@ -87,7 +87,8 @@ select text in the numbered preview or enter inclusive **Start line** and **End 
 Click **Attach selection** to include only those lines. The picker stays open after attaching, so
 you can add up to eight files or ranges to the same message, including separate ranges from one file.
 Adding an identical attachment again keeps one chip. Each native context chip shows its pinned
-revision and selected lines and can be removed independently. Attachments are consumed together
+revision and selected lines and can be removed independently. Click a chip to reopen the picker
+with that file and its line selection. Attachments are consumed together
 when the message is accepted. **Finish**, Escape, or clicking outside the picker closes it without
 changing the attachments. Conversation history records the complete set, and regenerating the
 answer reuses the original files, revisions, and line ranges.
