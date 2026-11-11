@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
@@ -43,8 +44,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.Lan
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.openai.OpenAiConversation;
 import com.googlesource.gerrit.plugins.reviewai.config.AiModelRoute;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandler;
 import com.googlesource.gerrit.plugins.reviewai.data.PluginDataHandlerProvider;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
@@ -83,6 +86,56 @@ public class LangChainClientTest {
       "__files/openai/openAiPromptTagRequests.json";
   private static final String GERRIT_FORMATTED_PATCH_RESOURCE =
       "__files/openai/gerritFormattedPatch.txt";
+
+  @Test
+  public void singleAgentReviewSendsSkillGuidanceAndParsesReviewResponse() throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OLLAMA);
+    when(config.getAiReviewTemperature()).thenReturn("0");
+    String role = readTestResource("__files/langchain/chatMemoryUserMessage.txt").strip();
+    when(config.getConfiguredAiSystemPromptInstructions()).thenReturn(Optional.of(role));
+    TestableLangChainClient client =
+        new TestableLangChainClient(config, new CodeContextPolicyNone(config));
+    String patch = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
+    String response = readTestResource(AI_RESPONSE_CONTENT_TRAILING_WHITESPACE_RESOURCE);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    ILangChainProvider provider = Mockito.mock(ILangChainProvider.class);
+    ChatModel model = Mockito.mock(ChatModel.class);
+    when(provider.buildChatModel(
+            Mockito.eq(config), Mockito.eq(0.0), Mockito.isNull(), Mockito.anyString()))
+        .thenReturn(new LangChainProvider(model, "test"));
+    when(model.chat(Mockito.any(ChatRequest.class)))
+        .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from(response)).build());
+
+    try (var providers = Mockito.mockStatic(LangChainProviderFactory.class)) {
+      providers
+          .when(() -> LangChainProviderFactory.get(AiProviderType.OLLAMA))
+          .thenReturn(provider);
+
+      AiResponseContent result = client.requestResponse(new ChangeSetData(1), change, patch);
+
+      AiResponseContent expected = client.parseResponseContent(response);
+      assertEquals(expected.getChangeId(), result.getChangeId());
+      assertEquals(
+          expected.getReplies().getFirst().getReply(), result.getReplies().getFirst().getReply());
+      ArgumentCaptor<ChatRequest> request = ArgumentCaptor.forClass(ChatRequest.class);
+      verify(model).chat(request.capture());
+      String systemInstructions =
+          LangChainChatMessages.content(request.getValue().messages().getFirst());
+      assertTrue(systemInstructions.contains(role));
+      assertTrue(
+          systemInstructions.contains(
+              readTestResource("__files/skills/reviewGuidelines.txt").strip()));
+      assertFalse(systemInstructions.contains("description:"));
+      assertEquals("format_replies", request.getValue().responseFormat().jsonSchema().name());
+      assertTrue(
+          request.getValue().messages().stream()
+              .map(LangChainChatMessages::content)
+              .anyMatch(content -> content.contains(patch)));
+    }
+  }
 
   @Test
   public void shouldLoadStructuredResponseFormatFromSchemaResource() throws Exception {
@@ -1051,6 +1104,10 @@ public class LangChainClientTest {
       super(config, null, null, null);
     }
 
+    private TestableLangChainClient(Configuration config, ICodeContextPolicy codeContextPolicy) {
+      super(config, codeContextPolicy, null, null);
+    }
+
     private TestableLangChainClient(
         Configuration config,
         GerritClient gerritClient,
@@ -1061,6 +1118,11 @@ public class LangChainClientTest {
 
     private String request(ChangeSetData data, GerritChange change, String patch) throws Exception {
       return askSingleRequest(data, change, patch).getRequestBody();
+    }
+
+    private AiResponseContent requestResponse(ChangeSetData data, GerritChange change, String patch)
+        throws Exception {
+      return askSingleRequest(data, change, patch).getResponseContent();
     }
 
     @Override
