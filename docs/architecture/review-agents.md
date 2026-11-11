@@ -11,6 +11,19 @@ For durable event intake, per-Change request serialization, and cancellation, se
 
 ## Core Concepts
 
+### Bundled review skill
+
+Unified reviews in `SINGLE_AGENT` mode and scoped patchset reviews load their shared additional review guidelines from
+[`skills/code-review/SKILL.md`](../../src/main/resources/skills/code-review/SKILL.md). The skill follows the
+[Agent Skills format](https://agentskills.io/specification): YAML frontmatter declares `name` and `description`,
+and the Markdown body supplies the guidance. Edit that body and rebuild the plugin to change these guidelines.
+LangChain4j Skills loads the bundled resource with the plugin's classloader and caches its instructions.
+
+ReviewAI includes the skill body automatically in the review prompt. Configured system instructions and the Gerrit
+UI role prompt retain their existing precedence; dynamic constraints and the Gerrit response format are still
+assembled by ReviewAI. Specialized guidance remains in JSON. Skill references, scripts, external
+collections, and model-driven skill activation are not enabled.
+
 ### Concern
 
 A concern is a review finding with a stable ID and lifecycle state. It retains the information needed to reassess and

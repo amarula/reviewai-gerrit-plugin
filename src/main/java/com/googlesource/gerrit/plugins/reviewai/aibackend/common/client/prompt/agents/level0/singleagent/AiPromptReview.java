@@ -127,7 +127,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES")));
+            getReviewGuidelines()));
     sections.add(
         buildSection(
             prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
@@ -179,11 +179,15 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                     List.of(
                         prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES"),
                         getAiAssistantInstructionsReview(),
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES"),
+                        getReviewGuidelines(),
                         prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
                         prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")))),
             getPatchSetReviewPrompt()));
     log.debug("Review instructions formed: {}", instructions);
+  }
+
+  protected String getReviewGuidelines() {
+    return CodeReviewSkill.instructions();
   }
 
   protected String getScopeAndReviewConstraints() {
