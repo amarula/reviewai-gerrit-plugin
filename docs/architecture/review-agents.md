@@ -11,6 +11,18 @@ For durable event intake, per-Change request serialization, and cancellation, se
 
 ## Core Concepts
 
+### Bundled review skills
+
+Reusable review guidance lives under [`skills/`](../../src/main/resources/skills). Each skill follows the
+[Agent Skills format](https://agentskills.io/specification): YAML frontmatter declares `name` and `description`,
+and the `SKILL.md` body supplies the instructions. LangChain4j Skills loads bundled resources with the plugin's
+classloader. ReviewAI caches the skills and composes the relevant guidance into each agent's prompt.
+
+Level-two Markdown headings delimit instruction sections; use deeper headings within a section. CommonMark keeps
+headings inside code fences and nested blocks within their containing sections. Edit the bundled skills and rebuild
+the plugin to change their guidance. Configured system instructions and the Gerrit UI role prompt retain their
+existing precedence.
+
 ### Concern
 
 A concern is a review finding with a stable ID and lifecycle state. It retains the information needed to reassess and

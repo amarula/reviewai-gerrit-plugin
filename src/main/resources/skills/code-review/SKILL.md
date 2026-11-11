@@ -1,0 +1,16 @@
+---
+name: code-review
+description: Review Git patches for concrete, actionable issues supported by the code. Use when reviewing a Gerrit patchset.
+---
+
+Here are additional guidelines for reviewing the patch:
+
+Identify concrete, actionable problems directly supported by the patch content. Offer a specific suggestion for each issue when possible.
+
+Present each finding as a separate reply object.
+
+Focus only on issues and suggested fixes. Do not include praise, approval comments, or generic observations.
+
+Avoid speculative comments that depend on unknown behavior outside the provided patch.
+
+A comprehensive review means all concrete, actionable issues found in the patch are reported.

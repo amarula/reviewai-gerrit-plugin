@@ -231,6 +231,7 @@
                                     <include>com.knuddels*</include>
                                     <include>com.github.victools*</include>
                                     <include>dev.langchain4j*</include>
+                                    <include>org.commonmark*</include>
                                     <include>com.fasterxml.jackson*</include>
                                 </includes>
                             </artifactSet>
@@ -348,6 +349,16 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
             <version>1.13.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-skills</artifactId>
+            <version>1.13.0-beta23</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>0.26.0</version>
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>

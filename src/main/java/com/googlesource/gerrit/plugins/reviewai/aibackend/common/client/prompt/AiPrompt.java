@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 import com.google.gson.reflect.TypeToken;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
@@ -173,6 +174,13 @@ public class AiPrompt {
     try (InputStreamReader reader = FileUtils.getInputStreamReader(promptFile)) {
       Map<String, Object> values =
           getGson().fromJson(reader, new TypeToken<Map<String, Object>>() {}.getType());
+      values.replaceAll(
+          (key, value) -> {
+            if (value instanceof Map<?, ?> reference && reference.containsKey("$skill")) {
+              return ReviewAgentSkills.instructions((String) reference.get("$skill"));
+            }
+            return value;
+          });
       Object parentPromptFilename = values.remove(PROMPT_EXTENDS_ATTRIBUTE);
       if (parentPromptFilename == null) {
         return values;
