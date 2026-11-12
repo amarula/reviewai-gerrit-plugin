@@ -35,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptConcernReview;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.concerns.AiPromptNewIssueFinder;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.feedback.AiPromptReviewFeedbackClassification;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritConditionLabel;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
@@ -320,12 +321,10 @@ public class AiPromptFactoryTest {
             config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
     assertTrue(prompt instanceof AiPromptNewIssueFinder);
-    Map<String, Object> prompts =
-        AiPrompt.getJsonPromptValues("agents/common/new-issue-finder/prompts");
     assertTrue(
         prompt
             .getDefaultAiAssistantInstructions()
-            .contains((String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER")));
+            .contains(ReviewAgentSkills.section("new-issue-finder", "Role")));
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains("# Condition Labels"));
     assertTrue(
         prompt.getDefaultAiAssistantInstructions().contains("Verified:\n  Current value: +1"));

@@ -1,0 +1,32 @@
+{
+  "review_condition": "label:Verified=+1",
+  "label_name": "Verified",
+  "condition_label": {
+    "currentValues": [1],
+    "possibleValues": [-1, 0, 1],
+    "description": "Tests validate correctness and cover the changed behavior."
+  },
+  "feedback_input": {
+    "current_memory": {
+      "schema_version": 1,
+      "generic_feedback": "Focus on observable behavior.",
+      "concern_feedback": {},
+      "dismissed_concerns": {},
+      "disabled_review_scopes": [],
+      "disabled_specialized_agents": [],
+      "condition_label_disabled_specialized_agents": []
+    },
+    "concerns": [],
+    "comments": [
+      {
+        "target_comment": {
+          "id": "feedback-1",
+          "message": "Resume security review and check registration isolation."
+        },
+        "thread_context": [],
+        "dismissal_allowed": false,
+        "review_control_allowed": true
+      }
+    ]
+  }
+}

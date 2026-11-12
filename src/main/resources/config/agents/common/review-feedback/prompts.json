@@ -1,7 +1,0 @@
-{
-  "$extends": "promptsAi",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK": {"$skill": "review-feedback", "section": "Role"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CATEGORIES": {"$skill": "review-feedback", "section": "Categories"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_MEMORY": {"$skill": "review-feedback", "section": "Memory"},
-  "DEFAULT_AI_MESSAGE_REVIEW_FEEDBACK": "Classify each supplied target_comment and update the distilled review feedback memory. comments may be empty when this request exists only to recompute specialized-agent exclusions from current Condition Labels. thread_context is ordered from the known thread root to the message immediately before the target. concerns contains the current ledger concerns. current_memory contains the previously distilled guidance.\n\n```json\n%s\n```"
-}

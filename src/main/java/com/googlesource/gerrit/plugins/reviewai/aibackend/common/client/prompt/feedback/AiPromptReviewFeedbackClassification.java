@@ -21,6 +21,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -28,34 +29,34 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
+  private static final String SKILL = "review-feedback";
+
   public AiPromptReviewFeedbackClassification(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/common/review-feedback/prompts");
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Role"));
   }
 
   @Override
   public String getDefaultAiAssistantInstructions() {
-    List<String> instructions =
-        new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK")));
+    List<String> instructions = new ArrayList<>(List.of(ReviewAgentSkills.section(SKILL, "Role")));
     instructions.addAll(buildConditionLabelSections());
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CATEGORIES"));
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_MEMORY"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Categories"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Memory"));
     return joinWithDoubleNewLine(instructions);
   }
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
-        prompt("DEFAULT_AI_MESSAGE_REVIEW_FEEDBACK"),
+        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
         getGson().toJson(changeSetData.getReviewFeedbackClassificationInput()));
   }
 
