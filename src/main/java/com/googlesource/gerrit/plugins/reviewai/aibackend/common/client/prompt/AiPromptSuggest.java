@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptSuggest extends AiPromptReview {
+  private static final String SKILL = "review-suggestions";
 
   public AiPromptSuggest(
       Configuration config,
@@ -37,7 +39,6 @@ public class AiPromptSuggest extends AiPromptReview {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("promptsAiSuggest");
     log.debug("AiPromptSuggest initialized for project: {}", change.getProjectName());
   }
 
@@ -50,41 +51,38 @@ public class AiPromptSuggest extends AiPromptReview {
   public String getDefaultAiAssistantInstructions() {
     return joinWithDoubleNewLine(
         List.of(
+            buildSection("Role", ReviewAgentSkills.section(SKILL, "Role")),
+            buildSection("Suggestion Task", getSuggestionTaskInstructions()),
             buildSection(
-                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_ROLE"),
-                prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE")),
-            buildSection(
-                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_TASK"), getSuggestionTaskInstructions()),
-            buildSection(
-                prompt("DEFAULT_AI_SUGGEST_SECTION_TITLE_RESPONSE_FORMAT"),
-                prompt("DEFAULT_AI_SUGGEST_RESPONSE_FORMAT"))));
+                "Mandatory Response Format",
+                ReviewAgentSkills.section(SKILL, "Mandatory Response Format"))));
   }
 
   private String getSuggestionTaskInstructions() {
     ReviewScope scope = changeSetData.getReviewScope();
     if (scope == ReviewScope.PATCHSET) {
-      return prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET");
+      return ReviewAgentSkills.section(SKILL, "Patchset Task");
     }
     if (scope == ReviewScope.COMMIT_MESSAGE) {
-      return prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE");
+      return ReviewAgentSkills.section(SKILL, "Commit Message Task");
     }
     if (new AiPromptParameters(config).isMultiAgentModeEnabled()) {
       return getSuggestionTaskInstructions(changeSetData.getReviewAssistantStage());
     }
     return joinWithDoubleNewLine(
         List.of(
-            prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET"),
-            prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE")));
+            ReviewAgentSkills.section(SKILL, "Patchset Task"),
+            ReviewAgentSkills.section(SKILL, "Commit Message Task")));
   }
 
   private String getSuggestionTaskInstructions(ReviewAssistantStage stage) {
     return stage == ReviewAssistantStage.REVIEW_COMMIT_MESSAGE
-        ? prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE")
-        : prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET");
+        ? ReviewAgentSkills.section(SKILL, "Commit Message Task")
+        : ReviewAgentSkills.section(SKILL, "Patchset Task");
   }
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
-    return String.format(prompt("DEFAULT_AI_SUGGEST_MESSAGE"), patchSet);
+    return String.format(ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(), patchSet);
   }
 }

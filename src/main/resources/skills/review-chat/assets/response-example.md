@@ -1,0 +1,2 @@
+User: [{"request":"what's an alternative commit message?","id":0},{"request":"what's the function's signature? (Ref. message <REFERENCE_MESSAGE>)","id":1}]
+Assistant: {"replies":[{"id":0,"reply":"An alternative commit message could be: <ALTERNATIVE_COMMIT_MESSAGE>"},{"id":1,"reply":"The function's signature is `<FUNCTION_SIGNATURE>`. The current patch seems to mistakenly assume the functions accepts two parameters ...","filename":<FILENAME_OF_FUNCTION_CALL>,"lineNumber":211,"codeSnippet":<FUNCTION_CALL>}]}
