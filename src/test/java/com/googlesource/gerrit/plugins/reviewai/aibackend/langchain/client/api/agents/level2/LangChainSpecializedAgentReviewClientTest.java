@@ -639,7 +639,7 @@ public class LangChainSpecializedAgentReviewClientTest {
   }
 
   @Test
-  public void specializedAgentDefinitionsAreLoadedFromJsonFiles() {
+  public void specializedAgentDefinitionsAreLoadedFromSkills() {
     List<String> agentNames =
         SpecializedReviewAgentDefinitions.load().stream()
             .map(definition -> definition.normalizedName())

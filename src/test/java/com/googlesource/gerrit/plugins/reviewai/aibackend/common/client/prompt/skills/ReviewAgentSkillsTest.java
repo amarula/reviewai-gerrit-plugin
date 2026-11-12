@@ -19,28 +19,81 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class ReviewAgentSkillsTest {
+  @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
   @Test
-  public void sharedGuidelinesResolveThroughExistingPromptKeys() throws Exception {
-    String expected;
-    try (InputStream resource =
-        getClass().getClassLoader().getResourceAsStream("__files/skills/reviewGuidelines.txt")) {
-      assertNotNull(resource);
-      expected = new String(resource.readAllBytes(), StandardCharsets.UTF_8).strip();
+  public void pipelineSkillSectionsPreserveExistingAgentInstructions() throws Exception {
+    var expected =
+        JsonParser.parseString(readResource("__files/skills/reviewPipelinePrompts.json"))
+            .getAsJsonObject();
+    for (var resource : expected.entrySet()) {
+      var actual = AiPrompt.getJsonPromptValues(resource.getKey());
+      for (var entry : resource.getValue().getAsJsonObject().entrySet()) {
+        assertEquals(
+            resource.getKey() + ": " + entry.getKey(),
+            entry.getValue().getAsString(),
+            actual.get(entry.getKey()));
+      }
     }
-    for (String prompts :
-        List.of("agents/level0/single-agent/prompts", "agents/level1/patchset/prompts")) {
-      assertEquals(
-          expected,
-          AiPrompt.getJsonPromptValues(prompts)
-              .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES"));
+  }
+
+  @Test
+  public void specialistSkillsPreserveIdentityDescriptionAndInstructions() throws Exception {
+    var expected =
+        JsonParser.parseString(readResource("__files/skills/reviewSpecialists.json"))
+            .getAsJsonArray();
+    assertEquals(expected.size(), SpecializedReviewAgentDefinitions.load().size());
+    for (var item : expected) {
+      var entry = item.getAsJsonObject();
+      var actual =
+          SpecializedReviewAgentDefinitions.findByName(entry.get("name").getAsString())
+              .orElseThrow();
+      assertEquals(entry.get("name").getAsString(), actual.getName());
+      assertEquals(entry.get("short_description").getAsString(), actual.getShortDescription());
+      assertEquals(entry.get("instructions").getAsString().strip(), actual.getInstructions());
+      assertTrue(actual.isValid());
+    }
+  }
+
+  @Test
+  public void loadsPipelineAndSpecialistSkillsFromJarWithoutDirectoryEntries() throws Exception {
+    Path jar = temporaryFolder.newFile("review-skills.jar").toPath();
+    List<String> names = List.of("concern-review", "security", "review-verification");
+    try (var output = new JarOutputStream(Files.newOutputStream(jar))) {
+      for (String name : names) {
+        String resource = "skills/" + name + "/SKILL.md";
+        output.putNextEntry(new JarEntry(resource));
+        output.write(readResource(resource).getBytes(StandardCharsets.UTF_8));
+        output.closeEntry();
+      }
+    }
+    try (var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
+      for (String name : names) {
+        var expected = ReviewAgentSkills.load(name);
+        var actual = ReviewAgentSkills.load(name, classLoader);
+        assertEquals(expected.name(), actual.name());
+        assertEquals(expected.description(), actual.description());
+        assertEquals(expected.content(), actual.content());
+      }
     }
   }
 
@@ -55,6 +108,14 @@ public class ReviewAgentSkillsTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> ReviewAgentSkills.section("section-parsing", "Fenced example"));
+  }
+
+  @Test
+  public void rejectsUnknownSectionsAndPathsOutsideTheSkillRoot() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewAgentSkills.section("concern-review", "Missing section"));
+    assertThrows(IllegalArgumentException.class, () -> ReviewAgentSkills.load("../config/prompts"));
   }
 
   private String readResource(String name) throws Exception {

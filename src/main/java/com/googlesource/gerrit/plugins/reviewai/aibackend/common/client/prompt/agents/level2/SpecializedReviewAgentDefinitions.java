@@ -17,11 +17,10 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2;
 
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
-import static com.googlesource.gerrit.plugins.reviewai.utils.ResourceUtils.forEachResourceFile;
 
-import java.io.InputStream;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
+import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class SpecializedReviewAgentDefinitions {
   private static final String RESOURCE_DIR = "config/agents/level2/specialized";
-  private static final String JSON_SUFFIX = ".json";
   private static volatile List<SpecializedReviewAgentDefinition> cachedDefinitions;
 
   private SpecializedReviewAgentDefinitions() {}
@@ -51,14 +49,18 @@ public final class SpecializedReviewAgentDefinitions {
   }
 
   private static List<SpecializedReviewAgentDefinition> loadDefinitions() {
-    ClassLoader classLoader = SpecializedReviewAgentDefinitions.class.getClassLoader();
     Map<String, SpecializedReviewAgentDefinition> definitions = new LinkedHashMap<>();
-    try {
-      forEachResourceFile(
-          classLoader,
-          RESOURCE_DIR,
-          JSON_SUFFIX,
-          (resourceName, inputStream) -> addDefinition(definitions, resourceName, inputStream));
+    try (InputStreamReader reader = FileUtils.getInputStreamReader(RESOURCE_DIR + "/skills.json")) {
+      String[] skills = getGson().fromJson(reader, String[].class);
+      for (String name : skills) {
+        var skill = ReviewAgentSkills.load(name);
+        var definition =
+            new SpecializedReviewAgentDefinition(
+                SpecializedReviewAgentDefinition.normalizeName(skill.name()),
+                skill.description(),
+                skill.content());
+        definitions.put(definition.normalizedName(), definition);
+      }
     } catch (Exception e) {
       log.warn("Unable to load specialized review agent definitions", e);
     }
@@ -88,24 +90,5 @@ public final class SpecializedReviewAgentDefinitions {
         .map(SpecializedReviewAgentDefinition::normalizedName)
         .reduce((left, right) -> left + ", " + right)
         .orElse("");
-  }
-
-  private static void addDefinition(
-      Map<String, SpecializedReviewAgentDefinition> definitions,
-      String resourceName,
-      InputStream inputStream) {
-    if (inputStream == null) {
-      return;
-    }
-    SpecializedReviewAgentDefinition definition =
-        getGson()
-            .fromJson(
-                new InputStreamReader(inputStream, StandardCharsets.UTF_8),
-                SpecializedReviewAgentDefinition.class);
-    if (definition == null || !definition.isValid()) {
-      log.debug("Ignoring non-agent specialized review resource {}", resourceName);
-      return;
-    }
-    definitions.put(definition.normalizedName(), definition);
   }
 }

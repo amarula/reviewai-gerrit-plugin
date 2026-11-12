@@ -177,7 +177,11 @@ public class AiPrompt {
       values.replaceAll(
           (key, value) -> {
             if (value instanceof Map<?, ?> reference && reference.containsKey("$skill")) {
-              return ReviewAgentSkills.instructions((String) reference.get("$skill"));
+              String skill = (String) reference.get("$skill");
+              Object section = reference.get("section");
+              return section == null
+                  ? ReviewAgentSkills.instructions(skill)
+                  : ReviewAgentSkills.section(skill, section.toString());
             }
             return value;
           });
