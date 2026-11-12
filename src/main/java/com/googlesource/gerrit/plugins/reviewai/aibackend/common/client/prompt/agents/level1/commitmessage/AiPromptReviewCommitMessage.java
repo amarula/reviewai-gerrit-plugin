@@ -72,11 +72,11 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
                         reviewSection("Mandatory Rules"),
                         getAiAssistantInstructionsReview(false, true, false),
                         commitMessageSection("Role")))),
-            prompt("DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES"),
+            getDefaultAiReviewPromptInstructionsCommitMessages(),
             getCommitMessageLocationInstructions(),
             getPatchSetReviewPromptInstructions(),
             commitMessageSection("Guidelines"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
+            getDefaultAiAssistantInstructionsResponseFormat(),
             getDefaultAiAssistantInstructionsResponseExamples()));
     log.debug("Commit Message Review specific AI Assistant Instructions added: {}", instructions);
   }

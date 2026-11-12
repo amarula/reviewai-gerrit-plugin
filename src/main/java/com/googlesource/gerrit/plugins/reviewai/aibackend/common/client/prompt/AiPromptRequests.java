@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithSpace;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -29,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
-  // prompts loaded via map
+  private static final String SKILL = "review-chat";
 
   public AiPromptRequests(
       Configuration config,
@@ -37,20 +38,24 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("promptsAiRequests");
     log.debug("AiPromptRequests initialized for change ID: {}", change.getFullChangeId());
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REQUESTS"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Role"));
     if (Boolean.TRUE.equals(changeSetData.getModeratorFeaturesAllowed())) {
-      instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_GRANTED"));
+      instructions.add(ReviewAgentSkills.section(SKILL, "Moderator Permission Granted"));
     } else {
-      instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED"));
+      instructions.add(ReviewAgentSkills.section(SKILL, "Moderator Permission Required"));
     }
     instructions.add(getCommentRequestPrompt(changeSetData.getCommentPropertiesSize()));
     log.debug("AI Assistant Instructions for requests added: {}", instructions);
+  }
+
+  @Override
+  public String getDefaultAiAssistantInstructionsResponseExamples() {
+    return ReviewAgentSkills.resource(SKILL, "assets/response-example.md");
   }
 
   @Override
@@ -73,10 +78,10 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
 
     List<String> promptSections = new ArrayList<>();
     if (patchSet != null && !patchSet.isEmpty()) {
-      promptSections.add(prompt("DEFAULT_AI_REQUEST_PROMPT_DIFF"));
+      promptSections.add(getDefaultAiRequestPromptDiff());
       promptSections.add(String.format("```%s```", patchSet));
     }
-    promptSections.add(prompt("DEFAULT_AI_REQUEST_PROMPT_REQUESTS"));
+    promptSections.add(getDefaultAiRequestPromptRequests());
     promptSections.add(requestDataPrompt);
     String prompt = joinWithSpace(promptSections);
     log.debug("AI thread review message for requests: {}", prompt);
@@ -90,11 +95,10 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
         new ArrayList<>(
             List.of(
                 buildFieldSpecifications(REQUEST_REPLY_ATTRIBUTES),
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES"),
-                prompt("DEFAULT_AI_REPLIES_PROMPT_INLINE"),
+                getDefaultAiAssistantInstructionsResponseFormat(),
+                getDefaultAiAssistantInstructionsResponseExamples(),
+                getDefaultAiRepliesPromptInline(),
                 String.format(
-                    prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK"),
-                    commentPropertiesSize))));
+                    getDefaultAiRepliesPromptEnforceResponseCheck(), commentPropertiesSize))));
   }
 }

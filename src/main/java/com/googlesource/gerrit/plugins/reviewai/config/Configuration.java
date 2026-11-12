@@ -18,12 +18,12 @@
 package com.googlesource.gerrit.plugins.reviewai.config;
 
 import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
-import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt.getJsonPromptValues;
 
 import com.google.gerrit.entities.Account;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.server.config.PluginConfig;
 import com.google.gerrit.server.util.OneOffRequestContext;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -272,7 +272,7 @@ public class Configuration extends ConfigCore {
     return aiProviderConfiguration.getAiProviderType();
   }
 
-  // The default system prompt/instructions are specified in the prompt files and are passed as a
+  // The default system prompt/instructions are specified in the bundled skills and are passed as a
   // parameter
   public String getAiSystemPromptInstructions(String defaultAiSystemPromptInstructions) {
     return getString(KEY_AI_SYSTEM_PROMPT_INSTRUCTIONS, defaultAiSystemPromptInstructions);
@@ -284,12 +284,10 @@ public class Configuration extends ConfigCore {
   }
 
   // If the default system prompt/instructions are not available in the caller's scope (e.g., when
-  // displaying the configuration after a command request), they are retrieved from the prompt
-  // files.
+  // displaying the configuration after a command request), they are retrieved from the bundled
+  // skill.
   public String getAiSystemPromptInstructions() {
-    Map<String, Object> systemPrompts = getJsonPromptValues("prompts");
-    return getAiSystemPromptInstructions(
-        systemPrompts.get("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS").toString());
+    return getAiSystemPromptInstructions(ReviewAgentSkills.section("review-common", "System"));
   }
 
   public boolean getAiReviewPatchSet() {
