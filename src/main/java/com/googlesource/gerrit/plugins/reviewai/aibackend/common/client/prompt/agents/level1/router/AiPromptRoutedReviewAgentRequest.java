@@ -18,7 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptRequests;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -32,7 +32,6 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts(AiPromptReview.class, "agents/level1/router/routed-request-prompts");
     log.debug(
         "AiPromptRoutedReviewAgentRequest initialized for stage {} and change ID {}",
         changeSetData.getReviewAssistantStage(),
@@ -42,9 +41,8 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
   @Override
   public String getDefaultAiSystemPromptInstructions() {
     return switch (changeSetData.getReviewAssistantStage()) {
-      case REVIEW_COMMIT_MESSAGE ->
-          prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
-      default -> prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
+      case REVIEW_COMMIT_MESSAGE -> ReviewAgentSkills.section("review-follow-up", "Commit message");
+      default -> ReviewAgentSkills.section("review-follow-up", "Patchset");
     };
   }
 }

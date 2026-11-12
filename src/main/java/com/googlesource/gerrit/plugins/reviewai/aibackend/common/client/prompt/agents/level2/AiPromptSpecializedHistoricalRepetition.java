@@ -28,32 +28,6 @@ public class AiPromptSpecializedHistoricalRepetition extends AiPromptSpecialized
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        "agents/level2/stages/historical-repetition/prompts");
-  }
-
-  @Override
-  protected String getCollectorRole() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION");
-  }
-
-  @Override
-  protected String getCollectorRules() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES");
-  }
-
-  @Override
-  protected String getCollectorResponseFormat() {
-    return prompt(
-        "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT");
-  }
-
-  @Override
-  protected String getCollectorMessage() {
-    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION");
+    super(config, changeSetData, change, codeContextPolicy, "review-historical-repetition");
   }
 }

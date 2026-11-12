@@ -28,33 +28,11 @@ public class AiPromptSpecializedVerification extends AiPromptSpecializedReviewCo
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        "agents/level2/stages/verification/prompts");
-  }
-
-  @Override
-  protected String getCollectorRole() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION");
-  }
-
-  @Override
-  protected String getCollectorRules() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION_RULES");
+    super(config, changeSetData, change, codeContextPolicy, "review-verification");
   }
 
   @Override
   protected String getCollectorResponseFormat() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION_RESPONSE_FORMAT")
-        + "\n\n"
-        + getCommitMessageLocationInstructions();
-  }
-
-  @Override
-  protected String getCollectorMessage() {
-    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_VERIFICATION");
+    return super.getCollectorResponseFormat() + "\n\n" + getCommitMessageLocationInstructions();
   }
 }

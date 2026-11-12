@@ -28,32 +28,6 @@ public class AiPromptSpecializedConflictResolution extends AiPromptSpecializedRe
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        "agents/level2/stages/conflict-resolution/prompts");
-  }
-
-  @Override
-  protected String getCollectorRole() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION");
-  }
-
-  @Override
-  protected String getCollectorRules() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RULES");
-  }
-
-  @Override
-  protected String getCollectorResponseFormat() {
-    return prompt(
-        "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONFLICT_RESOLUTION_RESPONSE_FORMAT");
-  }
-
-  @Override
-  protected String getCollectorMessage() {
-    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_CONFLICT_RESOLUTION");
+    super(config, changeSetData, change, codeContextPolicy, "review-conflict-resolution");
   }
 }
