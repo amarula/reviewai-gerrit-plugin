@@ -18,7 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.co
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.List;
@@ -36,7 +36,7 @@ public class CodeContextPolicyOnDemand extends CodeContextPolicyBase implements 
 
   @Override
   public void addCodeContextPolicyAwareAssistantRule(List<String> rules) {
-    rules.add(AiPromptReview.staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST"));
+    rules.add(ReviewAgentSkills.section("code-review", "On-demand Context"));
     log.debug("Added Assistant Rules for On-Demand code context policy");
   }
 }

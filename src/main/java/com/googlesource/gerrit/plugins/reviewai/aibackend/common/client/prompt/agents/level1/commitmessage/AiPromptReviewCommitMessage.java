@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -37,29 +38,46 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/level1/commit-message/prompts");
     this.defaultAiMessageReview = getDefaultAiMessageReview();
     log.debug("Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
+  }
+
+  protected static String commitMessageSection(String title) {
+    return ReviewAgentSkills.section("commit-message-review", title);
+  }
+
+  @Override
+  public String getDefaultAiSystemPromptInstructions() {
+    return commitMessageSection("System");
+  }
+
+  @Override
+  public String getDefaultAiMessageReview() {
+    return ReviewAgentSkills.resource("commit-message-review", "assets/request.md").strip();
+  }
+
+  @Override
+  public String getDefaultAiAssistantInstructionsResponseExamples() {
+    return ReviewAgentSkills.resource("commit-message-review", "assets/response-example.md");
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
     instructions.addAll(
         List.of(
-            resolveCommitMessageInstructions(
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES")),
+            resolveCommitMessageInstructions(commitMessageSection("Role")),
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES"),
+                        reviewSection("Mandatory Rules"),
                         getAiAssistantInstructionsReview(false, true, false),
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES")))),
+                        commitMessageSection("Role")))),
             prompt("DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION"),
+            getCommitMessageLocationInstructions(),
             getPatchSetReviewPromptInstructions(),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES"),
+            commitMessageSection("Guidelines"),
             prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")));
+            getDefaultAiAssistantInstructionsResponseExamples()));
     log.debug("Commit Message Review specific AI Assistant Instructions added: {}", instructions);
   }
 
@@ -68,42 +86,26 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
     List<String> sections = new ArrayList<>();
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
-            resolveCommitMessageInstructions(
-                    prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))
-                + "\n\nReturn the feedback using this plugin's mandatory JSON response format, "
-                + "not the standalone Gerrit UI Markdown code-block output format."));
+            "Role",
+            resolveCommitMessageInstructions(commitMessageSection("Role"))
+                + "\n\n"
+                + commitMessageSection("Output Format")));
     sections.addAll(buildReviewFeedbackSections());
+    sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
+    sections.add(
+        buildSection("Mandatory Rules", getAiAssistantInstructionsReview(false, true, false)));
+    sections.add(
+        buildSection("Commit Message Review Requirement", getReviewPromptCommitMessages()));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
-            getScopeAndReviewConstraints()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReview(false, true, false)));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT"),
-            getReviewPromptCommitMessages()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
+            "Field Definitions",
             getPatchSetReviewPromptInstructions()
                 + "\n\n"
-                + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION")));
+                + getCommitMessageLocationInstructions()));
+    sections.add(buildSection("Additional Review Guidelines", commitMessageSection("Guidelines")));
+    sections.add(buildSection("MANDATORY Response Format", getMandatoryResponseFormat()));
     sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES")));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            getMandatoryResponseFormat()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")));
+        buildSection("Example response", getDefaultAiAssistantInstructionsResponseExamples()));
 
     String compiledInstructions = joinWithDoubleNewLine(sections);
     log.debug(
