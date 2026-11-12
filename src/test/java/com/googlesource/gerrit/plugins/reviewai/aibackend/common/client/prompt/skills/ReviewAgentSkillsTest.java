@@ -20,15 +20,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonParser;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
+import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -55,6 +60,16 @@ public class ReviewAgentSkillsTest {
   }
 
   @Test
+  public void sharedReplyFieldsPreserveDescriptionsAndOrder() throws Exception {
+    var expected =
+        JsonParser.parseString(readResource("__files/skills/shared/reply-fields.json"))
+            .getAsJsonObject();
+    var fields = new AiPrompt(mock(Configuration.class)).getRepliesAttributes();
+    assertEquals(expected, new Gson().toJsonTree(fields));
+    assertEquals(new ArrayList<>(expected.keySet()), new ArrayList<>(fields.keySet()));
+  }
+
+  @Test
   public void specialistSkillsPreserveIdentityDescriptionAndInstructions() throws Exception {
     var expected =
         JsonParser.parseString(readResource("__files/skills/reviewSpecialists.json"))
@@ -77,6 +92,9 @@ public class ReviewAgentSkillsTest {
     Path jar = temporaryFolder.newFile("review-skills.jar").toPath();
     List<String> names =
         List.of(
+            "review-common",
+            "review-chat",
+            "review-suggestions",
             "code-review",
             "commit-message-review",
             "concern-review",
@@ -150,7 +168,7 @@ public class ReviewAgentSkillsTest {
         () -> ReviewAgentSkills.resource("concern-review", "assets/missing.md"));
     assertThrows(
         IllegalArgumentException.class,
-        () -> ReviewAgentSkills.resource("concern-review", "../../config/prompts.json"));
+        () -> ReviewAgentSkills.resource("concern-review", "../specialized-reviewers.json"));
   }
 
   private String readResource(String name) throws Exception {

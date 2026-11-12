@@ -30,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public final class SpecializedReviewAgentDefinitions {
-  private static final String RESOURCE_DIR = "config/agents/level2/specialized";
+  private static final String SKILL_CATALOG = "skills/specialized-reviewers.json";
   private static volatile List<SpecializedReviewAgentDefinition> cachedDefinitions;
 
   private SpecializedReviewAgentDefinitions() {}
@@ -50,7 +50,7 @@ public final class SpecializedReviewAgentDefinitions {
 
   private static List<SpecializedReviewAgentDefinition> loadDefinitions() {
     Map<String, SpecializedReviewAgentDefinition> definitions = new LinkedHashMap<>();
-    try (InputStreamReader reader = FileUtils.getInputStreamReader(RESOURCE_DIR + "/skills.json")) {
+    try (InputStreamReader reader = FileUtils.getInputStreamReader(SKILL_CATALOG)) {
       String[] skills = getGson().fromJson(reader, String[].class);
       for (String name : skills) {
         var skill = ReviewAgentSkills.load(name);
