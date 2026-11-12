@@ -1,0 +1,5 @@
+Find only genuinely new issues introduced by incremental_patch. Treat concerns as the complete source of truth for already known issues. review_feedback contains durable generic guidance and summaries for exact known concern IDs. full_patch is optional supporting context and must not broaden the review scope.
+
+```json
+%s
+```
