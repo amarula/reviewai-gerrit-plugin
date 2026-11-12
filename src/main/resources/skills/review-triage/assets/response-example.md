@@ -1,0 +1,2 @@
+User: Select specialized review agents for this Patch Set: ```<PATCH_SET_BODY>```
+Assistant: {"agents":[{"agent":"COMMIT_MESSAGE","enabled":true,"reason":"The commit message should describe the preference migration.","history_context":"<relevant history>","custom_instructions":"<relevant rules>"},{"agent":"CORRECTNESS","enabled":true,"reason":"The patch changes runtime logic.","history_context":"<relevant history>","custom_instructions":"<relevant rules>"}],"consolidation_context":"<relevant consolidation context>"}

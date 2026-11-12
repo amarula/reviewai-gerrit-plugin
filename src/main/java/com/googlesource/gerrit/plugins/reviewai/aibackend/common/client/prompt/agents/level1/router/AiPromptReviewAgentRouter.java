@@ -17,21 +17,23 @@
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 
 public class AiPromptReviewAgentRouter extends AiPrompt {
+  private static final String SKILL = "review-routing";
 
   public AiPromptReviewAgentRouter(Configuration config) {
     super(config);
-    loadPromptMap("agents/level1/router/prompts");
   }
 
   public String getDefaultAiAssistantInstructions() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER");
+    return ReviewAgentSkills.section(SKILL, "Role");
   }
 
   public String getDefaultAiThreadReviewMessage(String requestData) {
     return String.format(
-        prompt("DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER"), requestData == null ? "" : requestData);
+        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
+        requestData == null ? "" : requestData);
   }
 }

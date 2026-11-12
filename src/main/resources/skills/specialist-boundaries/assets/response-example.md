@@ -1,0 +1,2 @@
+User: Review this full specialist input: ```<SPECIALIZED_CONTEXT>```
+Assistant: {"concerns":[{"type":"%1$s","description":"A concrete issue within the active specialist's exclusive scope.","reasoning":"Patch evidence, the exact triggering condition, and why the issue matters within that scope.","preexisting":false,"locations":[{"filename":"src/Example.java","lineNumber":42,"codeSnippet":"changedCode();"}]}],"dismissed_concerns":[]}

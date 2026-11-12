@@ -1,4 +1,0 @@
-{
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT": {"$skill": "review-follow-up", "section": "Patchset"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT": {"$skill": "review-follow-up", "section": "Commit message"}
-}

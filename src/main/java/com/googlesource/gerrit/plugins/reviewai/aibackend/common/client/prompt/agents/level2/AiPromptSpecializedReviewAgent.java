@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage {
+  private static final String SKILL = "specialist-boundaries";
 
   public AiPromptSpecializedReviewAgent(
       Configuration config,
@@ -34,7 +36,6 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/level2/specialized/prompts");
   }
 
   @Override
@@ -59,13 +60,13 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         buildSection(
             "MANDATORY Response Format",
             String.format(
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT"),
+                ReviewAgentSkills.section(SKILL, "Patchset Response Format"),
                 expectedOwnerAgent())));
     sections.add(
         buildSection(
             "Example response",
             String.format(
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
+                ReviewAgentSkills.resource(SKILL, "assets/response-example.md"),
                 expectedOwnerAgent())));
     return joinWithDoubleNewLine(sections);
   }
@@ -91,14 +92,13 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         buildSection(
             "MANDATORY Response Format",
             String.format(
-                prompt(
-                    "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT"),
+                ReviewAgentSkills.section(SKILL, "Commit Message Response Format"),
                 expectedOwnerAgent())));
     sections.add(
         buildSection(
             "Example response",
             String.format(
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
+                ReviewAgentSkills.resource(SKILL, "assets/response-example.md"),
                 expectedOwnerAgent())));
     return joinWithDoubleNewLine(sections);
   }
@@ -109,10 +109,8 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
 
   private String buildStrictSpecialistBoundarySection() {
     return buildSection(
-        prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_STRICT_SPECIALIST_BOUNDARY"),
-        String.format(
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_STRICT_SCOPE"),
-            expectedOwnerAgent()));
+        "Strict Specialist Boundary",
+        String.format(ReviewAgentSkills.section(SKILL, "Scope boundary"), expectedOwnerAgent()));
   }
 
   private String expectedOwnerAgent() {
@@ -122,22 +120,12 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
   }
 
   private String getSpecializedReplyFieldDefinitions(boolean includeInlineLocationFields) {
-    String locations =
-        includeInlineLocationFields
-            ? "`locations`: array of precise objects with `filename`, `lineNumber`, and `codeSnippet`; "
-            : "`locations`: array with the exact commit-message filename from the patch input; ";
-    return "`concerns`: array of candidate issues that may deserve a final review comment; "
-        + "`dismissed_concerns`: array of investigated candidate issues that do not apply; "
-        + "`type`: exactly `"
-        + expectedOwnerAgent()
-        + "`; this machine-enforced field identifies the concern's semantic scope; "
-        + "`description`: precise statement of the candidate issue; "
-        + "`reasoning`: evidence, triggering condition, and why the issue matters; "
-        + "`preexisting`: true only when the concern existed before this patch; "
-        + locations
-        + getCommitMessageLocationInstructions()
-        + " "
-        + "Specialized agents must not write final Gerrit comments and must not include `reply`, `score`, `relevance`, `duplicated`, `repeated`, `conflicting`, or `source_agent` fields.";
+    return String.format(
+        ReviewAgentSkills.resource(SKILL, "assets/field-definitions.md").strip(),
+        expectedOwnerAgent(),
+        ReviewAgentSkills.section(
+            SKILL, includeInlineLocationFields ? "Patchset Locations" : "Commit Message Locations"),
+        getCommitMessageLocationInstructions());
   }
 
   @Override
@@ -145,6 +133,6 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     if (changeSetData.getSpecializedAgentName() == null) {
       return super.getDefaultAiThreadReviewMessage(patchSet);
     }
-    return String.format(prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_REVIEW"), patchSet);
+    return String.format(ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(), patchSet);
   }
 }

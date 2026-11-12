@@ -18,6 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -46,6 +47,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
@@ -130,7 +132,7 @@ public class AiPromptFactoryTest {
   }
 
   @Test
-  public void routedReviewAgentInstructionsAreLoadedIntoReviewPromptFields() {
+  public void routedReviewAgentInstructionsComeFromSkill() {
     ChangeSetData changeSetData = new ChangeSetData(1);
     changeSetData.setReviewAssistantStage(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE);
     AiPromptRoutedReviewAgentRequest request =
@@ -140,12 +142,9 @@ public class AiPromptFactoryTest {
             commentEventChange(),
             mock(ICodeContextPolicy.class));
 
-    Map<String, Object> prompts =
-        AiPrompt.getJsonPromptValues("agents/level1/router/routed-request-prompts");
-
     assertEquals(
-        prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"),
-        request.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT"));
+        ReviewAgentSkills.section("review-follow-up", "Commit message"),
+        request.getDefaultAiSystemPromptInstructions());
   }
 
   @Test
@@ -702,17 +701,37 @@ public class AiPromptFactoryTest {
   }
 
   @Test
-  public void reviewAgentRouterPromptsAreLoadedFromResource() {
+  public void reviewAgentRouterLoadsItsSkill() {
     AiPromptReviewAgentRouter routerPrompt =
         new AiPromptReviewAgentRouter(mock(Configuration.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/router/prompts");
 
     assertEquals(
-        prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER"),
+        ReviewAgentSkills.section("review-routing", "Role"),
         routerPrompt.getDefaultAiAssistantInstructions());
     assertEquals(
-        String.format(prompts.get("DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER").toString(), "request"),
+        String.format(
+            ReviewAgentSkills.resource("review-routing", "assets/request.md").strip(), "request"),
         routerPrompt.getDefaultAiThreadReviewMessage("request"));
+  }
+
+  @Test
+  public void reviewRetryUsesTheCodeReviewSkillExample() throws Exception {
+    ChangeSetData data = new ChangeSetData(1);
+    data.setForcedStagedReview(true);
+    data.setReviewAssistantStage(ReviewAssistantStage.REVIEW_REITERATED);
+    IAiPrompt prompt =
+        AiPromptFactory.getAiPrompt(
+            mock(Configuration.class), data, patchSetEventChange(), mock(ICodeContextPolicy.class));
+
+    try (var expected =
+        getClass()
+            .getClassLoader()
+            .getResourceAsStream("__files/skills/orchestration/retry-request.txt")) {
+      assertNotNull(expected);
+      assertEquals(
+          new String(expected.readAllBytes(), StandardCharsets.UTF_8),
+          prompt.getDefaultAiThreadReviewMessage(""));
+    }
   }
 
   private GerritChange commentEventChange() {

@@ -45,6 +45,6 @@ public class AiPromptReviewReiterated extends AiPromptReview implements IAiPromp
         List.of(
             prompt("DEFAULT_AI_MESSAGE_REQUEST_RESEND_FORMATTED"),
             prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")));
+            getDefaultAiAssistantInstructionsResponseExamples()));
   }
 }

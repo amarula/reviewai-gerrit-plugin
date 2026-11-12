@@ -1,4 +1,0 @@
-{
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_AGENT_ROUTER": {"$skill": "review-routing", "section": "Role"},
-  "DEFAULT_AI_MESSAGE_REVIEW_AGENT_ROUTER": "Classify the latest Gerrit review-agent request.\n\nRequest data:\n%s\n\nReturn exactly one token: PATCHSET or COMMIT_MESSAGE."
-}

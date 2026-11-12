@@ -22,7 +22,6 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.gson.JsonParser;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPrompt;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import java.io.InputStream;
 import java.net.URL;
@@ -43,15 +42,14 @@ public class ReviewAgentSkillsTest {
   @Test
   public void pipelineSkillSectionsPreserveExistingAgentInstructions() throws Exception {
     var expected =
-        JsonParser.parseString(readResource("__files/skills/reviewPipelinePrompts.json"))
+        JsonParser.parseString(readResource("__files/skills/reviewPipelineSections.json"))
             .getAsJsonObject();
     for (var resource : expected.entrySet()) {
-      var actual = AiPrompt.getJsonPromptValues(resource.getKey());
       for (var entry : resource.getValue().getAsJsonObject().entrySet()) {
         assertEquals(
             resource.getKey() + ": " + entry.getKey(),
             entry.getValue().getAsString(),
-            actual.get(entry.getKey()));
+            ReviewAgentSkills.section(resource.getKey(), entry.getKey()));
       }
     }
   }
@@ -85,7 +83,14 @@ public class ReviewAgentSkillsTest {
             "new-issue-finder",
             "review-feedback",
             "security",
-            "review-verification");
+            "review-verification",
+            "review-routing",
+            "review-follow-up",
+            "review-triage",
+            "specialist-boundaries",
+            "review-consolidation",
+            "review-historical-repetition",
+            "review-conflict-resolution");
     try (var output = new JarOutputStream(Files.newOutputStream(jar))) {
       for (String name : names) {
         String resource = "skills/" + name + "/SKILL.md";
