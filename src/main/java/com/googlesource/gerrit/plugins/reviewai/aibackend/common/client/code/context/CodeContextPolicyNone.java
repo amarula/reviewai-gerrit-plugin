@@ -18,7 +18,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.co
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.List;
@@ -36,8 +36,7 @@ public class CodeContextPolicyNone extends CodeContextPolicyBase implements ICod
 
   @Override
   public void addCodeContextPolicyAwareAssistantInstructions(List<String> instructions) {
-    instructions.add(
-        AiPromptBase.staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT"));
+    instructions.add(ReviewAgentSkills.section("review-common", "No File Context"));
     log.debug("Added Assistant Instructions for `None` code context policy");
   }
 }

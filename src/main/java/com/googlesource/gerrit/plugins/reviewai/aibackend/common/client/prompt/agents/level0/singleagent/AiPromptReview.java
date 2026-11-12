@@ -128,7 +128,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
                         reviewSection("Mandatory Rules"),
                         getAiAssistantInstructionsReview(),
                         reviewSection("Additional Review Guidelines"),
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
+                        getDefaultAiAssistantInstructionsResponseFormat(),
                         getDefaultAiAssistantInstructionsResponseExamples()))),
             getPatchSetReviewPrompt()));
     log.debug("Review instructions formed: {}", instructions);
@@ -149,7 +149,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String getScopeAndReviewConstraints() {
     List<String> constraints =
-        new ArrayList<>(List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT")));
+        new ArrayList<>(List.of(getDefaultAiAssistantInstructionsNoFileContext()));
     List<String> commonInstructions = new ArrayList<>();
     addCommonAiAssistantInstructions(commonInstructions, false);
     commonInstructions.stream()
@@ -160,8 +160,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
 
   protected String getMandatoryResponseFormat() {
     return joinWithNewLine(
-        splitString(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT").strip(), "\n")
-            .stream()
+        splitString(getDefaultAiAssistantInstructionsResponseFormat().strip(), "\n").stream()
             .map(String::strip)
             .filter(line -> !line.isEmpty())
             .filter(line -> !line.startsWith("//"))
