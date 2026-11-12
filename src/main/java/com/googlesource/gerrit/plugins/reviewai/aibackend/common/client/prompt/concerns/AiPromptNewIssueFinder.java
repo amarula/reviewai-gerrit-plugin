@@ -25,6 +25,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
@@ -34,6 +35,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import java.util.List;
 
 public final class AiPromptNewIssueFinder extends AiPromptBase {
+  private static final String SKILL = "new-issue-finder";
   private static final String COMMIT_MESSAGE_REVIEWER = "COMMIT_MESSAGE";
 
   private final IAiPrompt reviewPrompt;
@@ -44,13 +46,12 @@ public final class AiPromptNewIssueFinder extends AiPromptBase {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/common/new-issue-finder/prompts");
     reviewPrompt = reviewPrompt(config, changeSetData, change, codeContextPolicy);
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Role"));
   }
 
   @Override
@@ -58,14 +59,14 @@ public final class AiPromptNewIssueFinder extends AiPromptBase {
     return joinWithDoubleNewLine(
         List.of(
             reviewPrompt.getDefaultAiAssistantInstructions(),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NEW_ISSUE_FINDER_RULES")));
+            ReviewAgentSkills.section(SKILL, "Role"),
+            ReviewAgentSkills.section(SKILL, "Rules")));
   }
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
-        prompt("DEFAULT_AI_MESSAGE_NEW_ISSUE_FINDER"),
+        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
         getGson().toJson(changeSetData.getConcernWorkflowInput()));
   }
 
