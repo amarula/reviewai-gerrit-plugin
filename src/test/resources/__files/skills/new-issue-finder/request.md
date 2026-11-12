@@ -1,0 +1,5 @@
+Find only genuinely new issues introduced by incremental_patch. Treat concerns as the complete source of truth for already known issues. review_feedback contains durable generic guidance and summaries for exact known concern IDs. full_patch is optional supporting context and must not broaden the review scope.
+
+```json
+{"concerns":{"reviewer":{"kind":"SINGLE_AGENT","name":"SINGLE_AGENT"},"concerns":[{"id":"concern-1","status":"PRESENT","description":"Check that registrations remain independent.","merged_concern_ids":[],"reviewers":[],"locations":[]}]},"incremental_patch":"diff --git a/src/Example.java b/src/Example.java\n@@ -40,0 +41,2 @@\n+Object value \u003d lookup();\n+value.run();\n","full_patch":"diff --git a/src/Example.java b/src/Example.java\n@@ -1,3 +1,5 @@\n class Example {\n+  Object value \u003d lookup();\n+  value.run();\n }\n"}
+```

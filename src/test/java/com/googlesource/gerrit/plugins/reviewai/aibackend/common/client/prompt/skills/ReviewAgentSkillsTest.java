@@ -77,18 +77,26 @@ public class ReviewAgentSkillsTest {
   @Test
   public void loadsPipelineAndSpecialistSkillsFromJarWithoutDirectoryEntries() throws Exception {
     Path jar = temporaryFolder.newFile("review-skills.jar").toPath();
-    List<String> names = List.of("concern-review", "security", "review-verification");
+    List<String> names =
+        List.of(
+            "concern-review",
+            "new-issue-finder",
+            "review-feedback",
+            "security",
+            "review-verification");
     try (var output = new JarOutputStream(Files.newOutputStream(jar))) {
       for (String name : names) {
         String resource = "skills/" + name + "/SKILL.md";
         output.putNextEntry(new JarEntry(resource));
         output.write(readResource(resource).getBytes(StandardCharsets.UTF_8));
         output.closeEntry();
+        for (var asset : ReviewAgentSkills.load(name).resources()) {
+          String assetPath = "skills/" + name + "/" + asset.relativePath();
+          output.putNextEntry(new JarEntry(assetPath));
+          output.write(readResource(assetPath).getBytes(StandardCharsets.UTF_8));
+          output.closeEntry();
+        }
       }
-      String request = "skills/concern-review/assets/request.md";
-      output.putNextEntry(new JarEntry(request));
-      output.write(readResource(request).getBytes(StandardCharsets.UTF_8));
-      output.closeEntry();
     }
     try (var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
       for (String name : names) {
