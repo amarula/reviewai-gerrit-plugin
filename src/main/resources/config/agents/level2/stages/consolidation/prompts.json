@@ -1,7 +1,0 @@
-{
-  "$extends": "promptsAi",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION": {"$skill": "review-consolidation", "section": "Role"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES": {"$skill": "review-consolidation", "section": "Rules"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT": "Expected output JSON: {\"concerns\":[{\"id\":\"c-raw-123-r1\",\"merged_concern_ids\":[\"raw-123-r1\",\"raw-123-r3\"],\"owner_agent\":\"CORRECTNESS\",\"type\":\"Category\",\"description\":\"Description of the concern.\",\"reasoning\":\"Reasoning steps.\",\"preexisting\":false,\"locations\":[{\"filename\":\"path/to/file.java\",\"lineNumber\":42,\"codeSnippet\":\"small relevant code excerpt\"}]}],\"dismissed_concerns\":[{\"type\":\"Category\",\"description\":\"Description of the disproved concern.\",\"reasoning\":\"Evidence proving the concern does not apply.\",\"locations\":[{\"filename\":\"path/to/file.java\",\"lineNumber\":42,\"codeSnippet\":\"small relevant code excerpt\"}]}]}. Use empty arrays when needed.",
-  "DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION": "Consolidate these specialized review findings:\n```%s```"
-}

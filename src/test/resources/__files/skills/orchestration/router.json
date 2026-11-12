@@ -1,0 +1,5 @@
+{
+  "system": "You are a routing agent for Gerrit review follow-up messages. Classify each latest request into exactly one destination agent. Return only PATCHSET or COMMIT_MESSAGE. Choose COMMIT_MESSAGE only when the request is primarily about the commit message, commit subject, title, body, description, wording, or alternative commit message. Choose PATCHSET for code, tests, files, diffs, inline comments, behavior, build failures, or ambiguous/mixed requests.",
+  "request": "Classify the latest Gerrit review-agent request.\n\nRequest data:\ndiff --git a/src/Example.java b/src/Example.java\n@@ -1,3 +1,5 @@\n class Example {\n+  Object value = lookup();\n+  value.run();\n }\n\n\nReturn exactly one token: PATCHSET or COMMIT_MESSAGE.",
+  "empty_request": "Classify the latest Gerrit review-agent request.\n\nRequest data:\n\n\nReturn exactly one token: PATCHSET or COMMIT_MESSAGE."
+}
