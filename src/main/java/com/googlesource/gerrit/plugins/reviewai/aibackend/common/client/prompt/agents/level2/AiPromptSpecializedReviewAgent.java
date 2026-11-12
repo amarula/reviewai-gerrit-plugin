@@ -44,37 +44,26 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     }
 
     List<String> sections = new ArrayList<>();
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getSpecializationInstructions()));
+    sections.add(buildSection("Role", getSpecializationInstructions()));
     sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildConditionLabelSections());
     sections.addAll(buildReviewFeedbackSections());
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
-            getScopeAndReviewConstraints()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReview()));
+    sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
+    sections.add(buildSection("Mandatory Rules", getAiAssistantInstructionsReview()));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
       sections.add(buildSection("Triage-Selected Instructions", customInstructions));
     }
+    sections.add(buildSection("Field Definitions", getSpecializedReplyFieldDefinitions(true)));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
-            getSpecializedReplyFieldDefinitions(true)));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+            "MANDATORY Response Format",
             String.format(
                 prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_PATCHSET_RESPONSE_FORMAT"),
                 expectedOwnerAgent())));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            "Example response",
             String.format(
                 prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
                 expectedOwnerAgent())));
@@ -84,46 +73,30 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
   private String getCommitMessageSpecialistInstructions() {
     List<String> sections = new ArrayList<>();
     sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
-            resolveCommitMessageInstructions(
-                prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES"))));
+        buildSection("Role", resolveCommitMessageInstructions(commitMessageSection("Role"))));
     sections.add(buildStrictSpecialistBoundarySection());
     sections.addAll(buildReviewFeedbackSections());
+    sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
     sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
-            getScopeAndReviewConstraints()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReview(false, true, false)));
+        buildSection("Mandatory Rules", getAiAssistantInstructionsReview(false, true, false)));
     String customInstructions = changeSetData.getSpecializedAgentCustomInstructions();
     if (customInstructions != null && !customInstructions.isBlank()) {
       sections.add(buildSection("Triage-Selected Instructions", customInstructions));
     }
     sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT"),
-            getReviewPromptCommitMessages()));
+        buildSection("Commit Message Review Requirement", getReviewPromptCommitMessages()));
+    sections.add(buildSection("Field Definitions", getSpecializedReplyFieldDefinitions(false)));
+    sections.add(buildSection("Additional Review Guidelines", commitMessageSection("Guidelines")));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
-            getSpecializedReplyFieldDefinitions(false)));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_GUIDELINES")));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
+            "MANDATORY Response Format",
             String.format(
                 prompt(
                     "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_COMMIT_MESSAGE_RESPONSE_FORMAT"),
                 expectedOwnerAgent())));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            "Example response",
             String.format(
                 prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_RESPONSE_EXAMPLES"),
                 expectedOwnerAgent())));
@@ -162,7 +135,7 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
         + "`reasoning`: evidence, triggering condition, and why the issue matters; "
         + "`preexisting`: true only when the concern existed before this patch; "
         + locations
-        + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION")
+        + getCommitMessageLocationInstructions()
         + " "
         + "Specialized agents must not write final Gerrit comments and must not include `reply`, `score`, `relevance`, `duplicated`, `repeated`, `conflicting`, or `source_agent` fields.";
   }

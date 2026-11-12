@@ -34,7 +34,6 @@ import org.junit.rules.TemporaryFolder;
 
 public class ReviewAgentSkillsJarTest {
   private static final String SKILL_FILE = "skills/code-review/SKILL.md";
-  private static final String GUIDELINES_RESOURCE = "__files/skills/reviewGuidelines.txt";
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -43,13 +42,13 @@ public class ReviewAgentSkillsJarTest {
     Path jar = createSkillJar();
     try (var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
       assertEquals(
-          readResource(GUIDELINES_RESOURCE).strip(),
+          ReviewAgentSkills.instructions("code-review"),
           ReviewAgentSkills.load("code-review", classLoader).content());
     }
     // The adapter closes the filesystem it opened, so another load can mount the JAR again.
     try (var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
       assertEquals(
-          readResource(GUIDELINES_RESOURCE).strip(),
+          ReviewAgentSkills.instructions("code-review"),
           ReviewAgentSkills.load("code-review", classLoader).content());
     }
   }
@@ -60,7 +59,7 @@ public class ReviewAgentSkillsJarTest {
     try (var fileSystem = FileSystems.newFileSystem(jar);
         var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
       assertEquals(
-          readResource(GUIDELINES_RESOURCE).strip(),
+          ReviewAgentSkills.instructions("code-review"),
           ReviewAgentSkills.load("code-review", classLoader).content());
       assertTrue(fileSystem.isOpen());
     }

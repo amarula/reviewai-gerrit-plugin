@@ -262,10 +262,7 @@ public class AiPromptFactoryTest {
         AiPromptFactory.getAiPrompt(
             config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
 
-    String commitMessageRole =
-        (String)
-            AiPrompt.getJsonPromptValues("agents/level1/commit-message/prompts")
-                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES");
+    String commitMessageRole = ReviewAgentSkills.section("commit-message-review", "Role");
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertTrue(instructions.contains("# Role\n\n" + commitMessageRole));
     assertTrue(instructions.contains("# Task\n\nReassess every supplied concern"));
@@ -511,10 +508,8 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertTrue(
-        instructions.contains(
-            "RULE #1: " + prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")));
-    assertFalse(
-        instructions.contains(prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
+        instructions.contains("RULE #1: " + ReviewAgentSkills.section("code-review", "History")));
+    assertFalse(instructions.contains(ReviewAgentSkills.section("code-review", "Patch Scope")));
     assertTrue(instructions.contains("RULE #2: First directive"));
     assertTrue(instructions.contains("RULE #3: Second directive"));
   }
@@ -533,11 +528,9 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertFalse(
-        instructions.contains(
-            AiPromptReview.staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ON_DEMAND_REQUEST")));
+        instructions.contains(ReviewAgentSkills.section("code-review", "On-demand Context")));
     assertTrue(
-        instructions.contains(
-            "RULE #1: " + prompt.prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")));
+        instructions.contains("RULE #1: " + ReviewAgentSkills.section("code-review", "History")));
     assertTrue(instructions.contains("RULE #2: First directive"));
     assertTrue(instructions.contains("RULE #3: Second directive"));
   }
@@ -695,16 +688,17 @@ public class AiPromptFactoryTest {
   }
 
   @Test
-  public void patchsetAgentPromptsAreLoadedFromResource() {
-    new AiPromptReviewCode(
-        mock(Configuration.class),
-        new ChangeSetData(1),
-        patchSetEventChange(),
-        mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("agents/level1/patchset/prompts");
-
-    String reviewTasks = (String) prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS");
-    assertFalse(prompts.get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS").toString().isEmpty());
+  public void patchsetAgentLoadsCodeReviewSkill() {
+    AiPromptReviewCode prompt =
+        new AiPromptReviewCode(
+            mock(Configuration.class),
+            new ChangeSetData(1),
+            patchSetEventChange(),
+            mock(ICodeContextPolicy.class));
+    assertTrue(
+        prompt
+            .getDefaultAiAssistantInstructions()
+            .contains(ReviewAgentSkills.section("code-review", "Additional Review Guidelines")));
   }
 
   @Test
