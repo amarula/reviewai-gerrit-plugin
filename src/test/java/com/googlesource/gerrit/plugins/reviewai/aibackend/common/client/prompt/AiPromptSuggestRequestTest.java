@@ -16,34 +16,52 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
+import com.google.gson.JsonObject;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
 public class AiPromptSuggestRequestTest {
-  private static final Map<String, Object> PROMPTS =
-      AiPrompt.getJsonPromptValues("promptsAiSuggest");
-
   @Test
-  public void reviewRepliesRequestUsesResourceTemplate() {
+  public void reviewRepliesRequestUsesResourceTemplate() throws Exception {
     assertEquals(
-        String.format(prompt("DEFAULT_AI_SUGGEST_REVIEW_REPLIES_REQUEST"), "patch", "reviews"),
-        AiPromptSuggestRequest.forReviewReplies("patch", "reviews"));
+        expected("review_replies"), AiPromptSuggestRequest.forReviewReplies("patch", "reviews"));
   }
 
   @Test
-  public void existingContextRequestUsesResourceScopePrompt() {
+  public void existingContextRequestUsesResourceScopePrompt() throws Exception {
     assertEquals(
-        String.format(
-            prompt("DEFAULT_AI_SUGGEST_EXISTING_CONTEXT_REQUEST"),
-            "patch",
-            prompt("DEFAULT_AI_SUGGEST_SCOPE_PATCHSET")),
+        expected("patchset_context"),
         AiPromptSuggestRequest.forExistingContext("patch", ReviewScope.PATCHSET));
   }
 
-  private static String prompt(String key) {
-    return (String) PROMPTS.get(key);
+  @Test
+  public void existingContextRequestPreservesCommitMessageScope() throws Exception {
+    assertEquals(
+        expected("commit_message_context"),
+        AiPromptSuggestRequest.forExistingContext("patch", ReviewScope.COMMIT_MESSAGE));
+  }
+
+  @Test
+  public void existingContextRequestPreservesUnscopedRequests() throws Exception {
+    assertEquals(
+        expected("unscoped_context"), AiPromptSuggestRequest.forExistingContext("patch", null));
+  }
+
+  private String expected(String name) throws Exception {
+    try (var resource =
+        getClass()
+            .getClassLoader()
+            .getResourceAsStream("__files/skills/shared/suggest-requests.json")) {
+      assertNotNull(resource);
+      return getGson()
+          .fromJson(new String(resource.readAllBytes(), StandardCharsets.UTF_8), JsonObject.class)
+          .get(name)
+          .getAsString();
+    }
   }
 }

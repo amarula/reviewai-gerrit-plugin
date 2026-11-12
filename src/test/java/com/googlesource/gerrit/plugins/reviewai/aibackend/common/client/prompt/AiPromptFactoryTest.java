@@ -79,13 +79,9 @@ public class AiPromptFactoryTest {
             mock(ICodeContextPolicy.class));
 
     String permissionInstruction =
-        (String)
-            AiPrompt.getJsonPromptValues("promptsAiRequests")
-                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+        ReviewAgentSkills.section("review-chat", "Moderator Permission Required");
     String moderatorInstruction =
-        (String)
-            AiPrompt.getJsonPromptValues("promptsAiRequests")
-                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_GRANTED");
+        ReviewAgentSkills.section("review-chat", "Moderator Permission Granted");
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
     assertFalse(prompt.getDefaultAiAssistantInstructions().contains(moderatorInstruction));
   }
@@ -104,13 +100,9 @@ public class AiPromptFactoryTest {
             mock(ICodeContextPolicy.class));
 
     String permissionInstruction =
-        (String)
-            AiPrompt.getJsonPromptValues("promptsAiRequests")
-                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_REQUIRED");
+        ReviewAgentSkills.section("review-chat", "Moderator Permission Required");
     String moderatorInstruction =
-        (String)
-            AiPrompt.getJsonPromptValues("promptsAiRequests")
-                .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_MODERATOR_PERMISSION_GRANTED");
+        ReviewAgentSkills.section("review-chat", "Moderator Permission Granted");
     assertFalse(prompt.getDefaultAiAssistantInstructions().contains(permissionInstruction));
     assertTrue(prompt.getDefaultAiAssistantInstructions().contains(moderatorInstruction));
   }
@@ -575,11 +567,11 @@ public class AiPromptFactoryTest {
             changeSetData,
             patchSetEventChange(),
             mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
-    assertEquals(
-        prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE"),
-        prompt.prompt("DEFAULT_AI_SUGGEST_INSTRUCTIONS_ROLE"));
+    assertTrue(
+        prompt
+            .getDefaultAiAssistantInstructions()
+            .contains(ReviewAgentSkills.section("review-suggestions", "Role")));
     String instructions = prompt.getDefaultAiAssistantInstructions();
     assertTrue(instructions.contains("Suggestion Task"));
     assertTrue(instructions.contains("exactly ONE all-inclusive commit-message Suggested Edit"));
@@ -604,16 +596,14 @@ public class AiPromptFactoryTest {
             changeSetData,
             patchSetEventChange(),
             mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertTrue(
-        instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET").toString()));
+        instructions.contains(ReviewAgentSkills.section("review-suggestions", "Patchset Task")));
     assertFalse(
         instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE").toString()));
+            ReviewAgentSkills.section("review-suggestions", "Commit Message Task")));
   }
 
   @Test
@@ -628,16 +618,14 @@ public class AiPromptFactoryTest {
             changeSetData,
             patchSetEventChange(),
             mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertFalse(
-        instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET").toString()));
+        instructions.contains(ReviewAgentSkills.section("review-suggestions", "Patchset Task")));
     assertTrue(
         instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE").toString()));
+            ReviewAgentSkills.section("review-suggestions", "Commit Message Task")));
   }
 
   @Test
@@ -652,16 +640,14 @@ public class AiPromptFactoryTest {
     AiPromptSuggest prompt =
         new AiPromptSuggest(
             config, changeSetData, patchSetEventChange(), mock(ICodeContextPolicy.class));
-    Map<String, Object> prompts = AiPrompt.getJsonPromptValues("promptsAiSuggest");
 
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertFalse(
-        instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_PATCHSET").toString()));
+        instructions.contains(ReviewAgentSkills.section("review-suggestions", "Patchset Task")));
     assertTrue(
         instructions.contains(
-            prompts.get("DEFAULT_AI_SUGGEST_INSTRUCTIONS_TASK_COMMIT_MESSAGE").toString()));
+            ReviewAgentSkills.section("review-suggestions", "Commit Message Task")));
   }
 
   @Test
@@ -679,11 +665,7 @@ public class AiPromptFactoryTest {
     String instructions = prompt.getDefaultAiAssistantInstructions();
 
     assertTrue(instructions.startsWith("You are ReviewPatchsetAgent."));
-    assertFalse(
-        instructions.contains(
-            (String)
-                AiPrompt.getJsonPromptValues("prompts")
-                    .get("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS")));
+    assertFalse(instructions.contains(ReviewAgentSkills.section("review-common", "System")));
   }
 
   @Test

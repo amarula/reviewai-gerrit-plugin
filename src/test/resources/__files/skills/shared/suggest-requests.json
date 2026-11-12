@@ -1,0 +1,6 @@
+{
+  "review_replies": "patch\n\nGenerate one or more Gerrit suggested edits for every negative review reply:\nreviews",
+  "patchset_context": "patch\n\nGenerate one or more Gerrit suggested edits for every negative review reply already present in this conversation or context history. Only use patchset code-review replies.",
+  "commit_message_context": "patch\n\nGenerate one or more Gerrit suggested edits for every negative review reply already present in this conversation or context history. Only use commit-message review replies.",
+  "unscoped_context": "patch\n\nGenerate one or more Gerrit suggested edits for every negative review reply already present in this conversation or context history."
+}

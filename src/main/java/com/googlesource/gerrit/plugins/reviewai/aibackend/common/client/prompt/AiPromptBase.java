@@ -19,6 +19,7 @@ package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
@@ -27,27 +28,11 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
-
-  // Lazy static cache for callers that don't have an instance (e.g. CodeContextPolicyNone).
-  private static volatile Map<String, Object> cachedPromptsAi;
-
-  private static synchronized Map<String, Object> getCachedPromptsAi() {
-    if (cachedPromptsAi == null) {
-      cachedPromptsAi = getJsonPromptValues("promptsAi");
-    }
-    return cachedPromptsAi;
-  }
-
-  /** Returns a prompt value from promptsAi.json without requiring an instance. */
-  public static String staticPrompt(String key) {
-    return (String) getCachedPromptsAi().get(key);
-  }
 
   // ---- Instance fields ----
 
@@ -67,43 +52,44 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
     this.isCommentEvent = change.getIsCommentEvent();
-    loadPromptMap("promptsAi");
-    this.defaultAiMessageReview = prompt("DEFAULT_AI_MESSAGE_REVIEW");
+    this.defaultAiMessageReview =
+        ReviewAgentSkills.resource("review-common", "assets/request.md").strip();
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
   }
 
   // ---- Convenience accessors ----
 
   public String getDefaultAiAssistantName() {
-    return prompt("DEFAULT_AI_ASSISTANT_NAME");
+    return commonSection("Assistant Name");
   }
 
   public String getDefaultAiAssistantDescription() {
-    return prompt("DEFAULT_AI_ASSISTANT_DESCRIPTION");
+    return commonSection("Assistant Description");
   }
 
   public String getDefaultAiAssistantInstructionsFileContext() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FILE_CONTEXT");
+    return commonSection("File Context");
   }
 
   public String getDefaultAiAssistantInstructionsNoFileContext() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_NO_FILE_CONTEXT");
+    return commonSection("No File Context");
   }
 
   public String getDefaultAiAssistantInstructionsResponseFormat() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT");
+    return ReviewAgentSkills.resource("review-common", "assets/response-format.md");
   }
 
   public String getDefaultAiAssistantInstructionsResponseExamples() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES");
+    // Only reviewer and request prompts supply response examples.
+    return null;
   }
 
   public String getDefaultAiMessageRequestResendFormatted() {
-    return prompt("DEFAULT_AI_MESSAGE_REQUEST_RESEND_FORMATTED");
+    return commonSection("Retry Request");
   }
 
   public String getDefaultAiMessageReview() {
-    return prompt("DEFAULT_AI_MESSAGE_REVIEW");
+    return ReviewAgentSkills.resource("review-common", "assets/request.md").strip();
   }
 
   // ---- Abstract and instance methods ----
@@ -143,11 +129,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
           config.getAiSystemPromptInstructions(getDefaultAiSystemPromptInstructions()) + DOT);
     }
     codeContextPolicy.addCodeContextPolicyAwareAssistantInstructions(instructions);
-  }
-
-  @Override
-  public String getDefaultAiSystemPromptInstructions() {
-    return prompt("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS");
   }
 
   public String getDefaultAiAssistantInstructions() {

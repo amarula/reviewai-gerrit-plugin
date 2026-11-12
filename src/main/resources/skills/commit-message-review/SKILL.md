@@ -30,3 +30,22 @@ Use [assets/response-example.md](assets/response-example.md) for the response ex
 ## Request Template
 
 Use [assets/request.md](assets/request.md) for the user request. ReviewAI replaces its `%s` placeholder with the commit-message review input.
+
+## Review Requirement
+
+You MUST review the commit message of the PatchSet and provide your feedback in an additional reply. The commit message is provided in %s.
+
+## Review Instructions
+
+Add a commit-message reply only if there is a concrete issue, such as:
+
+- the subject is misleading;
+- the subject is too vague;
+- the subject does not match the patch scope;
+- the subject suggests a different type of change.
+
+If the commit-message feedback is negative, the reply MUST include an example of a clearer commit message.
+
+## Commit Message Source
+
+the "Subject:" entry of the Patch Set

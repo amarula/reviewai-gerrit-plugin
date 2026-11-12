@@ -16,16 +16,11 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
-import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 
-import com.google.gson.reflect.TypeToken;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
-import com.googlesource.gerrit.plugins.reviewai.utils.FileUtils;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.Setter;
@@ -33,9 +28,8 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class AiPrompt {
-  private static final String PROMPT_EXTENDS_ATTRIBUTE = "$extends";
 
-  // Reply attributes (compile-time constants, not JSON-loaded)
+  // Reply attributes
   public static final String ATTRIBUTE_ID = "id";
   public static final String ATTRIBUTE_REPLY = "reply";
   public static final String ATTRIBUTE_SCORE = "score";
@@ -64,9 +58,8 @@ public class AiPrompt {
       Collections.unmodifiableList(
           Arrays.asList(ATTRIBUTE_REPLY, ATTRIBUTE_ID, ATTRIBUTE_CHANGE_ID));
 
-  // ---- Instance prompt storage (no reflection) ----
+  // ---- Reply-field descriptions ----
 
-  private final Map<String, Object> promptValues = new LinkedHashMap<>();
   private Map<String, String> repliesAttributes;
 
   protected final Configuration config;
@@ -75,127 +68,84 @@ public class AiPrompt {
 
   public AiPrompt(Configuration config) {
     this.config = config;
-    loadPromptMap("prompts");
     log.debug("AiPrompt initialized.");
   }
 
-  // ---- Prompt value access ----
-
-  /** Returns a string prompt value by its JSON key. */
-  protected String prompt(String key) {
-    return (String) promptValues.get(key);
+  protected static String commonSection(String title) {
+    return ReviewAgentSkills.section("review-common", title);
   }
 
-  /** Returns the replies-attributes map, which is a nested JSON object in prompts.json. */
-  @SuppressWarnings("unchecked")
+  /** Returns the ordered reply-field descriptions from the shared skill. */
   public Map<String, String> getRepliesAttributes() {
     if (repliesAttributes == null) {
-      Object raw = promptValues.get("DEFAULT_AI_REPLIES_ATTRIBUTES");
-      if (raw instanceof Map) {
-        repliesAttributes = new LinkedHashMap<>((Map<String, String>) raw);
-      } else {
-        repliesAttributes = new LinkedHashMap<>();
+      repliesAttributes = new LinkedHashMap<>();
+      for (String attribute :
+          List.of(
+              ATTRIBUTE_REPLY,
+              ATTRIBUTE_ID,
+              ATTRIBUTE_SCORE,
+              ATTRIBUTE_FILENAME,
+              ATTRIBUTE_LINE_NUMBER,
+              ATTRIBUTE_CODE_SNIPPET,
+              ATTRIBUTE_RELEVANCE,
+              ATTRIBUTE_CHANGE_ID,
+              ATTRIBUTE_REPEATED,
+              ATTRIBUTE_DUPLICATED,
+              ATTRIBUTE_CONFLICTING)) {
+        repliesAttributes.put(attribute, commonSection("Field " + attribute));
       }
     }
     return repliesAttributes;
   }
 
-  /**
-   * Loads a JSON prompt file into this instance's promptValues map. Later loads override earlier
-   * values for the same key, which correctly handles subclass overrides (e.g.
-   * DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS).
-   */
-  protected void loadPromptMap(String promptFilename) {
-    Map<String, Object> values = getJsonPromptValues(promptFilename);
-    Object repliesAttr = values.remove("DEFAULT_AI_REPLIES_ATTRIBUTES");
-    promptValues.putAll(values);
-    if (repliesAttr instanceof Map) {
-      @SuppressWarnings("unchecked")
-      Map<String, String> replies = (Map<String, String>) repliesAttr;
-      repliesAttributes = new LinkedHashMap<>(replies);
-    }
-  }
-
   // ---- Convenience accessors ----
 
   public String getDefaultAiSystemPromptInstructions() {
-    return prompt("DEFAULT_AI_SYSTEM_PROMPT_INSTRUCTIONS");
+    return commonSection("System");
   }
 
   public String getDefaultAiReviewPromptDirectives() {
-    return prompt("DEFAULT_AI_REVIEW_PROMPT_DIRECTIVES");
+    return commonSection("Directives");
   }
 
   public String getDefaultAiPromptForceJsonFormat() {
-    return prompt("DEFAULT_AI_PROMPT_FORCE_JSON_FORMAT");
+    return commonSection("JSON Response");
   }
 
   public String getDefaultAiRepliesPromptSpecs() {
-    return prompt("DEFAULT_AI_REPLIES_PROMPT_SPECS");
+    return commonSection("Reply Specifications");
   }
 
   public String getDefaultAiRepliesPromptInline() {
-    return prompt("DEFAULT_AI_REPLIES_PROMPT_INLINE");
+    return commonSection("Inline Replies");
   }
 
   public String getDefaultAiRepliesPromptEnforceResponseCheck() {
-    return prompt("DEFAULT_AI_REPLIES_PROMPT_ENFORCE_RESPONSE_CHECK");
+    return commonSection("Reply Count");
   }
 
   public String getDefaultAiRequestPromptDiff() {
-    return prompt("DEFAULT_AI_REQUEST_PROMPT_DIFF");
+    return commonSection("Request Diff");
   }
 
   public String getDefaultAiRequestPromptRequests() {
-    return prompt("DEFAULT_AI_REQUEST_PROMPT_REQUESTS");
+    return commonSection("Request Data");
   }
 
   public String getDefaultAiReviewPromptCommitMessages() {
-    return prompt("DEFAULT_AI_REVIEW_PROMPT_COMMIT_MESSAGES");
+    return ReviewAgentSkills.section("commit-message-review", "Review Requirement");
   }
 
   public String getDefaultAiReviewPromptInstructionsCommitMessages() {
-    return prompt("DEFAULT_AI_REVIEW_PROMPT_INSTRUCTIONS_COMMIT_MESSAGES");
+    return ReviewAgentSkills.section("commit-message-review", "Review Instructions");
   }
 
   public String getDefaultAiRelevanceRules() {
-    return prompt("DEFAULT_AI_RELEVANCE_RULES");
+    return commonSection("Relevance");
   }
 
   public String getDefaultAiHowToFindCommitMessage() {
-    return prompt("DEFAULT_AI_HOW_TO_FIND_COMMIT_MESSAGE");
-  }
-
-  // ---- Static utility ----
-
-  /** Reads a JSON prompt file and follows $extends chains. Returns merged key-value map. */
-  public static Map<String, Object> getJsonPromptValues(String promptFilename) {
-    String promptFile = String.format("config/%s.json", promptFilename);
-    try (InputStreamReader reader = FileUtils.getInputStreamReader(promptFile)) {
-      Map<String, Object> values =
-          getGson().fromJson(reader, new TypeToken<Map<String, Object>>() {}.getType());
-      values.replaceAll(
-          (key, value) -> {
-            if (value instanceof Map<?, ?> reference && reference.containsKey("$skill")) {
-              String skill = (String) reference.get("$skill");
-              Object section = reference.get("section");
-              return section == null
-                  ? ReviewAgentSkills.instructions(skill)
-                  : ReviewAgentSkills.section(skill, section.toString());
-            }
-            return value;
-          });
-      Object parentPromptFilename = values.remove(PROMPT_EXTENDS_ATTRIBUTE);
-      if (parentPromptFilename == null) {
-        return values;
-      }
-      Map<String, Object> inheritedValues = getJsonPromptValues(parentPromptFilename.toString());
-      inheritedValues.putAll(values);
-      return inheritedValues;
-    } catch (IOException e) {
-      log.error("Failed to load prompts from file: {}", promptFilename, e);
-      throw new RuntimeException("Failed to load prompts", e);
-    }
+    return ReviewAgentSkills.section("commit-message-review", "Commit Message Source");
   }
 
   // ---- Prompt building methods ----
@@ -283,15 +233,5 @@ public class AiPrompt {
       replyAttributes.put(ATTRIBUTE_RELEVANCE, relevanceDescription);
       log.debug("Updated relevance description to: {}", relevanceDescription);
     }
-  }
-
-  // ---- Backward-compatibility bridge for subclasses still calling loadDefaultPrompts ----
-
-  protected void loadDefaultPrompts(String promptFilename) {
-    loadPromptMap(promptFilename);
-  }
-
-  protected void loadDefaultPrompts(Class<?> promptClass, String promptFilename) {
-    loadPromptMap(promptFilename);
   }
 }

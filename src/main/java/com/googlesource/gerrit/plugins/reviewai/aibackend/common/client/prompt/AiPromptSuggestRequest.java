@@ -16,38 +16,35 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewScope;
-import java.util.Map;
 
 public final class AiPromptSuggestRequest {
-  private static final Map<String, Object> PROMPTS =
-      AiPrompt.getJsonPromptValues("promptsAiSuggest");
+  private static final String SKILL = "review-suggestions";
 
   private AiPromptSuggestRequest() {}
 
   public static String forReviewReplies(String patchSet, String reviewReplies) {
     return String.format(
-        prompt("DEFAULT_AI_SUGGEST_REVIEW_REPLIES_REQUEST"), patchSet, reviewReplies);
+        ReviewAgentSkills.resource(SKILL, "assets/review-replies-request.md").strip(),
+        patchSet,
+        reviewReplies);
   }
 
   public static String forExistingContext(String patchSet, ReviewScope reviewScope) {
     return String.format(
-        prompt("DEFAULT_AI_SUGGEST_EXISTING_CONTEXT_REQUEST"),
+        ReviewAgentSkills.resource(SKILL, "assets/existing-context-request.md").strip(),
         patchSet,
         scopeInstruction(reviewScope));
   }
 
   private static String scopeInstruction(ReviewScope reviewScope) {
     if (reviewScope == ReviewScope.PATCHSET) {
-      return prompt("DEFAULT_AI_SUGGEST_SCOPE_PATCHSET");
+      return " " + ReviewAgentSkills.section(SKILL, "Patchset Scope");
     }
     if (reviewScope == ReviewScope.COMMIT_MESSAGE) {
-      return prompt("DEFAULT_AI_SUGGEST_SCOPE_COMMIT_MESSAGE");
+      return " " + ReviewAgentSkills.section(SKILL, "Commit Message Scope");
     }
     return "";
-  }
-
-  private static String prompt(String key) {
-    return (String) PROMPTS.get(key);
   }
 }
