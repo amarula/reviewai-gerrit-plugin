@@ -74,6 +74,17 @@ public final class ReviewAgentSkills {
     throw new IllegalArgumentException("Missing section " + title + " in skill " + name);
   }
 
+  public static String resource(String name, String relativePath) {
+    return load(name).resources().stream()
+        .filter(resource -> resource.relativePath().equals(relativePath))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Missing resource " + relativePath + " in skill " + name))
+        .content();
+  }
+
   private static void validateName(String name) {
     if (name == null || !name.matches("[a-z0-9]+(?:-[a-z0-9]+)*")) {
       throw new IllegalArgumentException("Invalid bundled skill name: " + name);

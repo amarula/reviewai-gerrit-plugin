@@ -85,6 +85,10 @@ public class ReviewAgentSkillsTest {
         output.write(readResource(resource).getBytes(StandardCharsets.UTF_8));
         output.closeEntry();
       }
+      String request = "skills/concern-review/assets/request.md";
+      output.putNextEntry(new JarEntry(request));
+      output.write(readResource(request).getBytes(StandardCharsets.UTF_8));
+      output.closeEntry();
     }
     try (var classLoader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
       for (String name : names) {
@@ -93,6 +97,16 @@ public class ReviewAgentSkillsTest {
         assertEquals(expected.name(), actual.name());
         assertEquals(expected.description(), actual.description());
         assertEquals(expected.content(), actual.content());
+        assertEquals(expected.resources().size(), actual.resources().size());
+        for (var resource : expected.resources()) {
+          assertEquals(
+              resource.content(),
+              actual.resources().stream()
+                  .filter(item -> item.relativePath().equals(resource.relativePath()))
+                  .findFirst()
+                  .orElseThrow()
+                  .content());
+        }
       }
     }
   }
@@ -116,6 +130,12 @@ public class ReviewAgentSkillsTest {
         IllegalArgumentException.class,
         () -> ReviewAgentSkills.section("concern-review", "Missing section"));
     assertThrows(IllegalArgumentException.class, () -> ReviewAgentSkills.load("../config/prompts"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewAgentSkills.resource("concern-review", "assets/missing.md"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReviewAgentSkills.resource("concern-review", "../../config/prompts.json"));
   }
 
   private String readResource(String name) throws Exception {
