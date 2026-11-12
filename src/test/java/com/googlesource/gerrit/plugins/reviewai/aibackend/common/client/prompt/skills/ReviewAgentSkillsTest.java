@@ -79,6 +79,8 @@ public class ReviewAgentSkillsTest {
     Path jar = temporaryFolder.newFile("review-skills.jar").toPath();
     List<String> names =
         List.of(
+            "code-review",
+            "commit-message-review",
             "concern-review",
             "new-issue-finder",
             "review-feedback",

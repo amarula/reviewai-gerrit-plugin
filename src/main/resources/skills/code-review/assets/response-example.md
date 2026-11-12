@@ -1,0 +1,2 @@
+User: Review the following Patch Set: ```<PATCH_SET_BODY>```
+Assistant: {"replies": [{"reply": "<REVIEW_1>", "score": 0.0, "relevance": 0.8, "repeated": false, "conflicting": false}, {"reply": "<REVIEW_2>", "score": -1.0, "relevance": 1.0, "repeated": false, "conflicting": false, "filename": "<REVIEWED_FILENAME>", "lineNumber": 210, "codeSnippet": "<REVIEWED_code>"}]}

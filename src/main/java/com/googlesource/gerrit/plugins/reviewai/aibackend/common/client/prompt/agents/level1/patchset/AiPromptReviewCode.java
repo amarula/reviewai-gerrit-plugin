@@ -36,7 +36,6 @@ public class AiPromptReviewCode extends AiPromptReview implements IAiPrompt {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadDefaultPrompts("agents/level1/patchset/prompts");
     log.debug("AiPromptReviewCode initialized for project: {}", change.getProjectName());
   }
 

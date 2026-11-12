@@ -41,15 +41,10 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
   @Override
   public String getDefaultAiAssistantInstructions() {
     List<String> sections = new ArrayList<>();
-    sections.add(buildSection(prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"), getCollectorRole()));
+    sections.add(buildSection("Role", getCollectorRole()));
     sections.addAll(buildConditionLabelSections());
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"), getCollectorRules()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            getCollectorResponseFormat()));
+    sections.add(buildSection("Mandatory Rules", getCollectorRules()));
+    sections.add(buildSection("MANDATORY Response Format", getCollectorResponseFormat()));
     return joinWithDoubleNewLine(sections);
   }
 

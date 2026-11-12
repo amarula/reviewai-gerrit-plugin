@@ -42,26 +42,15 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
   public String getDefaultAiAssistantInstructions() {
     List<String> sections = new ArrayList<>();
     sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")));
+        buildSection("Role", prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")));
     sections.addAll(buildConditionLabelSections());
     sections.add(buildSection("Available Specialized Agents", getAvailableSpecializedAgents()));
+    sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
+    sections.add(buildSection("Mandatory Rules", getAiAssistantInstructionsReview()));
+    sections.add(buildSection("MANDATORY Response Format", getTriageResponseFormat()));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
-            getScopeAndReviewConstraints()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReview()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            getTriageResponseFormat()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
+            "Example response",
             prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE")));
     return joinWithDoubleNewLine(sections);
   }

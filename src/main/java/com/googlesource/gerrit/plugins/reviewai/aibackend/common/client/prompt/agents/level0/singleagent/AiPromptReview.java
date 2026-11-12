@@ -24,8 +24,8 @@ import static org.apache.commons.collections4.MapUtils.isEmpty;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
@@ -39,21 +39,6 @@ import lombok.extern.slf4j.Slf4j;
 public class AiPromptReview extends AiPromptBase implements IAiPrompt {
   private static final String RULE_NUMBER_PREFIX = "RULE #";
 
-  // Lazy static cache for callers that do not have an instance.
-  private static volatile java.util.Map<String, Object> cachedReviewPrompts;
-
-  private static synchronized java.util.Map<String, Object> getCachedReviewPrompts() {
-    if (cachedReviewPrompts == null) {
-      cachedReviewPrompts = getJsonPromptValues("agents/level0/single-agent/prompts");
-    }
-    return cachedReviewPrompts;
-  }
-
-  /** Returns a prompt value without requiring an instance. */
-  public static String staticPrompt(String key) {
-    return (String) getCachedReviewPrompts().get(key);
-  }
-
   private final ICodeContextPolicy codeContextPolicy;
 
   public AiPromptReview(
@@ -63,27 +48,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
     this.codeContextPolicy = codeContextPolicy;
-    loadPromptMap("agents/level0/single-agent/prompts");
     log.debug("AiPromptReview initialized for change ID: {}", change.getFullChangeId());
-  }
-
-  public static String getRoutedReviewAgentInstructions(ReviewAssistantStage stage) {
-    return switch (stage) {
-      case REVIEW_COMMIT_MESSAGE ->
-          staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_COMMIT_MESSAGE_AGENT");
-      case REVIEW_CODE,
-          CLASSIFY_REVIEW_FEEDBACK,
-          REVIEW_CONCERNS,
-          FIND_NEW_ISSUES,
-          REVIEW_REITERATED,
-          REVIEW_SPECIALIZED_TRIAGE,
-          REVIEW_SPECIALIZED_AGENT,
-          REVIEW_SPECIALIZED_CONSOLIDATION,
-          REVIEW_SPECIALIZED_HISTORICAL_REPETITION,
-          REVIEW_SPECIALIZED_CONFLICT_RESOLUTION,
-          REVIEW_SPECIALIZED_VERIFICATION ->
-          staticPrompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_ROUTED_PATCHSET_AGENT");
-    };
   }
 
   @Override
@@ -91,7 +56,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     addReviewInstructions(instructions);
     if (includeCommitMessageReviewRequirement()) {
       instructions.add(getReviewPromptCommitMessages());
-      instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION"));
+      instructions.add(getCommitMessageLocationInstructions());
     }
     log.debug("AI Assistant Review Instructions added: {}", instructions);
   }
@@ -107,44 +72,27 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     List<String> sections = new ArrayList<>();
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ROLE"),
+            "Role",
             config
                 .getConfiguredAiSystemPromptInstructions()
-                .orElseGet(
-                    () ->
-                        resolveReviewInstructions(
-                            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_TASKS")))));
+                .orElseGet(() -> resolveReviewInstructions(reviewSection("Role")))));
     sections.addAll(buildConditionLabelSections());
     sections.addAll(buildReviewFeedbackSections());
+    sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
+    sections.add(buildSection("Mandatory Rules", getAiAssistantInstructionsReview()));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_SCOPE_AND_REVIEW_CONSTRAINTS"),
-            getScopeAndReviewConstraints()));
+            "Additional Review Guidelines", reviewSection("Additional Review Guidelines")));
+    sections.add(buildSection("MANDATORY Response Format", getMandatoryResponseFormat()));
+    sections.add(
+        buildSection("Example response", getDefaultAiAssistantInstructionsResponseExamples()));
     sections.add(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RULES"),
-            getAiAssistantInstructionsReview()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_ADDITIONAL_REVIEW_GUIDELINES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES")));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_MANDATORY_RESPONSE_FORMAT"),
-            getMandatoryResponseFormat()));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_EXAMPLE_RESPONSE"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")));
-    sections.add(
-        buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_FIELD_DEFINITIONS"),
+            "Field Definitions",
             getPatchSetReviewPrompt() + getCommitMessageLocationInstructionsIfNeeded()));
     if (includeCommitMessageReviewRequirement()) {
       sections.add(
-          buildSection(
-              prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_COMMIT_MESSAGE_REVIEW_REQUIREMENT"),
-              getReviewPromptCommitMessages()));
+          buildSection("Commit Message Review Requirement", getReviewPromptCommitMessages()));
     }
 
     String compiledInstructions = joinWithDoubleNewLine(sections);
@@ -156,7 +104,7 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     if (!includeCommitMessageReviewRequirement()) {
       return "";
     }
-    return "\n\n" + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION");
+    return "\n\n" + getCommitMessageLocationInstructions();
   }
 
   protected boolean includeCommitMessageReviewRequirement() {
@@ -177,13 +125,26 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
             joinWithNewLine(
                 new ArrayList<>(
                     List.of(
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_RULES"),
+                        reviewSection("Mandatory Rules"),
                         getAiAssistantInstructionsReview(),
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_GUIDELINES"),
+                        reviewSection("Additional Review Guidelines"),
                         prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_FORMAT"),
-                        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_RESPONSE_EXAMPLES")))),
+                        getDefaultAiAssistantInstructionsResponseExamples()))),
             getPatchSetReviewPrompt()));
     log.debug("Review instructions formed: {}", instructions);
+  }
+
+  protected static String reviewSection(String title) {
+    return ReviewAgentSkills.section("code-review", title);
+  }
+
+  protected static String getCommitMessageLocationInstructions() {
+    return ReviewAgentSkills.section("commit-message-review", "Locations");
+  }
+
+  @Override
+  public String getDefaultAiAssistantInstructionsResponseExamples() {
+    return ReviewAgentSkills.resource("code-review", "assets/response-example.md");
   }
 
   protected String getScopeAndReviewConstraints() {
@@ -226,10 +187,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     }
     return List.of(
         buildSection(
-            prompt("DEFAULT_AI_REVIEW_SECTION_TITLE_REVIEW_FEEDBACK"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_REVIEW_FEEDBACK_CONTEXT")
-                + "\n\n"
-                + getGson().toJson(memory)));
+            "Distilled User Review Feedback",
+            reviewSection("Distilled User Review Feedback") + "\n\n" + getGson().toJson(memory)));
   }
 
   protected String getAiAssistantInstructionsReview(boolean... ruleFilter) {
@@ -242,8 +201,8 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
     List<List<String>> builtInRuleSlots =
         List.of(
             codeContextPolicyRules,
-            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_HISTORY")),
-            List.of(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_FOCUS_PATCH_SET")));
+            List.of(reviewSection("History")),
+            List.of(reviewSection("Patch Scope")));
     List<String> rules = new ArrayList<>();
     for (int i = 0; i < builtInRuleSlots.size(); i++) {
       if (i >= ruleFilter.length || ruleFilter[i]) {

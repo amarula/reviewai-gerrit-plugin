@@ -50,7 +50,7 @@ public class AiPromptSpecializedVerification extends AiPromptSpecializedReviewCo
   protected String getCollectorResponseFormat() {
     return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_VERIFICATION_RESPONSE_FORMAT")
         + "\n\n"
-        + prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES_LOCATION");
+        + getCommitMessageLocationInstructions();
   }
 
   @Override
