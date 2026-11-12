@@ -1,0 +1,20 @@
+{
+  "concerns": {
+    "reviewer": {
+      "kind": "SINGLE_AGENT",
+      "name": "SINGLE_AGENT"
+    },
+    "concerns": [
+      {
+        "id": "concern-1",
+        "status": "PRESENT",
+        "description": "Check that registrations remain independent.",
+        "merged_concern_ids": [],
+        "reviewers": [],
+        "locations": []
+      }
+    ]
+  },
+  "incremental_patch": "diff --git a/src/Example.java b/src/Example.java\n@@ -40,0 +41,2 @@\n+Object value = lookup();\n+value.run();\n",
+  "full_patch": "diff --git a/src/Example.java b/src/Example.java\n@@ -1,3 +1,5 @@\n class Example {\n+  Object value = lookup();\n+  value.run();\n }\n"
+}
