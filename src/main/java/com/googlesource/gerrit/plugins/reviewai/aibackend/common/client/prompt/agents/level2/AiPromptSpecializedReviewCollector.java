@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -27,14 +28,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview {
+  private final String skill;
+
   protected AiPromptSpecializedReviewCollector(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
-      String promptResource) {
+      String skill) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap(promptResource);
+    this.skill = skill;
     this.defaultAiMessageReview = getCollectorMessage();
   }
 
@@ -48,11 +51,19 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
     return joinWithDoubleNewLine(sections);
   }
 
-  protected abstract String getCollectorRole();
+  protected String getCollectorRole() {
+    return ReviewAgentSkills.section(skill, "Role");
+  }
 
-  protected abstract String getCollectorRules();
+  protected String getCollectorRules() {
+    return ReviewAgentSkills.section(skill, "Rules");
+  }
 
-  protected abstract String getCollectorResponseFormat();
+  protected String getCollectorResponseFormat() {
+    return ReviewAgentSkills.section(skill, "MANDATORY Response Format");
+  }
 
-  protected abstract String getCollectorMessage();
+  protected String getCollectorMessage() {
+    return ReviewAgentSkills.resource(skill, "assets/request.md").strip();
+  }
 }
