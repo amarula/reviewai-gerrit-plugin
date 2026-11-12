@@ -22,6 +22,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
@@ -32,11 +33,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class AiPromptConcernReview extends AiPromptBase {
+  private static final String SKILL = "concern-review";
   private static final String COMMIT_MESSAGE_REVIEWER = "COMMIT_MESSAGE";
   private static final String COMMIT_MESSAGE_ROLE_INSTRUCTIONS =
-      (String)
-          getJsonPromptValues("agents/level1/commit-message/prompts")
-              .get("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_COMMIT_MESSAGES");
+      ReviewAgentSkills.section("commit-message-review", "Role");
 
   public AiPromptConcernReview(
       Configuration config,
@@ -44,13 +44,12 @@ public final class AiPromptConcernReview extends AiPromptBase {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/common/concern-review/prompts");
   }
 
   @Override
   public void addAiAssistantInstructions(List<String> instructions) {
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_ROLE"));
-    instructions.add(prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Role"));
+    instructions.add(ReviewAgentSkills.section(SKILL, "Task"));
   }
 
   @Override
@@ -59,32 +58,22 @@ public final class AiPromptConcernReview extends AiPromptBase {
     String specializedRole = specializedRoleInstructions();
     instructions.add(
         AiPromptSections.buildSection(
-            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_ROLE"),
-            specializedRole == null
-                ? prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_ROLE")
-                : specializedRole));
+            "Role",
+            specializedRole == null ? ReviewAgentSkills.section(SKILL, "Role") : specializedRole));
     if (!isCommitMessageReviewer()) {
       instructions.addAll(buildConditionLabelSections());
     }
-    instructions.add(
-        AiPromptSections.buildSection(
-            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_TASK"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW")));
-    instructions.add(
-        AiPromptSections.buildSection(
-            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_RULES"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_RULES")));
-    instructions.add(
-        AiPromptSections.buildSection(
-            prompt("DEFAULT_AI_CONCERN_REVIEW_SECTION_TITLE_RESPONSE_FORMAT"),
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_CONCERN_REVIEW_RESPONSE_FORMAT")));
+    for (String title : List.of("Task", "Mandatory Rules", "MANDATORY Response Format")) {
+      instructions.add(
+          AiPromptSections.buildSection(title, ReviewAgentSkills.section(SKILL, title)));
+    }
     return joinWithDoubleNewLine(instructions);
   }
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
-        prompt("DEFAULT_AI_MESSAGE_CONCERN_REVIEW"),
+        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
         getGson().toJson(changeSetData.getConcernWorkflowInput()));
   }
 
