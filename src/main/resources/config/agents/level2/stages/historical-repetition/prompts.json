@@ -1,7 +1,0 @@
-{
-  "$extends": "promptsAi",
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION": {"$skill": "review-historical-repetition", "section": "Role"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RULES": {"$skill": "review-historical-repetition", "section": "Rules"},
-  "DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_HISTORICAL_REPETITION_RESPONSE_FORMAT": "Return only JSON using this shape: {\"annotations\":[{\"concern_id\":\"raw-123-r1\",\"repeated\":false,\"past_comment_id\":\"\",\"reason\":\"\"}]}. Every result must contain `concern_id`, `repeated`, `past_comment_id`, and `reason`.",
-  "DEFAULT_AI_MESSAGE_SPECIALIZED_HISTORICAL_REPETITION": "Detect historical repetition for these new concerns:\n```%s```"
-}

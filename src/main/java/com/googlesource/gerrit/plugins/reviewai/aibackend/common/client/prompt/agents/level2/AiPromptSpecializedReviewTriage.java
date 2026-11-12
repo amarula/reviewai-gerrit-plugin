@@ -20,6 +20,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AiPromptSpecializedReviewTriage extends AiPromptReview {
+  private static final String SKILL = "review-triage";
 
   public AiPromptSpecializedReviewTriage(
       Configuration config,
@@ -34,15 +36,13 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
-    loadPromptMap("agents/level2/triage/prompts");
-    this.defaultAiMessageReview = prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_TRIAGE");
+    this.defaultAiMessageReview = ReviewAgentSkills.resource(SKILL, "assets/request.md").strip();
   }
 
   @Override
   public String getDefaultAiAssistantInstructions() {
     List<String> sections = new ArrayList<>();
-    sections.add(
-        buildSection("Role", prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE")));
+    sections.add(buildSection("Role", ReviewAgentSkills.section(SKILL, "Role")));
     sections.addAll(buildConditionLabelSections());
     sections.add(buildSection("Available Specialized Agents", getAvailableSpecializedAgents()));
     sections.add(buildSection("Scope and Review Constraints", getScopeAndReviewConstraints()));
@@ -50,19 +50,19 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
     sections.add(buildSection("MANDATORY Response Format", getTriageResponseFormat()));
     sections.add(
         buildSection(
-            "Example response",
-            prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_EXAMPLE")));
+            "Example response", ReviewAgentSkills.resource(SKILL, "assets/response-example.md")));
     return joinWithDoubleNewLine(sections);
   }
 
   private String getAvailableSpecializedAgents() {
-    return "COMMIT_MESSAGE: Review the commit subject, body, intent, clarity, and consistency with the patch.\n"
+    return ReviewAgentSkills.section(SKILL, "Commit Message Agent")
+        + "\n"
         + SpecializedReviewAgentDefinitions.triageAgentList();
   }
 
   private String getTriageResponseFormat() {
     return String.format(
-        prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_TRIAGE_RESPONSE_FORMAT"),
+        ReviewAgentSkills.section(SKILL, "MANDATORY Response Format"),
         "COMMIT_MESSAGE, " + SpecializedReviewAgentDefinitions.agentNames());
   }
 }

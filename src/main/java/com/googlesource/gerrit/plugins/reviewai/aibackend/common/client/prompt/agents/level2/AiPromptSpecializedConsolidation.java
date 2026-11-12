@@ -28,31 +28,6 @@ public class AiPromptSpecializedConsolidation extends AiPromptSpecializedReviewC
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(
-        config,
-        changeSetData,
-        change,
-        codeContextPolicy,
-        "agents/level2/stages/consolidation/prompts");
-  }
-
-  @Override
-  protected String getCollectorRole() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION");
-  }
-
-  @Override
-  protected String getCollectorRules() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RULES");
-  }
-
-  @Override
-  protected String getCollectorResponseFormat() {
-    return prompt("DEFAULT_AI_ASSISTANT_INSTRUCTIONS_SPECIALIZED_CONSOLIDATION_RESPONSE_FORMAT");
-  }
-
-  @Override
-  protected String getCollectorMessage() {
-    return prompt("DEFAULT_AI_MESSAGE_SPECIALIZED_CONSOLIDATION");
+    super(config, changeSetData, change, codeContextPolicy, "review-consolidation");
   }
 }
