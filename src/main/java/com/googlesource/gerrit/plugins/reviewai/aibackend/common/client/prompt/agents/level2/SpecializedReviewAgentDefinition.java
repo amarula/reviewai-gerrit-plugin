@@ -42,6 +42,10 @@ public class SpecializedReviewAgentDefinition {
     return normalizeName(name);
   }
 
+  public String skillName() {
+    return normalizedName().toLowerCase(Locale.ROOT).replace('_', '-');
+  }
+
   public static String normalizeName(String name) {
     return name == null
         ? ""

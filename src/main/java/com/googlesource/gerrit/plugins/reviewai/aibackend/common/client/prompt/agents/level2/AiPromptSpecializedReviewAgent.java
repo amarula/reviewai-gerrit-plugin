@@ -26,6 +26,7 @@ import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage {
   private static final String SKILL = "specialist-boundaries";
@@ -36,6 +37,10 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
+  }
+
+  public Optional<String> getSpecialistSkillName() {
+    return SpecializedReviewAgentDefinitions.findSkillName(changeSetData.getSpecializedAgentName());
   }
 
   @Override

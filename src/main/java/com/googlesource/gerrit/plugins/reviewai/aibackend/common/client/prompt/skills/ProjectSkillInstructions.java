@@ -31,7 +31,6 @@ import org.commonmark.parser.Parser;
 /** Reads additive project guidance without caching repository content as a bundled skill. */
 @Slf4j
 public final class ProjectSkillInstructions {
-  private static final String CODE_REVIEW_PATH = ".gerrit/skills/code-review/SKILL.md";
   // Use the same front matter parser as LangChain4j's bundled skill loaders.
   private static final Parser MARKDOWN =
       Parser.builder()
@@ -45,9 +44,13 @@ public final class ProjectSkillInstructions {
     this.gitRepoFiles = gitRepoFiles;
   }
 
-  public Optional<String> loadCodeReview(GerritChange change) {
+  public Optional<String> load(GerritChange change, String name) {
+    if (name == null || !name.matches("[a-z0-9]+(?:-[a-z0-9]+)*")) {
+      throw new IllegalArgumentException("Invalid project skill name: " + name);
+    }
+    String path = ".gerrit/skills/" + name + "/SKILL.md";
     try {
-      String markdown = gitRepoFiles.getFileContent(change, CODE_REVIEW_PATH);
+      String markdown = gitRepoFiles.getFileContent(change, path);
       if (markdown == null) {
         return Optional.empty();
       }
@@ -58,8 +61,8 @@ public final class ProjectSkillInstructions {
       var visitor = new YamlFrontMatterVisitor();
       frontMatter.accept(visitor);
       var metadata = visitor.getData();
-      if (!List.of("code-review").equals(metadata.get("name"))) {
-        throw new IllegalArgumentException("Expected name: code-review");
+      if (!List.of(name).equals(metadata.get("name"))) {
+        throw new IllegalArgumentException("Expected name: " + name);
       }
       var description = metadata.getOrDefault("description", List.of());
       if (description.size() != 1 || description.getFirst().isBlank()) {
@@ -72,11 +75,11 @@ public final class ProjectSkillInstructions {
       int start = body.getSourceSpans().getFirst().getInputIndex();
       return Optional.of(markdown.substring(start).strip());
     } catch (FileNotFoundException e) {
-      log.debug("No project skill at {} for {}", CODE_REVIEW_PATH, change.getFullChangeId());
+      log.debug("No project skill at {} for {}", path, change.getFullChangeId());
     } catch (IllegalArgumentException e) {
       log.warn(
           "Ignoring invalid project skill at {} for {}: {}",
-          CODE_REVIEW_PATH,
+          path,
           change.getFullChangeId(),
           e.getMessage());
     }

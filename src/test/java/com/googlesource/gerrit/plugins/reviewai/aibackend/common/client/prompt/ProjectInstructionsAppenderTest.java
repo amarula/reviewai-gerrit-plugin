@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -37,7 +39,10 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.a
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewTriage;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectSkillInstructions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
@@ -45,6 +50,7 @@ import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.clie
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Before;
@@ -57,6 +63,7 @@ public class ProjectInstructionsAppenderTest {
   private final ProjectInstructionsAppender appender = new ProjectInstructionsAppender(files);
   private IAiPrompt prompt;
   private String bundledInstructions;
+  private JsonObject specialistGuidance;
 
   @Before
   public void setUp() throws Exception {
@@ -69,6 +76,8 @@ public class ProjectInstructionsAppenderTest {
             config, new ChangeSetData(1), change, mock(ICodeContextPolicy.class));
     assertEquals(AiPromptReview.class, prompt.getClass());
     bundledInstructions = prompt.getDefaultAiAssistantInstructions();
+    specialistGuidance =
+        JsonParser.parseString(projectResource("specialist-guidance.json")).getAsJsonObject();
   }
 
   @Test
@@ -153,6 +162,133 @@ public class ProjectInstructionsAppenderTest {
   }
 
   @Test
+  public void selectedSpecialistsReceiveMatchingGuidanceWithoutChangingRouting() throws Exception {
+    String routing = SpecializedReviewAgentDefinitions.triageAgentList();
+    for (var entry : specialistGuidance.entrySet()) {
+      String name = entry.getKey();
+      String path = ".gerrit/skills/" + name + "/SKILL.md";
+      var settings = entry.getValue().getAsJsonObject();
+      var specialist = specialistPrompt(settings.get("agent").getAsString());
+      String original = specialist.getDefaultAiAssistantInstructions();
+      when(files.getFileContent(change, path)).thenReturn(projectResource(name + ".md"));
+
+      String actual = appender.append(specialist, change, original);
+
+      assertEquals(
+          original
+              + "\n\n# Project "
+              + name
+              + " guidance\n\n"
+              + settings.get("guidance").getAsString(),
+          actual);
+      assertFalse(actual.contains("description:"));
+      assertEquals(original, specialist.getDefaultAiAssistantInstructions());
+      verify(files).getFileContent(change, path);
+    }
+    assertEquals(routing, SpecializedReviewAgentDefinitions.triageAgentList());
+    verifyNoMoreInteractions(files);
+  }
+
+  @Test
+  public void securityGuidanceDoesNotAffectTestabilityOrSingleAgentReviews() throws Exception {
+    when(files.getFileContent(change, ".gerrit/skills/security/SKILL.md"))
+        .thenReturn(projectResource("security.md"));
+    var security = specialistPrompt("SECURITY");
+    var testability = specialistPrompt("TESTABILITY");
+    String testabilityInstructions = testability.getDefaultAiAssistantInstructions();
+
+    assertTrue(
+        appender
+            .append(security, change, security.getDefaultAiAssistantInstructions())
+            .endsWith(
+                specialistGuidance.getAsJsonObject("security").get("guidance").getAsString()));
+    assertSame(
+        testabilityInstructions, appender.append(testability, change, testabilityInstructions));
+    assertSame(bundledInstructions, appender.append(prompt, change, bundledInstructions));
+    verify(files).getFileContent(change, ".gerrit/skills/security/SKILL.md");
+    verify(files).getFileContent(change, ".gerrit/skills/testability/SKILL.md");
+    verify(files).getFileContent(change, SKILL_PATH);
+    verifyNoMoreInteractions(files);
+  }
+
+  @Test
+  public void missingAndInvalidSpecialistSettingsPreserveBundledInstructions() throws Exception {
+    var specialist = specialistPrompt("TESTABILITY");
+    String original = specialist.getDefaultAiAssistantInstructions();
+    String path = ".gerrit/skills/testability/SKILL.md";
+    var invalid = JsonParser.parseString(projectResource("invalid-skills.json")).getAsJsonObject();
+    for (var entry : invalid.entrySet()) {
+      when(files.getFileContent(change, path))
+          .thenReturn(entry.getValue().getAsString().replace("code-review", "testability"));
+
+      assertSame(entry.getKey(), original, appender.append(specialist, change, original));
+    }
+    when(files.getFileContent(change, path)).thenThrow(new FileNotFoundException(path));
+    assertSame(original, appender.append(specialist, change, original));
+  }
+
+  @Test
+  public void specialistGuidanceDoesNotLeakBetweenProjectsOrBranchUpdates() throws Exception {
+    var specialist = specialistPrompt("SECURITY");
+    String original = specialist.getDefaultAiAssistantInstructions();
+    String path = ".gerrit/skills/security/SKILL.md";
+    GerritChange otherChange = mock(GerritChange.class);
+    when(files.getFileContent(change, path))
+        .thenReturn(projectResource("security.md"))
+        .thenReturn(
+            projectResource("code-review.md").replace("name: code-review", "name: security"))
+        .thenThrow(new FileNotFoundException(path));
+    when(files.getFileContent(otherChange, path)).thenThrow(new FileNotFoundException(path));
+
+    assertTrue(
+        appender
+            .append(specialist, change, original)
+            .endsWith(
+                specialistGuidance.getAsJsonObject("security").get("guidance").getAsString()));
+    assertSame(original, appender.append(specialist, otherChange, original));
+    assertTrue(
+        appender
+            .append(specialist, change, original)
+            .endsWith(projectResource("guidance.md").strip()));
+    assertSame(original, appender.append(specialist, change, original));
+  }
+
+  @Test
+  public void specialistAliasesResolveToTheBundledSkillDirectory() throws Exception {
+    String path = ".gerrit/skills/code-quality/SKILL.md";
+    when(files.getFileContent(change, path)).thenReturn(projectResource("code-quality.md"));
+    var specialist = specialistPrompt(" code-quality ");
+
+    assertTrue(
+        appender
+            .append(specialist, change, specialist.getDefaultAiAssistantInstructions())
+            .endsWith(
+                specialistGuidance.getAsJsonObject("code-quality").get("guidance").getAsString()));
+    verify(files).getFileContent(change, path);
+    verifyNoMoreInteractions(files);
+  }
+
+  @Test
+  public void commitMessageAndUnknownSpecialistsDoNotReadCustomSettings() {
+    for (String name :
+        Arrays.asList(null, "COMMIT_MESSAGE", "UNKNOWN", "../security", "code-review")) {
+      assertSame(
+          bundledInstructions,
+          appender.append(specialistPrompt(name), change, bundledInstructions));
+    }
+    verifyNoInteractions(files);
+  }
+
+  @Test
+  public void rejectsSkillPathsOutsideTheProjectSkillRoot() {
+    var skills = new ProjectSkillInstructions(files);
+    for (String name : Arrays.asList(null, "../security", "/security", "security/SKILL.md")) {
+      assertThrows(IllegalArgumentException.class, () -> skills.load(change, name));
+    }
+    verifyNoInteractions(files);
+  }
+
+  @Test
   public void otherReviewStagesDoNotLoadCodeReviewGuidance() {
     for (IAiPrompt other :
         List.of(
@@ -187,6 +323,23 @@ public class ProjectInstructionsAppenderTest {
     assertNull(appender.append(prompt, change, null));
     assertSame(bundledInstructions, appender.append(null, change, bundledInstructions));
     verifyNoInteractions(files);
+  }
+
+  private AiPromptSpecializedReviewAgent specialistPrompt(String name) {
+    Configuration config = mock(Configuration.class);
+    when(config.getAgentSpecializationLevel())
+        .thenReturn(AgentSpecializationLevel.SPECIALIZED_AGENTS);
+    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    ChangeSetData data = new ChangeSetData(1);
+    data.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    data.setSpecializedAgentReview(true);
+    data.setSpecializedAgentName(name);
+    SpecializedReviewAgentDefinitions.findByName(name)
+        .ifPresent(
+            definition -> data.setSpecializedAgentInstructions(definition.getInstructions()));
+    return (AiPromptSpecializedReviewAgent)
+        AiPromptFactory.getAiPrompt(config, data, change, mock(ICodeContextPolicy.class));
   }
 
   private String projectResource(String name) throws Exception {

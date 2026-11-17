@@ -1,0 +1,22 @@
+{
+  "security": {
+    "agent": "SECURITY",
+    "guidance": "Check that tenant-scoped endpoints reject requests for another tenant's data."
+  },
+  "testability": {
+    "agent": "TESTABILITY",
+    "guidance": "Require regression tests for changes to tenant isolation."
+  },
+  "code-quality": {
+    "agent": "CODE_QUALITY",
+    "guidance": "Check that transaction boundaries remain clear when database helpers change."
+  },
+  "correctness": {
+    "agent": "CORRECTNESS",
+    "guidance": "Check that monetary calculations preserve the currency's rounding rules."
+  },
+  "documentation": {
+    "agent": "DOCUMENTATION",
+    "guidance": "Check that changed public endpoints document their tenant requirements."
+  }
+}

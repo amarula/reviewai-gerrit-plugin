@@ -76,6 +76,10 @@ public final class SpecializedReviewAgentDefinitions {
         .findFirst();
   }
 
+  public static Optional<String> findSkillName(String name) {
+    return findByName(name).map(SpecializedReviewAgentDefinition::skillName);
+  }
+
   public static String triageAgentList() {
     return load().stream()
         .map(

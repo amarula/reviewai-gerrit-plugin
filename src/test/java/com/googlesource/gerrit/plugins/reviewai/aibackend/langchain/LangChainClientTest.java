@@ -33,6 +33,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
@@ -102,6 +103,61 @@ public class LangChainClientTest {
 
     assertSingleAgentReviewSendsGuidance(
         files, readTestResource("__files/skills/project/guidance.md").strip());
+  }
+
+  @Test
+  public void specialistRequestIncludesMatchingUserSettingsAndPreservesResponseSchema()
+      throws Exception {
+    Configuration config = Mockito.mock(Configuration.class);
+    when(config.getAgentSpecializationLevel())
+        .thenReturn(AgentSpecializationLevel.SPECIALIZED_AGENTS);
+    when(config.getMultiAgentMode()).thenReturn(true);
+    when(config.getAiReviewCommitMessages()).thenReturn(true);
+    when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OLLAMA);
+    when(config.getAiReviewTemperature()).thenReturn("0");
+    GitRepoFiles files = Mockito.mock(GitRepoFiles.class);
+    GerritChange change = Mockito.mock(GerritChange.class);
+    when(files.getFileContent(change, ".gerrit/skills/security/SKILL.md"))
+        .thenReturn(readTestResource("__files/skills/project/security.md"));
+    var definition = SpecializedReviewAgentDefinitions.findByName("SECURITY").orElseThrow();
+    ChangeSetData data = new ChangeSetData(1);
+    data.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
+    data.setSpecializedAgentReview(true);
+    data.setSpecializedAgentName(definition.normalizedName());
+    data.setSpecializedAgentInstructions(definition.getInstructions());
+    TestableLangChainClient client =
+        new TestableLangChainClient(config, new CodeContextPolicyNone(config), files);
+    String response = readTestResource("__files/skills/project/specialist-response.json");
+    ILangChainProvider provider = Mockito.mock(ILangChainProvider.class);
+    ChatModel model = Mockito.mock(ChatModel.class);
+    when(provider.buildChatModel(
+            Mockito.eq(config), Mockito.eq(0.0), Mockito.isNull(), Mockito.anyString()))
+        .thenReturn(new LangChainProvider(model, "test"));
+    when(model.chat(Mockito.any(ChatRequest.class)))
+        .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from(response)).build());
+
+    try (var providers = Mockito.mockStatic(LangChainProviderFactory.class)) {
+      providers
+          .when(() -> LangChainProviderFactory.get(AiProviderType.OLLAMA))
+          .thenReturn(provider);
+
+      assertEquals(
+          response,
+          client.rawResponse(data, change, readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE)));
+
+      ArgumentCaptor<ChatRequest> request = ArgumentCaptor.forClass(ChatRequest.class);
+      verify(model).chat(request.capture());
+      String systemInstructions =
+          LangChainChatMessages.content(request.getValue().messages().getFirst());
+      assertTrue(systemInstructions.contains(definition.getInstructions()));
+      assertTrue(systemInstructions.contains("# Project security guidance\n\n"));
+      assertFalse(systemInstructions.contains("description:"));
+      assertEquals(
+          "format_specialized_replies", request.getValue().responseFormat().jsonSchema().name());
+      verify(files).getFileContent(change, ".gerrit/skills/security/SKILL.md");
+      Mockito.verifyNoMoreInteractions(files);
+    }
   }
 
   private void assertSingleAgentReviewSendsGuidance(GitRepoFiles files, String projectGuidance)
@@ -1144,6 +1200,11 @@ public class LangChainClientTest {
     private AiResponseContent requestResponse(ChangeSetData data, GerritChange change, String patch)
         throws Exception {
       return askSingleRequest(data, change, patch).getResponseContent();
+    }
+
+    private String rawResponse(ChangeSetData data, GerritChange change, String patch)
+        throws Exception {
+      return askSingleRawRequest(data, change, patch).getResponseText();
     }
 
     @Override

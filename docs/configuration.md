@@ -70,18 +70,38 @@ Check that every tenant-scoped query filters by tenant ID.
 Flag logging of access tokens or customer credentials.
 ```
 
-The file uses the same `SKILL.md` format as bundled skills. Its YAML front matter must contain
-`name: code-review` and a nonempty `description`, followed by a nonempty Markdown body. The body is
-appended as a separate project guidance section; metadata is not included in the prompt. Bundled
-instructions, configured roles, response formats, and request templates are retained.
+The file uses the same `SKILL.md` format as bundled skills. Its YAML front matter must contain a
+`name` matching the skill directory and a nonempty `description`, followed by a nonempty Markdown
+body. The body is appended as a separate project guidance section; metadata is not included in the
+prompt. Bundled instructions, configured roles, response formats, and request templates are retained.
 
 The plugin reads the committed file from the target branch for each request, using the same lookup
 as `.gerrit/ai-instructions.md`. Unmerged patch set edits to the skill do not affect reviews. Project
 guidance is not stored in the global bundled-skill cache. Missing files preserve existing behavior;
 invalid files are ignored with a warning in the plugin log.
 
-This convention currently applies only to single-agent reviews. Other review stages and specialist
-skills do not load these customizations. Files such as `assets/request.md` are not overridden.
+With `agentSpecializationLevel = SPECIALIZED_AGENTS`, the same convention supports the existing
+specialist skills: `code-quality`, `correctness`, `documentation`, `security`, and `testability`.
+For example, commit `.gerrit/skills/security/SKILL.md` to the target branch:
+
+```markdown
+---
+name: security
+description: Custom security review settings for this project.
+---
+
+Check that every tenant-scoped query filters by tenant ID.
+Flag logging of access tokens or customer credentials.
+```
+
+Only a selected specialist receives its matching file's guidance. A security customization does not
+affect testability or single-agent code reviews. Custom descriptions do not replace the bundled
+agent identities or routing descriptions, and adding a file does not register or select an agent.
+The bundled specialist boundaries and response formats are retained alongside triage-selected
+instructions. Missing or invalid specialist files follow the same fallback behavior described above.
+
+Other stages, including triage, consolidation, and commit-message specialists, do not load these
+customizations. Files such as `assets/request.md` are not overridden.
 The existing `.gerrit/ai-instructions.md` behavior for comment request prompts is unchanged.
 
 ### AI Review Permission
