@@ -1,0 +1,12 @@
+{
+  "empty file": "",
+  "missing front matter": "Check tenant isolation.",
+  "missing name": "---\ndescription: Project guidance.\n---\n\nCheck tenant isolation.",
+  "wrong name": "---\nname: security\ndescription: Project guidance.\n---\n\nCheck tenant isolation.",
+  "multiple names": "---\nname:\n  - code-review\n  - security\ndescription: Project guidance.\n---\n\nCheck tenant isolation.",
+  "missing description": "---\nname: code-review\n---\n\nCheck tenant isolation.",
+  "blank description": "---\nname: code-review\ndescription: ' '\n---\n\nCheck tenant isolation.",
+  "multiple descriptions": "---\nname: code-review\ndescription:\n  - First description.\n  - Second description.\n---\n\nCheck tenant isolation.",
+  "empty body": "---\nname: code-review\ndescription: Project guidance.\n---\n\n  ",
+  "unterminated front matter": "---\nname: code-review\ndescription: Project guidance.\n\nCheck tenant isolation."
+}

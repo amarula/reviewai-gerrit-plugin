@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyBase.CodeContextPolicies;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.code.context.CodeContextPolicyNone;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
@@ -89,6 +90,22 @@ public class LangChainClientTest {
 
   @Test
   public void singleAgentReviewSendsSkillGuidanceAndParsesReviewResponse() throws Exception {
+    assertSingleAgentReviewSendsGuidance(null, null);
+  }
+
+  @Test
+  public void singleAgentReviewSendsProjectSkillGuidanceAndParsesReviewResponse() throws Exception {
+    GitRepoFiles files = Mockito.mock(GitRepoFiles.class);
+    when(files.getFileContent(
+            Mockito.any(GerritChange.class), Mockito.eq(".gerrit/skills/code-review/SKILL.md")))
+        .thenReturn(readTestResource("__files/skills/project/code-review.md"));
+
+    assertSingleAgentReviewSendsGuidance(
+        files, readTestResource("__files/skills/project/guidance.md").strip());
+  }
+
+  private void assertSingleAgentReviewSendsGuidance(GitRepoFiles files, String projectGuidance)
+      throws Exception {
     Configuration config = Mockito.mock(Configuration.class);
     when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
@@ -97,7 +114,7 @@ public class LangChainClientTest {
     String role = readTestResource("__files/langchain/chatMemoryUserMessage.txt").strip();
     when(config.getConfiguredAiSystemPromptInstructions()).thenReturn(Optional.of(role));
     TestableLangChainClient client =
-        new TestableLangChainClient(config, new CodeContextPolicyNone(config));
+        new TestableLangChainClient(config, new CodeContextPolicyNone(config), files);
     String patch = readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE);
     String response = readTestResource(AI_RESPONSE_CONTENT_TRAILING_WHITESPACE_RESOURCE);
     GerritChange change = Mockito.mock(GerritChange.class);
@@ -129,6 +146,9 @@ public class LangChainClientTest {
           systemInstructions.contains(
               readTestResource("__files/skills/reviewGuidelines.txt").strip()));
       assertFalse(systemInstructions.contains("description:"));
+      if (projectGuidance != null) {
+        assertTrue(systemInstructions.endsWith(projectGuidance));
+      }
       assertEquals("format_replies", request.getValue().responseFormat().jsonSchema().name());
       assertTrue(
           request.getValue().messages().stream()
@@ -1104,8 +1124,9 @@ public class LangChainClientTest {
       super(config, null, null, null);
     }
 
-    private TestableLangChainClient(Configuration config, ICodeContextPolicy codeContextPolicy) {
-      super(config, codeContextPolicy, null, null);
+    private TestableLangChainClient(
+        Configuration config, ICodeContextPolicy codeContextPolicy, GitRepoFiles files) {
+      super(config, codeContextPolicy, null, null, null, null, files, null);
     }
 
     private TestableLangChainClient(

@@ -20,6 +20,8 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithS
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectSkillInstructions;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,9 +35,8 @@ import java.util.List;
  * focused on prompt text construction, instead of threading {@link GitRepoFiles} through many
  * prompt constructors that do not need it.
  *
- * <p>The {@link #append(IAiPrompt, GerritChange, String)} guard also preserves the previous
- * behavior: project instructions are appended only for request prompts, not for suggest, router,
- * collector, or specialized-agent prompt types.
+ * <p>General project instructions apply only to request prompts. Project code-review skill guidance
+ * applies only to single-agent reviews; other review stages retain their bundled skills.
  */
 public class ProjectInstructionsAppender {
   private final GitRepoFiles gitRepoFiles;
@@ -45,9 +46,21 @@ public class ProjectInstructionsAppender {
   }
 
   public String append(IAiPrompt prompt, GerritChange change, String systemInstructions) {
-    if (!(prompt instanceof AiPromptRequests)
-        || gitRepoFiles == null
-        || systemInstructions == null) {
+    if (gitRepoFiles == null || systemInstructions == null) {
+      return systemInstructions;
+    }
+    // Review subclasses represent other stages and must not inherit this skill's customization.
+    if (prompt != null && prompt.getClass() == AiPromptReview.class) {
+      return new ProjectSkillInstructions(gitRepoFiles)
+          .loadCodeReview(change)
+          .map(
+              guidance ->
+                  systemInstructions
+                      + "\n\n"
+                      + AiPromptSections.buildSection("Project code-review guidance", guidance))
+          .orElse(systemInstructions);
+    }
+    if (!(prompt instanceof AiPromptRequests)) {
       return systemInstructions;
     }
     List<String> instructions = new ArrayList<>();

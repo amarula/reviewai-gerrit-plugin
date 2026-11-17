@@ -55,6 +55,35 @@ To add the following content, please edit the `project.config` file in `refs/met
     ...
 ```
 
+### Project Skill Guidance
+
+To add project-specific guidance to single-agent code reviews, commit
+`.gerrit/skills/code-review/SKILL.md` to the change's target branch:
+
+```markdown
+---
+name: code-review
+description: Additional code review guidance for this project.
+---
+
+Check that every tenant-scoped query filters by tenant ID.
+Flag logging of access tokens or customer credentials.
+```
+
+The file uses the same `SKILL.md` format as bundled skills. Its YAML front matter must contain
+`name: code-review` and a nonempty `description`, followed by a nonempty Markdown body. The body is
+appended as a separate project guidance section; metadata is not included in the prompt. Bundled
+instructions, configured roles, response formats, and request templates are retained.
+
+The plugin reads the committed file from the target branch for each request, using the same lookup
+as `.gerrit/ai-instructions.md`. Unmerged patch set edits to the skill do not affect reviews. Project
+guidance is not stored in the global bundled-skill cache. Missing files preserve existing behavior;
+invalid files are ignored with a warning in the plugin log.
+
+This convention currently applies only to single-agent reviews. Other review stages and specialist
+skills do not load these customizations. Files such as `assets/request.md` are not overridden.
+The existing `.gerrit/ai-instructions.md` behavior for comment request prompts is unchanged.
+
 ### AI Review Permission
 
 ReviewAI uses Gerrit's native **AI Review** permission for the specific change. On Gerrit 3.15, grant this permission
