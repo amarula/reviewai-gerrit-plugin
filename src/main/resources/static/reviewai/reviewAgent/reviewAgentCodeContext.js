@@ -78,45 +78,112 @@
       this.attachShadow({mode: 'open'}).innerHTML = `
         <style>
           :host { display: contents; }
-          #picker { position: fixed; inset: auto; margin: 0; padding: 16px;
+          #picker { position: fixed; inset: auto; margin: 0; padding: var(--spacing-xl, 16px);
             box-sizing: border-box; max-width: calc(100vw - 24px);
             max-height: calc(100dvh - 24px); overflow: auto;
             color: var(--primary-text-color, #222);
-            font: inherit; background: var(--dialog-background-color, #fff);
-            border: 1px solid var(--border-color, #ccc); border-radius: 12px;
-            box-shadow: 0 8px 28px #0003; }
-          h3 { margin: 0 0 12px; font-size: 14px; }
-          label { display: block; margin-bottom: 6px; }
-          select { box-sizing: border-box; width: 100%; padding: 6px;
+            font-family: var(--font-family, Roboto, Arial, sans-serif);
+            font-size: var(--font-size-normal, 14px);
+            line-height: var(--line-height-normal, 20px);
+            background: var(--dialog-background-color, #fff);
+            border: 1px solid var(--border-color, #ccc);
+            border-radius: var(--border-radius, 4px);
+            box-shadow: var(--elevation-level-5,
+              0 4px 4px #3c40434d, 0 8px 12px 6px #3c404326); }
+          h3 { margin: 0 0 var(--spacing-l, 12px);
+            font-family: var(--header-font-family, var(--font-family, Roboto, Arial, sans-serif));
+            font-size: var(--font-size-h3, 16px); font-weight: var(--font-weight-h3, 400);
+            line-height: var(--line-height-h3, 24px); }
+          label, legend { color: var(--deemphasized-text-color, #5f6368);
+            font-weight: var(--font-weight-medium, 500); }
+          label { display: block; margin-bottom: var(--spacing-s, 4px); }
+          input[type=number] { box-sizing: border-box; width: 100%; min-width: 0;
+            border: 1px solid var(--border-color, #ccc);
+            border-radius: var(--border-radius, 4px); padding: var(--spacing-s, 4px);
+            font: inherit;
             color: var(--primary-text-color, #222);
-            background: var(--background-color-primary, #fff); }
-          button { cursor: pointer; padding: 5px 10px; }
-          button:disabled { cursor: default; }
-          #actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-          #status, #attachment-count { margin-top: 8px; font-size: var(--font-size-small, 12px); }
-          #range-option { margin-top: 12px; }
-          #range-fields { border: 0; margin: 12px 0 0; padding: 0; }
+            background: var(--view-background-color, #fff); }
+          button { display: inline-flex; align-items: center; justify-content: center;
+            min-height: 32px; border: 0; border-radius: var(--border-radius, 4px);
+            padding: var(--spacing-s, 4px) var(--spacing-m, 8px); font: inherit;
+            font-family: var(--header-font-family, var(--font-family, Roboto, Arial, sans-serif));
+            font-weight: var(--font-weight-medium, 500);
+            color: var(--default-button-text-color, #1565c0); background: transparent;
+            cursor: pointer; }
+          #attach { color: var(--primary-button-background-color, #1565c0); }
+          button:enabled:hover { background: var(--hover-background-color, #a1c2fa33); }
+          button:disabled, #attach:disabled, #files:disabled, input:disabled {
+            color: var(--disabled-foreground, #999); cursor: default; }
+          button:focus-visible, input:focus-visible, #preview:focus-visible {
+            outline: 2px solid var(--primary-button-background-color, #1565c0);
+            outline-offset: 2px; }
+          #files { justify-content: space-between; width: 100%; min-width: 0;
+            box-sizing: border-box; border: 1px solid var(--border-color, #ccc);
+            color: var(--primary-text-color, #222); font-family: inherit; font-weight: inherit;
+            background: var(--select-background-color, #f1f3f4); text-align: left; }
+          #file-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          #files md-icon { flex-shrink: 0; }
+          md-menu { max-height: 280px;
+            --md-menu-container-color: var(--dialog-background-color, #fff);
+            --md-menu-item-label-text-color: var(--primary-text-color, #222);
+            --md-menu-item-icon-color: var(--primary-text-color, #222);
+            --md-menu-item-hover-label-text-color: var(--primary-text-color, #222);
+            --md-menu-item-focus-label-text-color: var(--primary-text-color, #222);
+            --md-menu-item-pressed-label-text-color: var(--primary-text-color, #222);
+            --md-menu-item-hover-icon-color: var(--primary-text-color, #222);
+            --md-menu-item-focus-icon-color: var(--primary-text-color, #222);
+            --md-menu-item-pressed-icon-color: var(--primary-text-color, #222); }
+          md-menu-item { white-space: nowrap;
+            --md-menu-item-top-space: var(--spacing-s, 4px);
+            --md-menu-item-bottom-space: var(--spacing-s, 4px);
+            --md-menu-item-leading-space: var(--spacing-m, 8px);
+            --md-menu-item-trailing-space: var(--spacing-m, 8px);
+            --md-menu-item-one-line-container-height: 24px; }
+          #actions { display: flex; justify-content: flex-end; gap: var(--spacing-l, 12px);
+            margin-top: var(--spacing-xl, 16px); }
+          #status, #attachment-count, #range-status { margin-top: var(--spacing-m, 8px);
+            color: var(--deemphasized-text-color, #5f6368);
+            font-size: var(--font-size-small, 12px); line-height: var(--line-height-small, 16px); }
+          #range-option { display: flex; align-items: center; gap: var(--spacing-m, 8px);
+            margin-top: var(--spacing-l, 12px); color: var(--primary-text-color, #222);
+            font-weight: var(--font-weight-normal, 400); }
+          md-checkbox { background-color: var(--background-color-primary, #fff);
+            --md-sys-color-primary: var(--checkbox-primary, #1565c0);
+            --md-sys-color-on-primary: var(--checkbox-on-primary, #fff);
+            --md-sys-color-on-surface: var(--checkbox-on-surface, #222);
+            --md-sys-color-on-surface-variant: var(--checkbox-on-surface-variant, #5f6368);
+            --md-checkbox-container-shape: 0px; }
+          #range-fields { border: 0; margin: var(--spacing-l, 12px) 0 0; padding: 0; min-width: 0; }
           #range-fields[hidden] { display: none; }
-          #line-inputs { display: flex; gap: 16px; margin-bottom: 8px; }
-          #line-inputs label { flex: 1; }
-          input[type=number] { box-sizing: border-box; width: 100%; padding: 5px;
+          legend { padding: 0; margin-bottom: var(--spacing-m, 8px); }
+          #line-inputs { display: flex; gap: var(--spacing-xl, 16px); margin-bottom: var(--spacing-m, 8px); }
+          #line-inputs label { flex: 1; min-width: 0; }
+          #preview-container { display: flex; height: 200px;
+            border: 1px solid var(--border-color, #ccc); border-radius: var(--border-radius, 4px);
+            background: var(--view-background-color, #fff); }
+          #line-numbers, #preview { margin: 0; padding: var(--spacing-s, 4px);
+            font-family: var(--monospace-font-family, 'Roboto Mono', monospace);
+            font-size: var(--font-size-mono, 13px); line-height: var(--line-height-mono, 18px);
             color: var(--primary-text-color, #222);
-            background: var(--background-color-primary, #fff); }
-          #preview-container { display: flex; height: 200px; border: 1px solid var(--border-color, #ccc); }
-          #line-numbers, #preview { margin: 0; padding: 6px; font: 12px/18px monospace;
-            color: var(--primary-text-color, #222);
-            background: var(--background-color-primary, #fff); tab-size: 4; }
-          #line-numbers { overflow: hidden; text-align: right; user-select: none; flex-shrink: 0; }
+            background: transparent; tab-size: 4; }
+          #line-numbers { overflow: hidden; text-align: right; user-select: none; flex-shrink: 0;
+            color: var(--deemphasized-text-color, #5f6368);
+            background: var(--table-header-background-color, #f1f3f4);
+            border-right: 1px solid var(--border-color, #ccc); }
           #preview { min-width: 0; flex: 1; border: 0; resize: none; white-space: pre; }
-          #range-status { margin-top: 8px; font-size: var(--font-size-small, 12px); }
         </style>
         <section id="picker" popover="auto" role="dialog" aria-labelledby="title">
           <h3 id="title">Attach code</h3>
-          <label for="files">Changed file</label>
-          <select id="files" aria-label="Changed file for code context" disabled></select>
+          <label id="file-title" for="files">Changed file</label>
+          <button id="files" type="button" aria-label="Changed file for code context"
+            aria-haspopup="menu" aria-controls="file-menu" aria-expanded="false" disabled>
+            <span id="file-label">Choose a changed file…</span><md-icon>arrow_drop_down</md-icon>
+          </button>
+          <md-menu id="file-menu" anchor="files" anchor-corner="end-start" menu-corner="start-start"
+            positioning="popover" no-vertical-flip y-offset="4" aria-labelledby="file-title"></md-menu>
           <div id="status" role="status"></div>
           <div id="attachment-count" role="status"></div>
-          <label id="range-option"><input id="range-toggle" type="checkbox" disabled> Select lines</label>
+          <label id="range-option"><md-checkbox id="range-toggle" aria-label="Select lines" disabled></md-checkbox> Select lines</label>
           <fieldset id="range-fields" hidden disabled>
             <legend>Code selection</legend>
             <div id="line-inputs">
@@ -136,6 +203,8 @@
         </section>`;
       this._popover = this.shadowRoot.querySelector('#picker');
       this._select = this.shadowRoot.querySelector('#files');
+      this._fileLabel = this.shadowRoot.querySelector('#file-label');
+      this._fileMenu = this.shadowRoot.querySelector('#file-menu');
       this._attachButton = this.shadowRoot.querySelector('#attach');
       this._rangeToggle = this.shadowRoot.querySelector('#range-toggle');
       this._rangeFields = this.shadowRoot.querySelector('#range-fields');
@@ -145,7 +214,15 @@
       this._preview = this.shadowRoot.querySelector('#preview');
       this._lineNumbers = this.shadowRoot.querySelector('#line-numbers');
       this._previewGeneration = 0;
-      this._select.addEventListener('change', () => this._fileChanged());
+      this._select.addEventListener('click', () => this._openFileMenu());
+      this._select.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          this._fileMenu.defaultFocus = event.key === 'ArrowUp' ? 'last-item' : 'first-item';
+          this._openFileMenu();
+        }
+      });
+      this._fileMenu.addEventListener('closed', () => this._select.setAttribute('aria-expanded', 'false'));
       this._rangeToggle.addEventListener('change', () => this._toggleRange());
       this._startLine.addEventListener('input', () => this._updateRange(true));
       this._endLine.addEventListener('input', () => this._updateRange(true));
@@ -171,6 +248,7 @@
           global.addEventListener('resize', this._positionPopover);
           global.addEventListener('scroll', this._positionPopover, true);
         } else {
+          this._fileMenu.open = false;
           global.removeEventListener('resize', this._positionPopover);
           global.removeEventListener('scroll', this._positionPopover, true);
         }
@@ -327,7 +405,15 @@
     }
 
     _close() {
+      this._fileMenu.open = false;
       if (this._popover.matches(':popover-open')) this._popover.hidePopover();
+    }
+
+    _openFileMenu() {
+      if (this._select.disabled) return;
+      this._fitFileOptions();
+      this._select.setAttribute('aria-expanded', 'true');
+      this._fileMenu.open = true;
     }
 
     _position() {
@@ -347,7 +433,7 @@
 
     _fitFileOptions() {
       const style = global.getComputedStyle(this._select);
-      // Reserve padding and the native dropdown arrow before measuring its label.
+      // Reserve the dropdown arrow for the trigger and the icon/gap for menu items.
       const width = this._select.clientWidth - parseFloat(style.paddingLeft) -
         parseFloat(style.paddingRight) - 24;
       const key = `${width}:${style.font}`;
@@ -355,11 +441,14 @@
       this._optionLabelKey = key;
       this._textMeasure ||= document.createElement('canvas').getContext('2d');
       this._textMeasure.font = style.font;
-      for (const option of this._select.options) {
-        if (option.value) {
-          option.text = shortenPath(option.value, width,
-            text => this._textMeasure.measureText(text).width);
-        }
+      const measure = text => this._textMeasure.measureText(text).width;
+      this._fileLabel.textContent = this._select.value
+        ? shortenPath(this._select.value, width, measure) : 'Choose a changed file…';
+      const menuWidth = this._select.getBoundingClientRect().width;
+      this._fileMenu.style.minWidth = this._fileMenu.style.maxWidth = `${menuWidth}px`;
+      for (const item of this._fileMenu.querySelectorAll('md-menu-item')) {
+        item.querySelector('[slot=headline]').textContent =
+          shortenPath(item.dataset.path, Math.max(0, menuWidth - 56), measure);
       }
     }
 
@@ -504,7 +593,10 @@
       const { _sha: sha, _key: key } = this;
       const changeNumber = this._change?._number;
       const generation = ++this._generation;
-      this._select.replaceChildren(new Option('Choose a changed file…', ''));
+      this._fileMenu.open = false;
+      this._fileMenu.replaceChildren();
+      this._select.value = '';
+      this._fileLabel.textContent = 'Choose a changed file…';
       this._select.disabled = true;
       this._attachButton.disabled = true;
       this._fileChanged();
@@ -531,10 +623,25 @@
           if (path.startsWith('/') || file.status === 'D' || file.binary ||
               file.size > maxFileBytes ||
               (file.new_mode != null && (file.new_mode & 0o170000) !== 0o100000)) return;
-          const option = new Option(path, path);
-          option.title = path;
-          option.setAttribute('aria-label', path);
-          this._select.add(option);
+          const item = document.createElement('md-menu-item');
+          item.dataset.path = path;
+          item.title = path;
+          item.setAttribute('aria-label', path);
+          const icon = document.createElement('md-icon');
+          icon.slot = 'start';
+          icon.textContent = 'description';
+          const headline = document.createElement('span');
+          headline.slot = 'headline';
+          headline.textContent = path;
+          item.append(icon, headline);
+          item.addEventListener('click', () => {
+            this._select.value = path;
+            this._fileMenu.open = false;
+            this._optionLabelKey = null;
+            this._fileChanged();
+            this._fileMenu.defaultFocus = 'first-item';
+          });
+          this._fileMenu.append(item);
           count++;
         });
         this._select.disabled = count === 0;

@@ -11,9 +11,61 @@
   // Exercise the Gerrit 3.15 shadow-DOM/menu/chip event contract without a live Gerrit server.
   window.nativeTextDialogOpenCount = 0;
   window.nativeChipClickCount = 0;
-  customElements.define('md-menu', class extends HTMLElement {
-    set open(value) { this.hidden = !value; }
+  if (!customElements.get('md-menu')) customElements.define('md-menu', class extends HTMLElement {
+    connectedCallback() { this.hidden = true; }
+    set open(value) {
+      this.hidden = !value;
+      if (this.id !== 'file-menu') return;
+      this.setAttribute('role', 'menu');
+      this.style.display = value ? 'block' : 'none';
+      const anchor = this.getRootNode().querySelector('#' + this.getAttribute('anchor'));
+      if (!value) {
+        this.dispatchEvent(new Event('closed'));
+        return;
+      }
+      const box = anchor.getBoundingClientRect();
+      Object.assign(this.style, {position: 'fixed', left: box.left + 'px', top: box.bottom + 4 + 'px',
+        background: 'var(--dialog-background-color, white)', overflow: 'auto', zIndex: 1});
+      const items = Array.from(this.querySelectorAll('md-menu-item'));
+      for (const item of items) {
+        item.setAttribute('role', 'menuitem');
+        item.tabIndex = -1;
+        item.style.display = 'block';
+      }
+      const focus = this.defaultFocus === 'last-item' ? items.length - 1 : 0;
+      items[focus]?.focus();
+      this.onkeydown = event => {
+        let index = items.indexOf(this.getRootNode().activeElement);
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          this.open = false;
+          anchor.focus();
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          index = (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+          items[index]?.focus();
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          items[index]?.click();
+        }
+      };
+    }
     get open() { return !this.hidden; }
+  });
+  if (!customElements.get('md-checkbox')) customElements.define('md-checkbox', class extends HTMLElement {
+    static get observedAttributes() { return ['disabled']; }
+    constructor() {
+      super();
+      this.attachShadow({mode: 'open'}).innerHTML = '<input type="checkbox" aria-label="Select lines">';
+      this.input = this.shadowRoot.querySelector('input');
+      this.input.addEventListener('change', () => this.dispatchEvent(new Event('change', {bubbles: true})));
+    }
+    attributeChangedCallback() { this.input.disabled = this.disabled; }
+    get checked() { return this.input.checked; }
+    set checked(value) { this.input.checked = value; }
+    get disabled() { return this.hasAttribute('disabled'); }
+    set disabled(value) { this.toggleAttribute('disabled', value); }
   });
   customElements.define('md-filter-chip', class extends HTMLElement {
     connectedCallback() {
@@ -78,7 +130,7 @@
           [hidden] { display: none; }
         </style>
         <button id="addContextChip" aria-label="Add Context">＋ Add Context</button>
-        <md-menu id="contextMenu" hidden></md-menu>
+        <md-menu id="contextMenu" anchor="addContextChip"></md-menu>
         <input id="nativeLinkInput" hidden aria-label="Add external link">`;
       root.querySelector('#addContextChip').addEventListener('click', () => {
         root.querySelector('#contextMenu').open = true;

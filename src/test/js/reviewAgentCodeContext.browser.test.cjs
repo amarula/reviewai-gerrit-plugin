@@ -67,13 +67,18 @@ async function harness(t) {
   });
   const picker = page.locator('reviewai-code-context');
   const dialog = page.getByRole('dialog', {name: 'Attach code'});
-  const select = dialog.getByRole('combobox');
+  const select = dialog.getByRole('button', {name: 'Changed file for code context', exact: true});
+  const fileMenu = picker.locator('#file-menu');
+  const chooseFile = async file => {
+    await select.click();
+    await fileMenu.getByTitle(file, {exact: true}).click();
+  };
   const items = () => page.evaluate(() =>
     originalPanel.shadowRoot.querySelector('prompt-box').items);
   const open = async (keyboard = false) => {
     if (await dialog.isVisible()) return;
     await page.getByRole('button', {name: 'Add Context', exact: true}).click();
-    const item = page.getByRole('menuitem', {name: 'Changed file', exact: true});
+    const item = page.locator('context-input-chip md-menu-item').filter({hasText: 'Changed file'});
     if (keyboard) await item.press('Enter');
     else await item.click();
     await dialog.waitFor({state: 'visible'});
@@ -84,7 +89,7 @@ async function harness(t) {
   };
   const attach = async file => {
     await open();
-    await select.selectOption(file);
+    await chooseFile(file);
     await dialog.getByRole('button', {name: 'Attach file', exact: true}).click();
     assert.equal(await dialog.isVisible(), true);
   };
@@ -92,13 +97,13 @@ async function harness(t) {
   const preview = dialog.getByRole('textbox', {name: 'File preview', exact: true});
   const selectRange = async () => {
     await open();
-    await select.selectOption(fixture.path);
+    await chooseFile(fixture.path);
     await rangeToggle.check();
     await preview.waitFor({state: 'visible'});
     await dialog.getByRole('spinbutton', {name: 'Start line'}).waitFor();
     await page.waitForFunction(() => !document.querySelector('reviewai-code-context').shadowRoot.querySelector('#range-fields').disabled);
   };
-  return {page, picker, dialog, select, items, open, finish, attach, rangeToggle, preview, selectRange};
+  return {page, picker, dialog, select, fileMenu, chooseFile, items, open, finish, attach, rangeToggle, preview, selectRange};
 }
 
 test('Add Context opens a floating picker without taking sidebar space or opening link input', async t => {
@@ -108,8 +113,8 @@ test('Add Context opens a floating picker without taking sidebar space or openin
   assert.equal(await h.page.evaluate(() => fetches.length), 0);
   const originalBox = await h.page.locator('chat-panel').boundingBox();
   await h.open();
-  await h.page.waitForFunction(() => !document.querySelector('reviewai-code-context').shadowRoot.querySelector('select').disabled);
-  assert.equal(await h.select.locator('option').count(), 3);
+  await h.page.waitForFunction(() => !document.querySelector('reviewai-code-context').shadowRoot.querySelector('#files').disabled);
+  assert.equal(await h.fileMenu.locator('md-menu-item').count(), 2);
   assert.equal(await h.page.evaluate(() => nativeTextDialogOpenCount), 0);
   assert.deepEqual(await h.page.locator('chat-panel').boundingBox(), originalBox);
   const box = await h.dialog.boundingBox();
@@ -126,13 +131,44 @@ test('picker captures sidebar width on open and refreshes it only when reopened'
   await sidebar.evaluate(element => { element.style.width = '380px'; });
   await h.page.evaluate(() => window.dispatchEvent(new Event('resize')));
   assert.equal((await h.dialog.boundingBox()).width, 320);
-  await h.select.selectOption(fixture.path);
+  await h.chooseFile(fixture.path);
   await h.rangeToggle.check();
   await h.preview.waitFor({state: 'visible'});
   assert.equal((await h.dialog.boundingBox()).width, 320);
   await h.finish();
   await h.open();
   assert.equal((await h.dialog.boundingBox()).width, 380);
+});
+
+test('the file menu opens below its trigger without changing the selection', async t => {
+  const h = await harness(t);
+  await h.open();
+  await h.select.click();
+  const trigger = await h.select.boundingBox();
+  const menu = await h.fileMenu.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return {top: box.top, width: box.width};
+  });
+  assert.ok(menu.top >= trigger.y + trigger.height);
+  assert.ok(menu.width <= trigger.width + 2);
+  await h.fileMenu.getByRole('menuitem').first().press('Escape');
+  assert.equal(await h.dialog.isVisible(), true);
+  assert.equal(await h.select.evaluate(button => button.value), '');
+  assert.equal(await h.select.getAttribute('aria-expanded'), 'false');
+  assert.equal(await h.select.evaluate(button => button.getRootNode().activeElement === button), true);
+});
+
+test('the file menu supports arrow keys and Enter to select a full path', async t => {
+  const h = await harness(t);
+  await h.open();
+  await h.select.press('ArrowDown');
+  await h.fileMenu.getByRole('menuitem').first().press('ArrowDown');
+  const last = h.fileMenu.getByRole('menuitem', {name: fixture.path, exact: true});
+  assert.equal(await last.evaluate(item => item.getRootNode().activeElement === item), true);
+  await last.press('Enter');
+  assert.equal(await h.select.evaluate(button => button.value), fixture.path);
+  assert.equal(await h.rangeToggle.isDisabled(), false);
+  assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), false);
 });
 
 test('attaching uses native removable chips and consuming a request clears its draft attachment', async t => {
@@ -159,7 +195,7 @@ test('Finish, Escape and outside clicks dismiss the panel without changing attac
   await h.attach(fixture.path);
   const original = await h.items();
   await h.open();
-  await h.select.selectOption('src/Other.java');
+  await h.chooseFile('src/Other.java');
   await h.finish();
   assert.deepEqual(await h.items(), original);
   await h.open(true);
@@ -257,10 +293,17 @@ test('selecting text in the preview attaches its inclusive lines and restores th
   const h = await harness(t);
   await h.selectRange();
   assert.equal(await h.preview.inputValue(), fixture.content);
+  const metrics = await h.preview.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {top: parseFloat(style.paddingTop), left: parseFloat(style.paddingLeft),
+      lineHeight: parseFloat(style.lineHeight)};
+  });
   const previewBox = await h.preview.boundingBox();
-  await h.page.mouse.move(previewBox.x + 16, previewBox.y + 6 + 18 * (ranges.start_line - 0.5));
+  await h.page.mouse.move(previewBox.x + metrics.left + 8,
+    previewBox.y + metrics.top + metrics.lineHeight * (ranges.start_line - 0.5));
   await h.page.mouse.down();
-  await h.page.mouse.move(previewBox.x + 70, previewBox.y + 6 + 18 * (ranges.end_line - 0.5));
+  await h.page.mouse.move(previewBox.x + metrics.left + 64,
+    previewBox.y + metrics.top + metrics.lineHeight * (ranges.end_line - 0.5));
   await h.page.mouse.up();
   assert.equal(await h.dialog.getByRole('spinbutton', {name: 'Start line'}).inputValue(), String(ranges.start_line));
   assert.equal(await h.dialog.getByRole('spinbutton', {name: 'End line'}).inputValue(), String(ranges.end_line));
@@ -316,7 +359,7 @@ test('preview failures block range attachments while whole-file mode remains usa
   const h = await harness(t);
   await h.page.evaluate(() => { window.failPreview = true; });
   await h.open();
-  await h.select.selectOption(fixture.path);
+  await h.chooseFile(fixture.path);
   await h.rangeToggle.check();
   await h.page.getByText('Could not read file preview', {exact: true}).waitFor();
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).isDisabled(), true);
@@ -328,10 +371,10 @@ test('changing files discards an in-flight preview and its range', async t => {
   const h = await harness(t);
   await h.page.evaluate(() => { window.delayPreview = true; });
   await h.open();
-  await h.select.selectOption(fixture.path);
+  await h.chooseFile(fixture.path);
   await h.rangeToggle.check();
   await h.page.waitForFunction(() => typeof window.resolvePreview === 'function');
-  await h.select.selectOption('src/Other.java');
+  await h.chooseFile('src/Other.java');
   await h.page.evaluate(() => window.resolvePreview());
   assert.equal(await h.rangeToggle.isChecked(), false);
   assert.equal(await h.picker.locator('#preview').inputValue(), '');
@@ -342,7 +385,7 @@ test('empty files have no selectable lines', async t => {
   const h = await harness(t);
   await h.page.evaluate(value => { window.previewContent = value; }, ranges.empty_content);
   await h.open();
-  await h.select.selectOption(fixture.path);
+  await h.chooseFile(fixture.path);
   await h.rangeToggle.check();
   await h.page.getByText('This file has no lines to select.', {exact: true}).waitFor();
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach selection', exact: true}).isDisabled(), true);
@@ -438,7 +481,7 @@ test('the attachment limit blocks new chips until one is removed', async t => {
     return ReviewAi.codeContext.maxAttachments;
   });
   await h.open();
-  await h.select.selectOption('src/Other.java');
+  await h.chooseFile('src/Other.java');
   assert.equal(await h.dialog.getByRole('button', {name: 'Attach file', exact: true}).isDisabled(), true);
   assert.match(await h.picker.locator('#attachment-count').textContent(), /Remove a chip/);
   await h.finish();
@@ -482,13 +525,14 @@ test('dropdown labels use left ellipsis, adapt to width, and attach the full pat
     for (const path of paths) files[path] = {size: 100, new_mode: 33188};
   }, [dropdownPath.path, chipLayout.path]);
   await h.open();
-  await h.select.selectOption(dropdownPath.path);
-  const label = await h.select.evaluate(select => select.selectedOptions[0].text);
+  await h.chooseFile(dropdownPath.path);
+  const label = await h.picker.locator('#file-label').textContent();
   assert.ok(label.startsWith('…/'));
   assert.ok(label.endsWith(dropdownPath.filename));
   assert.ok(label.endsWith(dropdownPath.path.split('/').slice(-2).join('/')));
   assert.equal(await h.select.getAttribute('title'), dropdownPath.path);
-  assert.equal(await h.select.evaluate(select => select.selectedOptions[0].getAttribute('aria-label')), dropdownPath.path);
+  assert.equal(await h.fileMenu.getByRole('menuitem', {name: dropdownPath.path, exact: true, includeHidden: true})
+    .getAttribute('aria-label'), dropdownPath.path);
   for (const width of chipLayout.widths) {
     await h.page.setViewportSize({width, height: 740});
     await h.page.waitForFunction(() => {
@@ -497,13 +541,14 @@ test('dropdown labels use left ellipsis, adapt to width, and attach the full pat
       const available = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 24;
       const context = document.createElement('canvas').getContext('2d');
       context.font = style.font;
-      return Array.from(select.options).filter(option => option.value)
-        .every(option => context.measureText(option.text).width <= available);
+      return Array.from(select.getRootNode().querySelectorAll('#file-menu [slot=headline]'))
+        .every(label => context.measureText(label.textContent).width <= available);
     });
-    assert.equal(await h.select.inputValue(), dropdownPath.path);
-    assert.equal(await h.select.locator('option').filter({hasText: fixture.path}).count(), 1);
-    const longFilename = await h.select.evaluate((select, path) =>
-      Array.from(select.options).find(option => option.value === path).text, chipLayout.path);
+    assert.equal(await h.select.evaluate(button => button.value), dropdownPath.path);
+    assert.equal(await h.fileMenu.locator('[slot=headline]').filter({hasText: fixture.path}).count(), 1);
+    const longFilename = await h.fileMenu.evaluate((menu, path) =>
+      Array.from(menu.children).find(item => item.dataset.path === path)
+        .querySelector('[slot=headline]').textContent, chipLayout.path);
     assert.ok(longFilename.startsWith('…'));
     assert.ok(longFilename.endsWith('.java'));
   }
