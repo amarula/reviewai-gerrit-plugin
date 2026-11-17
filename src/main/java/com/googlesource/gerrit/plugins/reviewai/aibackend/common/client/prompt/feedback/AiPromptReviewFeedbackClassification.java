@@ -36,7 +36,7 @@ public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(config, changeSetData, change, codeContextPolicy);
+    super(config, changeSetData, change, codeContextPolicy, SKILL);
   }
 
   @Override

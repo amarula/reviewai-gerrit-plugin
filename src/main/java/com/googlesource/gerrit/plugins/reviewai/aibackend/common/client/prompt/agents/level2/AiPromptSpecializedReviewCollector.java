@@ -36,7 +36,7 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
       GerritChange change,
       ICodeContextPolicy codeContextPolicy,
       String skill) {
-    super(config, changeSetData, change, codeContextPolicy);
+    super(config, changeSetData, change, codeContextPolicy, skill);
     this.skill = skill;
     this.defaultAiMessageReview = getCollectorMessage();
   }

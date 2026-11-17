@@ -1,0 +1,12 @@
+[
+  {"stage": "REVIEW_SPECIALIZED_TRIAGE", "skill": "review-triage",
+   "schema": "format_specialized_triage", "response": {"agents": [], "consolidation_context": ""}},
+  {"stage": "REVIEW_SPECIALIZED_CONSOLIDATION", "skill": "review-consolidation",
+   "schema": "format_specialized_consolidation", "response": {"concerns": [], "dismissed_concerns": []}},
+  {"stage": "REVIEW_SPECIALIZED_HISTORICAL_REPETITION", "skill": "review-historical-repetition",
+   "schema": "format_specialized_historical_repetition", "response": {"annotations": []}},
+  {"stage": "REVIEW_SPECIALIZED_CONFLICT_RESOLUTION", "skill": "review-conflict-resolution",
+   "schema": "format_specialized_conflict_resolution", "response": {"concerns": [], "dismissed_concerns": []}},
+  {"stage": "REVIEW_SPECIALIZED_VERIFICATION", "skill": "review-verification",
+   "schema": "format_specialized_verification", "response": {"replies": []}}
+]

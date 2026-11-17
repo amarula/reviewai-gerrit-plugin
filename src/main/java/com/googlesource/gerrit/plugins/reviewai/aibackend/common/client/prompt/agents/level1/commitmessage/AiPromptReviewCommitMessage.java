@@ -37,7 +37,7 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(config, changeSetData, change, codeContextPolicy);
+    super(config, changeSetData, change, codeContextPolicy, "commit-message-review");
     this.defaultAiMessageReview = getDefaultAiMessageReview();
     log.debug("Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
   }

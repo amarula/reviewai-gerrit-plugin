@@ -22,6 +22,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithD
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptBase;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptSections;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
@@ -44,6 +45,30 @@ public final class AiPromptConcernReview extends AiPromptBase {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
+  }
+
+  @Override
+  protected List<String> getStageSkillNames() {
+    List<String> skills = new ArrayList<>(List.of(SKILL));
+    ConcernReviewerId reviewer = reviewer();
+    if (reviewer != null && reviewer.getKind() != null) {
+      skills.addAll(
+          switch (reviewer.getKind()) {
+            case SINGLE_AGENT ->
+                config.getAiReviewCommitMessages()
+                    ? List.of("code-review", "commit-message-review")
+                    : List.of("code-review");
+            case SCOPED_AGENT ->
+                List.of(isCommitMessageReviewer() ? "commit-message-review" : "code-review");
+            case SPECIALIZED_AGENT ->
+                isCommitMessageReviewer()
+                    ? List.of("commit-message-review")
+                    : SpecializedReviewAgentDefinitions.findSkillName(reviewer.getName())
+                        .map(List::of)
+                        .orElseGet(List::of);
+          });
+    }
+    return List.copyOf(skills);
   }
 
   @Override

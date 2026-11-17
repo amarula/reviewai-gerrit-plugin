@@ -41,16 +41,27 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   protected String defaultAiMessageReview;
 
   private final ICodeContextPolicy codeContextPolicy;
+  private final List<String> stageSkillNames;
 
   public AiPromptBase(
       Configuration config,
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
+    this(config, changeSetData, change, codeContextPolicy, new String[0]);
+  }
+
+  protected AiPromptBase(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      String... stageSkillNames) {
     super(config);
     this.changeSetData = changeSetData;
     this.change = change;
     this.codeContextPolicy = codeContextPolicy;
+    this.stageSkillNames = List.of(stageSkillNames);
     this.isCommentEvent = change.getIsCommentEvent();
     this.defaultAiMessageReview =
         ReviewAgentSkills.resource("review-common", "assets/request.md").strip();
@@ -58,6 +69,18 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   }
 
   // ---- Convenience accessors ----
+
+  @Override
+  public List<String> getProjectSkillNames() {
+    List<String> skills = new ArrayList<>(List.of("review-common"));
+    skills.addAll(getStageSkillNames());
+    return List.copyOf(skills);
+  }
+
+  /** Returns stage-specific skills; the common skill is prepended by the base prompt. */
+  protected List<String> getStageSkillNames() {
+    return stageSkillNames;
+  }
 
   public String getDefaultAiAssistantName() {
     return commonSection("Assistant Name");

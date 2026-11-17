@@ -37,7 +37,7 @@ public class AiPromptRequests extends AiPromptBase implements IAiPrompt {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(config, changeSetData, change, codeContextPolicy);
+    super(config, changeSetData, change, codeContextPolicy, SKILL);
     log.debug("AiPromptRequests initialized for change ID: {}", change.getFullChangeId());
   }
 

@@ -20,11 +20,10 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.joinWithS
 
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level0.singleagent.AiPromptReview;
-import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.AiPromptSpecializedReviewAgent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectSkillInstructions;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -36,8 +35,8 @@ import java.util.List;
  * focused on prompt text construction, instead of threading {@link GitRepoFiles} through many
  * prompt constructors that do not need it.
  *
- * <p>General project instructions apply only to request prompts. Project skill guidance applies to
- * single-agent reviews and selected patchset specialists; other stages retain their bundled skills.
+ * <p>General project instructions apply only to request prompts. Each prompt declares which skills'
+ * project guidance applies after its bundled instructions have been assembled.
  */
 public class ProjectInstructionsAppender {
   private final GitRepoFiles gitRepoFiles;
@@ -47,26 +46,33 @@ public class ProjectInstructionsAppender {
   }
 
   public String append(IAiPrompt prompt, GerritChange change, String systemInstructions) {
+    if (prompt == null || gitRepoFiles == null || systemInstructions == null) {
+      return systemInstructions;
+    }
+    String skillInstructions =
+        appendSkills(prompt.getProjectSkillNames(), change, systemInstructions);
+    if (!(prompt instanceof AiPromptRequests)) {
+      return skillInstructions;
+    }
+    List<String> instructions = new ArrayList<>();
+    instructions.add(skillInstructions);
+    new ProjectInstructions(change, gitRepoFiles).addProjectInstructions(instructions);
+    return joinWithSpace(instructions);
+  }
+
+  public String appendRouting(GerritChange change, String systemInstructions) {
+    return appendSkills(List.of("review-common", "review-routing"), change, systemInstructions);
+  }
+
+  private String appendSkills(List<String> names, GerritChange change, String systemInstructions) {
     if (gitRepoFiles == null || systemInstructions == null) {
       return systemInstructions;
     }
-    if (prompt instanceof AiPromptSpecializedReviewAgent specialist) {
-      return specialist
-          .getSpecialistSkillName()
-          .map(name -> appendSkill(name, change, systemInstructions))
-          .orElse(systemInstructions);
+    String instructions = systemInstructions;
+    for (String name : new LinkedHashSet<>(names)) {
+      instructions = appendSkill(name, change, instructions);
     }
-    // Review subclasses represent other stages and must not inherit code-review customization.
-    if (prompt != null && prompt.getClass() == AiPromptReview.class) {
-      return appendSkill("code-review", change, systemInstructions);
-    }
-    if (!(prompt instanceof AiPromptRequests)) {
-      return systemInstructions;
-    }
-    List<String> instructions = new ArrayList<>();
-    instructions.add(systemInstructions);
-    new ProjectInstructions(change, gitRepoFiles).addProjectInstructions(instructions);
-    return joinWithSpace(instructions);
+    return instructions;
   }
 
   private String appendSkill(String name, GerritChange change, String systemInstructions) {

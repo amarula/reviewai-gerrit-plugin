@@ -38,7 +38,7 @@ public class AiPromptSuggest extends AiPromptReview {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(config, changeSetData, change, codeContextPolicy);
+    super(config, changeSetData, change, codeContextPolicy, SKILL);
     log.debug("AiPromptSuggest initialized for project: {}", change.getProjectName());
   }
 

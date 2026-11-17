@@ -44,6 +44,17 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
   }
 
   @Override
+  protected List<String> getStageSkillNames() {
+    List<String> skills = new ArrayList<>(List.of(SKILL));
+    if (changeSetData.getSpecializedAgentName() == null) {
+      skills.add("commit-message-review");
+    } else {
+      getSpecialistSkillName().ifPresent(skills::add);
+    }
+    return List.copyOf(skills);
+  }
+
+  @Override
   public String getDefaultAiAssistantInstructions() {
     if (changeSetData.getSpecializedAgentName() == null) {
       return getCommitMessageSpecialistInstructions();

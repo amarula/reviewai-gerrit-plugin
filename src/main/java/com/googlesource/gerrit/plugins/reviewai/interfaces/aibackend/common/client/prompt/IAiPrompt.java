@@ -19,6 +19,11 @@ package com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.cli
 import java.util.List;
 
 public interface IAiPrompt {
+  /** Returns the bundled skills that accept project guidance for this prompt, in order. */
+  default List<String> getProjectSkillNames() {
+    return List.of();
+  }
+
   void addAiAssistantInstructions(List<String> instructions);
 
   String getDefaultAiAssistantInstructions();

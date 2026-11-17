@@ -22,6 +22,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.s
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -36,6 +37,11 @@ public class AiPromptRoutedReviewAgentRequest extends AiPromptRequests {
         "AiPromptRoutedReviewAgentRequest initialized for stage {} and change ID {}",
         changeSetData.getReviewAssistantStage(),
         change.getFullChangeId());
+  }
+
+  @Override
+  protected List<String> getStageSkillNames() {
+    return List.of("review-chat", "review-follow-up");
   }
 
   @Override

@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.IAiPrompt;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class AiPromptNewIssueFinder extends AiPromptBase {
@@ -47,6 +48,13 @@ public final class AiPromptNewIssueFinder extends AiPromptBase {
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy);
     reviewPrompt = reviewPrompt(config, changeSetData, change, codeContextPolicy);
+  }
+
+  @Override
+  public List<String> getProjectSkillNames() {
+    List<String> skills = new ArrayList<>(reviewPrompt.getProjectSkillNames());
+    skills.add(SKILL);
+    return List.copyOf(skills);
   }
 
   @Override

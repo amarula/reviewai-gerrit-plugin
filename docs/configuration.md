@@ -100,8 +100,44 @@ agent identities or routing descriptions, and adding a file does not register or
 The bundled specialist boundaries and response formats are retained alongside triage-selected
 instructions. Missing or invalid specialist files follow the same fallback behavior described above.
 
-Other stages, including triage, consolidation, and commit-message specialists, do not load these
-customizations. Files such as `assets/request.md` are not overridden.
+The same convention supports the other pipeline stages. Each prompt declares its applicable skills;
+the plugin appends their project guidance after assembling the bundled prompt. Shared
+`review-common` guidance comes first, and each skill is applied at most once per request.
+Reviewer guidance also applies when that reviewer reassesses concerns or searches for new issues.
+
+| Skill directory | Where its guidance applies |
+| --- | --- |
+| `review-common` | All review, chat, suggestion, feedback, and routing prompts |
+| `code-review` | Single-agent and scoped code reviews, retries, and their concern workflows |
+| `commit-message-review` | Reviews that include commit messages, commit-message specialists, and their concern workflows |
+| `code-quality`, `correctness`, `documentation`, `security`, `testability` | The matching selected specialist and its concern workflows |
+| `review-chat` | Comment request prompts, including routed follow-ups |
+| `review-follow-up` | Follow-ups routed to a code or commit-message reviewer |
+| `review-suggestions` | Suggested-edit generation |
+| `review-feedback` | User feedback classification |
+| `concern-review` | Reassessment of existing concerns |
+| `new-issue-finder` | Searching for new concerns |
+| `review-routing` | Selection of the reviewer for a follow-up message |
+| `review-triage` | Selection and instruction of specialist agents |
+| `specialist-boundaries` | Patchset and commit-message specialist prompts, including new-issue finding |
+| `review-consolidation` | Consolidation of specialist concerns |
+| `review-historical-repetition` | Checks against historical findings |
+| `review-conflict-resolution` | Resolution of conflicting concerns |
+| `review-verification` | Verification and final review replies |
+
+For example, `.gerrit/skills/review-triage/SKILL.md` can guide specialist selection:
+
+```markdown
+---
+name: review-triage
+description: Custom specialist selection settings for this project.
+---
+
+Consider tenant isolation when deciding whether a security specialist is needed.
+```
+
+Guidance is additive. Output schemas, field definitions, agent catalogs, and template placeholders
+continue to come from the plugin. Files such as `assets/request.md` are not overridden.
 The existing `.gerrit/ai-instructions.md` behavior for comment request prompts is unchanged.
 
 ### AI Review Permission

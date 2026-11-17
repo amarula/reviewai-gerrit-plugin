@@ -46,9 +46,29 @@ public class AiPromptReview extends AiPromptBase implements IAiPrompt {
       ChangeSetData changeSetData,
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
-    super(config, changeSetData, change, codeContextPolicy);
+    this(config, changeSetData, change, codeContextPolicy, new String[0]);
+  }
+
+  protected AiPromptReview(
+      Configuration config,
+      ChangeSetData changeSetData,
+      GerritChange change,
+      ICodeContextPolicy codeContextPolicy,
+      String... stageSkillNames) {
+    super(config, changeSetData, change, codeContextPolicy, stageSkillNames);
     this.codeContextPolicy = codeContextPolicy;
     log.debug("AiPromptReview initialized for change ID: {}", change.getFullChangeId());
+  }
+
+  @Override
+  protected List<String> getStageSkillNames() {
+    List<String> stageSkills = super.getStageSkillNames();
+    if (!stageSkills.isEmpty()) {
+      return stageSkills;
+    }
+    return includeCommitMessageReviewRequirement()
+        ? List.of("code-review", "commit-message-review")
+        : List.of("code-review");
   }
 
   @Override

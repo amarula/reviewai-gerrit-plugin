@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.google.gson.JsonParser;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
@@ -156,7 +157,75 @@ public class LangChainClientTest {
       assertEquals(
           "format_specialized_replies", request.getValue().responseFormat().jsonSchema().name());
       verify(files).getFileContent(change, ".gerrit/skills/security/SKILL.md");
+      verify(files).getFileContent(change, ".gerrit/skills/review-common/SKILL.md");
+      verify(files).getFileContent(change, ".gerrit/skills/specialist-boundaries/SKILL.md");
       Mockito.verifyNoMoreInteractions(files);
+    }
+  }
+
+  @Test
+  public void pipelineRequestsApplyUserSettingsAndKeepStageResponseSchemas() throws Exception {
+    var cases =
+        JsonParser.parseString(readTestResource("__files/skills/project/pipeline-responses.json"))
+            .getAsJsonArray();
+    for (var item : cases) {
+      var testCase = item.getAsJsonObject();
+      String skill = testCase.get("skill").getAsString();
+      Configuration config = Mockito.mock(Configuration.class);
+      when(config.getMultiAgentMode()).thenReturn(true);
+      when(config.getAiReviewCommitMessages()).thenReturn(true);
+      when(config.getAgentSpecializationLevel())
+          .thenReturn(AgentSpecializationLevel.SPECIALIZED_AGENTS);
+      when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
+      when(config.getAiProviderType()).thenReturn(AiProviderType.OLLAMA);
+      when(config.getAiReviewTemperature()).thenReturn("0");
+      GitRepoFiles files = Mockito.mock(GitRepoFiles.class);
+      GerritChange change = Mockito.mock(GerritChange.class);
+      when(files.getFileContent(change, ".gerrit/skills/" + skill + "/SKILL.md"))
+          .thenReturn(
+              readTestResource("__files/skills/project/pipeline-skill.md")
+                  .replace("SKILL_NAME", skill));
+      ChangeSetData data = new ChangeSetData(1);
+      data.setReviewAssistantStage(
+          ReviewAssistantStage.valueOf(testCase.get("stage").getAsString()));
+      String original =
+          AiPromptFactory.getAiPrompt(config, data, change, new CodeContextPolicyNone(config))
+              .getDefaultAiAssistantInstructions();
+      String response = testCase.get("response").toString();
+      ILangChainProvider provider = Mockito.mock(ILangChainProvider.class);
+      ChatModel model = Mockito.mock(ChatModel.class);
+      when(provider.buildChatModel(
+              Mockito.eq(config), Mockito.eq(0.0), Mockito.isNull(), Mockito.anyString()))
+          .thenReturn(new LangChainProvider(model, "test"));
+      when(model.chat(Mockito.any(ChatRequest.class)))
+          .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from(response)).build());
+      TestableLangChainClient client =
+          new TestableLangChainClient(config, new CodeContextPolicyNone(config), files);
+
+      try (var providers = Mockito.mockStatic(LangChainProviderFactory.class)) {
+        providers
+            .when(() -> LangChainProviderFactory.get(AiProviderType.OLLAMA))
+            .thenReturn(provider);
+
+        assertEquals(
+            response,
+            client.rawResponse(data, change, readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE)));
+
+        ArgumentCaptor<ChatRequest> request = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(model).chat(request.capture());
+        assertEquals(
+            original
+                + "\n\n# Project "
+                + skill
+                + " guidance\n\n"
+                + readTestResource("__files/skills/project/pipeline-guidance.md")
+                    .replace("SKILL_NAME", skill)
+                    .strip(),
+            LangChainChatMessages.content(request.getValue().messages().getFirst()));
+        assertEquals(
+            testCase.get("schema").getAsString(),
+            request.getValue().responseFormat().jsonSchema().name());
+      }
     }
   }
 

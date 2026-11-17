@@ -29,8 +29,10 @@ import static org.mockito.Mockito.when;
 import com.googlesource.gerrit.plugins.reviewai.TestResourceLoader;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritChange;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.commitmessage.AiPromptReviewCommitMessage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.patchset.AiPromptReviewCode;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiReplyItem;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritComment;
@@ -46,25 +48,94 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.Re
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackMemory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.client.api.LangChainClient;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.messages.LangChainChatMessages;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.model.LangChainProvider;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.langchain.provider.LangChainProviderFactory;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
 import com.googlesource.gerrit.plugins.reviewai.errors.exceptions.AiConnectionFailException;
 import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.code.context.ICodeContextPolicy;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.langchain.provider.ILangChainProvider;
 import com.googlesource.gerrit.plugins.reviewai.localization.Localizer;
+import com.googlesource.gerrit.plugins.reviewai.settings.AiProviderType;
 import com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils;
 import com.googlesource.gerrit.plugins.reviewai.web.ReviewAgentConversationStore;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 public class LangChainMultiAgentReviewClientTest {
+  @Test
+  public void routingRequestIncludesProjectGuidanceAndPreservesRouteParsing() throws Exception {
+    Configuration config = config();
+    when(config.getAiProviderType()).thenReturn(AiProviderType.OLLAMA);
+    GitRepoFiles files = mock(GitRepoFiles.class);
+    GerritChange change = mock(GerritChange.class);
+    when(files.getFileContent(change, ".gerrit/skills/review-routing/SKILL.md"))
+        .thenReturn(
+            readTestResource("__files/skills/project/pipeline-skill.md")
+                .replace("SKILL_NAME", "review-routing"));
+    String expected =
+        new AiPromptReviewAgentRouter(config).getDefaultAiAssistantInstructions()
+            + "\n\n# Project review-routing guidance\n\n"
+            + readTestResource("__files/skills/project/pipeline-guidance.md")
+                .replace("SKILL_NAME", "review-routing")
+                .strip();
+    LangChainMultiAgentReviewClient client =
+        new LangChainMultiAgentReviewClient(
+            config, null, null, null, null, null, null, Runnable::run, files, null) {
+          @Override
+          protected ChatMemory buildTransientMemory(Object memoryId) {
+            return MessageWindowChatMemory.withMaxMessages(20);
+          }
+        };
+    ILangChainProvider provider = mock(ILangChainProvider.class);
+    ChatModel model = mock(ChatModel.class);
+    when(provider.buildChatModel(
+            Mockito.eq(config), Mockito.eq(0.0), Mockito.isNull(), Mockito.anyString()))
+        .thenReturn(new LangChainProvider(model, "test"));
+    when(model.chat(Mockito.<ChatMessage>anyList()))
+        .thenReturn(
+            ChatResponse.builder()
+                .aiMessage(
+                    AiMessage.from(readTestResource("__files/skills/project/routing-response.txt")))
+                .build());
+
+    try (var providers = Mockito.mockStatic(LangChainProviderFactory.class)) {
+      providers
+          .when(() -> LangChainProviderFactory.get(AiProviderType.OLLAMA))
+          .thenReturn(provider);
+
+      assertEquals(
+          ReviewAssistantStage.REVIEW_COMMIT_MESSAGE,
+          client.routeMessage(new ChangeSetData(1), change));
+
+      Mockito.verify(provider)
+          .buildChatModel(
+              Mockito.eq(config), Mockito.eq(0.0), Mockito.isNull(), Mockito.eq(expected));
+      Mockito.verify(model)
+          .chat(
+              Mockito.argThat(
+                  (List<ChatMessage> messages) ->
+                      expected.equals(LangChainChatMessages.content(messages.getFirst()))));
+      Mockito.verify(files).getFileContent(change, ".gerrit/skills/review-common/SKILL.md");
+      Mockito.verify(files).getFileContent(change, ".gerrit/skills/review-routing/SKILL.md");
+      Mockito.verifyNoMoreInteractions(files);
+    }
+  }
+
   private static final Path TEST_RESOURCES_PATH = TestResourceLoader.getTestResourcePath();
   private static final String ROUTER_HISTORY_PROMPT_RESOURCE =
       "__files/langchain/routerAiDataPromptWithHistory.json";

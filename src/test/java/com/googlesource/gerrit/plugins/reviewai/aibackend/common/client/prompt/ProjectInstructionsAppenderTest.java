@@ -24,6 +24,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -58,6 +59,8 @@ import org.junit.Test;
 
 public class ProjectInstructionsAppenderTest {
   private static final String SKILL_PATH = ".gerrit/skills/code-review/SKILL.md";
+  private static final String COMMON_PATH = ".gerrit/skills/review-common/SKILL.md";
+  private static final String BOUNDARIES_PATH = ".gerrit/skills/specialist-boundaries/SKILL.md";
   private final GitRepoFiles files = mock(GitRepoFiles.class);
   private final GerritChange change = mock(GerritChange.class);
   private final ProjectInstructionsAppender appender = new ProjectInstructionsAppender(files);
@@ -94,6 +97,7 @@ public class ProjectInstructionsAppenderTest {
     assertFalse(actual.contains("description:"));
     assertEquals(bundledInstructions, prompt.getDefaultAiAssistantInstructions());
     verify(files).getFileContent(change, SKILL_PATH);
+    verify(files).getFileContent(change, COMMON_PATH);
     verifyNoMoreInteractions(files);
   }
 
@@ -186,6 +190,8 @@ public class ProjectInstructionsAppenderTest {
       verify(files).getFileContent(change, path);
     }
     assertEquals(routing, SpecializedReviewAgentDefinitions.triageAgentList());
+    verify(files, times(specialistGuidance.size())).getFileContent(change, COMMON_PATH);
+    verify(files, times(specialistGuidance.size())).getFileContent(change, BOUNDARIES_PATH);
     verifyNoMoreInteractions(files);
   }
 
@@ -208,6 +214,8 @@ public class ProjectInstructionsAppenderTest {
     verify(files).getFileContent(change, ".gerrit/skills/security/SKILL.md");
     verify(files).getFileContent(change, ".gerrit/skills/testability/SKILL.md");
     verify(files).getFileContent(change, SKILL_PATH);
+    verify(files, times(3)).getFileContent(change, COMMON_PATH);
+    verify(files, times(2)).getFileContent(change, BOUNDARIES_PATH);
     verifyNoMoreInteractions(files);
   }
 
@@ -265,18 +273,23 @@ public class ProjectInstructionsAppenderTest {
             .endsWith(
                 specialistGuidance.getAsJsonObject("code-quality").get("guidance").getAsString()));
     verify(files).getFileContent(change, path);
+    verify(files).getFileContent(change, COMMON_PATH);
+    verify(files).getFileContent(change, BOUNDARIES_PATH);
     verifyNoMoreInteractions(files);
   }
 
   @Test
-  public void commitMessageAndUnknownSpecialistsDoNotReadCustomSettings() {
+  public void unknownSpecialistsDoNotReadUnregisteredSettings() throws Exception {
     for (String name :
         Arrays.asList(null, "COMMIT_MESSAGE", "UNKNOWN", "../security", "code-review")) {
       assertSame(
           bundledInstructions,
           appender.append(specialistPrompt(name), change, bundledInstructions));
     }
-    verifyNoInteractions(files);
+    verify(files, times(5)).getFileContent(change, COMMON_PATH);
+    verify(files, times(5)).getFileContent(change, BOUNDARIES_PATH);
+    verify(files).getFileContent(change, ".gerrit/skills/commit-message-review/SKILL.md");
+    verifyNoMoreInteractions(files);
   }
 
   @Test
@@ -289,7 +302,7 @@ public class ProjectInstructionsAppenderTest {
   }
 
   @Test
-  public void otherReviewStagesDoNotLoadCodeReviewGuidance() {
+  public void promptsWithoutDeclaredSkillsDoNotLoadGuidance() {
     for (IAiPrompt other :
         List.of(
             mock(AiPromptSuggest.class),
