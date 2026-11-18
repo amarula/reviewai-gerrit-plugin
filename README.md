@@ -170,6 +170,7 @@ Administrator roles.
 - [Review Agent Architecture](docs/architecture/review-agents.md)
 - [AI Request Coordination](docs/architecture/request-coordination.md)
 - [Configuration](docs/configuration.md)
+- [Custom Skills](docs/custom-skills.md)
 - [Command Reference](docs/commands.md)
 - [Development and Debugging](docs/development.md)
 - [Telemetry](docs/telemetry.md)
