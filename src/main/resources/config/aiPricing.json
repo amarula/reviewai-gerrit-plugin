@@ -1,7 +1,7 @@
 {
   "currency": "USD",
   "unit": "perMillionTokens",
-  "verifiedOn": "2026-10-27",
+  "verifiedOn": "2026-11-18",
   "sources": {
     "OpenAI": "https://developers.openai.com/api/docs/pricing",
     "Gemini": "https://ai.google.dev/gemini-api/docs/pricing",
@@ -9,6 +9,32 @@
     "MoonShot": "https://platform.kimi.ai/docs/pricing"
   },
   "models": [
+    {
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "input": 8,
+      "cachedInput": 0.4,
+      "cacheWrite": 10,
+      "output": 40,
+      "longThreshold": 272000,
+      "longInput": 16,
+      "longCachedInput": 0.8,
+      "longCacheWrite": 20,
+      "longOutput": 60
+    },
+    {
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "input": 2,
+      "cachedInput": 0.1,
+      "cacheWrite": 2.5,
+      "output": 10,
+      "longThreshold": 272000,
+      "longInput": 4,
+      "longCachedInput": 0.2,
+      "longCacheWrite": 5,
+      "longOutput": 15
+    },
     {
       "provider": "OpenAI",
       "model": "gpt-6-astra",

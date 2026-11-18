@@ -30,18 +30,18 @@ import org.junit.Test;
 public class AiCostCalculatorTest {
   @Test
   public void calculatesOpenAiCachedInputAndOutputInNanoUsd() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-terra");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.2-astra");
     TokenUsage usage = new DetailedTokenUsage(12000, 500, 12500, 8000, null);
 
-    assertEquals(6_900_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
+    assertEquals(55_200_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
   }
 
   @Test
   public void calculatesOpenAiCacheWritesOnlyWhenReported() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-terra");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.2-sol");
     TokenUsage usage = new DetailedTokenUsage(12000, 500, 12500, 8000, 1000);
 
-    assertEquals(7_150_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
+    assertEquals(14_300_000L, AiCostCalculator.calculateNanoUsd(pricing, usage).orElseThrow());
   }
 
   @Test
@@ -61,14 +61,28 @@ public class AiCostCalculatorTest {
 
   @Test
   public void switchesToLongContextPricingAboveThreshold() {
-    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.1-terra");
+    ModelPricing pricing = pricing(AiProviderType.OPENAI, "gpt-6.2-astra");
 
     assertEquals(
-        272_000_000L,
+        2_176_000_000L,
         AiCostCalculator.calculateNanoUsd(pricing, new TokenUsage(272000, 0)).orElseThrow());
     assertEquals(
-        544_002_000L,
+        4_352_016_000L,
         AiCostCalculator.calculateNanoUsd(pricing, new TokenUsage(272001, 0)).orElseThrow());
+  }
+
+  @Test
+  public void calculatesGpt62LongContextCachedInputWritesAndOutput() {
+    TokenUsage usage = new DetailedTokenUsage(272001, 500, 272501, 8000, 1000);
+
+    assertEquals(
+        4_264_416_000L,
+        AiCostCalculator.calculateNanoUsd(pricing(AiProviderType.OPENAI, "gpt-6.2-astra"), usage)
+            .orElseThrow());
+    assertEquals(
+        1_066_104_000L,
+        AiCostCalculator.calculateNanoUsd(pricing(AiProviderType.OPENAI, "gpt-6.2-sol"), usage)
+            .orElseThrow());
   }
 
   @Test
@@ -121,6 +135,8 @@ public class AiCostCalculatorTest {
             route(AiProviderType.OPENAI, "gpt-6-astra"),
             route(AiProviderType.OPENAI, "gpt-6.1-sol"),
             route(AiProviderType.OPENAI, "gpt-6.1-terra"),
+            route(AiProviderType.OPENAI, "gpt-6.2-astra"),
+            route(AiProviderType.OPENAI, "gpt-6.2-sol"),
             route(AiProviderType.OPENAI, "gpt-6-sol"),
             route(AiProviderType.OPENAI, "gpt-6-luna"),
             route(AiProviderType.OPENAI, "gpt-5.6-sol"),

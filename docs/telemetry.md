@@ -234,8 +234,12 @@ The built-in prices are USD per one million tokens and were verified on 2026-10-
 [Moonshot](https://platform.kimi.ai/docs/pricing) documentation. Administrators can override them without rebuilding the
 plugin, as described below.
 
+GPT-6.2 Astra and Sol prices were verified on 2026-11-18 against the OpenAI documentation.
+
 | Provider/model                                         | Input | Cached input | Cache write | Output | Long-context input / cached / write / output |
 |--------------------------------------------------------|------:|-------------:|------------:|-------:|----------------------------------------------|
+| `OpenAI/gpt-6.2-astra`                                 |  8.00 |         0.40 |       10.00 |  40.00 | 16.00 / 0.80 / 20.00 / 60.00 above 272K      |
+| `OpenAI/gpt-6.2-sol`                                   |  2.00 |         0.10 |        2.50 |  10.00 | 4.00 / 0.20 / 5.00 / 15.00 above 272K        |
 | `OpenAI/gpt-6-astra`                                   | 10.00 |         1.00 |       12.50 |  50.00 | 20.00 / 2.00 / 25.00 / 75.00 above 272K      |
 | `OpenAI/gpt-6.1-sol`                                   |  2.00 |         0.10 |        2.50 |  10.00 | 4.00 / 0.20 / 5.00 / 15.00 above 272K        |
 | `OpenAI/gpt-6.1-terra`                                 |  1.00 |         0.05 |        1.25 |   5.00 | 2.00 / 0.10 / 2.50 / 7.50 above 272K         |
