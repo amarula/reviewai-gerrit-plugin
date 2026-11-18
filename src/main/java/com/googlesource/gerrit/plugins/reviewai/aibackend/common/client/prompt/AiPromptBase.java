@@ -38,7 +38,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
 
   protected final ChangeSetData changeSetData;
   protected final GerritChange change;
-  protected String defaultAiMessageReview;
 
   private final ICodeContextPolicy codeContextPolicy;
   private final List<String> stageSkillNames;
@@ -63,8 +62,6 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
     this.codeContextPolicy = codeContextPolicy;
     this.stageSkillNames = List.of(stageSkillNames);
     this.isCommentEvent = change.getIsCommentEvent();
-    this.defaultAiMessageReview =
-        ReviewAgentSkills.resource("review-common", "assets/request.md").strip();
     log.debug("Initialized AiPromptBase with change ID: {}", change.getFullChangeId());
   }
 
@@ -112,7 +109,7 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
   }
 
   public String getDefaultAiMessageReview() {
-    return ReviewAgentSkills.resource("review-common", "assets/request.md").strip();
+    return requestTemplate("review-common");
   }
 
   // ---- Abstract and instance methods ----
@@ -169,7 +166,7 @@ public abstract class AiPromptBase extends AiPrompt implements IAiPrompt {
       log.debug("Request User Prompt retrieved: {}", aiRequestDataPrompt);
       return aiRequestDataPrompt;
     } else {
-      String defaultMessage = String.format(defaultAiMessageReview, patchSet);
+      String defaultMessage = String.format(getDefaultAiMessageReview(), patchSet);
       log.debug("Default Thread Review Message used: {}", defaultMessage);
       return defaultMessage;
     }

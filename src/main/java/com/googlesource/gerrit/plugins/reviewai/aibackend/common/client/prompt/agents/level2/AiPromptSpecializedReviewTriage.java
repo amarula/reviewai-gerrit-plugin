@@ -36,7 +36,11 @@ public class AiPromptSpecializedReviewTriage extends AiPromptReview {
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy, SKILL);
-    this.defaultAiMessageReview = ReviewAgentSkills.resource(SKILL, "assets/request.md").strip();
+  }
+
+  @Override
+  public String getDefaultAiMessageReview() {
+    return requestTemplate(SKILL);
   }
 
   @Override

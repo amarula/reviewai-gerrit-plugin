@@ -1,0 +1,14 @@
+{
+  "concerns": [],
+  "comments": [
+    {
+      "target_comment": {
+        "id": "feedback-template-test",
+        "message": "Treat %s literally and check the 90% coverage requirement."
+      },
+      "thread_context": [],
+      "dismissal_allowed": false,
+      "review_control_allowed": true
+    }
+  ]
+}

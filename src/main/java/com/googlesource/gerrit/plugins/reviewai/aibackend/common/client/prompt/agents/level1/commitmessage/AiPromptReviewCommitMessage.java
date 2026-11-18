@@ -38,7 +38,6 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
       GerritChange change,
       ICodeContextPolicy codeContextPolicy) {
     super(config, changeSetData, change, codeContextPolicy, "commit-message-review");
-    this.defaultAiMessageReview = getDefaultAiMessageReview();
     log.debug("Initialized AiPromptReviewCommitMessage for project: {}", change.getProjectName());
   }
 
@@ -53,7 +52,7 @@ public class AiPromptReviewCommitMessage extends AiPromptReview implements IAiPr
 
   @Override
   public String getDefaultAiMessageReview() {
-    return ReviewAgentSkills.resource("commit-message-review", "assets/request.md").strip();
+    return requestTemplate("commit-message-review");
   }
 
   @Override

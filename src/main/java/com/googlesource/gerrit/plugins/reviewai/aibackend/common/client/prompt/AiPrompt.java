@@ -21,6 +21,7 @@ import static com.googlesource.gerrit.plugins.reviewai.utils.TextUtils.*;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ReviewAgentSkills;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.gerrit.GerritPermittedVotingRange;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
+import com.googlesource.gerrit.plugins.reviewai.interfaces.aibackend.common.client.prompt.RequestTemplateResolver;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.Setter;
@@ -61,6 +62,7 @@ public class AiPrompt {
   // ---- Reply-field descriptions ----
 
   private Map<String, String> repliesAttributes;
+  private RequestTemplateResolver requestTemplateResolver = (skill, bundled) -> bundled;
 
   protected final Configuration config;
 
@@ -69,6 +71,17 @@ public class AiPrompt {
   public AiPrompt(Configuration config) {
     this.config = config;
     log.debug("AiPrompt initialized.");
+  }
+
+  /** Resolves the request template belonging to the named skill. */
+  protected String requestTemplate(String skill) {
+    return requestTemplateResolver.resolve(
+        skill, ReviewAgentSkills.resource(skill, "assets/request.md").strip());
+  }
+
+  /** Sets the project resolver used when this prompt loads a request template. */
+  public void setRequestTemplateResolver(RequestTemplateResolver resolver) {
+    this.requestTemplateResolver = resolver;
   }
 
   protected static String commonSection(String title) {

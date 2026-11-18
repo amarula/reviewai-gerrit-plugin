@@ -98,8 +98,7 @@ public final class AiPromptConcernReview extends AiPromptBase {
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
-        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
-        getGson().toJson(changeSetData.getConcernWorkflowInput()));
+        requestTemplate(SKILL), getGson().toJson(changeSetData.getConcernWorkflowInput()));
   }
 
   @Override

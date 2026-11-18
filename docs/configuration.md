@@ -136,9 +136,57 @@ description: Custom specialist selection settings for this project.
 Consider tenant isolation when deciding whether a security specialist is needed.
 ```
 
-Guidance is additive. Output schemas, field definitions, agent catalogs, and template placeholders
-continue to come from the plugin. Files such as `assets/request.md` are not overridden.
+Skill guidance is additive. Output schemas, field definitions, and agent catalogs continue to come
+from the plugin. The supported request templates can be replaced as described below; other skill assets
+remain bundled.
 The existing `.gerrit/ai-instructions.md` behavior for comment request prompts is unchanged.
+
+### Custom Request Templates
+
+Custom user request templates can replace these bundled Markdown files. Each path below is relative
+to `.gerrit/skills/` and must be committed to the change's target branch:
+
+| Custom file | Value inserted at `%s` |
+| --- | --- |
+| `review-common/assets/request.md` | Patch set for common review requests |
+| `commit-message-review/assets/request.md` | Commit message for scoped and specialist commit-message reviews |
+| `review-feedback/assets/request.md` | Classification input JSON, including comments, concerns, and current feedback memory |
+| `concern-review/assets/request.md` | Concern reassessment input JSON |
+| `new-issue-finder/assets/request.md` | New-issue search input JSON |
+| `review-routing/assets/request.md` | Latest review-agent request text |
+| `review-suggestions/assets/request.md` | Patch set with negative review replies |
+| `review-triage/assets/request.md` | Patch set for specialist selection |
+| `specialist-boundaries/assets/request.md` | Full patch set for the selected patch-set specialist |
+| `review-consolidation/assets/request.md` | Specialist findings to consolidate |
+| `review-historical-repetition/assets/request.md` | New concerns to check against historical findings |
+| `review-conflict-resolution/assets/request.md` | Consolidated findings whose conflicts need resolution |
+| `review-verification/assets/request.md` | Conflict-resolved findings for final verification |
+
+To replace the default patch-set request with custom user settings, commit
+`.gerrit/skills/review-common/assets/request.md` to the change's target branch:
+
+```markdown
+Review this patch using our project conventions. Coverage target: 90%%.
+
+Patch set:
+%s
+```
+
+This is a plain Markdown template, without YAML front matter. It must contain exactly one `%s`,
+which receives the value listed above. Write literal percent signs as `%%`. Other format specifiers,
+including indexed placeholders such as `%1$s`, are unsupported. Missing, empty, or invalid templates
+fall back to the bundled request; invalid templates produce a warning in the plugin log.
+
+The common override applies only when a prompt uses the common request template, including single-agent
+and scoped code reviews, and chat prompts with no explicit user request. Scoped reviews still remove
+commit-message content before inserting the patch set. Each stage reads only its own request
+template: a common override does not replace the feedback, commit-message, or other stage request.
+Explicit user messages and retry prompts retain their existing behavior. System instructions,
+response schemas, and Markdown assets other than the listed request templates are unaffected.
+
+The files are read from the target branch when constructing the request, using the same lookup as
+project skill guidance. They do not require a custom `SKILL.md`. Unmerged patch set
+edits do not affect the request, and project templates are not stored in the bundled-skill cache.
 
 ### AI Review Permission
 

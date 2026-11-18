@@ -92,7 +92,7 @@ public class LangChainClientTest {
 
   @Test
   public void singleAgentReviewSendsSkillGuidanceAndParsesReviewResponse() throws Exception {
-    assertSingleAgentReviewSendsGuidance(null, null);
+    assertSingleAgentReviewSendsGuidance(null, null, null);
   }
 
   @Test
@@ -103,7 +103,21 @@ public class LangChainClientTest {
         .thenReturn(readTestResource("__files/skills/project/code-review.md"));
 
     assertSingleAgentReviewSendsGuidance(
-        files, readTestResource("__files/skills/project/guidance.md").strip());
+        files, readTestResource("__files/skills/project/guidance.md").strip(), null);
+  }
+
+  @Test
+  public void singleAgentReviewSendsCustomUserRequestTemplateAndParsesReviewResponse()
+      throws Exception {
+    GitRepoFiles files = Mockito.mock(GitRepoFiles.class);
+    String template = readTestResource("__files/skills/project/request-template.md").strip();
+    when(files.getFileContent(
+            Mockito.any(GerritChange.class),
+            Mockito.eq(".gerrit/skills/review-common/assets/request.md")))
+        .thenReturn(template);
+
+    assertSingleAgentReviewSendsGuidance(
+        files, null, template.formatted(readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE)));
   }
 
   @Test
@@ -121,6 +135,12 @@ public class LangChainClientTest {
     GerritChange change = Mockito.mock(GerritChange.class);
     when(files.getFileContent(change, ".gerrit/skills/security/SKILL.md"))
         .thenReturn(readTestResource("__files/skills/project/security.md"));
+    String template =
+        readTestResource("__files/skills/project/pipeline-request-template.md")
+            .replace("SKILL_NAME", "specialist-boundaries")
+            .strip();
+    when(files.getFileContent(change, ".gerrit/skills/specialist-boundaries/assets/request.md"))
+        .thenReturn(template);
     var definition = SpecializedReviewAgentDefinitions.findByName("SECURITY").orElseThrow();
     ChangeSetData data = new ChangeSetData(1);
     data.setReviewAssistantStage(ReviewAssistantStage.REVIEW_SPECIALIZED_AGENT);
@@ -159,6 +179,11 @@ public class LangChainClientTest {
       verify(files).getFileContent(change, ".gerrit/skills/security/SKILL.md");
       verify(files).getFileContent(change, ".gerrit/skills/review-common/SKILL.md");
       verify(files).getFileContent(change, ".gerrit/skills/specialist-boundaries/SKILL.md");
+      verify(files)
+          .getFileContent(change, ".gerrit/skills/specialist-boundaries/assets/request.md");
+      assertEquals(
+          template.formatted(readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE)),
+          LangChainChatMessages.content(request.getValue().messages().getLast()));
       Mockito.verifyNoMoreInteractions(files);
     }
   }
@@ -185,6 +210,12 @@ public class LangChainClientTest {
           .thenReturn(
               readTestResource("__files/skills/project/pipeline-skill.md")
                   .replace("SKILL_NAME", skill));
+      String template =
+          readTestResource("__files/skills/project/pipeline-request-template.md")
+              .replace("SKILL_NAME", skill)
+              .strip();
+      when(files.getFileContent(change, ".gerrit/skills/" + skill + "/assets/request.md"))
+          .thenReturn(template);
       ChangeSetData data = new ChangeSetData(1);
       data.setReviewAssistantStage(
           ReviewAssistantStage.valueOf(testCase.get("stage").getAsString()));
@@ -225,12 +256,15 @@ public class LangChainClientTest {
         assertEquals(
             testCase.get("schema").getAsString(),
             request.getValue().responseFormat().jsonSchema().name());
+        assertEquals(
+            template.formatted(readTestResource(GERRIT_FORMATTED_PATCH_RESOURCE)),
+            LangChainChatMessages.content(request.getValue().messages().getLast()));
       }
     }
   }
 
-  private void assertSingleAgentReviewSendsGuidance(GitRepoFiles files, String projectGuidance)
-      throws Exception {
+  private void assertSingleAgentReviewSendsGuidance(
+      GitRepoFiles files, String projectGuidance, String expectedUserMessage) throws Exception {
     Configuration config = Mockito.mock(Configuration.class);
     when(config.getAgentSpecializationLevel()).thenReturn(AgentSpecializationLevel.SINGLE_AGENT);
     when(config.getCodeContextPolicy()).thenReturn(CodeContextPolicies.NONE);
@@ -273,6 +307,11 @@ public class LangChainClientTest {
       assertFalse(systemInstructions.contains("description:"));
       if (projectGuidance != null) {
         assertTrue(systemInstructions.endsWith(projectGuidance));
+      }
+      if (expectedUserMessage != null) {
+        assertEquals(
+            expectedUserMessage,
+            LangChainChatMessages.content(request.getValue().messages().getLast()));
       }
       assertEquals("format_replies", request.getValue().responseFormat().jsonSchema().name());
       assertTrue(

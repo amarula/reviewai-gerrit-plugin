@@ -83,6 +83,16 @@ public class LangChainMultiAgentReviewClientTest {
     when(config.getAiProviderType()).thenReturn(AiProviderType.OLLAMA);
     GitRepoFiles files = mock(GitRepoFiles.class);
     GerritChange change = mock(GerritChange.class);
+    String template =
+        readTestResource("__files/skills/project/pipeline-request-template.md")
+            .replace("SKILL_NAME", "review-routing")
+            .strip();
+    when(files.getFileContent(change, ".gerrit/skills/review-routing/assets/request.md"))
+        .thenReturn(template);
+    ChangeSetData data = new ChangeSetData(1);
+    String requestData = readTestResource("__files/skills/project/guidance.md");
+    data.setAiDataPrompt(requestData);
+    String expectedRequest = template.formatted(requestData);
     when(files.getFileContent(change, ".gerrit/skills/review-routing/SKILL.md"))
         .thenReturn(
             readTestResource("__files/skills/project/pipeline-skill.md")
@@ -118,9 +128,7 @@ public class LangChainMultiAgentReviewClientTest {
           .when(() -> LangChainProviderFactory.get(AiProviderType.OLLAMA))
           .thenReturn(provider);
 
-      assertEquals(
-          ReviewAssistantStage.REVIEW_COMMIT_MESSAGE,
-          client.routeMessage(new ChangeSetData(1), change));
+      assertEquals(ReviewAssistantStage.REVIEW_COMMIT_MESSAGE, client.routeMessage(data, change));
 
       Mockito.verify(provider)
           .buildChatModel(
@@ -129,9 +137,13 @@ public class LangChainMultiAgentReviewClientTest {
           .chat(
               Mockito.argThat(
                   (List<ChatMessage> messages) ->
-                      expected.equals(LangChainChatMessages.content(messages.getFirst()))));
+                      expected.equals(LangChainChatMessages.content(messages.getFirst()))
+                          && expectedRequest.equals(
+                              LangChainChatMessages.content(messages.getLast()))));
       Mockito.verify(files).getFileContent(change, ".gerrit/skills/review-common/SKILL.md");
       Mockito.verify(files).getFileContent(change, ".gerrit/skills/review-routing/SKILL.md");
+      Mockito.verify(files)
+          .getFileContent(change, ".gerrit/skills/review-routing/assets/request.md");
       Mockito.verifyNoMoreInteractions(files);
     }
   }

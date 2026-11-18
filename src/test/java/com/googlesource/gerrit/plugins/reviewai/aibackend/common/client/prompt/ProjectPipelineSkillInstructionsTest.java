@@ -16,6 +16,7 @@
 
 package com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt;
 
+import static com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerrit.GerritClientPatchSetHelper.filterPatchWithoutCommitMessage;
 import static com.googlesource.gerrit.plugins.reviewai.utils.GsonUtils.getGson;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -23,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -33,10 +35,12 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.gerr
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.api.git.GitRepoFiles;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level2.SpecializedReviewAgentDefinitions;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectRequestTemplate;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ReviewAssistantStage;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernReviewerId;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ConcernWorkflowInput;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewFeedbackClassificationInput;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.review.ReviewerConcerns;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration;
 import com.googlesource.gerrit.plugins.reviewai.config.Configuration.AgentSpecializationLevel;
@@ -80,6 +84,7 @@ public class ProjectPipelineSkillInstructionsTest {
   private String original;
   private String request;
   private String patch;
+  private String requestArgument;
 
   @Before
   public void setUp() throws Exception {
@@ -100,6 +105,7 @@ public class ProjectPipelineSkillInstructionsTest {
       router = new AiPromptReviewAgentRouter(config);
       original = router.getDefaultAiAssistantInstructions();
       request = router.getDefaultAiThreadReviewMessage(patch);
+      requestArgument = patch;
       return;
     }
     when(change.getIsCommentEvent()).thenReturn(flag("comment"));
@@ -110,6 +116,10 @@ public class ProjectPipelineSkillInstructionsTest {
     data.setForcedStagedReview(flag("staged"));
     data.setSuggestMode(flag("suggest"));
     data.setSpecializedAgentReview(flag("specialized"));
+    data.setReviewFeedbackClassificationInput(
+        getGson()
+            .fromJson(
+                resource("request-feedback-input.json"), ReviewFeedbackClassificationInput.class));
     if (testCase.has("specialist")) {
       var definition =
           SpecializedReviewAgentDefinitions.findByName(testCase.get("specialist").getAsString())
@@ -127,6 +137,86 @@ public class ProjectPipelineSkillInstructionsTest {
     assertEquals(skills, prompt.getProjectSkillNames());
     original = prompt.getDefaultAiAssistantInstructions();
     request = prompt.getDefaultAiThreadReviewMessage(patch);
+    requestArgument =
+        switch (scenario) {
+          case "scoped-code" -> filterPatchWithoutCommitMessage(change, patch);
+          case "feedback" -> getGson().toJson(data.getReviewFeedbackClassificationInput());
+          default ->
+              testCase.has("reviewer") ? getGson().toJson(data.getConcernWorkflowInput()) : patch;
+        };
+  }
+
+  @Test
+  public void customRequestTemplatesApplyOnlyToPromptsThatUseThem() throws Exception {
+    for (var item : scenarios()) {
+      var other = (JsonObject) item[1];
+      if (!other.get("request_skill").isJsonNull()) {
+        String skill = other.get("request_skill").getAsString();
+        when(files.getFileContent(change, requestPath(skill))).thenReturn(requestTemplate(skill));
+      }
+    }
+    configureRequestTemplate();
+
+    String skill = requestSkill();
+    String expected = skill == null ? request : requestTemplate(skill).formatted(requestArgument);
+    assertEquals(expected, renderRequest());
+    verifyOnlyRequestTemplate();
+  }
+
+  @Test
+  public void invalidAndMissingRequestTemplatesPreserveBundledRequests() throws Exception {
+    configureRequestTemplate();
+    assertEquals(request, renderRequest());
+    String skill = requestSkill();
+    if (skill != null) {
+      String invalid =
+          JsonParser.parseString(resource("invalid-request-templates.json"))
+              .getAsJsonObject()
+              .get("numeric argument")
+              .getAsString();
+      when(files.getFileContent(change, requestPath(skill))).thenReturn(invalid);
+      assertEquals(request, renderRequest());
+      when(files.getFileContent(change, requestPath(skill))).thenThrow(new FileNotFoundException());
+      assertEquals(request, renderRequest());
+    }
+  }
+
+  private void configureRequestTemplate() {
+    var templates = new ProjectRequestTemplate(files);
+    if (router == null) {
+      templates.configure(prompt, change);
+    } else {
+      templates.configureRouting(router, change);
+    }
+  }
+
+  private String requestSkill() {
+    return testCase.get("request_skill").isJsonNull()
+        ? null
+        : testCase.get("request_skill").getAsString();
+  }
+
+  private String requestPath(String skill) {
+    return ".gerrit/skills/" + skill + "/assets/request.md";
+  }
+
+  private String requestTemplate(String skill) throws Exception {
+    return resource("pipeline-request-template.md").replace("SKILL_NAME", skill).strip();
+  }
+
+  private String renderRequest() {
+    return router == null
+        ? prompt.getDefaultAiThreadReviewMessage(patch)
+        : router.getDefaultAiThreadReviewMessage(patch);
+  }
+
+  private void verifyOnlyRequestTemplate() throws Exception {
+    if (requestSkill() == null) {
+      verifyNoInteractions(files);
+    } else {
+      verify(files).getFileContent(change, requestPath(requestSkill()));
+      verifyNoMoreInteractions(files);
+    }
   }
 
   @Test

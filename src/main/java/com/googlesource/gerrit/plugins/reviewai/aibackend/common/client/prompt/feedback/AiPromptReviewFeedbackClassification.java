@@ -56,7 +56,7 @@ public final class AiPromptReviewFeedbackClassification extends AiPromptBase {
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
     return String.format(
-        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
+        requestTemplate(SKILL),
         getGson().toJson(changeSetData.getReviewFeedbackClassificationInput()));
   }
 

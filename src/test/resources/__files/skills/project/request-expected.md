@@ -1,0 +1,9 @@
+Review using project conventions. Coverage target: 90%.
+
+Patch follows:
+diff --git a/example.txt b/example.txt
+--- a/example.txt
++++ b/example.txt
+@@ -1 +1 @@
+-Progress: 50%
++Progress: %s (100%)

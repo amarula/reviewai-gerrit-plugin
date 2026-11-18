@@ -38,7 +38,11 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
       String skill) {
     super(config, changeSetData, change, codeContextPolicy, skill);
     this.skill = skill;
-    this.defaultAiMessageReview = getCollectorMessage();
+  }
+
+  @Override
+  public String getDefaultAiMessageReview() {
+    return getCollectorMessage();
   }
 
   @Override
@@ -64,6 +68,6 @@ public abstract class AiPromptSpecializedReviewCollector extends AiPromptReview 
   }
 
   protected String getCollectorMessage() {
-    return ReviewAgentSkills.resource(skill, "assets/request.md").strip();
+    return requestTemplate(skill);
   }
 }

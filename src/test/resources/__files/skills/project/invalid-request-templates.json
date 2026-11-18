@@ -1,0 +1,19 @@
+{
+  "empty": "",
+  "blank": " \n\t",
+  "missing patch set": "Review the code.",
+  "escaped placeholder only": "Patch: %%s",
+  "multiple arguments": "Review %s and %s",
+  "trailing percent": "Review %s; coverage: 90%",
+  "unescaped percent": "Coverage: 90%. Review %s",
+  "numeric argument": "Review %d",
+  "discarded argument": "Review %b",
+  "precision truncates patch set": "Review %.10s",
+  "width": "Review %20s",
+  "indexed argument": "Review %1$s",
+  "nonexistent argument": "Review %2$s",
+  "relative argument": "Review %s and %<s",
+  "newline conversion": "Review %s%n",
+  "date conversion": "Review %tF",
+  "unsupported conversion": "Review %q"
+}

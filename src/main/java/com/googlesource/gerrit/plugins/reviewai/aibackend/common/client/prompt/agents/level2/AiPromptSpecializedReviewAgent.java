@@ -149,6 +149,6 @@ public class AiPromptSpecializedReviewAgent extends AiPromptReviewCommitMessage 
     if (changeSetData.getSpecializedAgentName() == null) {
       return super.getDefaultAiThreadReviewMessage(patchSet);
     }
-    return String.format(ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(), patchSet);
+    return String.format(requestTemplate(SKILL), patchSet);
   }
 }

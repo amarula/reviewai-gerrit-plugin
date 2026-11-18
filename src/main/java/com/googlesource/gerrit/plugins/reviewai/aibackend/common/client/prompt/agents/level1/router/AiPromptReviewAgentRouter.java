@@ -32,8 +32,6 @@ public class AiPromptReviewAgentRouter extends AiPrompt {
   }
 
   public String getDefaultAiThreadReviewMessage(String requestData) {
-    return String.format(
-        ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(),
-        requestData == null ? "" : requestData);
+    return String.format(requestTemplate(SKILL), requestData == null ? "" : requestData);
   }
 }

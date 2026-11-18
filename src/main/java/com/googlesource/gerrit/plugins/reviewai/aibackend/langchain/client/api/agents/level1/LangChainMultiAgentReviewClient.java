@@ -30,6 +30,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.A
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistoryMessageFilter;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructionsAppender;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.agents.level1.router.AiPromptReviewAgentRouter;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectRequestTemplate;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -430,6 +431,7 @@ public class LangChainMultiAgentReviewClient extends LangChainClient implements 
     boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
     ChatMemory memory = buildTransientMemory(routerMemoryId);
     AiPromptReviewAgentRouter routerPrompt = new AiPromptReviewAgentRouter(config);
+    new ProjectRequestTemplate(gitRepoFiles).configureRouting(routerPrompt, change);
     String routerInstructions =
         new ProjectInstructionsAppender(gitRepoFiles)
             .appendRouting(change, routerPrompt.getDefaultAiAssistantInstructions());

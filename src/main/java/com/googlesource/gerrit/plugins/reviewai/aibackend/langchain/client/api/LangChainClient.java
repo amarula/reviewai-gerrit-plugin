@@ -32,6 +32,7 @@ import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.commands
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiHistory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.AiPromptFactory;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.ProjectInstructionsAppender;
+import com.googlesource.gerrit.plugins.reviewai.aibackend.common.client.prompt.skills.ProjectRequestTemplate;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.api.ai.AiResponseContent;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.ChangeSetData;
 import com.googlesource.gerrit.plugins.reviewai.aibackend.common.model.data.GerritClientData;
@@ -559,6 +560,7 @@ public class LangChainClient extends AiClientBase implements IAiClient {
     try {
       boolean useOpenAiResponses = shouldUseOpenAiResponses(providerType);
       var prompt = AiPromptFactory.getAiPrompt(config, changeSetData, change, codeContextPolicy);
+      new ProjectRequestTemplate(gitRepoFiles).configure(prompt, change);
       String systemInstructions =
           projectInstructionsAppender.append(
               prompt, change, prompt.getDefaultAiAssistantInstructions());

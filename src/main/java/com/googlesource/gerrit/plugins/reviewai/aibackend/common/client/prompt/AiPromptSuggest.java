@@ -83,6 +83,6 @@ public class AiPromptSuggest extends AiPromptReview {
 
   @Override
   public String getDefaultAiThreadReviewMessage(String patchSet) {
-    return String.format(ReviewAgentSkills.resource(SKILL, "assets/request.md").strip(), patchSet);
+    return String.format(requestTemplate(SKILL), patchSet);
   }
 }
